@@ -6,6 +6,7 @@ import { Bubble } from "@/components/MessageBubble";
 import { TaskCard } from "@/components/TaskCard";
 import { GroupedTasks } from "@/components/GroupedTasks";
 import { GroupedByProject } from "@/components/GroupedByProject";
+import { GroupedByDay } from "@/components/GroupedByDay";
 import { Toasts, type Toast } from "@/components/Toast";
 import type { AssistantId } from "@/assistants/types";
 
@@ -37,17 +38,16 @@ export default function Home(){
     setToasts(ts => ts.filter(t=>t.id !== id));
   },[]);
 
-  // ostatni snapshot zadań – używany do operacji „jak ChatGPT”
   const lastTasks = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       const m = messages[i];
       if (Array.isArray(m.toolResult)) return m.toolResult as any[];
       if (m.toolResult?.groups && m.toolResult?.tasks) return m.toolResult.tasks as any[];
+      if (m.toolResult?.tasks && m.toolResult?.week) return m.toolResult.tasks as any[];
     }
     return [] as any[];
   }, [messages]);
 
-  // usuń task z danej wiadomości po akcji (optymistycznie)
   const removeTaskFromMessage = useCallback((msgIndex: number, taskId: string)=>{
     setMessages(prev => {
       const copy = [...prev];
@@ -58,14 +58,17 @@ export default function Home(){
       if (Array.isArray(tr)) {
         m.toolResult = tr.filter((t:any)=> String(t.id) !== String(taskId));
       } else if (tr?.tasks && tr?.groups) {
-        // wersja grupowana przez LLM
         m.toolResult = {
           ...tr,
           tasks: tr.tasks.filter((t:any)=> String(t.id) !== String(taskId)),
           groups: tr.groups.map((g:any)=> ({...g, task_ids: g.task_ids.filter((id:string)=> String(id)!==String(taskId))})),
         };
       } else if (tr?.groupByProject && tr?.tasks) {
-        // lokalne grupowanie wg projektu
+        m.toolResult = {
+          ...tr,
+          tasks: tr.tasks.filter((t:any)=> String(t.id) !== String(taskId)),
+        };
+      } else if (tr?.week && tr?.tasks) {
         m.toolResult = {
           ...tr,
           tasks: tr.tasks.filter((t:any)=> String(t.id) !== String(taskId)),
@@ -130,8 +133,6 @@ export default function Home(){
 
         <div className="flex gap-2 items-center">
           <AssistantSelector value={assistant} onChange={setAssistant} />
-
-          {/* Przycisk Todoist tylko dla asystenta 'todoist' */}
           {assistant === 'todoist' && (
             <>
               <button className="btn bg-accent text-white" onClick={connectTodoist} disabled={!userId || connectingTodoist}>
@@ -147,10 +148,10 @@ export default function Home(){
       <div className="flex flex-wrap gap-2">
         {assistant === 'todoist' && (
           <>
-            <button className="btn bg-ink text-white text-sm" onClick={()=>sendMsg("daj taski na dzisiaj")}>daj taski na dzisiaj</button>
-            <button className="btn bg-ink text-white text-sm" onClick={()=>sendMsg("daj przeterminowane")}>daj przeterminowane</button>
-            <button className="btn bg-white text-sm" onClick={()=> setMessages(m=>[...m,{ role:"assistant", content:"Grupuję wg projektów…", toolResult:{ groupByProject:true, tasks:lastTasks } }])}>grupuj wg projektu</button>
-            <button className="btn bg-white text-sm" onClick={()=>sendMsg("zaproponuj kolejność")}>zaproponuj kolejność</button>
+            <button className="btn bg-ink text-white text-sm" onClick={()=>sendMsg("daj taski na dzisiaj")}>dzisiaj</button>
+            <button className="btn bg-ink text-white text-sm" onClick={()=>sendMsg("daj taski na jutro")}>jutro</button>
+            <button className="btn bg-ink text-white text-sm" onClick={()=>sendMsg("daj taski na ten tydzień")}>tydzień</button>
+            <button className="btn bg-ink text-white text-sm" onClick={()=>sendMsg("daj przeterminowane")}>przeterminowane</button>
           </>
         )}
       </div>
@@ -164,7 +165,7 @@ export default function Home(){
               </div>
             </Bubble>
 
-            {/* Zwykła lista zadań */}
+            {/* Zwykła lista */}
             {m.toolResult && Array.isArray(m.toolResult) && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {m.toolResult.map((t: any) => (
@@ -200,18 +201,14 @@ export default function Home(){
               />
             )}
 
-            {/* Plan kolejności */}
-            {m.toolResult?.plan && m.toolResult?.tasks && (
-              <div className="space-y-2">
-                <div className="text-sm text-zinc-700 px-1">Plan wykonania (kolejność):</div>
-                <ol className="list-decimal pl-6 space-y-1">
-                  {m.toolResult.plan.order?.map((id:string)=> {
-                    const t = (m.toolResult.tasks as any[]).find((x)=> String(x.id)===String(id));
-                    return <li key={id}>{t ? t.content : id}</li>;
-                  })}
-                </ol>
-                {m.toolResult.plan.notes && <div className="text-xs text-zinc-500 px-1">{m.toolResult.plan.notes}</div>}
-              </div>
+            {/* Grupowanie wg dni tygodnia */}
+            {m.toolResult?.week && m.toolResult?.tasks && (
+              <GroupedByDay
+                tasks={m.toolResult.tasks}
+                userId={userId}
+                onRemoved={(id)=> removeTaskFromMessage(i, id)}
+                notify={pushToast}
+              />
             )}
           </div>
         ))}
@@ -220,7 +217,7 @@ export default function Home(){
       <footer className="sticky bottom-0 bg-soft py-2">
         <div className="flex gap-2">
           <input className="input"
-            placeholder={assistant==='hats' ? "Opisz dylemat – zacznijmy pytaniami." : "Napisz, co chcesz zrobić (np. „Pokaż dzisiejsze zadania”)."}
+            placeholder={assistant==='hats' ? "Opisz dylemat – zacznijmy pytaniami." : "Napisz, co chcesz zrobić (np. „Pokaż jutrzejsze zadania”)."}
             value={input} onChange={(e)=>setInput(e.target.value)} onKeyDown={(e)=> e.key==='Enter' ? send() : null}
           />
           <button className="btn bg-ink text-white" onClick={send}>Wyślij</button>
