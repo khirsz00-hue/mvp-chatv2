@@ -10,35 +10,43 @@ import { GroupedByDay } from "@/components/GroupedByDay";
 import { Toasts, type Toast } from "@/components/Toast";
 import type { AssistantId } from "@/assistants/types";
 
-type Msg = { role:'user'|'assistant'; content:string; toolResult?:any };
-const stripTool = (t:string)=> t.replace(/```tool[\s\S]*?```/g,"").trim();
+type Msg = { role: "user" | "assistant"; content: string; toolResult?: any };
+const stripTool = (t: string) => t.replace(/```tool[\s\S]*?```/g, "").trim();
 
-export default function Home(){
+export default function Home() {
   const sb = supabaseBrowser();
   const [session, setSession] = useState<any>(null);
-  const [assistant, setAssistant] = useState<AssistantId>('todoist');
+  const [assistant, setAssistant] = useState<AssistantId>("todoist");
   const [messages, setMessages] = useState<Msg[]>([]);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [connectingTodoist, setConnectingTodoist] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  useEffect(()=>{
+  // AUTH
+  useEffect(() => {
     let mounted = true;
-    sb.auth.getSession().then(({data})=> { if (mounted) setSession(data.session); });
-    const { data: sub } = sb.auth.onAuthStateChange((_e,s)=> setSession(s));
-    return ()=> { mounted = false; sub.subscription.unsubscribe(); };
-  },[]);
+    sb.auth.getSession().then(({ data }) => {
+      if (mounted) setSession(data.session);
+    });
+    const { data: sub } = sb.auth.onAuthStateChange((_e, s) => setSession(s));
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
 
   const userId = session?.user?.id as string | undefined;
 
-  const pushToast = useCallback((text: string, type?: Toast['type'])=>{
+  // TOASTS
+  const pushToast = useCallback((text: string, type?: Toast["type"]) => {
     const id = Math.random().toString(36).slice(2);
-    setToasts(ts => [...ts, { id, text, type }]);
-  },[]);
-  const dropToast = useCallback((id:string)=>{
-    setToasts(ts => ts.filter(t=>t.id !== id));
-  },[]);
+    setToasts((ts) => [...ts, { id, text, type }]);
+  }, []);
+  const dropToast = useCallback((id: string) => {
+    setToasts((ts) => ts.filter((t) => t.id !== id));
+  }, []);
 
+  // LAST TASK SNAPSHOT
   const lastTasks = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       const m = messages[i];
@@ -49,59 +57,79 @@ export default function Home(){
     return [] as any[];
   }, [messages]);
 
-  const removeTaskFromMessage = useCallback((msgIndex: number, taskId: string)=>{
-    setMessages(prev => {
+  // OPTIMISTIC REMOVE
+  const removeTaskFromMessage = useCallback((msgIndex: number, taskId: string) => {
+    setMessages((prev) => {
       const copy = [...prev];
       const m = copy[msgIndex];
       if (!m) return prev;
       const tr = m.toolResult;
 
       if (Array.isArray(tr)) {
-        m.toolResult = tr.filter((t:any)=> String(t.id) !== String(taskId));
+        m.toolResult = tr.filter((t: any) => String(t.id) !== String(taskId));
       } else if (tr?.tasks && tr?.groups) {
         m.toolResult = {
           ...tr,
-          tasks: tr.tasks.filter((t:any)=> String(t.id) !== String(taskId)),
-          groups: tr.groups.map((g:any)=> ({...g, task_ids: g.task_ids.filter((id:string)=> String(id)!==String(taskId))})),
+          tasks: tr.tasks.filter((t: any) => String(t.id) !== String(taskId)),
+          groups: tr.groups.map((g: any) => ({
+            ...g,
+            task_ids: g.task_ids.filter((id: string) => String(id) !== String(taskId)),
+          })),
         };
       } else if (tr?.groupByProject && tr?.tasks) {
-        m.toolResult = { ...tr, tasks: tr.tasks.filter((t:any)=> String(t.id) !== String(taskId)) };
+        m.toolResult = { ...tr, tasks: tr.tasks.filter((t: any) => String(t.id) !== String(taskId)) };
       } else if (tr?.week && tr?.tasks) {
-        m.toolResult = { ...tr, tasks: tr.tasks.filter((t:any)=> String(t.id) !== String(taskId)) };
+        m.toolResult = { ...tr, tasks: tr.tasks.filter((t: any) => String(t.id) !== String(taskId)) };
       }
+
       copy[msgIndex] = { ...m };
       return copy;
     });
-  },[]);
+  }, []);
 
-  const connectTodoist = ()=>{
-    if(!userId) { pushToast("Najpierw zaloguj się.", "error"); return; }
+  // TODOIST CONNECT/DISCONNECT
+  const connectTodoist = () => {
+    if (!userId) {
+      pushToast("Najpierw zaloguj się.", "error");
+      return;
+    }
     setConnectingTodoist(true);
     window.location.href = `/api/todoist/connect?uid=${userId}`;
   };
-  const disconnectTodoist = async ()=>{
-    if(!userId) { pushToast("Najpierw zaloguj się.", "error"); return; }
+  const disconnectTodoist = async () => {
+    if (!userId) {
+      pushToast("Najpierw zaloguj się.", "error");
+      return;
+    }
     await fetch("/api/todoist/disconnect", {
-      method:"POST", headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ userId })
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
     });
     pushToast("Odłączono Todoist.", "success");
   };
 
+  // ABS URL helper (na Vercel/localhost)
   const abs = (path: string) =>
     typeof window !== "undefined" ? `${window.location.origin}${path}` : path;
 
-  async function quickFetch(action: "get_today_tasks"|"get_tomorrow_tasks"|"get_week_tasks"|"get_overdue_tasks") {
-    if (!userId) { pushToast("Brak userId – zaloguj się ponownie.", "error"); return; }
+  // DIRECT QUICK ACTIONS
+  async function quickFetch(
+    action: "get_today_tasks" | "get_tomorrow_tasks" | "get_week_tasks" | "get_overdue_tasks"
+  ) {
+    if (!userId) {
+      pushToast("Brak userId – zaloguj się ponownie.", "error");
+      return;
+    }
     try {
       const res = await fetch(abs("/api/todoist/actions"), {
-        method:"POST",
-        headers:{ "Content-Type":"application/json" },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, action, payload: {} }),
-        cache:"no-store",
+        cache: "no-store",
       });
       if (!res.ok) {
-        const t = await res.text().catch(()=> "");
+        const t = await res.text().catch(() => "");
         pushToast(`Błąd pobierania: ${t}`, "error");
         return;
       }
@@ -109,7 +137,7 @@ export default function Home(){
       const result = data?.result ?? data;
 
       if (action === "get_week_tasks") {
-        pushAssistantBlock("Plan na ten tydzień (pogrupowany wg dni):", { week:true, tasks: result });
+        pushAssistantBlock("Plan na ten tydzień (pogrupowany wg dni):", { week: true, tasks: result });
       } else if (action === "get_tomorrow_tasks") {
         pushAssistantBlock("Oto Twoje zadania na jutro:", result);
       } else if (action === "get_overdue_tasks") {
@@ -117,50 +145,62 @@ export default function Home(){
       } else {
         pushAssistantBlock("Oto Twoje zadania na dziś:", result);
       }
-    } catch (e:any) {
+    } catch (e: any) {
       pushToast(`Błąd pobierania: ${e?.message || "unknown"}`, "error");
     }
   }
 
   function pushAssistantBlock(text: string, toolResult: any) {
-    setMessages(m=> [...m, { role:"assistant", content:text, toolResult }]);
+    setMessages((m) => [...m, { role: "assistant", content: text, toolResult }]);
   }
 
-  async function sendMsg(text: string){
-    if(!text.trim() || !userId) { pushToast("Brak userId – zaloguj się ponownie.", "error"); return; }
-    const myMsg: Msg = { role:'user', content: text.trim() };
-    setMessages(m=>[...m,myMsg]);
+  // CHAT (LLM)
+  async function sendMsg(text: string) {
+    if (!text.trim() || !userId) {
+      pushToast("Brak userId – zaloguj się ponownie.", "error");
+      return;
+    }
+    const myMsg: Msg = { role: "user", content: text.trim() };
+    setMessages((m) => [...m, myMsg]);
+
     const res = await fetch(abs("/api/chat"), {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ assistantId: assistant, messages: [...messages, myMsg], userId, contextTasks: lastTasks })
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        assistantId: assistant,
+        messages: [...messages, myMsg],
+        userId,
+        contextTasks: lastTasks,
+      }),
     });
     if (!res.ok) {
-      const t = await res.text().catch(()=> "");
+      const t = await res.text().catch(() => "");
       pushToast(`Chat error: ${t}`, "error");
       return;
     }
     const data = await res.json();
-
     const toolResult =
       data && typeof data.toolResult === "object" && data.toolResult !== null && "result" in data.toolResult
         ? (data.toolResult.result as any)
         : data.toolResult;
 
-    setMessages(m=>[...m, { role:'assistant', content: stripTool(data.content||""), toolResult }]);
+    setMessages((m) => [...m, { role: "assistant", content: stripTool(data.content || ""), toolResult }]);
   }
 
-  const send = async ()=>{
-    if(!input.trim()) return;
-    const txt = input; setInput('');
+  const send = async () => {
+    if (!input.trim()) return;
+    const txt = input;
+    setInput("");
     await sendMsg(txt);
   };
 
-  if(!session){
+  // RENDER: SIGN-IN
+  if (!session) {
     const SignIn = require("@/components/SignIn").SignIn;
     return <SignIn />;
   }
 
+  // RENDER: APP
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-4">
       <header className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
@@ -171,25 +211,39 @@ export default function Home(){
 
         <div className="flex gap-2 items-center">
           <AssistantSelector value={assistant} onChange={setAssistant} />
-          {assistant === 'todoist' && (
+          {assistant === "todoist" && (
             <>
-              <button className="btn bg-accent text-white" onClick={connectTodoist} disabled={!userId || connectingTodoist}>
+              <button
+                className="btn bg-accent text-white"
+                onClick={connectTodoist}
+                disabled={!userId || connectingTodoist}
+              >
                 {connectingTodoist ? "Łączenie..." : "Połącz Todoist"}
               </button>
-              <button className="btn bg-white" onClick={disconnectTodoist}>Odłącz</button>
+              <button className="btn bg-white" onClick={disconnectTodoist}>
+                Odłącz
+              </button>
             </>
           )}
         </div>
       </header>
 
-      {/* Szybkie akcje (DIRECT) */}
+      {/* Szybkie akcje */}
       <div className="flex flex-wrap gap-2">
-        {assistant === 'todoist' && (
+        {assistant === "todoist" && (
           <>
-            <button className="btn bg-ink text-white text-sm" onClick={()=>quickFetch("get_today_tasks")} disabled={!userId}>dzisiaj</button>
-            <button className="btn bg-ink text-white text-sm" onClick={()=>quickFetch("get_tomorrow_tasks")} disabled={!userId}>jutro</button>
-            <button className="btn bg-ink text-white text-sm" onClick={()=>quickFetch("get_week_tasks")} disabled={!userId}>tydzień</button>
-            <button className="btn bg-ink text-white text-sm" onClick={()=>quickFetch("get_overdue_tasks")} disabled={!userId}>przeterminowane</button>
+            <button className="btn bg-ink text-white text-sm" onClick={() => quickFetch("get_today_tasks")} disabled={!userId}>
+              dzisiaj
+            </button>
+            <button className="btn bg-ink text-white text-sm" onClick={() => quickFetch("get_tomorrow_tasks")} disabled={!userId}>
+              jutro
+            </button>
+            <button className="btn bg-ink text-white text-sm" onClick={() => quickFetch("get_week_tasks")} disabled={!userId}>
+              tydzień
+            </button>
+            <button className="btn bg-ink text-white text-sm" onClick={() => quickFetch("get_overdue_tasks")} disabled={!userId}>
+              przeterminowane
+            </button>
           </>
         )}
       </div>
@@ -211,9 +265,9 @@ export default function Home(){
                     key={t.id}
                     t={t}
                     userId={userId}
-                    onRemoved={(id)=> removeTaskFromMessage(i, id)}
+                    onRemoved={(id) => removeTaskFromMessage(i, id)}
                     notify={pushToast}
-                    onAsk={(txt)=> sendMsg(txt)}   {/* <<< NOWE */}
+                    onAsk={(txt) => sendMsg(txt)}
                   />
                 ))}
               </div>
@@ -225,7 +279,7 @@ export default function Home(){
                 groups={m.toolResult.groups}
                 tasks={m.toolResult.tasks}
                 userId={userId}
-                onRemoved={(id)=> removeTaskFromMessage(i, id)}
+                onRemoved={(id) => removeTaskFromMessage(i, id)}
                 notify={pushToast}
               />
             )}
@@ -235,7 +289,7 @@ export default function Home(){
               <GroupedByProject
                 tasks={m.toolResult.tasks}
                 userId={userId}
-                onRemoved={(id)=> removeTaskFromMessage(i, id)}
+                onRemoved={(id) => removeTaskFromMessage(i, id)}
                 notify={pushToast}
               />
             )}
@@ -245,7 +299,7 @@ export default function Home(){
               <GroupedByDay
                 tasks={m.toolResult.tasks}
                 userId={userId}
-                onRemoved={(id)=> removeTaskFromMessage(i, id)}
+                onRemoved={(id) => removeTaskFromMessage(i, id)}
                 notify={pushToast}
               />
             )}
@@ -255,11 +309,20 @@ export default function Home(){
 
       <footer className="sticky bottom-0 bg-soft py-2">
         <div className="flex gap-2">
-          <input className="input"
-            placeholder={assistant==='hats' ? "Opisz dylemat – zacznijmy pytaniami." : "Napisz, co chcesz zrobić (np. „Pokaż jutrzejsze zadania”)."}
-            value={input} onChange={(e)=>setInput(e.target.value)} onKeyDown={(e)=> e.key==='Enter' ? send() : null}
+          <input
+            className="input"
+            placeholder={
+              assistant === "hats"
+                ? "Opisz dylemat – zacznijmy pytaniami."
+                : "Napisz, co chcesz zrobić (np. „Pokaż jutrzejsze zadania”)."
+            }
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => (e.key === "Enter" ? send() : null)}
           />
-          <button className="btn bg-ink text-white" onClick={send} disabled={!userId}>Wyślij</button>
+          <button className="btn bg-ink text-white" onClick={send} disabled={!userId}>
+            Wyślij
+          </button>
         </div>
       </footer>
 
