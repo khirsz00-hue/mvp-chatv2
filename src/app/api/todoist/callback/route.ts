@@ -1,34 +1,39 @@
-// src/app/api/todoist/callback/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { exchangeCodeForToken, saveTodoistToken } from "@/lib/todoist";
+import { exchangeCodeForToken, resolveBaseUrl, saveTodoistToken } from "@/lib/todoist";
 
-function resolveBaseUrl(fallbackOrigin?: string) {
-  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  if (fallbackOrigin) return fallbackOrigin;
-  return "http://localhost:3000";
+function html(msg: string, code = 400) {
+  return new NextResponse(
+    `<!doctype html><meta charset="utf-8"><pre>${msg}</pre>`,
+    { status: code, headers: { "Content-Type": "text/html; charset=utf-8" } }
+  );
 }
 
 export async function GET(req: NextRequest) {
-  const url = new URL(req.url);
-  const code = url.searchParams.get("code");
-  const state = url.searchParams.get("state"); // tu przenosimy uid
-  let uid = url.searchParams.get("uid") || ""; // fallback (gdyby kiedyś było w redirect_uri)
+  try {
+    const url = new URL(req.url);
+    const code = url.searchParams.get("code");
+    const state = url.searchParams.get("state");
+    let uid = url.searchParams.get("uid") || "";
 
-  if (!uid && state) {
-    try {
-      const parsed = JSON.parse(decodeURIComponent(state));
-      uid = parsed?.uid || "";
-    } catch {}
+    if (!uid && state) {
+      try {
+        const parsed = JSON.parse(decodeURIComponent(state));
+        uid = parsed?.uid || "";
+      } catch (e: any) {
+        return html(`Bad state: ${String(e)}`, 400);
+      }
+    }
+
+    if (!code) return html("Missing 'code' parameter", 400);
+    if (!uid) return html("Missing 'uid' (state) parameter", 400);
+
+    const token = await exchangeCodeForToken(code);
+    await saveTodoistToken(uid, token.access_token);
+
+    const base = resolveBaseUrl(url.origin);
+    return NextResponse.redirect(`${base}/?todoist=connected`);
+  } catch (e: any) {
+    console.error("Todoist callback error:", e);
+    return html(`Callback error: ${e?.message || String(e)}`, 500);
   }
-
-  if (!code || !uid) {
-    return new NextResponse("Missing code or uid", { status: 400 });
-  }
-
-  const token = await exchangeCodeForToken(code);
-  await saveTodoistToken(uid, token.access_token);
-
-  const base = resolveBaseUrl(url.origin);
-  return NextResponse.redirect(`${base}/?todoist=connected`);
 }
