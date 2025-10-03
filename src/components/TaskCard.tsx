@@ -42,26 +42,18 @@ export function TaskCard({ t, userId }: { t: Task; userId?: string }) {
       </div>
 
       <div className="mt-3 flex gap-2">
-        <button
-          className="btn bg-ink text-white text-xs"
-          disabled={!!busy}
-          onClick={()=>call("complete_task", { task_id: t.id })}
-          title="Oznacz jako ukończone"
-        >{busy==="complete_task" ? "..." : "Ukończ"}</button>
-
-        <button
-          className="btn bg-white text-xs"
-          disabled={!!busy}
-          onClick={()=>call("move_to_tomorrow", { task_id: t.id })}
-          title="Przenieś na jutro"
-        >{busy==="move_to_tomorrow" ? "..." : "Jutro"}</button>
-
-        <button
-          className="btn bg-white text-xs"
-          disabled={!!busy}
-          onClick={()=>call("delete_task", { task_id: t.id })}
-          title="Usuń zadanie"
-        >{busy==="delete_task" ? "..." : "Usuń"}</button>
+        <button className="btn bg-ink text-white text-xs" disabled={!!busy}
+          onClick={()=>call("complete_task", { task_id: t.id })}>{
+            busy==="complete_task" ? "..." : "Ukończ"
+          }</button>
+        <button className="btn bg-white text-xs" disabled={!!busy}
+          onClick={()=>call("move_to_tomorrow", { task_id: t.id })}>{
+            busy==="move_to_tomorrow" ? "..." : "Jutro"
+          }</button>
+        <button className="btn bg-white text-xs" disabled={!!busy}
+          onClick={()=>call("delete_task", { task_id: t.id })}>{
+            busy==="delete_task" ? "..." : "Usuń"
+          }</button>
       </div>
     </div>
   );
