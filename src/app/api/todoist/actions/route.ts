@@ -1,95 +1,134 @@
-// src/app/api/todoist/actions/route.ts
+// src/app/api/chat/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import {
-  // READS
-  listTodayTasks,
-  listTomorrowTasks,
-  listWeekTasks,
-  listOverdueTasks,
-  listProjects,
-  // WRITES
-  addTask,
-  deleteTask,
-  closeTask,
-  postponeToTomorrow,
-  postponeToDate,
-  moveOverdueToToday,
-} from "@/lib/todoist";
+import { assistants } from "@/assistants/config";
+import { readKnowledge, readPrompt } from "@/assistants/server";
+import type { AssistantId } from "@/assistants/types";
+import { openai } from "@/lib/openai";
+
+/** Usuwa bloki ```tool ... ``` z treści */
+const stripTool = (t: string) => t.replace(/```tool[\s\S]*?```/g, "").trim();
+
+/** Proste dopasowania zamiast proszenia LLM o halucynacje */
+const isToday = (s: string) =>
+  /(dzisiaj|dziś|today)/i.test(s);
+const isTomorrow = (s: string) =>
+  /(jutro|tomorrow)/i.test(s);
+const isWeek = (s: string) =>
+  /(tydzień|tydzien|this week|week|7 dni|7\s*days)/i.test(s);
+const isOverdue = (s: string) =>
+  /(przeterminowane|zaległe|zalegle|overdue)/i.test(s);
+
+/** call helper do naszego wewnętrznego endpointu */
+async function callTodoistAction(req: NextRequest, body: any) {
+  const url = new URL("/api/todoist/actions", req.nextUrl.origin);
+  const res = await fetch(url.toString(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Todoist action failed: HTTP ${res.status} :: ${text}`);
+  }
+  const json = await res.json().catch(() => ({}));
+  // kompatybilność: zwracamy czyste dane listy (nie obiekt z {success})
+  return json?.result ?? json;
+}
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { userId, action, payload } = body || {};
+    const { assistantId, messages, userId, contextTasks } = (await req.json()) as {
+      assistantId: AssistantId;
+      userId: string;
+      messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
+      contextTasks?: Array<any>;
+    };
 
-    if (!userId || !action) {
-      return NextResponse.json({ error: "Missing params" }, { status: 400 });
+    if (!assistantId || !userId) {
+      return new NextResponse("Missing assistantId or userId", { status: 400 });
     }
 
-    let result: any = null;
+    const lastUserText =
+      messages.filter((m) => m.role === "user").slice(-1)[0]?.content || "";
 
-    switch (action) {
-      /* ---------- READS ---------- */
-      case "get_today_tasks": {
-        result = await listTodayTasks(userId);
-        break;
-      }
-      case "get_tomorrow_tasks": {
-        result = await listTomorrowTasks(userId);
-        break;
-      }
-      case "get_week_tasks": {
-        result = await listWeekTasks(userId);
-        break;
-      }
-      case "get_overdue_tasks": {
-        result = await listOverdueTasks(userId);
-        break;
-      }
-      case "list_projects": {
-        result = await listProjects(userId);
-        break;
-      }
-
-      /* ---------- WRITES ---------- */
-      case "add_task": {
-        result = await addTask(userId, payload);
-        break;
-      }
-      case "delete_task": {
-        result = await deleteTask(userId, String(payload?.task_id));
-        break;
-      }
-      case "complete_task": {
-        result = await closeTask(userId, String(payload?.task_id));
-        break;
-      }
-      case "move_to_tomorrow": {
-        result = await postponeToTomorrow(userId, String(payload?.task_id));
-        break;
-      }
-      case "move_to_date": {
-        result = await postponeToDate(
+    /* ──────────────────────────────────────────────────────────────
+       HARD-CODED HANDLERS DLA TODOIST (dzisiaj/jutro/tydzień/przeterminowane)
+       ────────────────────────────────────────────────────────────── */
+    if (assistantId === "todoist") {
+      if (isToday(lastUserText)) {
+        const tasks = await callTodoistAction(req, {
           userId,
-          String(payload?.task_id),
-          String(payload?.date)
-        );
-        break;
+          action: "get_today_tasks",
+          payload: {},
+        });
+        return NextResponse.json({
+          content: "Oto Twoje zadania na dziś:",
+          toolResult: tasks,
+        });
       }
-      case "move_overdue_to_today": {
-        result = await moveOverdueToToday(userId);
-        break;
+      if (isTomorrow(lastUserText)) {
+        const tasks = await callTodoistAction(req, {
+          userId,
+          action: "get_tomorrow_tasks",
+          payload: {},
+        });
+        return NextResponse.json({
+          content: "Oto Twoje zadania na jutro:",
+          toolResult: tasks,
+        });
       }
-
-      default: {
-        return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+      if (isWeek(lastUserText)) {
+        const tasks = await callTodoistAction(req, {
+          userId,
+          action: "get_week_tasks",
+          payload: {},
+        });
+        // Renderer tygodniowy oczekuje { week:true, tasks:[...] }
+        return NextResponse.json({
+          content: "Plan na ten tydzień (pogrupowany wg dni):",
+          toolResult: { week: true, tasks },
+        });
+      }
+      if (isOverdue(lastUserText)) {
+        const tasks = await callTodoistAction(req, {
+          userId,
+          action: "get_overdue_tasks",
+          payload: {},
+        });
+        return NextResponse.json({
+          content: "Oto Twoje przeterminowane zadania:",
+          toolResult: tasks,
+        });
       }
     }
 
-    return NextResponse.json({ success: true, result });
+    /* ──────────────────────────────────────────────────────────────
+       STANDARDOWA ŚCIEŻKA: LLM (zachowujemy się jak wcześniej)
+       ────────────────────────────────────────────────────────────── */
+    const baseSystem = readPrompt(assistantId);
+    const kb = readKnowledge(assistantId);
+    const system = kb ? `${baseSystem}\n\n# Dodatkowa baza wiedzy\n${kb}` : baseSystem;
+
+    const conf = assistants[assistantId];
+    const convo = conf.stateless
+      ? [{ role: "system", content: system }, messages[messages.length - 1]]
+      : [{ role: "system", content: system }, ...messages];
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0.5,
+      messages: convo as any,
+    });
+
+    const raw = completion.choices[0]?.message?.content || "";
+    const cleaned = stripTool(raw);
+
+    return NextResponse.json({ content: cleaned || raw });
   } catch (e: any) {
-    console.error(">>> /api/todoist/actions error:", e?.message, e?.stack);
+    console.error(">>> /api/chat error:", e?.message, e?.stack);
     return NextResponse.json(
-      { error: e?.message || "Todoist action failed", stack: e?.stack },
+      { error: e?.message || "Chat error", stack: e?.stack },
       { status: 500 }
     );
   }
