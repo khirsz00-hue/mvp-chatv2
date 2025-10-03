@@ -5,7 +5,11 @@ import { TaskCard } from "@/components/TaskCard";
 type Task = { id: string; content: string; due?: { date?: string }; project_id?: string; priority?: number; };
 type Group = { title: string; task_ids: string[] };
 
-export function GroupedTasks({ groups, tasks, userId }:{ groups: Group[]; tasks: Task[]; userId: string }) {
+export function GroupedTasks({ groups, tasks, userId }:{
+  groups: Group[];
+  tasks: Task[];
+  userId?: string;
+}) {
   const map = new Map<string, Task>();
   for (const t of tasks) map.set(String(t.id), t);
 
