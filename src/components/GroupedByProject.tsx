@@ -4,7 +4,10 @@ import { TaskCard } from "@/components/TaskCard";
 
 type Task = { id:string; content:string; due?:{ date?:string }; project_id?:string; priority?:number; };
 
-export function GroupedByProject({ tasks, userId }:{ tasks: Task[]; userId: string }){
+export function GroupedByProject({ tasks, userId }:{
+  tasks: Task[];
+  userId?: string;
+}){
   const groups = new Map<string, Task[]>();
   for (const t of tasks) {
     const key = t.project_id || "Bez projektu";
