@@ -22,14 +22,17 @@ export default function Home(){
   const [connectingTodoist, setConnectingTodoist] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
+  // ───────────────── auth ─────────────────
   useEffect(()=>{
-    sb.auth.getSession().then(({data})=> setSession(data.session));
+    let mounted = true;
+    sb.auth.getSession().then(({data})=> { if (mounted) setSession(data.session); });
     const { data: sub } = sb.auth.onAuthStateChange((_e,s)=> setSession(s));
-    return ()=> sub.subscription.unsubscribe();
+    return ()=> { mounted = false; sub.subscription.unsubscribe(); };
   },[]);
 
   const userId = session?.user?.id as string | undefined;
 
+  // ───────────────── toasty ───────────────
   const pushToast = useCallback((text: string, type?: Toast['type'])=>{
     const id = Math.random().toString(36).slice(2);
     setToasts(ts => [...ts, { id, text, type }]);
@@ -38,6 +41,7 @@ export default function Home(){
     setToasts(ts => ts.filter(t=>t.id !== id));
   },[]);
 
+  // ───────── ostatni snapshot zadań ───────
   const lastTasks = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       const m = messages[i];
@@ -48,6 +52,7 @@ export default function Home(){
     return [] as any[];
   }, [messages]);
 
+  // ───────── optimistic remove ────────────
   const removeTaskFromMessage = useCallback((msgIndex: number, taskId: string)=>{
     setMessages(prev => {
       const copy = [...prev];
@@ -64,28 +69,23 @@ export default function Home(){
           groups: tr.groups.map((g:any)=> ({...g, task_ids: g.task_ids.filter((id:string)=> String(id)!==String(taskId))})),
         };
       } else if (tr?.groupByProject && tr?.tasks) {
-        m.toolResult = {
-          ...tr,
-          tasks: tr.tasks.filter((t:any)=> String(t.id) !== String(taskId)),
-        };
+        m.toolResult = { ...tr, tasks: tr.tasks.filter((t:any)=> String(t.id) !== String(taskId)) };
       } else if (tr?.week && tr?.tasks) {
-        m.toolResult = {
-          ...tr,
-          tasks: tr.tasks.filter((t:any)=> String(t.id) !== String(taskId)),
-        };
+        m.toolResult = { ...tr, tasks: tr.tasks.filter((t:any)=> String(t.id) !== String(taskId)) };
       }
       copy[msgIndex] = { ...m };
       return copy;
     });
   },[]);
 
+  // ───────── todoist connect/disconnect ───
   const connectTodoist = ()=>{
-    if(!userId) return;
+    if(!userId) { pushToast("Najpierw zaloguj się.", "error"); return; }
     setConnectingTodoist(true);
     window.location.href = `/api/todoist/connect?uid=${userId}`;
   };
   const disconnectTodoist = async ()=>{
-    if(!userId) return;
+    if(!userId) { pushToast("Najpierw zaloguj się.", "error"); return; }
     await fetch("/api/todoist/disconnect", {
       method:"POST", headers:{ "Content-Type":"application/json" },
       body: JSON.stringify({ userId })
@@ -93,34 +93,42 @@ export default function Home(){
     pushToast("Odłączono Todoist.", "success");
   };
 
-  /** ─────────────────────────────────────────────────────────────────
-   *  🔹 HARD WIRED SZYBKIE AKCJE (bezpośrednio do Todoist actions)
-   *  dzięki temu „jutro” i „tydzień” DZIAŁAJĄ niezależnie od chatu
-   *  ───────────────────────────────────────────────────────────────── */
-  async function quickFetch(action: "get_today_tasks"|"get_tomorrow_tasks"|"get_week_tasks"|"get_overdue_tasks") {
-    if (!userId) return pushToast("Brak userId – zaloguj się ponownie.", "error");
-    const res = await fetch("/api/todoist/actions", {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ userId, action, payload: {} }),
-      cache:"no-store",
-    });
-    if (!res.ok) {
-      const t = await res.text().catch(()=> "");
-      pushToast(`Błąd pobierania: ${t}`, "error");
-      return;
-    }
-    const data = await res.json();
-    const result = data?.result ?? data;
+  // ───────── helper: absolutny URL ────────
+  const abs = (path: string) =>
+    typeof window !== "undefined" ? `${window.location.origin}${path}` : path;
 
-    if (action === "get_week_tasks") {
-      pushAssistantBlock("Plan na ten tydzień (pogrupowany wg dni):", { week:true, tasks: result });
-    } else if (action === "get_tomorrow_tasks") {
-      pushAssistantBlock("Oto Twoje zadania na jutro:", result);
-    } else if (action === "get_overdue_tasks") {
-      pushAssistantBlock("Oto Twoje przeterminowane zadania:", result);
-    } else {
-      pushAssistantBlock("Oto Twoje zadania na dziś:", result);
+  // ───────── DIRECT quick actions ─────────
+  async function quickFetch(action: "get_today_tasks"|"get_tomorrow_tasks"|"get_week_tasks"|"get_overdue_tasks") {
+    if (!userId) { pushToast("Brak userId – zaloguj się ponownie.", "error"); return; }
+    try {
+      console.log("[quickFetch] userId:", userId, "action:", action);
+      const res = await fetch(abs("/api/todoist/actions"), {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ userId, action, payload: {} }),
+        cache:"no-store",
+      });
+      if (!res.ok) {
+        const t = await res.text().catch(()=> "");
+        console.error("[quickFetch] ERROR", res.status, t);
+        pushToast(`Błąd pobierania: ${t}`, "error");
+        return;
+      }
+      const data = await res.json();
+      const result = data?.result ?? data;
+
+      if (action === "get_week_tasks") {
+        pushAssistantBlock("Plan na ten tydzień (pogrupowany wg dni):", { week:true, tasks: result });
+      } else if (action === "get_tomorrow_tasks") {
+        pushAssistantBlock("Oto Twoje zadania na jutro:", result);
+      } else if (action === "get_overdue_tasks") {
+        pushAssistantBlock("Oto Twoje przeterminowane zadania:", result);
+      } else {
+        pushAssistantBlock("Oto Twoje zadania na dziś:", result);
+      }
+    } catch (e:any) {
+      console.error("[quickFetch] exception", e?.message);
+      pushToast(`Błąd pobierania: ${e?.message || "unknown"}`, "error");
     }
   }
 
@@ -128,18 +136,22 @@ export default function Home(){
     setMessages(m=> [...m, { role:"assistant", content:text, toolResult }]);
   }
 
-  /** ─────────────────────────────────────────────────────────────────
-   *  Standardowy chat (LLM). Zostawiamy do innych komend.
-   *  ───────────────────────────────────────────────────────────────── */
+  // ───────── standard chat (LLM) ──────────
   async function sendMsg(text: string){
-    if(!text.trim() || !userId) return;
+    if(!text.trim() || !userId) { pushToast("Brak userId – zaloguj się ponownie.", "error"); return; }
     const myMsg: Msg = { role:'user', content: text.trim() };
     setMessages(m=>[...m,myMsg]);
-    const res = await fetch("/api/chat", {
+    const res = await fetch(abs("/api/chat"), {
       method:"POST",
       headers:{ "Content-Type":"application/json" },
       body: JSON.stringify({ assistantId: assistant, messages: [...messages, myMsg], userId, contextTasks: lastTasks })
     });
+    if (!res.ok) {
+      const t = await res.text().catch(()=> "");
+      console.error("[/api/chat] ERROR", res.status, t);
+      pushToast(`Chat error: ${t}`, "error");
+      return;
+    }
     const data = await res.json();
 
     const toolResult =
@@ -156,6 +168,7 @@ export default function Home(){
     await sendMsg(txt);
   };
 
+  // ───────── render ───────────────────────
   if(!session){
     const SignIn = require("@/components/SignIn").SignIn;
     return <SignIn />;
@@ -186,83 +199,13 @@ export default function Home(){
       <div className="flex flex-wrap gap-2">
         {assistant === 'todoist' && (
           <>
-            <button className="btn bg-ink text-white text-sm" onClick={()=>quickFetch("get_today_tasks")}>dzisiaj</button>
-            <button className="btn bg-ink text-white text-sm" onClick={()=>quickFetch("get_tomorrow_tasks")}>jutro</button>
-            <button className="btn bg-ink text-white text-sm" onClick={()=>quickFetch("get_week_tasks")}>tydzień</button>
-            <button className="btn bg-ink text-white text-sm" onClick={()=>quickFetch("get_overdue_tasks")}>przeterminowane</button>
+            <button className="btn bg-ink text-white text-sm" onClick={()=>quickFetch("get_today_tasks")} disabled={!userId}>dzisiaj</button>
+            <button className="btn bg-ink text-white text-sm" onClick={()=>quickFetch("get_tomorrow_tasks")} disabled={!userId}>jutro</button>
+            <button className="btn bg-ink text-white text-sm" onClick={()=>quickFetch("get_week_tasks")} disabled={!userId}>tydzień</button>
+            <button className="btn bg-ink text-white text-sm" onClick={()=>quickFetch("get_overdue_tasks")} disabled={!userId}>przeterminowane</button>
           </>
         )}
       </div>
 
       <main className="space-y-4">
-        {messages.map((m, i) => (
-          <div key={i} className="space-y-2">
-            <Bubble role={m.role}>
-              <div className="prose prose-zinc max-w-none">
-                <pre className="whitespace-pre-wrap">{stripTool(m.content)}</pre>
-              </div>
-            </Bubble>
-
-            {/* Zwykła lista */}
-            {m.toolResult && Array.isArray(m.toolResult) && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {m.toolResult.map((t: any) => (
-                  <TaskCard
-                    key={t.id}
-                    t={t}
-                    userId={userId}
-                    onRemoved={(id)=> removeTaskFromMessage(i, id)}
-                    notify={pushToast}
-                  />
-                ))}
-              </div>
-            )}
-
-            {/* Grupowanie z LLM */}
-            {m.toolResult?.groups && m.toolResult?.tasks && (
-              <GroupedTasks
-                groups={m.toolResult.groups}
-                tasks={m.toolResult.tasks}
-                userId={userId}
-                onRemoved={(id)=> removeTaskFromMessage(i, id)}
-                notify={pushToast}
-              />
-            )}
-
-            {/* Lokalnie wg projektu */}
-            {m.toolResult?.groupByProject && m.toolResult?.tasks && (
-              <GroupedByProject
-                tasks={m.toolResult.tasks}
-                userId={userId}
-                onRemoved={(id)=> removeTaskFromMessage(i, id)}
-                notify={pushToast}
-              />
-            )}
-
-            {/* Grupowanie wg dni tygodnia */}
-            {m.toolResult?.week && m.toolResult?.tasks && (
-              <GroupedByDay
-                tasks={m.toolResult.tasks}
-                userId={userId}
-                onRemoved={(id)=> removeTaskFromMessage(i, id)}
-                notify={pushToast}
-              />
-            )}
-          </div>
-        ))}
-      </main>
-
-      <footer className="sticky bottom-0 bg-soft py-2">
-        <div className="flex gap-2">
-          <input className="input"
-            placeholder={assistant==='hats' ? "Opisz dylemat – zacznijmy pytaniami." : "Napisz, co chcesz zrobić (np. „Pokaż jutrzejsze zadania”)."}
-            value={input} onChange={(e)=>setInput(e.target.value)} onKeyDown={(e)=> e.key==='Enter' ? send() : null}
-          />
-          <button className="btn bg-ink text-white" onClick={send}>Wyślij</button>
-        </div>
-      </footer>
-
-      <Toasts items={toasts} onDone={dropToast} />
-    </div>
-  );
-}
+        {messages
