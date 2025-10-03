@@ -1,24 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  addTask,
-  deleteTask,
+  listTodayTasks,
+  listTomorrowTasks,
+  listWeekTasks,
   listOverdueTasks,
   listProjects,
-  listTodayTasks,
-  moveOverdueToToday,
+  addTask,
+  deleteTask,
   closeTask,
   postponeToTomorrow,
   postponeToDate,
+  moveOverdueToToday,
 } from "@/lib/todoist";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    console.log(">>> /api/todoist/actions body:", body);
-
     const { userId, action, payload } = body || {};
+
     if (!userId || !action) {
-      console.error(">>> Missing params:", body);
       return NextResponse.json({ error: "Missing params" }, { status: 400 });
     }
 
@@ -27,6 +27,12 @@ export async function POST(req: NextRequest) {
     switch (action) {
       case "get_today_tasks":
         result = await listTodayTasks(userId);
+        break;
+      case "get_tomorrow_tasks":
+        result = await listTomorrowTasks(userId);
+        break;
+      case "get_week_tasks":
+        result = await listWeekTasks(userId);
         break;
       case "get_overdue_tasks":
         result = await listOverdueTasks(userId);
@@ -53,14 +59,11 @@ export async function POST(req: NextRequest) {
         result = await moveOverdueToToday(userId);
         break;
       default:
-        console.error(">>> Unknown action:", action);
         return NextResponse.json({ error: "Unknown action" }, { status: 400 });
     }
 
-    console.log(">>> Success", { action, ok: true });
     return NextResponse.json({ success: true, result });
   } catch (e: any) {
-    console.error(">>> Todoist actions error:", e?.message, e?.stack);
     return NextResponse.json(
       { error: e?.message || "Todoist action failed", stack: e?.stack },
       { status: 500 }
