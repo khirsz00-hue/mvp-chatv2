@@ -1,12 +1,34 @@
+// src/app/api/todoist/callback/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { exchangeCodeForToken, saveTodoistToken } from "@/lib/todoist";
-export async function GET(req: NextRequest){
+
+function resolveBaseUrl(fallbackOrigin?: string) {
+  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  if (fallbackOrigin) return fallbackOrigin;
+  return "http://localhost:3000";
+}
+
+export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
-  const uid = url.searchParams.get("uid");
-  if(!code || !uid) return new NextResponse("Missing params", { status:400 });
+  const state = url.searchParams.get("state"); // tu przenosimy uid
+  let uid = url.searchParams.get("uid") || ""; // fallback (gdyby kiedyś było w redirect_uri)
+
+  if (!uid && state) {
+    try {
+      const parsed = JSON.parse(decodeURIComponent(state));
+      uid = parsed?.uid || "";
+    } catch {}
+  }
+
+  if (!code || !uid) {
+    return new NextResponse("Missing code or uid", { status: 400 });
+  }
+
   const token = await exchangeCodeForToken(code);
   await saveTodoistToken(uid, token.access_token);
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  return NextResponse.redirect(`${appUrl}/?todoist=connected`);
+
+  const base = resolveBaseUrl(url.origin);
+  return NextResponse.redirect(`${base}/?todoist=connected`);
 }
