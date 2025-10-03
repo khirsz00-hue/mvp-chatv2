@@ -3,17 +3,22 @@ import { useState } from "react";
 
 type Task = { id:string; content:string; due?:{ date?:string }; project_id?:string; priority?:number; };
 
-export function TaskCard({ t }:{ t:Task }){
+export function TaskCard({ t, userId }:{ t:Task; userId: string }){
   const [busy, setBusy] = useState<string | null>(null);
 
   async function call(action: string, payload: any = {}) {
     try{
       setBusy(action);
-      await fetch("/api/todoist/actions", {
+      const res = await fetch("/api/todoist/actions", {
         method:"POST",
         headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({ action, payload, userId: "__server__uses_session__" }) // userId i tak wyciąga backend z tokenu przez nasze API; tu stub
+        body: JSON.stringify({ action, payload, userId })
       });
+      if (!res.ok) {
+        const txt = await res.text();
+        console.error("Action error:", txt);
+        alert(`Błąd akcji: ${txt}`);
+      }
     } finally {
       setBusy(null);
     }
