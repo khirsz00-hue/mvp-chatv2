@@ -8,6 +8,7 @@ import {
   moveOverdueToToday,
   closeTask,
   postponeToTomorrow,
+  postponeToDate,
 } from "@/lib/todoist";
 
 export async function POST(req: NextRequest) {
@@ -44,6 +45,9 @@ export async function POST(req: NextRequest) {
         break;
       case "move_to_tomorrow":
         result = await postponeToTomorrow(userId, String(payload?.task_id));
+        break;
+      case "move_to_date":
+        result = await postponeToDate(userId, String(payload?.task_id), String(payload?.date));
         break;
       case "move_overdue_to_today":
         result = await moveOverdueToToday(userId);
