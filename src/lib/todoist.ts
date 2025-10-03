@@ -1,4 +1,3 @@
-// src/lib/todoist.ts
 import { supabaseAdmin } from "@/lib/supabaseClient";
 
 const TODOIST_BASE = "https://api.todoist.com/rest/v2";
@@ -15,41 +14,26 @@ export async function getUserTodoistToken(userId: string) {
   return data?.access_token as string | undefined;
 }
 
-/**
- * Bazowy URL aplikacji – działa nawet jeśli NEXT_PUBLIC_APP_URL nie jest ustawione.
- * Priorytety:
- * 1) NEXT_PUBLIC_APP_URL
- * 2) VERCEL_URL (z runtime) -> https://<vercel-url>
- * 3) fallback przekazany z route (origin)
- */
-function resolveBaseUrl(fallbackOrigin?: string) {
+export function resolveBaseUrl(fallbackOrigin?: string) {
   if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
   if (fallbackOrigin) return fallbackOrigin;
   return "http://localhost:3000";
 }
 
-/**
- * Tworzy URL do autoryzacji Todoist.
- * Używamy parametru `state` do przekazania uid (bez dokładania ?uid do redirect_uri).
- */
 export function buildTodoistAuthUrl(opts: { origin?: string; uid: string }) {
   const clientId = process.env.NEXT_PUBLIC_TODOIST_CLIENT_ID!;
   const baseUrl = resolveBaseUrl(opts.origin);
   const redirectUri = `${baseUrl}/api/todoist/callback`;
   const scope = "data:read_write";
-
-  // Przekazujemy uid w state (JSON zakodowany URL-owo)
   const state = encodeURIComponent(JSON.stringify({ uid: opts.uid }));
-
-  const url =
+  return (
     `https://todoist.com/oauth/authorize` +
     `?client_id=${encodeURIComponent(clientId)}` +
     `&scope=${encodeURIComponent(scope)}` +
     `&state=${state}` +
-    `&redirect_uri=${encodeURIComponent(redirectUri)}`;
-
-  return url;
+    `&redirect_uri=${encodeURIComponent(redirectUri)}`
+  );
 }
 
 export async function exchangeCodeForToken(code: string) {
@@ -62,7 +46,10 @@ export async function exchangeCodeForToken(code: string) {
       code,
     }),
   });
-  if (!res.ok) throw new Error("Todoist token exchange failed");
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Todoist token exchange failed (${res.status}): ${text}`);
+  }
   return res.json() as Promise<{ access_token: string; token_type: string }>;
 }
 
