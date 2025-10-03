@@ -4,7 +4,7 @@ import { TaskCard } from "@/components/TaskCard";
 
 type Task = { id:string; content:string; due?:{ date?:string }; project_id?:string; priority?:number; };
 
-export function GroupedByProject({ tasks }:{ tasks: Task[] }){
+export function GroupedByProject({ tasks, userId }:{ tasks: Task[]; userId: string }){
   const groups = new Map<string, Task[]>();
   for (const t of tasks) {
     const key = t.project_id || "Bez projektu";
@@ -18,7 +18,7 @@ export function GroupedByProject({ tasks }:{ tasks: Task[] }){
         <section key={pid} className="space-y-2">
           <h3 className="text-sm font-semibold text-zinc-700 px-1">Projekt: {pid}</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {list.map((t)=> <TaskCard key={t.id} t={t} />)}
+            {list.map((t)=> <TaskCard key={t.id} t={t} userId={userId} />)}
           </div>
         </section>
       ))}
