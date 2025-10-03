@@ -208,4 +208,74 @@ export default function Home(){
       </div>
 
       <main className="space-y-4">
-        {messages
+        {messages.map((m, i) => (
+          <div key={i} className="space-y-2">
+            <Bubble role={m.role}>
+              <div className="prose prose-zinc max-w-none">
+                <pre className="whitespace-pre-wrap">{stripTool(m.content)}</pre>
+              </div>
+            </Bubble>
+
+            {/* Zwykła lista */}
+            {m.toolResult && Array.isArray(m.toolResult) && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {m.toolResult.map((t: any) => (
+                  <TaskCard
+                    key={t.id}
+                    t={t}
+                    userId={userId}
+                    onRemoved={(id)=> removeTaskFromMessage(i, id)}
+                    notify={pushToast}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Grupowanie z LLM */}
+            {m.toolResult?.groups && m.toolResult?.tasks && (
+              <GroupedTasks
+                groups={m.toolResult.groups}
+                tasks={m.toolResult.tasks}
+                userId={userId}
+                onRemoved={(id)=> removeTaskFromMessage(i, id)}
+                notify={pushToast}
+              />
+            )}
+
+            {/* Lokalnie wg projektu */}
+            {m.toolResult?.groupByProject && m.toolResult?.tasks && (
+              <GroupedByProject
+                tasks={m.toolResult.tasks}
+                userId={userId}
+                onRemoved={(id)=> removeTaskFromMessage(i, id)}
+                notify={pushToast}
+              />
+            )}
+
+            {/* Grupowanie wg dni tygodnia */}
+            {m.toolResult?.week && m.toolResult?.tasks && (
+              <GroupedByDay
+                tasks={m.toolResult.tasks}
+                userId={userId}
+                onRemoved={(id)=> removeTaskFromMessage(i, id)}
+                notify={pushToast}
+              />
+            )}
+          </div>
+        ))}
+      </main>
+
+      <footer className="sticky bottom-0 bg-soft py-2">
+        <div className="flex gap-2">
+          <input className="input"
+            placeholder={assistant==='hats' ? "Opisz dylemat – zacznijmy pytaniami." : "Napisz, co chcesz zrobić (np. „Pokaż jutrzejsze zadania”)."}
+            value={input} onChange={(e)=>setInput(e.target.value)} onKeyDown={(e)=> e.key==='Enter' ? send() : null}
+          />
+          <button className="btn bg-ink text-white" onClick={send} disabled={!userId}>Wyślij</button>
+        </div>
+      </footer>
+
+      <Toasts items={toasts} onDone={dropToast} />
+    </div>
+  );
+}
