@@ -1,9 +1,10 @@
 'use client';
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { AssistantSelector } from "@/components/AssistantSelector";
 import { Bubble } from "@/components/MessageBubble";
 import { TaskCard } from "@/components/TaskCard";
+import { GroupedTasks } from "@/components/GroupedTasks";
 import type { AssistantId } from "@/assistants/types";
 import { assistants } from "@/assistants/config";
 
@@ -29,6 +30,16 @@ export default function Home(){
 
   const userId = session?.user?.id as string | undefined;
 
+  // Wyciągnij ostatnią listę zadań z historii (dla grupowania)
+  const lastTasks = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (Array.isArray(m.toolResult)) return m.toolResult as any[];
+      if (m.toolResult?.groups && m.toolResult?.tasks) return m.toolResult.tasks as any[];
+    }
+    return [] as any[];
+  }, [messages]);
+
   const connectTodoist = ()=>{
     if(!userId) return;
     setConnectingTodoist(true);
@@ -46,13 +57,23 @@ export default function Home(){
     const myMsg: Msg = { role:'user', content: input.trim() };
     setMessages(m=>[...m,myMsg]);
     setInput('');
+
     const res = await fetch("/api/chat", {
       method:"POST",
       headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ assistantId: assistant, messages: [...messages, myMsg], userId })
+      body: JSON.stringify({
+        assistantId: assistant,
+        messages: [...messages, myMsg],
+        userId,
+        contextTasks: lastTasks // <— tu przekazujemy zadania do ewentualnego grupowania
+      })
     });
     const data = await res.json();
-    const a: Msg = { role:'assistant', content: stripToolFenceLocal(data.content || ""), toolResult: data.toolResult };
+    const a: Msg = {
+      role:'assistant',
+      content: stripToolFenceLocal(data.content || ""),
+      toolResult: data.toolResult
+    };
     setMessages(m=>[...m,a]);
   };
 
@@ -95,6 +116,7 @@ export default function Home(){
               </div>
             </Bubble>
 
+            {/* 1) Standardowa lista zadań (tablica) */}
             {m.toolResult && Array.isArray(m.toolResult) && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {m.toolResult.map((t: any) => (
@@ -102,6 +124,12 @@ export default function Home(){
                 ))}
               </div>
             )}
+
+            {/* 2) Grupowanie: { groups, tasks } */}
+            {m.toolResult?.groups && m.toolResult?.tasks && (
+              <GroupedTasks groups={m.toolResult.groups} tasks={m.toolResult.tasks} />
+            )}
+
             {m.toolResult && m.toolResult.moved && (
               <div className="text-sm text-zinc-600">
                 Przeniesiono {m.toolResult.moved} zadań na dziś.
