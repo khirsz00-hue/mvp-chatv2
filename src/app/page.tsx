@@ -22,7 +22,6 @@ export default function Home(){
   const [connectingTodoist, setConnectingTodoist] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  // ───────────────── auth ─────────────────
   useEffect(()=>{
     let mounted = true;
     sb.auth.getSession().then(({data})=> { if (mounted) setSession(data.session); });
@@ -32,7 +31,6 @@ export default function Home(){
 
   const userId = session?.user?.id as string | undefined;
 
-  // ───────────────── toasty ───────────────
   const pushToast = useCallback((text: string, type?: Toast['type'])=>{
     const id = Math.random().toString(36).slice(2);
     setToasts(ts => [...ts, { id, text, type }]);
@@ -41,7 +39,6 @@ export default function Home(){
     setToasts(ts => ts.filter(t=>t.id !== id));
   },[]);
 
-  // ───────── ostatni snapshot zadań ───────
   const lastTasks = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       const m = messages[i];
@@ -52,7 +49,6 @@ export default function Home(){
     return [] as any[];
   }, [messages]);
 
-  // ───────── optimistic remove ────────────
   const removeTaskFromMessage = useCallback((msgIndex: number, taskId: string)=>{
     setMessages(prev => {
       const copy = [...prev];
@@ -78,7 +74,6 @@ export default function Home(){
     });
   },[]);
 
-  // ───────── todoist connect/disconnect ───
   const connectTodoist = ()=>{
     if(!userId) { pushToast("Najpierw zaloguj się.", "error"); return; }
     setConnectingTodoist(true);
@@ -93,15 +88,12 @@ export default function Home(){
     pushToast("Odłączono Todoist.", "success");
   };
 
-  // ───────── helper: absolutny URL ────────
   const abs = (path: string) =>
     typeof window !== "undefined" ? `${window.location.origin}${path}` : path;
 
-  // ───────── DIRECT quick actions ─────────
   async function quickFetch(action: "get_today_tasks"|"get_tomorrow_tasks"|"get_week_tasks"|"get_overdue_tasks") {
     if (!userId) { pushToast("Brak userId – zaloguj się ponownie.", "error"); return; }
     try {
-      console.log("[quickFetch] userId:", userId, "action:", action);
       const res = await fetch(abs("/api/todoist/actions"), {
         method:"POST",
         headers:{ "Content-Type":"application/json" },
@@ -110,7 +102,6 @@ export default function Home(){
       });
       if (!res.ok) {
         const t = await res.text().catch(()=> "");
-        console.error("[quickFetch] ERROR", res.status, t);
         pushToast(`Błąd pobierania: ${t}`, "error");
         return;
       }
@@ -127,7 +118,6 @@ export default function Home(){
         pushAssistantBlock("Oto Twoje zadania na dziś:", result);
       }
     } catch (e:any) {
-      console.error("[quickFetch] exception", e?.message);
       pushToast(`Błąd pobierania: ${e?.message || "unknown"}`, "error");
     }
   }
@@ -136,7 +126,6 @@ export default function Home(){
     setMessages(m=> [...m, { role:"assistant", content:text, toolResult }]);
   }
 
-  // ───────── standard chat (LLM) ──────────
   async function sendMsg(text: string){
     if(!text.trim() || !userId) { pushToast("Brak userId – zaloguj się ponownie.", "error"); return; }
     const myMsg: Msg = { role:'user', content: text.trim() };
@@ -148,7 +137,6 @@ export default function Home(){
     });
     if (!res.ok) {
       const t = await res.text().catch(()=> "");
-      console.error("[/api/chat] ERROR", res.status, t);
       pushToast(`Chat error: ${t}`, "error");
       return;
     }
@@ -168,7 +156,6 @@ export default function Home(){
     await sendMsg(txt);
   };
 
-  // ───────── render ───────────────────────
   if(!session){
     const SignIn = require("@/components/SignIn").SignIn;
     return <SignIn />;
@@ -226,6 +213,7 @@ export default function Home(){
                     userId={userId}
                     onRemoved={(id)=> removeTaskFromMessage(i, id)}
                     notify={pushToast}
+                    onAsk={(txt)=> sendMsg(txt)}   {/* <<< NOWE */}
                   />
                 ))}
               </div>
