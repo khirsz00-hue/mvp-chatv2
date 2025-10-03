@@ -170,6 +170,19 @@ export async function postponeToTomorrow(userId: string, taskId: string) {
   return { ok: true };
 }
 
+/** NOWE: przełóż na konkretną datę YYYY-MM-DD */
+export async function postponeToDate(userId: string, taskId: string, dateISO: string) {
+  const token = await getUserTodoistToken(userId);
+  if (!token) throw new Error("Brak połączenia z Todoist (token nie znaleziony).");
+  const res = await fetch(`${TODOIST_BASE}/tasks/${taskId}`, {
+    method: "POST",
+    headers: AUTH(token),
+    body: JSON.stringify({ due_date: dateISO }),
+  });
+  await assertOk(res, "Postpone task to specific date");
+  return { ok: true };
+}
+
 export async function moveOverdueToToday(userId: string) {
   const token = await getUserTodoistToken(userId);
   if (!token) throw new Error("Brak połączenia z Todoist (token nie znaleziony).");
