@@ -42,11 +42,16 @@ function humanizeToolAction(action?: string) {
   }
 }
 
+function wantsGrouping(text: string) {
+  return /(pogrupuj|zgrupuj|grup|bloki|kategorie|tematyczn)/i.test(text);
+}
+
 export async function POST(req: NextRequest) {
-  const { assistantId, messages, userId } = (await req.json()) as {
+  const { assistantId, messages, userId, contextTasks } = (await req.json()) as {
     assistantId: AssistantId;
     userId: string;
     messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
+    contextTasks?: Array<any>;
   };
 
   if (!assistantId || !userId) {
@@ -64,6 +69,60 @@ export async function POST(req: NextRequest) {
     ? [{ role: "system", content: system }, messages[messages.length - 1]]
     : [{ role: "system", content: system }, ...messages];
 
+  const lastUserText =
+    messages.filter((m) => m.role === "user").slice(-1)[0]?.content || "";
+
+  // SPECIAL CASE: Grupowanie zadań, jeśli mamy kontekst zadań i prośbę o grupy
+  if (
+    assistantId === "todoist" &&
+    contextTasks &&
+    contextTasks.length > 0 &&
+    wantsGrouping(lastUserText)
+  ) {
+    // Zlecamy modelowi zwrot WYŁĄCZNIE JSON-a ze strukturą grup.
+    const sys =
+      "Jesteś pomocnikiem, który grupuje zadania Todoist po tematach. " +
+      "Zwróć wyłącznie poprawny JSON w formacie: " +
+      `{"groups":[{"title":"<nazwa grupy>","task_ids":["<id1>","<id2>", ...]}]}. ` +
+      "Bez komentarzy, bez markdown, bez dodatkowego tekstu.";
+    const user = [
+      "Oto lista zadań do pogrupowania (id i tytuł):",
+      ...contextTasks.map((t: any) => `- ${t.id}: ${t.content}`),
+      "",
+      "Podziel je na 3–8 sensownych grup tematycznych.",
+    ].join("\n");
+
+    const cmp = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0.2,
+      messages: [
+        { role: "system", content: sys },
+        { role: "user", content: user },
+      ],
+    });
+
+    const raw = cmp.choices[0]?.message?.content?.trim() || "{}";
+    let parsed: any = null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      // Spróbuj zdjąć ewentualne code fences
+      const cleaned = raw.replace(/```json|```/g, "").trim();
+      try {
+        parsed = JSON.parse(cleaned);
+      } catch {
+        parsed = { groups: [] };
+      }
+    }
+
+    // Zwracamy komunikat + strukturę do renderu (grupy + surowe taski dla mapowania)
+    return NextResponse.json({
+      content: "Pogrupowałem zadania na bloki tematyczne:",
+      toolResult: { groups: parsed.groups || [], tasks: contextTasks },
+    });
+  }
+
+  // Standardowa ścieżka: generacja + ewentualny tool-call
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     messages: convo as any,
@@ -74,7 +133,6 @@ export async function POST(req: NextRequest) {
   const tool = extractToolCall(raw);
   const cleaned = stripToolFence(raw);
 
-  // Jeśli jest tool-call i to asystent Todoist → wykonujemy akcję i zwracamy ludzki tekst + rezultat
   if (tool && assistantId === "todoist") {
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_APP_URL}/api/todoist/actions`,
@@ -100,6 +158,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ content: human, toolResult });
   }
 
-  // W pozostałych przypadkach zwracamy oczyszczony tekst
   return NextResponse.json({ content: cleaned || raw });
 }
