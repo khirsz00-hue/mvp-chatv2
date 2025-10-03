@@ -3,11 +3,15 @@ import { useState } from "react";
 
 type Task = { id:string; content:string; due?:{ date?:string }; project_id?:string; priority?:number; };
 
-export function TaskCard({ t, userId }:{ t:Task; userId: string }){
+export function TaskCard({ t, userId }: { t: Task; userId?: string }) {
   const [busy, setBusy] = useState<string | null>(null);
 
   async function call(action: string, payload: any = {}) {
-    try{
+    if (!userId) {
+      alert("Brak userId – odśwież stronę lub zaloguj się ponownie.");
+      return;
+    }
+    try {
       setBusy(action);
       const res = await fetch("/api/todoist/actions", {
         method:"POST",
