@@ -23,7 +23,6 @@ export async function getUserTodoistToken(userId: string) {
     .eq("user_id", userId)
     .eq("provider", "todoist")
     .maybeSingle();
-
   if (error) throw error;
   return data?.access_token as string | undefined;
 }
@@ -94,7 +93,6 @@ export async function removeTodoistToken(userId: string) {
 export async function listTodayTasks(userId: string) {
   const token = await getUserTodoistToken(userId);
   if (!token) throw new Error("Brak połączenia z Todoist (token nie znaleziony).");
-
   const res = await fetch(
     `${TODOIST_BASE}/tasks?filter=${encodeURIComponent("today")}`,
     { headers: AUTH(token) }
@@ -106,7 +104,6 @@ export async function listTodayTasks(userId: string) {
 export async function listOverdueTasks(userId: string) {
   const token = await getUserTodoistToken(userId);
   if (!token) throw new Error("Brak połączenia z Todoist (token nie znaleziony).");
-
   const res = await fetch(
     `${TODOIST_BASE}/tasks?filter=${encodeURIComponent("overdue")}`,
     { headers: AUTH(token) }
@@ -118,7 +115,6 @@ export async function listOverdueTasks(userId: string) {
 export async function listProjects(userId: string) {
   const token = await getUserTodoistToken(userId);
   if (!token) throw new Error("Brak połączenia z Todoist (token nie znaleziony).");
-
   const res = await fetch(`${TODOIST_BASE}/projects`, { headers: AUTH(token) });
   await assertOk(res, "List projects");
   return res.json();
@@ -131,7 +127,6 @@ export async function addTask(
 ) {
   const token = await getUserTodoistToken(userId);
   if (!token) throw new Error("Brak połączenia z Todoist (token nie znaleziony).");
-
   const res = await fetch(`${TODOIST_BASE}/tasks`, {
     method: "POST",
     headers: AUTH(token),
@@ -144,7 +139,6 @@ export async function addTask(
 export async function deleteTask(userId: string, taskId: string) {
   const token = await getUserTodoistToken(userId);
   if (!token) throw new Error("Brak połączenia z Todoist (token nie znaleziony).");
-
   const res = await fetch(`${TODOIST_BASE}/tasks/${taskId}`, {
     method: "DELETE",
     headers: AUTH(token),
@@ -156,7 +150,6 @@ export async function deleteTask(userId: string, taskId: string) {
 export async function closeTask(userId: string, taskId: string) {
   const token = await getUserTodoistToken(userId);
   if (!token) throw new Error("Brak połączenia z Todoist (token nie znaleziony).");
-
   const res = await fetch(`${TODOIST_BASE}/tasks/${taskId}/close`, {
     method: "POST",
     headers: AUTH(token),
@@ -168,7 +161,6 @@ export async function closeTask(userId: string, taskId: string) {
 export async function postponeToTomorrow(userId: string, taskId: string) {
   const token = await getUserTodoistToken(userId);
   if (!token) throw new Error("Brak połączenia z Todoist (token nie znaleziony).");
-
   const res = await fetch(`${TODOIST_BASE}/tasks/${taskId}`, {
     method: "POST",
     headers: AUTH(token),
@@ -181,11 +173,9 @@ export async function postponeToTomorrow(userId: string, taskId: string) {
 export async function moveOverdueToToday(userId: string) {
   const token = await getUserTodoistToken(userId);
   if (!token) throw new Error("Brak połączenia z Todoist (token nie znaleziony).");
-
   const tasks = await listOverdueTasks(userId);
   let moved = 0;
   const ids: string[] = [];
-
   for (const t of tasks) {
     const res = await fetch(`${TODOIST_BASE}/tasks/${t.id}`, {
       method: "POST",
