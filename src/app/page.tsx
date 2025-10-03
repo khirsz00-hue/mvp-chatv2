@@ -93,6 +93,44 @@ export default function Home(){
     pushToast("Odłączono Todoist.", "success");
   };
 
+  /** ─────────────────────────────────────────────────────────────────
+   *  🔹 HARD WIRED SZYBKIE AKCJE (bezpośrednio do Todoist actions)
+   *  dzięki temu „jutro” i „tydzień” DZIAŁAJĄ niezależnie od chatu
+   *  ───────────────────────────────────────────────────────────────── */
+  async function quickFetch(action: "get_today_tasks"|"get_tomorrow_tasks"|"get_week_tasks"|"get_overdue_tasks") {
+    if (!userId) return pushToast("Brak userId – zaloguj się ponownie.", "error");
+    const res = await fetch("/api/todoist/actions", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ userId, action, payload: {} }),
+      cache:"no-store",
+    });
+    if (!res.ok) {
+      const t = await res.text().catch(()=> "");
+      pushToast(`Błąd pobierania: ${t}`, "error");
+      return;
+    }
+    const data = await res.json();
+    const result = data?.result ?? data;
+
+    if (action === "get_week_tasks") {
+      pushAssistantBlock("Plan na ten tydzień (pogrupowany wg dni):", { week:true, tasks: result });
+    } else if (action === "get_tomorrow_tasks") {
+      pushAssistantBlock("Oto Twoje zadania na jutro:", result);
+    } else if (action === "get_overdue_tasks") {
+      pushAssistantBlock("Oto Twoje przeterminowane zadania:", result);
+    } else {
+      pushAssistantBlock("Oto Twoje zadania na dziś:", result);
+    }
+  }
+
+  function pushAssistantBlock(text: string, toolResult: any) {
+    setMessages(m=> [...m, { role:"assistant", content:text, toolResult }]);
+  }
+
+  /** ─────────────────────────────────────────────────────────────────
+   *  Standardowy chat (LLM). Zostawiamy do innych komend.
+   *  ───────────────────────────────────────────────────────────────── */
   async function sendMsg(text: string){
     if(!text.trim() || !userId) return;
     const myMsg: Msg = { role:'user', content: text.trim() };
@@ -144,14 +182,14 @@ export default function Home(){
         </div>
       </header>
 
-      {/* Szybkie akcje */}
+      {/* Szybkie akcje (DIRECT) */}
       <div className="flex flex-wrap gap-2">
         {assistant === 'todoist' && (
           <>
-            <button className="btn bg-ink text-white text-sm" onClick={()=>sendMsg("daj taski na dzisiaj")}>dzisiaj</button>
-            <button className="btn bg-ink text-white text-sm" onClick={()=>sendMsg("daj taski na jutro")}>jutro</button>
-            <button className="btn bg-ink text-white text-sm" onClick={()=>sendMsg("daj taski na ten tydzień")}>tydzień</button>
-            <button className="btn bg-ink text-white text-sm" onClick={()=>sendMsg("daj przeterminowane")}>przeterminowane</button>
+            <button className="btn bg-ink text-white text-sm" onClick={()=>quickFetch("get_today_tasks")}>dzisiaj</button>
+            <button className="btn bg-ink text-white text-sm" onClick={()=>quickFetch("get_tomorrow_tasks")}>jutro</button>
+            <button className="btn bg-ink text-white text-sm" onClick={()=>quickFetch("get_week_tasks")}>tydzień</button>
+            <button className="btn bg-ink text-white text-sm" onClick={()=>quickFetch("get_overdue_tasks")}>przeterminowane</button>
           </>
         )}
       </div>
