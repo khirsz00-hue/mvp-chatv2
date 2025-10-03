@@ -4,9 +4,13 @@ import { TaskCard } from "@/components/TaskCard";
 
 type Task = { id:string; content:string; due?:{ date?:string }; project_id?:string; priority?:number; };
 
-export function GroupedByProject({ tasks, userId }:{
+export function GroupedByProject({
+  tasks, userId, onRemoved, notify
+}:{
   tasks: Task[];
   userId?: string;
+  onRemoved?: (id:string)=>void;
+  notify?: (text: string, type?: 'success'|'error'|'info') => void;
 }){
   const groups = new Map<string, Task[]>();
   for (const t of tasks) {
@@ -21,7 +25,9 @@ export function GroupedByProject({ tasks, userId }:{
         <section key={pid} className="space-y-2">
           <h3 className="text-sm font-semibold text-zinc-700 px-1">Projekt: {pid}</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {list.map((t)=> <TaskCard key={t.id} t={t} userId={userId} />)}
+            {list.map((t)=> (
+              <TaskCard key={t.id} t={t} userId={userId} onRemoved={onRemoved} notify={notify} />
+            ))}
           </div>
         </section>
       ))}
