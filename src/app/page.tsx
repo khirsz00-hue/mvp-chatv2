@@ -1,99 +1,105 @@
-'use client';
-import { useEffect, useState } from "react";
-import { supabaseBrowser } from "@/lib/supabaseClient";
-import { AssistantSelector } from "@/components/AssistantSelector";
-import { Bubble } from "@/components/MessageBubble";
-import { TaskCard } from "@/components/TaskCard";
-import type { AssistantId } from "@/assistants/types";
+import { NextRequest, NextResponse } from "next/server";
 import { assistants } from "@/assistants/config";
+import { readKnowledge, readPrompt } from "@/assistants/server";
+import type { AssistantId } from "@/assistants/types";
+import { openai } from "@/lib/openai";
 
-type Msg = { role:'user'|'assistant'; content:string; toolResult?:any };
+function extractToolCall(text: string) {
+  const m = text.match(/```tool([\s\S]*?)```/);
+  if (!m) return null;
+  const block = m[1];
+  const actionMatch = block.match(/action:\s*([\w_]+)/);
+  const payloadMatch = block.match(/payload:\s*([\s\S]+)/);
+  let payload: any = {};
+  if (payloadMatch) {
+    try {
+      payload = JSON.parse(payloadMatch[1].trim());
+    } catch {}
+  }
+  return { action: actionMatch?.[1], payload };
+}
 
-export default function Home(){
-  const sb = supabaseBrowser();
-  const [session, setSession] = useState<any>(null);
-  const [assistant, setAssistant] = useState<AssistantId>('todoist');
-  const [messages, setMessages] = useState<Msg[]>([]);
-  const [input, setInput] = useState('');
-  const [connectingTodoist, setConnectingTodoist] = useState(false);
+function stripToolFence(text: string) {
+  return text.replace(/```tool[\s\S]*?```/g, "").trim();
+}
 
-  useEffect(()=>{
-    sb.auth.getSession().then(({data})=> setSession(data.session));
-    const { data: sub } = sb.auth.onAuthStateChange((_e,s)=> setSession(s));
-    return ()=> sub.subscription.unsubscribe();
-  },[]);
+function humanizeToolAction(action?: string) {
+  switch (action) {
+    case "get_today_tasks":
+      return "Oto Twoje zadania na dziś:";
+    case "get_overdue_tasks":
+      return "Oto Twoje przeterminowane zadania:";
+    case "list_projects":
+      return "Lista projektów:";
+    case "add_task":
+      return "Dodano zadanie. Poniżej szczegóły:";
+    case "delete_task":
+      return "Usunięto zadanie.";
+    case "move_overdue_to_today":
+      return "Przeniosłem zaległe zadania na dziś.";
+    default:
+      return "";
+  }
+}
 
-  const userId = session?.user?.id as string | undefined;
-
-  const connectTodoist = ()=>{
-    if(!userId) return;
-    setConnectingTodoist(true);
-    const url = `/api/todoist/connect?uid=${userId}`;
-    window.location.href = url;
+export async function POST(req: NextRequest) {
+  const { assistantId, messages, userId } = (await req.json()) as {
+    assistantId: AssistantId;
+    userId: string;
+    messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
   };
-  const disconnectTodoist = async ()=>{
-    if(!userId) return;
-    await fetch("/api/todoist/disconnect", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ userId }) });
-    alert("Odłączono Todoist.");
-  };
-  const send = async ()=>{
-    if(!input.trim() || !userId) return;
-    const myMsg: Msg = { role:'user', content: input.trim() };
-    setMessages(m=>[...m,myMsg]); setInput('');
-    const res = await fetch("/api/chat", { method:"POST", headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ assistantId: assistant, messages: [...messages, myMsg], userId })
-    });
-    const data = await res.json();
-    const a: Msg = { role:'assistant', content: data.content, toolResult: data.toolResult };
-    setMessages(m=>[...m,a]);
-  };
 
-  if(!session){
-    const SignIn = require("@/components/SignIn").SignIn;
-    return <SignIn />;
+  if (!assistantId || !userId) {
+    return new NextResponse("Missing assistantId or userId", { status: 400 });
   }
 
-  return (
-    <div className="max-w-3xl mx-auto p-4 space-y-4">
-      <header className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="text-2xl font-bold">ZenON</div>
-          <div className="text-sm text-zinc-600">Asystenci ADHD & anty-prokrastynacja</div>
-        </div>
-        <div className="flex gap-2 items-center">
-          <AssistantSelector value={assistant} onChange={setAssistant} />
-          <button className="btn bg-accent text-white" onClick={connectTodoist} disabled={!userId || connectingTodoist}>
-            {connectingTodoist ? "Łączenie..." : "Połącz Todoist"}
-          </button>
-          <button className="btn bg-white" onClick={disconnectTodoist}>Odłącz</button>
-        </div>
-      </header>
+  const conf = assistants[assistantId];
+  const baseSystem = readPrompt(assistantId);
+  const kb = readKnowledge(assistantId);
+  const system = kb
+    ? `${baseSystem}\n\n# Dodatkowa baza wiedzy\n${kb}`
+    : baseSystem;
 
-      <main className="space-y-4">
-        {messages.map((m,i)=> (
-          <div key={i} className="space-y-2">
-            <Bubble role={m.role}><div className="prose prose-zinc max-w-none"><pre className="whitespace-pre-wrap">{m.content}</pre></div></Bubble>
-            {m.toolResult && Array.isArray(m.toolResult) && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {m.toolResult.map((t:any)=> <TaskCard key={t.id} t={t} />)}
-              </div>
-            )}
-            {m.toolResult && m.toolResult.moved && (
-              <div className="text-sm text-zinc-600">Przeniesiono {m.toolResult.moved} zadań na dziś.</div>
-            )}
-          </div>
-        ))}
-      </main>
+  const convo = conf.stateless
+    ? [{ role: "system", content: system }, messages[messages.length - 1]]
+    : [{ role: "system", content: system }, ...messages];
 
-      <footer className="sticky bottom-0 bg-soft py-2">
-        <div className="flex gap-2">
-          <input className="input"
-            placeholder={assistant==='hats' ? "Opisz dylemat – zacznijmy pytaniami." : "Napisz, co chcesz zrobić (np. „Pokaż dzisiejsze zadania”)."}
-            value={input} onChange={(e)=>setInput(e.target.value)} onKeyDown={(e)=> e.key==='Enter' ? send() : null}
-          />
-          <button className="btn bg-ink text-white" onClick={send}>Wyślij</button>
-        </div>
-      </footer>
-    </div>
-  );
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: convo as any,
+    temperature: 0.5,
+  });
+
+  const raw = completion.choices[0]?.message?.content || "";
+  const tool = extractToolCall(raw);
+  const cleaned = stripToolFence(raw);
+
+  // Jeśli jest tool-call i to asystent Todoist → wykonujemy akcję i zwracamy ludzki tekst + rezultat
+  if (tool && assistantId === "todoist") {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL}/api/todoist/actions`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          action: tool.action,
+          payload: tool.payload,
+        }),
+      }
+    );
+
+    let toolResult: any = null;
+    try {
+      toolResult = await res.json();
+    } catch {
+      /* ignore */
+    }
+
+    const human = cleaned || humanizeToolAction(tool.action) || "Gotowe.";
+    return NextResponse.json({ content: human, toolResult });
+  }
+
+  // W pozostałych przypadkach zwracamy oczyszczony tekst
+  return NextResponse.json({ content: cleaned || raw });
 }
