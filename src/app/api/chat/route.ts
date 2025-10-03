@@ -12,39 +12,15 @@ function extractToolCall(text: string) {
   const payloadMatch = block.match(/payload:\s*([\s\S]+)/);
   let payload: any = {};
   if (payloadMatch) {
-    try {
-      payload = JSON.parse(payloadMatch[1].trim());
-    } catch {}
+    try { payload = JSON.parse(payloadMatch[1].trim()); } catch {}
   }
   return { action: actionMatch?.[1], payload };
 }
+const stripTool = (t:string)=> t.replace(/```tool[\s\S]*?```/g,"").trim();
 
-function stripToolFence(text: string) {
-  return text.replace(/```tool[\s\S]*?```/g, "").trim();
-}
-
-function humanizeToolAction(action?: string) {
-  switch (action) {
-    case "get_today_tasks":
-      return "Oto Twoje zadania na dziś:";
-    case "get_overdue_tasks":
-      return "Oto Twoje przeterminowane zadania:";
-    case "list_projects":
-      return "Lista projektów:";
-    case "add_task":
-      return "Dodano zadanie. Poniżej szczegóły:";
-    case "delete_task":
-      return "Usunięto zadanie.";
-    case "move_overdue_to_today":
-      return "Przeniosłem zaległe zadania na dziś.";
-    default:
-      return "";
-  }
-}
-
-function wantsGrouping(text: string) {
-  return /(pogrupuj|zgrupuj|grup|bloki|kategorie|tematyczn)/i.test(text);
-}
+const wantsGrouping = (t:string)=> /(pogrupuj|zgrupuj|grup|bloki|kategorie|tematyczn)/i.test(t);
+const wantsOrdering = (t:string)=> /(kolejność|kolejnosc|priorytet|uporządkuj|uporzadkuj|plan dnia|harmonogram|schedule|order)/i.test(t);
+const wantsBreakdown = (t:string)=> /(rozbij|podziel|kroki|steps|subtask)/i.test(t);
 
 export async function POST(req: NextRequest) {
   const { assistantId, messages, userId, contextTasks } = (await req.json()) as {
@@ -54,75 +30,72 @@ export async function POST(req: NextRequest) {
     contextTasks?: Array<any>;
   };
 
-  if (!assistantId || !userId) {
+  if (!assistantId || !userId)
     return new NextResponse("Missing assistantId or userId", { status: 400 });
-  }
 
   const conf = assistants[assistantId];
   const baseSystem = readPrompt(assistantId);
   const kb = readKnowledge(assistantId);
-  const system = kb
-    ? `${baseSystem}\n\n# Dodatkowa baza wiedzy\n${kb}`
-    : baseSystem;
+  const system = kb ? `${baseSystem}\n\n# Dodatkowa baza wiedzy\n${kb}` : baseSystem;
 
   const convo = conf.stateless
     ? [{ role: "system", content: system }, messages[messages.length - 1]]
     : [{ role: "system", content: system }, ...messages];
 
-  const lastUserText =
-    messages.filter((m) => m.role === "user").slice(-1)[0]?.content || "";
+  const lastUserText = messages.filter(m=>m.role==="user").slice(-1)[0]?.content || "";
 
-  // SPECIAL CASE: Grupowanie zadań, jeśli mamy kontekst zadań i prośbę o grupy
-  if (
-    assistantId === "todoist" &&
-    contextTasks &&
-    contextTasks.length > 0 &&
-    wantsGrouping(lastUserText)
-  ) {
-    // Zlecamy modelowi zwrot WYŁĄCZNIE JSON-a ze strukturą grup.
-    const sys =
-      "Jesteś pomocnikiem, który grupuje zadania Todoist po tematach. " +
-      "Zwróć wyłącznie poprawny JSON w formacie: " +
-      `{"groups":[{"title":"<nazwa grupy>","task_ids":["<id1>","<id2>", ...]}]}. ` +
-      "Bez komentarzy, bez markdown, bez dodatkowego tekstu.";
-    const user = [
-      "Oto lista zadań do pogrupowania (id i tytuł):",
-      ...contextTasks.map((t: any) => `- ${t.id}: ${t.content}`),
-      "",
-      "Podziel je na 3–8 sensownych grup tematycznych.",
-    ].join("\n");
-
-    const cmp = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      temperature: 0.2,
-      messages: [
-        { role: "system", content: sys },
-        { role: "user", content: user },
-      ],
-    });
-
-    const raw = cmp.choices[0]?.message?.content?.trim() || "{}";
-    let parsed: any = null;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      // Spróbuj zdjąć ewentualne code fences
-      const cleaned = raw.replace(/```json|```/g, "").trim();
-      try {
-        parsed = JSON.parse(cleaned);
-      } catch {
-        parsed = { groups: [] };
-      }
+  // ---- Inteligentne operacje na snapshocie zadań (bez kolejnych tool-calli) ----
+  if (assistantId === "todoist" && contextTasks && contextTasks.length > 0) {
+    if (wantsOrdering(lastUserText)) {
+      const sys = "Jesteś planerem dnia. Otrzymasz listę zadań Todoist (id + tytuł + terminy + priorytety). Podaj kolejność wykonywania na dziś w JSON: {\"order\":[\"<task_id>\",...], \"notes\":\"(krótkie wskazówki)\"}. Tylko JSON, bez markdown.";
+      const user = [
+        "Zadania do uporządkowania:",
+        ...contextTasks.map((t: any) => `- ${t.id} | P${t.priority ?? 1} | ${t.due?.date ?? "-"} | ${t.content}`),
+        "",
+        "Kryteria: krótkość, ważność (P1>P4?), terminy (przeterminowane i dziś), naturalne bloki."
+      ].join("\n");
+      const cmp = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        temperature: 0.2,
+        messages: [{ role:"system", content: sys }, { role:"user", content: user }]
+      });
+      const raw = cmp.choices[0]?.message?.content?.trim() || "{}";
+      let parsed:any; try{ parsed = JSON.parse(raw.replace(/```json|```/g,"").trim()); }catch{ parsed = { order:[], notes:"" }; }
+      return NextResponse.json({ content: "Proponowana kolejność wykonania:", toolResult: { plan: parsed, tasks: contextTasks } });
     }
 
-    // Zwracamy komunikat + strukturę do renderu (grupy + surowe taski dla mapowania)
-    return NextResponse.json({
-      content: "Pogrupowałem zadania na bloki tematyczne:",
-      toolResult: { groups: parsed.groups || [], tasks: contextTasks },
-    });
-  }
+    if (wantsGrouping(lastUserText)) {
+      const sys = "Zwróć wyłącznie JSON: {\"groups\":[{\"title\":\"<nazwa>\",\"task_ids\":[\"<id>\",...]}]}. Bez markdown.";
+      const user = [
+        "Pogrupuj tematycznie zadania (3–8 grup):",
+        ...contextTasks.map((t: any) => `- ${t.id}: ${t.content}`)
+      ].join("\n");
+      const cmp = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        temperature: 0.2,
+        messages: [{ role:"system", content: sys }, { role:"user", content: user }]
+      });
+      const raw = cmp.choices[0]?.message?.content?.trim() || "{}";
+      let parsed:any; try{ parsed = JSON.parse(raw.replace(/```json|```/g,"").trim()); }catch{ parsed = { groups:[] }; }
+      return NextResponse.json({ content: "Pogrupowałem zadania na bloki:", toolResult: { groups: parsed.groups||[], tasks: contextTasks } });
+    }
 
-  // Standardowa ścieżka: generacja + ewentualny tool-call
+    if (wantsBreakdown(lastUserText)) {
+      const sys = "Rozbij wybrane zadanie na 5–10 krótkich kroków. Zwróć JSON: {\"task_id\":\"...\",\"steps\":[\"krok1\",...]}";
+      const user = "Wybierz najbardziej złożone zadanie z listy i zaproponuj kroki:\n" +
+        contextTasks.map((t:any)=> `- ${t.id}: ${t.content}`).join("\n");
+      const cmp = await openai.chat.completions.create({
+        model:"gpt-4o-mini", temperature:0.3,
+        messages:[{role:"system",content:sys},{role:"user",content:user}]
+      });
+      const raw = cmp.choices[0]?.message?.content?.trim() || "{}";
+      let parsed:any; try{ parsed = JSON.parse(raw.replace(/```json|```/g,"").trim()); }catch{ parsed = { task_id:"", steps:[] }; }
+      return NextResponse.json({ content: "Proponuję takie kroki:", toolResult: { breakdown: parsed } });
+    }
+  }
+  // -----------------------------------------------------------------------------
+
+  // Standardowa generacja + narzędzia
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     messages: convo as any,
@@ -131,30 +104,16 @@ export async function POST(req: NextRequest) {
 
   const raw = completion.choices[0]?.message?.content || "";
   const tool = extractToolCall(raw);
-  const cleaned = stripToolFence(raw);
+  const cleaned = stripTool(raw);
 
   if (tool && assistantId === "todoist") {
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL}/api/todoist/actions`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId,
-          action: tool.action,
-          payload: tool.payload,
-        }),
-      }
-    );
-
-    let toolResult: any = null;
-    try {
-      toolResult = await res.json();
-    } catch {
-      /* ignore */
-    }
-
-    const human = cleaned || humanizeToolAction(tool.action) || "Gotowe.";
+    const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/todoist/actions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, action: tool.action, payload: tool.payload }),
+    });
+    let toolResult:any=null; try{ toolResult = await res.json(); }catch{}
+    const human = cleaned || "Gotowe.";
     return NextResponse.json({ content: human, toolResult });
   }
 
