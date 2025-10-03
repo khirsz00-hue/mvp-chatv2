@@ -2,15 +2,28 @@ import { supabaseAdmin } from "@/lib/supabaseClient";
 
 const TODOIST_BASE = "https://api.todoist.com/rest/v2";
 
-// === TOKENS ===
+// ---------- helpers ----------
+async function assertOk(res: Response, ctx: string) {
+  if (res.ok) return;
+  const text = await res.text().catch(() => "");
+  throw new Error(`${ctx} :: HTTP ${res.status} :: ${text}`);
+}
+
+const AUTH = (token: string) => ({
+  Authorization: `Bearer ${token}`,
+  "Content-Type": "application/json",
+});
+
+// ---------- tokens ----------
 export async function getUserTodoistToken(userId: string) {
   const sb = supabaseAdmin();
   const { data, error } = await sb
     .from("user_tokens")
-    .select("*")
+    .select("access_token")
     .eq("user_id", userId)
     .eq("provider", "todoist")
     .maybeSingle();
+
   if (error) throw error;
   return data?.access_token as string | undefined;
 }
@@ -47,11 +60,8 @@ export async function exchangeCodeForToken(code: string) {
       code,
     }),
   });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Todoist token exchange failed (${res.status}): ${text}`);
-  }
-  return res.json() as Promise<{ access_token: string; token_type: string }>;
+  await assertOk(res, "Todoist token exchange");
+  return (await res.json()) as { access_token: string; token_type: string };
 }
 
 export async function saveTodoistToken(userId: string, token: string) {
@@ -80,101 +90,102 @@ export async function removeTodoistToken(userId: string) {
   if (error) throw error;
 }
 
-// === HELPERS ===
-const AUTH = (token: string) => ({
-  Authorization: `Bearer ${token}`,
-  "Content-Type": "application/json",
-});
-
-// === READ ===
+// ---------- reads ----------
 export async function listTodayTasks(userId: string) {
   const token = await getUserTodoistToken(userId);
-  if (!token) throw new Error("Brak połączenia z Todoist.");
+  if (!token) throw new Error("Brak połączenia z Todoist (token nie znaleziony).");
+
   const res = await fetch(
     `${TODOIST_BASE}/tasks?filter=${encodeURIComponent("today")}`,
     { headers: AUTH(token) }
   );
-  if (!res.ok) throw new Error("Nie udało się pobrać zadań na dziś.");
+  await assertOk(res, "List today tasks");
   return res.json();
 }
 
 export async function listOverdueTasks(userId: string) {
   const token = await getUserTodoistToken(userId);
-  if (!token) throw new Error("Brak połączenia z Todoist.");
+  if (!token) throw new Error("Brak połączenia z Todoist (token nie znaleziony).");
+
   const res = await fetch(
     `${TODOIST_BASE}/tasks?filter=${encodeURIComponent("overdue")}`,
     { headers: AUTH(token) }
   );
-  if (!res.ok) throw new Error("Nie udało się pobrać zadań.");
+  await assertOk(res, "List overdue tasks");
   return res.json();
 }
 
 export async function listProjects(userId: string) {
   const token = await getUserTodoistToken(userId);
-  if (!token) throw new Error("Brak połączenia z Todoist.");
+  if (!token) throw new Error("Brak połączenia z Todoist (token nie znaleziony).");
+
   const res = await fetch(`${TODOIST_BASE}/projects`, { headers: AUTH(token) });
-  if (!res.ok) throw new Error("Nie udało się pobrać projektów.");
+  await assertOk(res, "List projects");
   return res.json();
 }
 
-// === WRITE ===
+// ---------- writes ----------
 export async function addTask(
   userId: string,
   input: { content: string; due_string?: string; project_id?: string; priority?: number }
 ) {
   const token = await getUserTodoistToken(userId);
-  if (!token) throw new Error("Brak połączenia z Todoist.");
+  if (!token) throw new Error("Brak połączenia z Todoist (token nie znaleziony).");
+
   const res = await fetch(`${TODOIST_BASE}/tasks`, {
     method: "POST",
     headers: AUTH(token),
     body: JSON.stringify(input),
   });
-  if (!res.ok) throw new Error("Nie udało się dodać zadania.");
+  await assertOk(res, "Add task");
   return res.json();
 }
 
 export async function deleteTask(userId: string, taskId: string) {
   const token = await getUserTodoistToken(userId);
-  if (!token) throw new Error("Brak połączenia z Todoist.");
+  if (!token) throw new Error("Brak połączenia z Todoist (token nie znaleziony).");
+
   const res = await fetch(`${TODOIST_BASE}/tasks/${taskId}`, {
     method: "DELETE",
     headers: AUTH(token),
   });
-  if (!res.ok) throw new Error("Nie udało się usunąć zadania.");
+  await assertOk(res, "Delete task");
   return { ok: true };
 }
 
-/** oznacz ukończone */
 export async function closeTask(userId: string, taskId: string) {
   const token = await getUserTodoistToken(userId);
-  if (!token) throw new Error("Brak połączenia z Todoist.");
+  if (!token) throw new Error("Brak połączenia z Todoist (token nie znaleziony).");
+
   const res = await fetch(`${TODOIST_BASE}/tasks/${taskId}/close`, {
     method: "POST",
     headers: AUTH(token),
   });
-  if (!res.ok) throw new Error("Nie udało się oznaczyć zadania jako ukończone.");
+  await assertOk(res, "Close task");
   return { ok: true };
 }
 
-/** przełóż na jutro */
 export async function postponeToTomorrow(userId: string, taskId: string) {
   const token = await getUserTodoistToken(userId);
-  if (!token) throw new Error("Brak połączenia z Todoist.");
+  if (!token) throw new Error("Brak połączenia z Todoist (token nie znaleziony).");
+
   const res = await fetch(`${TODOIST_BASE}/tasks/${taskId}`, {
     method: "POST",
     headers: AUTH(token),
     body: JSON.stringify({ due_string: "tomorrow" }),
   });
-  if (!res.ok) throw new Error("Nie udało się przełożyć zadania.");
+  await assertOk(res, "Postpone task to tomorrow");
   return { ok: true };
 }
 
 export async function moveOverdueToToday(userId: string) {
-  const tasks = await listOverdueTasks(userId);
   const token = await getUserTodoistToken(userId);
-  if (!token) throw new Error("Brak połączenia z Todoist.");
+  if (!token) throw new Error("Brak połączenia z Todoist (token nie znaleziony).");
+
+  const tasks = await listOverdueTasks(userId);
   let moved = 0;
   const ids: string[] = [];
+
   for (const t of tasks) {
     const res = await fetch(`${TODOIST_BASE}/tasks/${t.id}`, {
       method: "POST",
@@ -183,7 +194,10 @@ export async function moveOverdueToToday(userId: string) {
     });
     if (res.ok) {
       moved++;
-      ids.push(t.id);
+      ids.push(String(t.id));
+    } else {
+      const txt = await res.text().catch(() => "");
+      console.error("Move single overdue -> today failed", t.id, res.status, txt);
     }
   }
   return { moved, ids };
