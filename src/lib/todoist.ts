@@ -140,6 +140,31 @@ export async function deleteTask(userId: string, taskId: string) {
   return { ok: true };
 }
 
+/** oznacz ukończone */
+export async function closeTask(userId: string, taskId: string) {
+  const token = await getUserTodoistToken(userId);
+  if (!token) throw new Error("Brak połączenia z Todoist.");
+  const res = await fetch(`${TODOIST_BASE}/tasks/${taskId}/close`, {
+    method: "POST",
+    headers: AUTH(token),
+  });
+  if (!res.ok) throw new Error("Nie udało się oznaczyć zadania jako ukończone.");
+  return { ok: true };
+}
+
+/** przełóż na jutro */
+export async function postponeToTomorrow(userId: string, taskId: string) {
+  const token = await getUserTodoistToken(userId);
+  if (!token) throw new Error("Brak połączenia z Todoist.");
+  const res = await fetch(`${TODOIST_BASE}/tasks/${taskId}`, {
+    method: "POST",
+    headers: AUTH(token),
+    body: JSON.stringify({ due_string: "tomorrow" }),
+  });
+  if (!res.ok) throw new Error("Nie udało się przełożyć zadania.");
+  return { ok: true };
+}
+
 export async function moveOverdueToToday(userId: string) {
   const tasks = await listOverdueTasks(userId);
   const token = await getUserTodoistToken(userId);
