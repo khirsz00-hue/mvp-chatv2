@@ -4,7 +4,6 @@ import {
   listTomorrowTasks,
   listWeekTasks,
   listOverdueTasks,
-  listProjects,
   addTask,
   deleteTask,
   closeTask,
