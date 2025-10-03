@@ -1,46 +1,57 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTodoistClient } from "@/lib/todoist";
+import {
+  addTask,
+  deleteTask,
+  listOverdueTasks,
+  listProjects,
+  listTodayTasks,
+  moveOverdueToToday,
+  closeTask,
+  postponeToTomorrow,
+} from "@/lib/todoist";
 
-export async function POST(req: NextRequest) {
-  try {
-    const { action, taskId } = await req.json();
-    const client = await getTodoistClient(req);
+/**
+ * Endpoint do wszystkich akcji Todoist.
+ * WYMAGA: body: { userId: string, action: string, payload?: any }
+ */
+export async function POST(req: NextRequest){
+  const { userId, action, payload } = await req.json();
 
-    if (!client) {
-      return NextResponse.json({ error: "Not connected to Todoist" }, { status: 401 });
-    }
+  if(!userId || !action) {
+    return new NextResponse("Missing params", { status: 400 });
+  }
 
-    let result;
+  try{
+    switch(action){
+      case "get_today_tasks":
+        return NextResponse.json(await listTodayTasks(userId));
 
-    switch (action) {
-      case "complete":
-        result = await client.closeTask(taskId);
-        break;
+      case "get_overdue_tasks":
+        return NextResponse.json(await listOverdueTasks(userId));
+
+      case "list_projects":
+        return NextResponse.json(await listProjects(userId));
+
+      case "add_task":
+        return NextResponse.json(await addTask(userId, payload));
+
+      case "delete_task":
+        return NextResponse.json(await deleteTask(userId, String(payload.task_id)));
+
+      case "complete_task":
+        return NextResponse.json(await closeTask(userId, String(payload.task_id)));
 
       case "move_to_tomorrow":
-        // pobieramy task -> zmieniamy due date na jutro
-        const task = await client.getTask(taskId);
-        if (task?.due?.date) {
-          const newDate = new Date();
-          newDate.setDate(newDate.getDate() + 1);
-          result = await client.updateTask(taskId, {
-            due_date: newDate.toISOString().split("T")[0],
-          });
-        } else {
-          return NextResponse.json({ error: "Task has no due date" }, { status: 400 });
-        }
-        break;
+        return NextResponse.json(await postponeToTomorrow(userId, String(payload.task_id)));
+
+      case "move_overdue_to_today":
+        return NextResponse.json(await moveOverdueToToday(userId));
 
       default:
-        return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+        return new NextResponse("Unknown action", { status: 400 });
     }
-
-    return NextResponse.json({ success: true, result });
-  } catch (e: any) {
-    console.error("Todoist action error", e);
-    return NextResponse.json(
-      { error: e.message || "Todoist action failed" },
-      { status: 500 }
-    );
+  }catch(e:any){
+    console.error("Todoist actions error:", e);
+    return new NextResponse(e?.message || "Error", { status: 500 });
   }
 }
