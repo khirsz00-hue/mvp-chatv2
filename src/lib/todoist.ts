@@ -2,6 +2,7 @@ import { supabaseAdmin } from "@/lib/supabaseClient";
 
 const TODOIST_BASE = "https://api.todoist.com/rest/v2";
 
+// === TOKENS ===
 export async function getUserTodoistToken(userId: string) {
   const sb = supabaseAdmin();
   const { data, error } = await sb
@@ -79,11 +80,13 @@ export async function removeTodoistToken(userId: string) {
   if (error) throw error;
 }
 
+// === HELPERS ===
 const AUTH = (token: string) => ({
   Authorization: `Bearer ${token}`,
   "Content-Type": "application/json",
 });
 
+// === READ ===
 export async function listTodayTasks(userId: string) {
   const token = await getUserTodoistToken(userId);
   if (!token) throw new Error("Brak połączenia z Todoist.");
@@ -114,6 +117,7 @@ export async function listProjects(userId: string) {
   return res.json();
 }
 
+// === WRITE ===
 export async function addTask(
   userId: string,
   input: { content: string; due_string?: string; project_id?: string; priority?: number }
