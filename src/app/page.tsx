@@ -5,14 +5,13 @@ import { AssistantSelector } from "@/components/AssistantSelector";
 import { Bubble } from "@/components/MessageBubble";
 import { TaskCard } from "@/components/TaskCard";
 import { GroupedTasks } from "@/components/GroupedTasks";
+import { GroupedByProject } from "@/components/GroupedByProject";
 import type { AssistantId } from "@/assistants/types";
 import { assistants } from "@/assistants/config";
 
 type Msg = { role:'user'|'assistant'; content:string; toolResult?:any };
 
-function stripToolFenceLocal(text: string) {
-  return text.replace(/```tool[\s\S]*?```/g, "").trim();
-}
+const stripTool = (t:string)=> t.replace(/```tool[\s\S]*?```/g,"").trim();
 
 export default function Home(){
   const sb = supabaseBrowser();
@@ -30,7 +29,7 @@ export default function Home(){
 
   const userId = session?.user?.id as string | undefined;
 
-  // Wyciągnij ostatnią listę zadań z historii (dla grupowania)
+  // Ostatni snapshot zadań
   const lastTasks = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       const m = messages[i];
@@ -39,6 +38,18 @@ export default function Home(){
     }
     return [] as any[];
   }, [messages]);
+
+  // Szybkie przyciski
+  async function quick(action: string, label: string){
+    setMessages(m=>[...m, { role:'user', content: label }]);
+    const res = await fetch("/api/chat", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ assistantId: assistant, messages: [...messages, { role:'user', content: label }], userId, contextTasks: lastTasks })
+    });
+    const data = await res.json();
+    setMessages(m=>[...m, { role:'assistant', content: stripTool(data.content||""), toolResult: data.toolResult }]);
+  }
 
   const connectTodoist = ()=>{
     if(!userId) return;
@@ -55,26 +66,14 @@ export default function Home(){
   const send = async ()=>{
     if(!input.trim() || !userId) return;
     const myMsg: Msg = { role:'user', content: input.trim() };
-    setMessages(m=>[...m,myMsg]);
-    setInput('');
-
+    setMessages(m=>[...m,myMsg]); setInput('');
     const res = await fetch("/api/chat", {
       method:"POST",
       headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({
-        assistantId: assistant,
-        messages: [...messages, myMsg],
-        userId,
-        contextTasks: lastTasks // <— tu przekazujemy zadania do ewentualnego grupowania
-      })
+      body: JSON.stringify({ assistantId: assistant, messages: [...messages, myMsg], userId, contextTasks: lastTasks })
     });
     const data = await res.json();
-    const a: Msg = {
-      role:'assistant',
-      content: stripToolFenceLocal(data.content || ""),
-      toolResult: data.toolResult
-    };
-    setMessages(m=>[...m,a]);
+    setMessages(m=>[...m, { role:'assistant', content: stripTool(data.content||""), toolResult: data.toolResult }]);
   };
 
   if(!session){
@@ -87,52 +86,72 @@ export default function Home(){
       <header className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="text-2xl font-bold">ZenON</div>
-          <div className="text-sm text-zinc-600">
-            Asystenci ADHD & anty-prokrastynacja
-          </div>
+          <div className="text-sm text-zinc-600">Asystenci ADHD & anty-prokrastynacja</div>
         </div>
         <div className="flex gap-2 items-center">
           <AssistantSelector value={assistant} onChange={setAssistant} />
-          <button className="btn bg-accent text-white"
-            onClick={connectTodoist}
-            disabled={!userId || connectingTodoist}
-          >
+          <button className="btn bg-accent text-white" onClick={connectTodoist} disabled={!userId || connectingTodoist}>
             {connectingTodoist ? "Łączenie..." : "Połącz Todoist"}
           </button>
-          <button className="btn bg-white" onClick={disconnectTodoist}>
-            Odłącz
-          </button>
+          <button className="btn bg-white" onClick={disconnectTodoist}>Odłącz</button>
         </div>
       </header>
+
+      {/* Szybkie akcje */}
+      <div className="flex flex-wrap gap-2">
+        <button className="btn bg-ink text-white text-sm" onClick={()=>quick("get_today_tasks","daj taski na dzisiaj")}>daj taski na dzisiaj</button>
+        <button className="btn bg-ink text-white text-sm" onClick={()=>quick("get_overdue_tasks","daj przeterminowane")}>daj przeterminowane</button>
+        <button className="btn bg-white text-sm" onClick={()=>setMessages(m=>[...m,{role:"assistant",content:"Grupuję wg projektów…", toolResult:{ groupByProject:true, tasks:lastTasks }}])}>grupuj wg projektu</button>
+        <button className="btn bg-white text-sm" onClick={()=>quick("order","zaproponuj kolejność")}>zaproponuj kolejność</button>
+      </div>
 
       <main className="space-y-4">
         {messages.map((m, i) => (
           <div key={i} className="space-y-2">
             <Bubble role={m.role}>
               <div className="prose prose-zinc max-w-none">
-                <pre className="whitespace-pre-wrap">
-                  {stripToolFenceLocal(m.content)}
-                </pre>
+                <pre className="whitespace-pre-wrap">{stripTool(m.content)}</pre>
               </div>
             </Bubble>
 
-            {/* 1) Standardowa lista zadań (tablica) */}
+            {/* 1) zwykła lista zadań */}
             {m.toolResult && Array.isArray(m.toolResult) && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {m.toolResult.map((t: any) => (
-                  <TaskCard key={t.id} t={t} />
-                ))}
+                {m.toolResult.map((t: any) => <TaskCard key={t.id} t={t} />)}
               </div>
             )}
 
-            {/* 2) Grupowanie: { groups, tasks } */}
+            {/* 2) grupy z LLM */}
             {m.toolResult?.groups && m.toolResult?.tasks && (
               <GroupedTasks groups={m.toolResult.groups} tasks={m.toolResult.tasks} />
             )}
 
-            {m.toolResult && m.toolResult.moved && (
-              <div className="text-sm text-zinc-600">
-                Przeniesiono {m.toolResult.moved} zadań na dziś.
+            {/* 3) grupowanie lokalne wg projektu */}
+            {m.toolResult?.groupByProject && m.toolResult?.tasks && (
+              <GroupedByProject tasks={m.toolResult.tasks} />
+            )}
+
+            {/* 4) plan kolejności */}
+            {m.toolResult?.plan && m.toolResult?.tasks && (
+              <div className="space-y-2">
+                <div className="text-sm text-zinc-700 px-1">Plan wykonania (kolejność):</div>
+                <ol className="list-decimal pl-6 space-y-1">
+                  {m.toolResult.plan.order?.map((id:string)=> {
+                    const t = (m.toolResult.tasks as any[]).find((x)=> String(x.id)===String(id));
+                    return <li key={id}>{t ? t.content : id}</li>;
+                  })}
+                </ol>
+                {m.toolResult.plan.notes && <div className="text-xs text-zinc-500 px-1">{m.toolResult.plan.notes}</div>}
+              </div>
+            )}
+
+            {/* 5) breakdown na kroki */}
+            {m.toolResult?.breakdown && (
+              <div className="space-y-2">
+                <div className="text-sm text-zinc-700 px-1">Kroki dla zadania {m.toolResult.breakdown.task_id}:</div>
+                <ul className="list-disc pl-6">
+                  {m.toolResult.breakdown.steps?.map((s:string,idx:number)=> <li key={idx}>{s}</li>)}
+                </ul>
               </div>
             )}
           </div>
@@ -141,20 +160,11 @@ export default function Home(){
 
       <footer className="sticky bottom-0 bg-soft py-2">
         <div className="flex gap-2">
-          <input
-            className="input"
-            placeholder={
-              assistant === 'hats'
-                ? "Opisz dylemat – zacznijmy pytaniami."
-                : "Napisz, co chcesz zrobić (np. „Pokaż dzisiejsze zadania”)."
-            }
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => (e.key === 'Enter' ? send() : null)}
+          <input className="input"
+            placeholder={assistant==='hats' ? "Opisz dylemat – zacznijmy pytaniami." : "Napisz, co chcesz zrobić (np. „Pokaż dzisiejsze zadania”)."}
+            value={input} onChange={(e)=>setInput(e.target.value)} onKeyDown={(e)=> e.key==='Enter' ? send() : null}
           />
-          <button className="btn bg-ink text-white" onClick={send}>
-            Wyślij
-          </button>
+          <button className="btn bg-ink text-white" onClick={send}>Wyślij</button>
         </div>
       </footer>
     </div>
