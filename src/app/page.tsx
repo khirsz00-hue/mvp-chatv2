@@ -1,132 +1,158 @@
-import { NextRequest, NextResponse } from "next/server";
-import { assistants } from "@/assistants/config";
-import { readKnowledge, readPrompt } from "@/assistants/server";
+'use client';
+import { useEffect, useMemo, useState } from "react";
+import { supabaseBrowser } from "@/lib/supabaseClient";
+import { AssistantSelector } from "@/components/AssistantSelector";
+import { Bubble } from "@/components/MessageBubble";
+import { TaskCard } from "@/components/TaskCard";
+import { GroupedTasks } from "@/components/GroupedTasks";
+import { GroupedByProject } from "@/components/GroupedByProject";
 import type { AssistantId } from "@/assistants/types";
-import { openai } from "@/lib/openai";
 
-function extractToolCall(text: string) {
-  const m = text.match(/```tool([\s\S]*?)```/);
-  if (!m) return null;
-  const block = m[1];
-  const actionMatch = block.match(/action:\s*([\w_]+)/);
-  const payloadMatch = block.match(/payload:\s*([\s\S]+)/);
-  let payload: any = {};
-  if (payloadMatch) {
-    try { payload = JSON.parse(payloadMatch[1].trim()); } catch {}
-  }
-  return { action: actionMatch?.[1], payload };
-}
+type Msg = { role:'user'|'assistant'; content:string; toolResult?:any };
+const stripTool = (t:string)=> t.replace(/```tool[\s\S]*?```/g,"").trim();
 
-const stripTool = (t: string) => t.replace(/```tool[\s\S]*?```/g, "").trim();
+export default function Home(){
+  const sb = supabaseBrowser();
+  const [session, setSession] = useState<any>(null);
+  const [assistant, setAssistant] = useState<AssistantId>('todoist');
+  const [messages, setMessages] = useState<Msg[]>([]);
+  const [input, setInput] = useState('');
+  const [connectingTodoist, setConnectingTodoist] = useState(false);
 
-function humanizeToolAction(action?: string) {
-  switch (action) {
-    case "get_today_tasks": return "Oto Twoje zadania na dziś:";
-    case "get_overdue_tasks": return "Oto Twoje przeterminowane zadania:";
-    case "list_projects": return "Lista projektów:";
-    case "add_task": return "Dodano zadanie. Poniżej szczegóły:";
-    case "delete_task": return "Usunięto zadanie.";
-    case "complete_task": return "Oznaczyłem zadanie jako ukończone.";
-    case "move_to_tomorrow": return "Przeniosłem zadanie na jutro.";
-    case "move_overdue_to_today": return "Przeniosłem zaległe zadania na dziś.";
-    default: return "Gotowe.";
-  }
-}
+  useEffect(()=>{
+    sb.auth.getSession().then(({data})=> setSession(data.session));
+    const { data: sub } = sb.auth.onAuthStateChange((_e,s)=> setSession(s));
+    return ()=> sub.subscription.unsubscribe();
+  },[]);
 
-const wantsGrouping = (t: string) => /(pogrupuj|zgrupuj|grup|bloki|kategorie|tematyczn)/i.test(t);
-const wantsOrdering = (t: string) => /(kolejność|kolejnosc|priorytet|uporządkuj|uporzadkuj|plan dnia|harmonogram|schedule|order)/i.test(t);
-const wantsBreakdown = (t: string) => /(rozbij|podziel|kroki|steps|subtask)/i.test(t);
+  const userId = session?.user?.id as string | undefined;
 
-export async function POST(req: NextRequest) {
-  const { assistantId, messages, userId, contextTasks } = (await req.json()) as {
-    assistantId: AssistantId;
-    userId: string;
-    messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
-    contextTasks?: Array<any>;
+  const lastTasks = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (Array.isArray(m.toolResult)) return m.toolResult as any[];
+      if (m.toolResult?.groups && m.toolResult?.tasks) return m.toolResult.tasks as any[];
+    }
+    return [] as any[];
+  }, [messages]);
+
+  const connectTodoist = ()=>{
+    if(!userId) return;
+    setConnectingTodoist(true);
+    window.location.href = `/api/todoist/connect?uid=${userId}`;
+  };
+  const disconnectTodoist = async ()=>{
+    if(!userId) return;
+    await fetch("/api/todoist/disconnect", {
+      method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ userId })
+    });
+    alert("Odłączono Todoist.");
   };
 
-  if (!assistantId || !userId)
-    return new NextResponse("Missing assistantId or userId", { status: 400 });
-
-  const baseSystem = readPrompt(assistantId);
-  const kb = readKnowledge(assistantId);
-  const system = kb ? `${baseSystem}\n\n# Dodatkowa baza wiedzy\n${kb}` : baseSystem;
-
-  const conf = assistants[assistantId];
-  const convo = conf.stateless
-    ? [{ role: "system", content: system }, messages[messages.length - 1]]
-    : [{ role: "system", content: system }, ...messages];
-
-  const lastUserText = messages.filter(m=>m.role==="user").slice(-1)[0]?.content || "";
-
-  // --- praca na snapshocie
-  if (assistantId === "todoist" && contextTasks && contextTasks.length > 0) {
-    if (wantsOrdering(lastUserText)) {
-      const sys = "Jesteś planerem dnia. Zwróć tylko JSON: {\"order\":[\"<task_id>\"...],\"notes\":\"...\"}";
-      const user = [
-        "Zadania do uporządkowania:",
-        ...contextTasks.map((t:any)=> `- ${t.id} | P${t.priority??1} | ${t.due?.date ?? "-"} | ${t.content}`)
-      ].join("\n");
-      const cmp = await openai.chat.completions.create({
-        model:"gpt-4o-mini", temperature:0.2,
-        messages:[{role:"system",content:sys},{role:"user",content:user}]
-      });
-      const raw = cmp.choices[0]?.message?.content?.trim() || "{}";
-      let parsed:any; try{ parsed = JSON.parse(raw.replace(/```json|```/g,"").trim()); }catch{ parsed = { order:[], notes:"" }; }
-      return NextResponse.json({ content:"Proponowana kolejność wykonania:", toolResult:{ plan: parsed, tasks: contextTasks } });
-    }
-
-    if (wantsGrouping(lastUserText)) {
-      const sys = "Zwróć tylko JSON: {\"groups\":[{\"title\":\"...\",\"task_ids\":[\"id\",...]}]}";
-      const user = ["Pogrupuj tematycznie zadania:", ...contextTasks.map((t:any)=> `- ${t.id}: ${t.content}`)].join("\n");
-      const cmp = await openai.chat.completions.create({
-        model:"gpt-4o-mini", temperature:0.2,
-        messages:[{role:"system",content:sys},{role:"user",content:user}]
-      });
-      const raw = cmp.choices[0]?.message?.content?.trim() || "{}";
-      let parsed:any; try{ parsed = JSON.parse(raw.replace(/```json|```/g,"").trim()); }catch{ parsed = { groups:[] }; }
-      return NextResponse.json({ content:"Pogrupowałem zadania na bloki:", toolResult:{ groups: parsed.groups||[], tasks: contextTasks } });
-    }
-
-    if (wantsBreakdown(lastUserText)) {
-      const sys = "Zwróć JSON: {\"task_id\":\"...\",\"steps\":[\"krok1\",...]}";
-      const user = "Wybierz najbardziej złożone zadanie i rozbij na kroki:\n" + contextTasks.map((t:any)=>`- ${t.id}: ${t.content}`).join("\n");
-      const cmp = await openai.chat.completions.create({
-        model:"gpt-4o-mini", temperature:0.3,
-        messages:[{role:"system",content:sys},{role:"user",content:user}]
-      });
-      const raw = cmp.choices[0]?.message?.content?.trim() || "{}";
-      let parsed:any; try{ parsed = JSON.parse(raw.replace(/```json|```/g,"").trim()); }catch{ parsed = { task_id:"", steps:[] }; }
-      return NextResponse.json({ content:"Proponuję takie kroki:", toolResult:{ breakdown: parsed } });
-    }
-  }
-
-  // --- standardowe LLM
-  const completion = await openai.chat.completions.create({
-    model:"gpt-4o-mini", temperature:0.5, messages:convo as any
-  });
-
-  const raw = completion.choices[0]?.message?.content || "";
-  const tool = extractToolCall(raw);
-  const cleaned = stripTool(raw);
-
-  if (tool && assistantId === "todoist") {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/todoist/actions`, {
+  async function sendMsg(text: string){
+    if(!text.trim() || !userId) return;
+    const myMsg: Msg = { role:'user', content: text.trim() };
+    setMessages(m=>[...m,myMsg]);
+    const res = await fetch("/api/chat", {
       method:"POST",
       headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ userId, action: tool.action, payload: tool.payload })
+      body: JSON.stringify({ assistantId: assistant, messages: [...messages, myMsg], userId, contextTasks: lastTasks })
     });
+    const data = await res.json();
 
-    let toolJson:any=null; try{ toolJson = await res.json(); }catch{}
-    const toolResult = (toolJson && typeof toolJson==="object" && "success" in toolJson)
-      ? toolJson.result : toolJson;
+    const toolResult =
+      data && typeof data.toolResult === "object" && data.toolResult !== null && "result" in data.toolResult
+        ? (data.toolResult.result as any)
+        : data.toolResult;
 
-    const human = cleaned && cleaned.toLowerCase()!=="gotowe"
-      ? cleaned
-      : humanizeToolAction(tool.action);
-
-    return NextResponse.json({ content: human, toolResult });
+    setMessages(m=>[...m, { role:'assistant', content: stripTool(data.content||""), toolResult }]);
   }
 
-  return NextResponse.json({ content: cleaned || raw });
+  const send = async ()=>{
+    if(!input.trim()) return;
+    const txt = input; setInput('');
+    await sendMsg(txt);
+  };
+
+  if(!session){
+    const SignIn = require("@/components/SignIn").SignIn;
+    return <SignIn />;
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto p-4 space-y-4">
+      <header className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="text-2xl font-bold">ZenON</div>
+          <div className="text-sm text-zinc-600">Asystenci ADHD & anty-prokrastynacja</div>
+        </div>
+        <div className="flex gap-2 items-center">
+          <AssistantSelector value={assistant} onChange={setAssistant} />
+          <button className="btn bg-accent text-white" onClick={connectTodoist} disabled={!userId || connectingTodoist}>
+            {connectingTodoist ? "Łączenie..." : "Połącz Todoist"}
+          </button>
+          <button className="btn bg-white" onClick={disconnectTodoist}>Odłącz</button>
+        </div>
+      </header>
+
+      <div className="flex flex-wrap gap-2">
+        <button className="btn bg-ink text-white text-sm" onClick={()=>sendMsg("daj taski na dzisiaj")}>daj taski na dzisiaj</button>
+        <button className="btn bg-ink text-white text-sm" onClick={()=>sendMsg("daj przeterminowane")}>daj przeterminowane</button>
+        <button className="btn bg-white text-sm" onClick={()=> setMessages(m=>[...m,{ role:"assistant", content:"Grupuję wg projektów…", toolResult:{ groupByProject:true, tasks:lastTasks } }])}>grupuj wg projektu</button>
+        <button className="btn bg-white text-sm" onClick={()=>sendMsg("zaproponuj kolejność")}>zaproponuj kolejność</button>
+      </div>
+
+      <main className="space-y-4">
+        {messages.map((m, i) => (
+          <div key={i} className="space-y-2">
+            <Bubble role={m.role}>
+              <div className="prose prose-zinc max-w-none">
+                <pre className="whitespace-pre-wrap">{stripTool(m.content)}</pre>
+              </div>
+            </Bubble>
+
+            {m.toolResult && Array.isArray(m.toolResult) && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {m.toolResult.map((t: any) => (
+                  <TaskCard key={t.id} t={t} userId={userId} />
+                ))}
+              </div>
+            )}
+
+            {m.toolResult?.groups && m.toolResult?.tasks && (
+              <GroupedTasks groups={m.toolResult.groups} tasks={m.toolResult.tasks} userId={userId} />
+            )}
+
+            {m.toolResult?.groupByProject && m.toolResult?.tasks && (
+              <GroupedByProject tasks={m.toolResult.tasks} userId={userId} />
+            )}
+
+            {m.toolResult?.plan && m.toolResult?.tasks && (
+              <div className="space-y-2">
+                <div className="text-sm text-zinc-700 px-1">Plan wykonania (kolejność):</div>
+                <ol className="list-decimal pl-6 space-y-1">
+                  {m.toolResult.plan.order?.map((id:string)=> {
+                    const t = (m.toolResult.tasks as any[]).find((x)=> String(x.id)===String(id));
+                    return <li key={id}>{t ? t.content : id}</li>;
+                  })}
+                </ol>
+                {m.toolResult.plan.notes && <div className="text-xs text-zinc-500 px-1">{m.toolResult.plan.notes}</div>}
+              </div>
+            )}
+          </div>
+        ))}
+      </main>
+
+      <footer className="sticky bottom-0 bg-soft py-2">
+        <div className="flex gap-2">
+          <input className="input"
+            placeholder={assistant==='hats' ? "Opisz dylemat – zacznijmy pytaniami." : "Napisz, co chcesz zrobić (np. „Pokaż dzisiejsze zadania”)."}
+            value={input} onChange={(e)=>setInput(e.target.value)} onKeyDown={(e)=> e.key==='Enter' ? send() : null}
+          />
+          <button className="btn bg-ink text-white" onClick={send}>Wyślij</button>
+        </div>
+      </footer>
+    </div>
+  );
 }
