@@ -15,9 +15,7 @@ function extractToolCall(text: string) {
   if (payloadMatch) {
     try {
       payload = JSON.parse(payloadMatch[1].trim());
-    } catch {
-      // ignorujemy – payload może być pusty
-    }
+    } catch {}
   }
   return { action: actionMatch?.[1], payload };
 }
@@ -200,7 +198,7 @@ export async function POST(req: NextRequest) {
   const tool = extractToolCall(raw);
   const cleaned = stripTool(raw);
 
-  // Jeśli model wywołał nasze narzędzie (Todoist) – wykonujemy je i zwracamy wynik
+  // Jeżeli model wywołał narzędzie (Todoist) – wykonujemy je i ZAWSZE zwracamy *sam `result`*
   if (tool && assistantId === "todoist") {
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_APP_URL}/api/todoist/actions`,
@@ -215,19 +213,25 @@ export async function POST(req: NextRequest) {
       }
     );
 
-    // ⬇️ KLUCZOWA ZMIANA: rozpakuj { success, result } -> zwróć samo result
     let toolJson: any = null;
     try {
       toolJson = await res.json();
     } catch {
       toolJson = null;
     }
+
+    // ⬇️ NORMALIZACJA: jeśli przyszło { success, result } → zwróć tylko `result`
     const toolResult =
       toolJson && typeof toolJson === "object" && "success" in toolJson
         ? toolJson.result
         : toolJson;
 
-    const human = cleaned || humanizeToolAction(tool.action);
+    // jeśli model „wypuścił” własny tekst „Gotowe”, to i tak pokażmy ludzką etykietę akcji
+    const human =
+      cleaned && cleaned.toLowerCase() !== "gotowe"
+        ? cleaned
+        : humanizeToolAction(tool.action);
+
     return NextResponse.json({ content: human, toolResult });
   }
 
