@@ -10,48 +10,57 @@ import {
   postponeToTomorrow,
 } from "@/lib/todoist";
 
-/**
- * Endpoint do wszystkich akcji Todoist.
- * WYMAGA: body: { userId: string, action: string, payload?: any }
- */
-export async function POST(req: NextRequest){
-  const { userId, action, payload } = await req.json();
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    console.log(">>> /api/todoist/actions body", body);
 
-  if(!userId || !action) {
-    return new NextResponse("Missing params", { status: 400 });
-  }
+    const { userId, action, payload } = body;
 
-  try{
-    switch(action){
-      case "get_today_tasks":
-        return NextResponse.json(await listTodayTasks(userId));
-
-      case "get_overdue_tasks":
-        return NextResponse.json(await listOverdueTasks(userId));
-
-      case "list_projects":
-        return NextResponse.json(await listProjects(userId));
-
-      case "add_task":
-        return NextResponse.json(await addTask(userId, payload));
-
-      case "delete_task":
-        return NextResponse.json(await deleteTask(userId, String(payload.task_id)));
-
-      case "complete_task":
-        return NextResponse.json(await closeTask(userId, String(payload.task_id)));
-
-      case "move_to_tomorrow":
-        return NextResponse.json(await postponeToTomorrow(userId, String(payload.task_id)));
-
-      case "move_overdue_to_today":
-        return NextResponse.json(await moveOverdueToToday(userId));
-
-      default:
-        return new NextResponse("Unknown action", { status: 400 });
+    if (!userId || !action) {
+      console.error(">>> Missing params:", body);
+      return NextResponse.json({ error: "Missing params" }, { status: 400 });
     }
-  }catch(e:any){
-    console.error("Todoist actions error:", e);
-    return new NextResponse(e?.message || "Error", { status: 500 });
+
+    let result;
+
+    switch (action) {
+      case "get_today_tasks":
+        result = await listTodayTasks(userId);
+        break;
+      case "get_overdue_tasks":
+        result = await listOverdueTasks(userId);
+        break;
+      case "list_projects":
+        result = await listProjects(userId);
+        break;
+      case "add_task":
+        result = await addTask(userId, payload);
+        break;
+      case "delete_task":
+        result = await deleteTask(userId, String(payload.task_id));
+        break;
+      case "complete_task":
+        result = await closeTask(userId, String(payload.task_id));
+        break;
+      case "move_to_tomorrow":
+        result = await postponeToTomorrow(userId, String(payload.task_id));
+        break;
+      case "move_overdue_to_today":
+        result = await moveOverdueToToday(userId);
+        break;
+      default:
+        console.error(">>> Unknown action", action);
+        return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+    }
+
+    console.log(">>> Success:", { action, result });
+    return NextResponse.json({ success: true, result });
+  } catch (e: any) {
+    console.error(">>> Todoist actions error:", e);
+    return NextResponse.json(
+      { error: e?.message || "Todoist action failed", stack: e?.stack },
+      { status: 500 }
+    );
   }
 }
