@@ -7,10 +7,8 @@ import { TaskCard } from "@/components/TaskCard";
 import { GroupedTasks } from "@/components/GroupedTasks";
 import { GroupedByProject } from "@/components/GroupedByProject";
 import type { AssistantId } from "@/assistants/types";
-import { assistants } from "@/assistants/config";
 
 type Msg = { role:'user'|'assistant'; content:string; toolResult?:any };
-
 const stripTool = (t:string)=> t.replace(/```tool[\s\S]*?```/g,"").trim();
 
 export default function Home(){
@@ -29,7 +27,7 @@ export default function Home(){
 
   const userId = session?.user?.id as string | undefined;
 
-  // Ostatni snapshot zadań
+  // ostatni snapshot zadań – używany do operacji „jak ChatGPT”
   const lastTasks = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       const m = messages[i];
@@ -39,34 +37,24 @@ export default function Home(){
     return [] as any[];
   }, [messages]);
 
-  // Szybkie przyciski
-  async function quick(action: string, label: string){
-    setMessages(m=>[...m, { role:'user', content: label }]);
-    const res = await fetch("/api/chat", {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ assistantId: assistant, messages: [...messages, { role:'user', content: label }], userId, contextTasks: lastTasks })
-    });
-    const data = await res.json();
-    setMessages(m=>[...m, { role:'assistant', content: stripTool(data.content||""), toolResult: data.toolResult }]);
-  }
-
   const connectTodoist = ()=>{
     if(!userId) return;
     setConnectingTodoist(true);
-    const url = `/api/todoist/connect?uid=${userId}`;
-    window.location.href = url;
+    window.location.href = `/api/todoist/connect?uid=${userId}`;
   };
   const disconnectTodoist = async ()=>{
     if(!userId) return;
-    await fetch("/api/todoist/disconnect", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ userId }) });
+    await fetch("/api/todoist/disconnect", {
+      method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ userId })
+    });
     alert("Odłączono Todoist.");
   };
 
-  const send = async ()=>{
-    if(!input.trim() || !userId) return;
-    const myMsg: Msg = { role:'user', content: input.trim() };
-    setMessages(m=>[...m,myMsg]); setInput('');
+  async function sendMsg(text: string){
+    if(!text.trim() || !userId) return;
+    const myMsg: Msg = { role:'user', content: text.trim() };
+    setMessages(m=>[...m,myMsg]);
     const res = await fetch("/api/chat", {
       method:"POST",
       headers:{ "Content-Type":"application/json" },
@@ -74,6 +62,12 @@ export default function Home(){
     });
     const data = await res.json();
     setMessages(m=>[...m, { role:'assistant', content: stripTool(data.content||""), toolResult: data.toolResult }]);
+  }
+
+  const send = async ()=>{
+    if(!input.trim()) return;
+    const txt = input; setInput('');
+    await sendMsg(txt);
   };
 
   if(!session){
@@ -99,10 +93,10 @@ export default function Home(){
 
       {/* Szybkie akcje */}
       <div className="flex flex-wrap gap-2">
-        <button className="btn bg-ink text-white text-sm" onClick={()=>quick("get_today_tasks","daj taski na dzisiaj")}>daj taski na dzisiaj</button>
-        <button className="btn bg-ink text-white text-sm" onClick={()=>quick("get_overdue_tasks","daj przeterminowane")}>daj przeterminowane</button>
-        <button className="btn bg-white text-sm" onClick={()=>setMessages(m=>[...m,{role:"assistant",content:"Grupuję wg projektów…", toolResult:{ groupByProject:true, tasks:lastTasks }}])}>grupuj wg projektu</button>
-        <button className="btn bg-white text-sm" onClick={()=>quick("order","zaproponuj kolejność")}>zaproponuj kolejność</button>
+        <button className="btn bg-ink text-white text-sm" onClick={()=>sendMsg("daj taski na dzisiaj")}>daj taski na dzisiaj</button>
+        <button className="btn bg-ink text-white text-sm" onClick={()=>sendMsg("daj przeterminowane")}>daj przeterminowane</button>
+        <button className="btn bg-white text-sm" onClick={()=> setMessages(m=>[...m,{ role:"assistant", content:"Grupuję wg projektów…", toolResult:{ groupByProject:true, tasks:lastTasks } }])}>grupuj wg projektu</button>
+        <button className="btn bg-white text-sm" onClick={()=>sendMsg("zaproponuj kolejność")}>zaproponuj kolejność</button>
       </div>
 
       <main className="space-y-4">
@@ -117,18 +111,20 @@ export default function Home(){
             {/* 1) zwykła lista zadań */}
             {m.toolResult && Array.isArray(m.toolResult) && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {m.toolResult.map((t: any) => <TaskCard key={t.id} t={t} />)}
+                {m.toolResult.map((t: any) => (
+                  <TaskCard key={t.id} t={t} userId={userId!} />
+                ))}
               </div>
             )}
 
             {/* 2) grupy z LLM */}
             {m.toolResult?.groups && m.toolResult?.tasks && (
-              <GroupedTasks groups={m.toolResult.groups} tasks={m.toolResult.tasks} />
+              <GroupedTasks groups={m.toolResult.groups} tasks={m.toolResult.tasks} userId={userId!} />
             )}
 
             {/* 3) grupowanie lokalne wg projektu */}
             {m.toolResult?.groupByProject && m.toolResult?.tasks && (
-              <GroupedByProject tasks={m.toolResult.tasks} />
+              <GroupedByProject tasks={m.toolResult.tasks} userId={userId!} />
             )}
 
             {/* 4) plan kolejności */}
@@ -142,16 +138,6 @@ export default function Home(){
                   })}
                 </ol>
                 {m.toolResult.plan.notes && <div className="text-xs text-zinc-500 px-1">{m.toolResult.plan.notes}</div>}
-              </div>
-            )}
-
-            {/* 5) breakdown na kroki */}
-            {m.toolResult?.breakdown && (
-              <div className="space-y-2">
-                <div className="text-sm text-zinc-700 px-1">Kroki dla zadania {m.toolResult.breakdown.task_id}:</div>
-                <ul className="list-disc pl-6">
-                  {m.toolResult.breakdown.steps?.map((s:string,idx:number)=> <li key={idx}>{s}</li>)}
-                </ul>
               </div>
             )}
           </div>
