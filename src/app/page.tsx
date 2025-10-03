@@ -1,11 +1,12 @@
 'use client';
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { AssistantSelector } from "@/components/AssistantSelector";
 import { Bubble } from "@/components/MessageBubble";
 import { TaskCard } from "@/components/TaskCard";
 import { GroupedTasks } from "@/components/GroupedTasks";
 import { GroupedByProject } from "@/components/GroupedByProject";
+import { Toasts, type Toast } from "@/components/Toast";
 import type { AssistantId } from "@/assistants/types";
 
 type Msg = { role:'user'|'assistant'; content:string; toolResult?:any };
@@ -18,6 +19,7 @@ export default function Home(){
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [connectingTodoist, setConnectingTodoist] = useState(false);
+  const [toasts, setToasts] = useState<Toast[]>([]);
 
   useEffect(()=>{
     sb.auth.getSession().then(({data})=> setSession(data.session));
@@ -27,6 +29,15 @@ export default function Home(){
 
   const userId = session?.user?.id as string | undefined;
 
+  const pushToast = useCallback((text: string, type?: Toast['type'])=>{
+    const id = Math.random().toString(36).slice(2);
+    setToasts(ts => [...ts, { id, text, type }]);
+  },[]);
+  const dropToast = useCallback((id:string)=>{
+    setToasts(ts => ts.filter(t=>t.id !== id));
+  },[]);
+
+  // ostatni snapshot zadań – używany do operacji „jak ChatGPT”
   const lastTasks = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       const m = messages[i];
@@ -35,6 +46,35 @@ export default function Home(){
     }
     return [] as any[];
   }, [messages]);
+
+  // usuń task z danej wiadomości po akcji (optymistycznie)
+  const removeTaskFromMessage = useCallback((msgIndex: number, taskId: string)=>{
+    setMessages(prev => {
+      const copy = [...prev];
+      const m = copy[msgIndex];
+      if (!m) return prev;
+      const tr = m.toolResult;
+
+      if (Array.isArray(tr)) {
+        m.toolResult = tr.filter((t:any)=> String(t.id) !== String(taskId));
+      } else if (tr?.tasks && tr?.groups) {
+        // wersja grupowana przez LLM
+        m.toolResult = {
+          ...tr,
+          tasks: tr.tasks.filter((t:any)=> String(t.id) !== String(taskId)),
+          groups: tr.groups.map((g:any)=> ({...g, task_ids: g.task_ids.filter((id:string)=> String(id)!==String(taskId))})),
+        };
+      } else if (tr?.groupByProject && tr?.tasks) {
+        // lokalne grupowanie wg projektu
+        m.toolResult = {
+          ...tr,
+          tasks: tr.tasks.filter((t:any)=> String(t.id) !== String(taskId)),
+        };
+      }
+      copy[msgIndex] = { ...m };
+      return copy;
+    });
+  },[]);
 
   const connectTodoist = ()=>{
     if(!userId) return;
@@ -47,7 +87,7 @@ export default function Home(){
       method:"POST", headers:{ "Content-Type":"application/json" },
       body: JSON.stringify({ userId })
     });
-    alert("Odłączono Todoist.");
+    pushToast("Odłączono Todoist.", "success");
   };
 
   async function sendMsg(text: string){
@@ -87,20 +127,32 @@ export default function Home(){
           <div className="text-2xl font-bold">ZenON</div>
           <div className="text-sm text-zinc-600">Asystenci ADHD & anty-prokrastynacja</div>
         </div>
+
         <div className="flex gap-2 items-center">
           <AssistantSelector value={assistant} onChange={setAssistant} />
-          <button className="btn bg-accent text-white" onClick={connectTodoist} disabled={!userId || connectingTodoist}>
-            {connectingTodoist ? "Łączenie..." : "Połącz Todoist"}
-          </button>
-          <button className="btn bg-white" onClick={disconnectTodoist}>Odłącz</button>
+
+          {/* Przycisk Todoist tylko dla asystenta 'todoist' */}
+          {assistant === 'todoist' && (
+            <>
+              <button className="btn bg-accent text-white" onClick={connectTodoist} disabled={!userId || connectingTodoist}>
+                {connectingTodoist ? "Łączenie..." : "Połącz Todoist"}
+              </button>
+              <button className="btn bg-white" onClick={disconnectTodoist}>Odłącz</button>
+            </>
+          )}
         </div>
       </header>
 
+      {/* Szybkie akcje */}
       <div className="flex flex-wrap gap-2">
-        <button className="btn bg-ink text-white text-sm" onClick={()=>sendMsg("daj taski na dzisiaj")}>daj taski na dzisiaj</button>
-        <button className="btn bg-ink text-white text-sm" onClick={()=>sendMsg("daj przeterminowane")}>daj przeterminowane</button>
-        <button className="btn bg-white text-sm" onClick={()=> setMessages(m=>[...m,{ role:"assistant", content:"Grupuję wg projektów…", toolResult:{ groupByProject:true, tasks:lastTasks } }])}>grupuj wg projektu</button>
-        <button className="btn bg-white text-sm" onClick={()=>sendMsg("zaproponuj kolejność")}>zaproponuj kolejność</button>
+        {assistant === 'todoist' && (
+          <>
+            <button className="btn bg-ink text-white text-sm" onClick={()=>sendMsg("daj taski na dzisiaj")}>daj taski na dzisiaj</button>
+            <button className="btn bg-ink text-white text-sm" onClick={()=>sendMsg("daj przeterminowane")}>daj przeterminowane</button>
+            <button className="btn bg-white text-sm" onClick={()=> setMessages(m=>[...m,{ role:"assistant", content:"Grupuję wg projektów…", toolResult:{ groupByProject:true, tasks:lastTasks } }])}>grupuj wg projektu</button>
+            <button className="btn bg-white text-sm" onClick={()=>sendMsg("zaproponuj kolejność")}>zaproponuj kolejność</button>
+          </>
+        )}
       </div>
 
       <main className="space-y-4">
@@ -112,22 +164,43 @@ export default function Home(){
               </div>
             </Bubble>
 
+            {/* Zwykła lista zadań */}
             {m.toolResult && Array.isArray(m.toolResult) && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {m.toolResult.map((t: any) => (
-                  <TaskCard key={t.id} t={t} userId={userId} />
+                  <TaskCard
+                    key={t.id}
+                    t={t}
+                    userId={userId}
+                    onRemoved={(id)=> removeTaskFromMessage(i, id)}
+                    notify={pushToast}
+                  />
                 ))}
               </div>
             )}
 
+            {/* Grupowanie z LLM */}
             {m.toolResult?.groups && m.toolResult?.tasks && (
-              <GroupedTasks groups={m.toolResult.groups} tasks={m.toolResult.tasks} userId={userId} />
+              <GroupedTasks
+                groups={m.toolResult.groups}
+                tasks={m.toolResult.tasks}
+                userId={userId}
+                onRemoved={(id)=> removeTaskFromMessage(i, id)}
+                notify={pushToast}
+              />
             )}
 
+            {/* Lokalnie wg projektu */}
             {m.toolResult?.groupByProject && m.toolResult?.tasks && (
-              <GroupedByProject tasks={m.toolResult.tasks} userId={userId} />
+              <GroupedByProject
+                tasks={m.toolResult.tasks}
+                userId={userId}
+                onRemoved={(id)=> removeTaskFromMessage(i, id)}
+                notify={pushToast}
+              />
             )}
 
+            {/* Plan kolejności */}
             {m.toolResult?.plan && m.toolResult?.tasks && (
               <div className="space-y-2">
                 <div className="text-sm text-zinc-700 px-1">Plan wykonania (kolejność):</div>
@@ -153,6 +226,8 @@ export default function Home(){
           <button className="btn bg-ink text-white" onClick={send}>Wyślij</button>
         </div>
       </footer>
+
+      <Toasts items={toasts} onDone={dropToast} />
     </div>
   );
 }
