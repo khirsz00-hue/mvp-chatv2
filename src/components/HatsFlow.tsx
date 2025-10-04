@@ -26,6 +26,7 @@ export function HatsFlow({ userId }:{ userId: string }){
   const seq = DEFAULT_SEQUENCE;
   const [turns, setTurns] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   const currentIndex = turns.length;
   const currentHat: HatMode | null = seq[currentIndex] ?? null;
@@ -57,8 +58,9 @@ export function HatsFlow({ userId }:{ userId: string }){
   const sendStep = useCallback(async () => {
     if(!currentHat || busy) return;
     setBusy(true);
-    const ctx: any = {};
+    setErr(null);
 
+    const ctx: any = {};
     if(currentHat === "blue_start"){
       ctx.goal = inputs.goal; ctx.constraints = inputs.constraints; ctx.success = inputs.success;
     }
@@ -78,27 +80,45 @@ export function HatsFlow({ userId }:{ userId: string }){
       ctx.ideas = inputs.ideas; ctx.methods = inputs.methods; ctx.tests = inputs.tests;
     }
 
-    const res = await fetch("/api/hats/step", {
-      method: "POST",
-      headers: { "Content-Type":"application/json" },
-      body: JSON.stringify({
-        userId,
-        mode: currentHat,
-        transcript: turns.map(t => ({ hat: t.hat, content: t.content })),
-        context: ctx,
-      }),
-    });
+    // timeout 45s – żeby nie wisieć
+    const ac = new AbortController();
+    const tm = setTimeout(()=> ac.abort(), 45_000);
 
-    const data = await res.json();
-    if(!res.ok){
-      alert(data?.error || "Błąd kroku Hats");
+    try {
+      const res = await fetch("/api/hats/step", {
+        method: "POST",
+        headers: { "Content-Type":"application/json" },
+        body: JSON.stringify({
+          userId,
+          mode: currentHat,
+          transcript: turns.map(t => ({ hat: t.hat, content: t.content })),
+          context: ctx,
+        }),
+        signal: ac.signal,
+      });
+
+      const text = await res.text();
+      let data: any = {};
+      try { data = text ? JSON.parse(text) : {}; } catch { /* zostaw text surowy */ }
+
+      if(!res.ok){
+        const msg = data?.error || data?.message || text || "Błąd kroku Hats";
+        setErr(String(msg));
+        return;
+      }
+
+      const newTurn: Turn = { hat: currentHat, content: data.content, context: ctx };
+      setTurns(prev => [...prev, newTurn]);
+    } catch (e:any) {
+      if (e?.name === "AbortError") {
+        setErr("Przekroczono czas oczekiwania (timeout). Spróbuj ponownie.");
+      } else {
+        setErr(e?.message || "Wystąpił nieoczekiwany błąd połączenia.");
+      }
+    } finally {
+      clearTimeout(tm);
       setBusy(false);
-      return;
     }
-
-    const newTurn: Turn = { hat: currentHat, content: data.content, context: ctx };
-    setTurns(prev => [...prev, newTurn]);
-    setBusy(false);
   }, [userId, currentHat, turns, inputs, busy]);
 
   return (
@@ -146,7 +166,7 @@ export function HatsFlow({ userId }:{ userId: string }){
 
           {currentHat==="red" && (
             <div className="grid gap-2">
-              <textarea className="input min-h-[60px]" placeholder="Moje odczucia"
+              <textarea className="input min-h-[60px]" placeholder="Moje odczucia (bez uzasadnień)"
                 value={inputs.feelings} onChange={e=> setInputs(s=>({...s, feelings:e.target.value}))} />
               <textarea className="input min-h-[60px]" placeholder="Możliwe reakcje interesariuszy"
                 value={inputs.reactions} onChange={e=> setInputs(s=>({...s, reactions:e.target.value}))} />
@@ -200,6 +220,12 @@ export function HatsFlow({ userId }:{ userId: string }){
             </button>
             {busy && <div className="text-xs text-zinc-500">pracuję…</div>}
           </div>
+
+          {err && (
+            <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
+              {err}
+            </div>
+          )}
         </div>
       )}
 
