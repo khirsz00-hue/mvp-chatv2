@@ -1,7 +1,12 @@
 // src/app/api/hats/step/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { openai } from "@/lib/openai";
-import { HATS_GLOBAL, HAT_INSTRUCTIONS, DEFAULT_SEQUENCE, type HatMode } from "@/assistants/hats/prompt";
+import {
+  HATS_GLOBAL,
+  HAT_INSTRUCTIONS,
+  DEFAULT_SEQUENCE,
+  type HatMode,
+} from "@/assistants/hats/prompt";
 
 /**
  * Body:
@@ -9,7 +14,7 @@ import { HATS_GLOBAL, HAT_INSTRUCTIONS, DEFAULT_SEQUENCE, type HatMode } from "@
  *   userId: string,
  *   mode: HatMode,
  *   transcript?: Array<{hat: HatMode, content: string}>,
- *   context?: any // np. odpowiedzi formularza
+ *   context?: any
  * }
  */
 export async function POST(req: NextRequest) {
@@ -25,9 +30,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing userId or mode" }, { status: 400 });
     }
 
-    // Walidacja sekwencji: dopuszczamy tylko kolejny krok z DEFAULT_SEQUENCE
+    // pilnujemy kolejności
     const seq = DEFAULT_SEQUENCE;
-    const doneHats = (transcript || []).map(t => t.hat);
+    const doneHats = (transcript || []).map((t) => t.hat);
     const expectedMode = seq[doneHats.length] || "blue_final";
     if (mode !== expectedMode) {
       return NextResponse.json(
@@ -43,11 +48,11 @@ export async function POST(req: NextRequest) {
     const system = `${HATS_GLOBAL}\n\nAktualny kapelusz: ${mode.toUpperCase()}\nTrzymaj się wyłącznie jego ramy.`;
 
     const user = `
-Kontekst użytkownika (opcjonalny):
+Kontekst:
 ${context ? JSON.stringify(context, null, 2) : "(brak)"}
 
-Dotychczasowy zapis (skrót):
-${historyText || "(to pierwszy krok)"}
+Dotychczasowy zapis:
+${historyText || "(pierwszy krok)"}
 
 Instrukcja kapelusza:
 ${HAT_INSTRUCTIONS[mode]}
@@ -63,6 +68,7 @@ ${HAT_INSTRUCTIONS[mode]}
     });
 
     const content = completion.choices[0]?.message?.content || "";
+
     const doneCount = doneHats.length + 1;
     const nextMode = seq[doneCount] || null;
 
