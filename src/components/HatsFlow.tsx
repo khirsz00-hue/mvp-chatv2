@@ -80,6 +80,7 @@ export function HatsFlow({ userId }:{ userId: string }){
       ctx.ideas = inputs.ideas; ctx.methods = inputs.methods; ctx.tests = inputs.tests;
     }
 
+    // timeout 45s – na wszelki wypadek
     const ac = new AbortController();
     const tm = setTimeout(()=> ac.abort(), 45_000);
 
@@ -98,24 +99,35 @@ export function HatsFlow({ userId }:{ userId: string }){
 
       const text = await res.text();
       let data: any = {};
-      try { data = text ? JSON.parse(text) : {}; } catch { /* ok */ }
+      try { data = text ? JSON.parse(text) : {}; } catch { /* ok – zostaje raw text */ }
 
       if(!res.ok){
         const msg = data?.error || data?.message || text || "Błąd kroku Hats";
+        console.error("Hats step error:", msg);
         setErr(String(msg));
         return;
       }
 
       const newTurn: Turn = { hat: currentHat, content: data.content, context: ctx };
       setTurns(prev => [...prev, newTurn]);
+      setErr(null);
     } catch (e:any) {
-      if (e?.name === "AbortError") setErr("Przekroczono czas oczekiwania (timeout). Spróbuj ponownie.");
-      else setErr(e?.message || "Wystąpił nieoczekiwany błąd połączenia.");
+      if (e?.name === "AbortError") {
+        setErr("Przekroczono czas oczekiwania (timeout). Spróbuj ponownie.");
+      } else {
+        console.error("Hats step fetch error:", e);
+        setErr(e?.message || "Wystąpił nieoczekiwany błąd połączenia.");
+      }
     } finally {
       clearTimeout(tm);
       setBusy(false);
     }
   }, [userId, currentHat, turns, inputs, busy]);
+
+  const onSubmit = useCallback((e: React.FormEvent)=>{
+    e.preventDefault();           // 🔒 nie przeładowuj strony
+    if (!busy && canProceed) sendStep();
+  }, [busy, canProceed, sendStep]);
 
   return (
     <div className="space-y-4">
@@ -133,7 +145,10 @@ export function HatsFlow({ userId }:{ userId: string }){
 
       {/* Formularz aktywnego kapelusza */}
       {currentHat && (
-        <div className="rounded-2xl bg-white border border-zinc-200 p-4 space-y-3">
+        <form
+          onSubmit={onSubmit}
+          className="rounded-2xl bg-white border border-zinc-200 p-4 space-y-3"
+        >
           <div className="text-sm font-semibold">{HAT_LABEL[currentHat]}</div>
 
           {currentHat==="blue_start" && (
@@ -211,7 +226,11 @@ export function HatsFlow({ userId }:{ userId: string }){
           )}
 
           <div className="flex items-center gap-2 pt-1">
-            <button className="btn bg-ink text-white" onClick={sendStep} disabled={busy || !canProceed}>
+            <button
+              type="submit"
+              className="btn bg-ink text-white"
+              disabled={busy || !canProceed}
+            >
               {currentHat === "blue_final" ? "Generuj syntezę" : "Dalej"}
             </button>
             {busy && <div className="text-xs text-zinc-500">pracuję…</div>}
@@ -222,7 +241,7 @@ export function HatsFlow({ userId }:{ userId: string }){
               {err}
             </div>
           )}
-        </div>
+        </form>
       )}
 
       {/* Transkrypt */}
