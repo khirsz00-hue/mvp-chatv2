@@ -80,7 +80,6 @@ export function HatsFlow({ userId }:{ userId: string }){
       ctx.ideas = inputs.ideas; ctx.methods = inputs.methods; ctx.tests = inputs.tests;
     }
 
-    // timeout 45s – żeby nie wisieć
     const ac = new AbortController();
     const tm = setTimeout(()=> ac.abort(), 45_000);
 
@@ -99,7 +98,7 @@ export function HatsFlow({ userId }:{ userId: string }){
 
       const text = await res.text();
       let data: any = {};
-      try { data = text ? JSON.parse(text) : {}; } catch { /* zostaw text surowy */ }
+      try { data = text ? JSON.parse(text) : {}; } catch { /* ok */ }
 
       if(!res.ok){
         const msg = data?.error || data?.message || text || "Błąd kroku Hats";
@@ -110,11 +109,8 @@ export function HatsFlow({ userId }:{ userId: string }){
       const newTurn: Turn = { hat: currentHat, content: data.content, context: ctx };
       setTurns(prev => [...prev, newTurn]);
     } catch (e:any) {
-      if (e?.name === "AbortError") {
-        setErr("Przekroczono czas oczekiwania (timeout). Spróbuj ponownie.");
-      } else {
-        setErr(e?.message || "Wystąpił nieoczekiwany błąd połączenia.");
-      }
+      if (e?.name === "AbortError") setErr("Przekroczono czas oczekiwania (timeout). Spróbuj ponownie.");
+      else setErr(e?.message || "Wystąpił nieoczekiwany błąd połączenia.");
     } finally {
       clearTimeout(tm);
       setBusy(false);
