@@ -11,13 +11,10 @@ import { Toasts, type Toast } from "@/components/Toast";
 import type { AssistantId } from "@/assistants/types";
 import { ChatSidebar } from "@/components/ChatSidebar";
 import {
-  makeChat,
-  loadChats,
-  saveChats,
-  updateTitleFromFirstUserMessage,
-  type Chat,
-  type Msg as ChatMsg
+  makeChat, loadChats, saveChats, updateTitleFromFirstUserMessage,
+  type Chat, type Msg as ChatMsg
 } from "@/lib/chatStore";
+import { HatsFlow } from "@/components/HatsFlow";
 
 type Msg = ChatMsg;
 const stripTool = (t:string)=> t.replace(/```tool[\s\S]*?```/g,"").trim();
@@ -38,7 +35,7 @@ export default function Home(){
   // assistant
   const [assistant, setAssistant] = useState<AssistantId>('todoist');
 
-  // chats per assistant
+  // chats per assistant (dla Todoist – zachowujemy, Hats ma własny flow)
   const [chats, setChats] = useState<Chat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | undefined>(undefined);
 
@@ -52,9 +49,10 @@ export default function Home(){
     setToasts(ts => ts.filter(t=>t.id !== id));
   },[]);
 
-  // load chats when user or assistant changes
+  // ładowanie historii tylko dla todoist
   useEffect(()=>{
     if(!userId) return;
+    if(assistant !== 'todoist') return;
     const arr = loadChats(userId, assistant);
     if(arr.length === 0){
       const c = makeChat(assistant);
@@ -63,24 +61,21 @@ export default function Home(){
       saveChats(userId, assistant, [c]);
     } else {
       setChats(arr);
-      // prefer last updated chat
       const last = [...arr].sort((a,b)=> b.updatedAt - a.updatedAt)[0];
       setActiveChatId(last?.id);
     }
   }, [userId, assistant]);
 
-  // helpers to persist
   const persist = useCallback((next: Chat[])=>{
     if(!userId) return;
     setChats(next);
-    saveChats(userId, assistant, next);
-  }, [userId, assistant]);
+    saveChats(userId, 'todoist', next);
+  }, [userId]);
 
-  // derive active chat & messages
   const activeChat = useMemo(()=> chats.find(c=> c.id === activeChatId), [chats, activeChatId]);
   const messages = activeChat?.messages ?? [];
 
-  // last tasks snapshot (for LLM context)
+  // snapshot zadań (dla LLM context – tylko todoist)
   const lastTasks = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       const m = messages[i];
@@ -91,25 +86,20 @@ export default function Home(){
     return [] as any[];
   }, [messages]);
 
-  // optimistic remove from a specific assistant message index
   const removeTaskFromMessage = useCallback((msgIndex: number, taskId: string)=>{
     const idx = chats.findIndex(c=> c.id === activeChatId);
     if(idx === -1) return;
     const c = chats[idx];
     const copy = [...chats];
     const msgs = [...c.messages];
-    const m = msgs[msgIndex];
-    if(!m) return;
-
+    const m = msgs[msgIndex]; if(!m) return;
     const tr = m.toolResult;
+
     if (Array.isArray(tr)) {
       m.toolResult = tr.filter((t:any)=> String(t.id) !== String(taskId));
     } else if (tr?.tasks && tr?.groups) {
-      m.toolResult = {
-        ...tr,
-        tasks: tr.tasks.filter((t:any)=> String(t.id) !== String(taskId)),
-        groups: tr.groups.map((g:any)=> ({...g, task_ids: g.task_ids.filter((id:string)=> String(id)!==String(taskId))})),
-      };
+      m.toolResult = { ...tr, tasks: tr.tasks.filter((t:any)=> String(t.id) !== String(taskId)),
+        groups: tr.groups.map((g:any)=> ({...g, task_ids: g.task_ids.filter((id:string)=> String(id)!==String(taskId))})) };
     } else if (tr?.groupByProject && tr?.tasks) {
       m.toolResult = { ...tr, tasks: tr.tasks.filter((t:any)=> String(t.id) !== String(taskId)) };
     } else if (tr?.week && tr?.tasks) {
@@ -118,8 +108,7 @@ export default function Home(){
 
     msgs[msgIndex] = { ...m };
     const updated = { ...c, messages: msgs, updatedAt: Date.now() };
-    copy[idx] = updated;
-    persist(copy);
+    copy[idx] = updated; persist(copy);
   }, [chats, activeChatId, persist]);
 
   // connect/disconnect todoist
@@ -138,17 +127,14 @@ export default function Home(){
     pushToast("Odłączono Todoist.", "success");
   };
 
-  // abs url
   const abs = (path: string) =>
     typeof window !== "undefined" ? `${window.location.origin}${path}` : path;
 
-  // push message helpers
   const pushUser = useCallback((text: string)=>{
     const idx = chats.findIndex(c=> c.id === activeChatId);
     if(idx === -1) return;
     const c = chats[idx];
     const msgs = [...c.messages, { role:'user' as const, content: text }];
-    // if first user message, propose title
     const updatedBase = { ...c, messages: msgs, updatedAt: Date.now() };
     const updated = c.title === "Nowy czat" ? updateTitleFromFirstUserMessage(updatedBase) : updatedBase;
     const arr = [...chats]; arr[idx] = updated; persist(arr);
@@ -163,7 +149,6 @@ export default function Home(){
     const arr = [...chats]; arr[idx] = updated; persist(arr);
   }, [chats, activeChatId, persist]);
 
-  // quick actions (direct Todoist API)
   async function quickFetch(
     action: "get_today_tasks" | "get_tomorrow_tasks" | "get_week_tasks" | "get_overdue_tasks"
   ) {
@@ -197,19 +182,25 @@ export default function Home(){
     }
   }
 
-  // chat via LLM
   async function sendMsg(text: string){
     if(!text.trim() || !userId) { pushToast("Brak userId – zaloguj się ponownie.", "error"); return; }
     pushUser(text.trim());
-
     const res = await fetch(abs("/api/chat"), {
       method:"POST",
-      headers:{ "Content-Type":"application/json" },
+      headers: { "Content-Type":"application/json" },
       body: JSON.stringify({
         assistantId: assistant,
         messages: [...(activeChat?.messages ?? []), { role:'user', content: text.trim() }],
         userId,
-        contextTasks: lastTasks
+        contextTasks: (()=>{
+          for (let i = (activeChat?.messages?.length ?? 0)-1; i>=0; i--){
+            const m = activeChat!.messages[i]!;
+            if (Array.isArray(m.toolResult)) return m.toolResult as any[];
+            if (m.toolResult?.groups && m.toolResult?.tasks) return m.toolResult.tasks as any[];
+            if (m.toolResult?.tasks && m.toolResult?.week) return m.toolResult.tasks as any[];
+          }
+          return [];
+        })()
       })
     });
     if (!res.ok) {
@@ -222,43 +213,10 @@ export default function Home(){
       data && typeof data.toolResult === "object" && data.toolResult !== null && "result" in data.toolResult
         ? (data.toolResult.result as any)
         : data.toolResult;
-
     pushAssistant(stripTool(data.content||""), toolResult);
   }
 
-  // sidebar ops
-  const onNewChat = ()=>{
-    const c = makeChat(assistant);
-    const arr = [c, ...chats];
-    persist(arr);
-    setActiveChatId(c.id);
-  };
-
-  const onSelectChat = (id: string)=> setActiveChatId(id);
-
-  const onRenameChat = (id: string, title: string)=>{
-    const arr = chats.map(c => c.id === id ? { ...c, title, updatedAt: Date.now() } : c);
-    persist(arr);
-  };
-
-  const onDeleteChat = (id: string)=>{
-    const arr = chats.filter(c => c.id !== id);
-    persist(arr);
-    if (activeChatId === id) {
-      if (arr.length) setActiveChatId(arr[0].id);
-      else {
-        // make empty chat
-        const c = makeChat(assistant);
-        persist([c]);
-        setActiveChatId(c.id);
-      }
-    }
-  };
-
-  // controlled input
-  const [input, setInput] = useState('');
-
-  // sign-in gate
+  // sign-in
   if(!session){
     const SignIn = require("@/components/SignIn").SignIn;
     return <SignIn />;
@@ -267,17 +225,26 @@ export default function Home(){
   return (
     <div className="max-w-6xl mx-auto p-4">
       <div className="flex flex-col sm:flex-row gap-4">
-        {/* SIDEBAR */}
-        <ChatSidebar
-          chats={chats}
-          activeId={activeChatId}
-          onSelect={onSelectChat}
-          onNew={onNewChat}
-          onRename={onRenameChat}
-          onDelete={onDeleteChat}
-        />
+        {/* Sidebar: tylko dla Todoist (Hats ma własny stepper flow bez historii chatów) */}
+        {assistant === 'todoist' && (
+          <ChatSidebar
+            chats={chats}
+            activeId={activeChatId}
+            onSelect={setActiveChatId}
+            onNew={()=>{
+              const c = makeChat('todoist'); const arr = [c, ...chats]; persist(arr); setActiveChatId(c.id);
+            }}
+            onRename={(id, title)=> persist(chats.map(c=> c.id===id? {...c, title, updatedAt: Date.now()} : c))}
+            onDelete={(id)=>{
+              const arr = chats.filter(c=> c.id !== id); persist(arr);
+              if (activeChatId === id) {
+                if (arr.length) setActiveChatId(arr[0].id);
+                else { const c = makeChat('todoist'); persist([c]); setActiveChatId(c.id); }
+              }
+            }}
+          />
+        )}
 
-        {/* MAIN */}
         <div className="flex-1 space-y-4">
           <header className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
             <div className="flex items-center gap-3">
@@ -286,13 +253,7 @@ export default function Home(){
             </div>
 
             <div className="flex gap-2 items-center">
-              <AssistantSelector
-                value={assistant}
-                onChange={(a)=>{
-                  setAssistant(a);
-                  // po zmianie asystenta lista czatów załaduje się w useEffect
-                }}
-              />
+              <AssistantSelector value={assistant} onChange={setAssistant} />
               {assistant === 'todoist' && (
                 <>
                   <button className="btn bg-accent text-white" onClick={connectTodoist} disabled={!userId || connectingTodoist}>
@@ -304,91 +265,104 @@ export default function Home(){
             </div>
           </header>
 
-          {/* Quick actions */}
-          {assistant === 'todoist' && (
-            <div className="flex flex-wrap gap-2">
-              <button className="btn bg-ink text-white text-sm" onClick={()=>quickFetch("get_today_tasks")} disabled={!userId}>dzisiaj</button>
-              <button className="btn bg-ink text-white text-sm" onClick={()=>quickFetch("get_tomorrow_tasks")} disabled={!userId}>jutro</button>
-              <button className="btn bg-ink text-white text-sm" onClick={()=>quickFetch("get_week_tasks")} disabled={!userId}>tydzień</button>
-              <button className="btn bg-ink text-white text-sm" onClick={()=>quickFetch("get_overdue_tasks")} disabled={!userId}>przeterminowane</button>
-            </div>
-          )}
+          {assistant === 'hats' ? (
+            <HatsFlow userId={userId!} />
+          ) : (
+            <>
+              {/* Quick actions */}
+              <div className="flex flex-wrap gap-2">
+                <button className="btn bg-ink text-white text-sm" onClick={()=>quickFetch("get_today_tasks")} disabled={!userId}>dzisiaj</button>
+                <button className="btn bg-ink text-white text-sm" onClick={()=>quickFetch("get_tomorrow_tasks")} disabled={!userId}>jutro</button>
+                <button className="btn bg-ink text-white text-sm" onClick={()=>quickFetch("get_week_tasks")} disabled={!userId}>tydzień</button>
+                <button className="btn bg-ink text-white text-sm" onClick={()=>quickFetch("get_overdue_tasks")} disabled={!userId}>przeterminowane</button>
+              </div>
 
-          {/* THREAD */}
-          <main className="space-y-4">
-            {messages.map((m, i) => (
-              <div key={i} className="space-y-2">
-                <Bubble role={m.role}>
-                  <div className="prose prose-zinc max-w-none">
-                    <pre className="whitespace-pre-wrap">{stripTool(m.content)}</pre>
-                  </div>
-                </Bubble>
+              {/* Thread */}
+              <main className="space-y-4">
+                {(activeChat?.messages ?? []).map((m, i) => (
+                  <div key={i} className="space-y-2">
+                    <Bubble role={m.role}>
+                      <div className="prose prose-zinc max-w-none">
+                        <pre className="whitespace-pre-wrap">{stripTool(m.content)}</pre>
+                      </div>
+                    </Bubble>
 
-                {/* plain list */}
-                {m.toolResult && Array.isArray(m.toolResult) && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {m.toolResult.map((t: any) => (
-                      <TaskCard
-                        key={t.id}
-                        t={t}
+                    {m.toolResult && Array.isArray(m.toolResult) && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {m.toolResult.map((t: any) => (
+                          <TaskCard
+                            key={t.id}
+                            t={t}
+                            userId={userId}
+                            onRemoved={(id)=> removeTaskFromMessage(i, id)}
+                            notify={(txt,type)=> setToasts(ts=> [...ts, { id: Math.random().toString(36).slice(2), text: txt, type }])}
+                            onAsk={(txt)=> sendMsg(txt)}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    {m.toolResult?.groups && m.toolResult?.tasks && (
+                      <GroupedTasks
+                        groups={m.toolResult.groups}
+                        tasks={m.toolResult.tasks}
                         userId={userId}
                         onRemoved={(id)=> removeTaskFromMessage(i, id)}
                         notify={(txt,type)=> setToasts(ts=> [...ts, { id: Math.random().toString(36).slice(2), text: txt, type }])}
-                        onAsk={(txt)=> sendMsg(txt)}
                       />
-                    ))}
+                    )}
+
+                    {m.toolResult?.groupByProject && m.toolResult?.tasks && (
+                      <GroupedByProject
+                        tasks={m.toolResult.tasks}
+                        userId={userId}
+                        onRemoved={(id)=> removeTaskFromMessage(i, id)}
+                        notify={(txt,type)=> setToasts(ts=> [...ts, { id: Math.random().toString(36).slice(2), text: txt, type }])}
+                      />
+                    )}
+
+                    {m.toolResult?.week && m.toolResult?.tasks && (
+                      <GroupedByDay
+                        tasks={m.toolResult.tasks}
+                        userId={userId}
+                        onRemoved={(id)=> removeTaskFromMessage(i, id)}
+                        notify={(txt,type)=> setToasts(ts=> [...ts, { id: Math.random().toString(36).slice(2), text: txt, type }])}
+                      />
+                    )}
                   </div>
-                )}
+                ))}
+              </main>
 
-                {/* grouped by LLM */}
-                {m.toolResult?.groups && m.toolResult?.tasks && (
-                  <GroupedTasks
-                    groups={m.toolResult.groups}
-                    tasks={m.toolResult.tasks}
-                    userId={userId}
-                    onRemoved={(id)=> removeTaskFromMessage(i, id)}
-                    notify={(txt,type)=> setToasts(ts=> [...ts, { id: Math.random().toString(36).slice(2), text: txt, type }])}
+              {/* Composer */}
+              <footer className="sticky bottom-0 bg-soft py-2">
+                <div className="flex gap-2">
+                  <input
+                    className="input"
+                    placeholder="Napisz, co chcesz zrobić (np. „Pokaż jutrzejsze zadania”)."
+                    onKeyDown={(e)=> e.key==='Enter' ? (async ()=>{
+                      const target = e.target as HTMLInputElement;
+                      const txt = target.value;
+                      (e.target as HTMLInputElement).value = '';
+                      await sendMsg(txt);
+                    })() : null}
                   />
-                )}
-
-                {/* grouped by project (local) */}
-                {m.toolResult?.groupByProject && m.toolResult?.tasks && (
-                  <GroupedByProject
-                    tasks={m.toolResult.tasks}
-                    userId={userId}
-                    onRemoved={(id)=> removeTaskFromMessage(i, id)}
-                    notify={(txt,type)=> setToasts(ts=> [...ts, { id: Math.random().toString(36).slice(2), text: txt, type }])}
-                  />
-                )}
-
-                {/* grouped by week/day */}
-                {m.toolResult?.week && m.toolResult?.tasks && (
-                  <GroupedByDay
-                    tasks={m.toolResult.tasks}
-                    userId={userId}
-                    onRemoved={(id)=> removeTaskFromMessage(i, id)}
-                    notify={(txt,type)=> setToasts(ts=> [...ts, { id: Math.random().toString(36).slice(2), text: txt, type }])}
-                  />
-                )}
-              </div>
-            ))}
-          </main>
-
-          {/* composer */}
-          <footer className="sticky bottom-0 bg-soft py-2">
-            <div className="flex gap-2">
-              <input
-                className="input"
-                placeholder={assistant==='hats' ? "Opisz dylemat – zacznijmy pytaniami." : "Napisz, co chcesz zrobić (np. „Pokaż jutrzejsze zadania”)."}
-                value={input}
-                onChange={(e)=>setInput(e.target.value)}
-                onKeyDown={(e)=> e.key==='Enter' ? (async ()=>{ const txt=input; setInput(''); await sendMsg(txt); })() : null}
-              />
-              <button className="btn bg-ink text-white" onClick={async ()=>{ const txt=input; setInput(''); await sendMsg(txt); }} disabled={!userId}>
-                Wyślij
-              </button>
-            </div>
-          </footer>
+                  <button
+                    className="btn bg-ink text-white"
+                    onClick={async ()=>{
+                      const el = document.querySelector<HTMLInputElement>('input.input');
+                      const txt = el?.value?.trim() || "";
+                      if(!txt) return;
+                      if(el) el.value='';
+                      await sendMsg(txt);
+                    }}
+                    disabled={!userId}
+                  >
+                    Wyślij
+                  </button>
+                </div>
+              </footer>
+            </>
+          )}
         </div>
       </div>
 
