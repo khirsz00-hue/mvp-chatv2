@@ -1,13 +1,5 @@
-'use client';
-import { useState } from "react";
-
-type Task = {
-  id: string | number;
-  content: string;
-  project_id?: string | number;
-  priority?: number;
-  due?: { date?: string; string?: string };
-};
+"use client";
+import { useRef, useState } from "react";
 
 export function TaskCard({
   t,
@@ -15,142 +7,136 @@ export function TaskCard({
   onRemoved,
   notify,
   onAsk,
+  selectable,
+  selected,
+  onToggleSelect,
 }: {
-  t: Task;
+  t: any;
   userId?: string;
   onRemoved?: (id: string) => void;
   notify?: (text: string, type?: "success" | "error" | "info") => void;
-  /** Funkcja wysyłająca wiadomość do chatu – dostarczana przez stronę główną */
   onAsk?: (text: string) => void;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string, next: boolean) => void;
 }) {
-  const [busy, setBusy] = useState<null | string>(null);
+  const [busy, setBusy] = useState(false);
+  const dateRef = useRef<HTMLInputElement>(null);
 
-  const call = async (action: string, payload: any, successMsg: string) => {
+  const id = String(t.id);
+  const content = t.content || t.title;
+  const projectName = t.project?.name || t.project || "";
+  const dueDate =
+    t.due?.date ||
+    (t.due?.datetime ? t.due.datetime.slice(0, 10) : t.due_date) ||
+    undefined;
+
+  async function api(action: string, payload: any) {
+    const res = await fetch("/api/todoist/actions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, action, payload }),
+    });
+    if (!res.ok) throw new Error(await res.text().catch(() => "API error"));
+    return res.json();
+  }
+
+  async function completeOne() {
     try {
-      if (!userId) {
-        notify?.("Brak userId – zaloguj się ponownie.", "error");
-        return;
-      }
-      setBusy(action);
-      const res = await fetch("/api/todoist/actions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, action, payload }),
-      });
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        notify?.(`Błąd: ${text}`, "error");
-        setBusy(null);
-        return;
-      }
-      // optymistyczne odświeżenie widoku (usuwamy z listy)
-      if (action === "complete_task" || action === "move_to_tomorrow" || action === "delete_task") {
-        onRemoved?.(String(t.id));
-      }
-      notify?.(successMsg, "success");
+      setBusy(true);
+      await api("complete_task", { id });
+      notify?.("Zadanie ukończono ✅", "success");
+      onRemoved?.(id);
     } catch (e: any) {
-      notify?.(e?.message || "Wystąpił błąd", "error");
+      notify?.(e?.message || "Błąd ukończenia", "error");
     } finally {
-      setBusy(null);
+      setBusy(false);
     }
-  };
+  }
 
-  const complete = () =>
-    call("complete_task", { task_id: t.id }, "Zadanie ukończono.");
-
-  const moveTomorrow = () =>
-    call("move_to_tomorrow", { task_id: t.id }, "Przeniesiono na jutro.");
-
-  const remove = () =>
-    call("delete_task", { task_id: t.id }, "Zadanie usunięto.");
-
-  const help = () => {
-    // Komunikat do chatu – przekażemy kontekst zadania w JSON,
-    // poprosimy o max 3 pytania uzupełniające i rozbicie na kroki.
-    const prompt = [
-      "Pomóż mi z tym zadaniem.",
-      "Najpierw zadaj maksymalnie 3 krótkie pytania, które są niezbędne, aby dobrze zaplanować wykonanie.",
-      "Następnie zaproponuj rozbicie na 3–10 konkretnych kroków (mini-zadań), z krótkimi opisami i estymacją czasu.",
-      "Jeśli to możliwe, zaproponuj priorytet (wysoki/średni/niski) oraz sugestię kiedy najlepiej to zrobić.",
-      "",
-      "Oto pełny kontekst zadania w JSON:",
-      "```json",
-      JSON.stringify(
-        {
-          id: String(t.id),
-          content: t.content,
-          project_id: t.project_id ?? null,
-          priority: t.priority ?? null,
-          due: t.due ?? null,
-        },
-        null,
-        2
-      ),
-      "```",
-    ].join("\n");
-
-    if (onAsk) {
-      onAsk(prompt);
-    } else {
-      notify?.("Brak funkcji onAsk – nie mogę uruchomić rozmowy.", "error");
+  function openDatePicker() {
+    // Od razu pokazujemy natywny datepicker
+    if (dateRef.current) {
+      // @ts-ignore
+      if (typeof dateRef.current.showPicker === "function") {
+        // nowoczesne przeglądarki
+        // @ts-ignore
+        dateRef.current.showPicker();
+      } else {
+        dateRef.current.click();
+      }
     }
-  };
+  }
+
+  async function onDateChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const date = e.target.value; // "YYYY-MM-DD"
+    if (!date) return;
+    try {
+      setBusy(true);
+      await api("postpone_task", { id, date });
+      notify?.(`Przełożono na ${date} 📅`, "success");
+      onRemoved?.(id);
+    } catch (err: any) {
+      notify?.(err?.message || "Błąd przełożenia", "error");
+    } finally {
+      setBusy(false);
+      if (dateRef.current) dateRef.current.value = "";
+    }
+  }
 
   return (
-    <div className="rounded-2xl bg-white shadow-sm border border-zinc-200 p-4 flex flex-col gap-3">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="font-semibold text-zinc-900">{t.content}</div>
-          <div className="mt-1 text-xs text-zinc-500 flex items-center gap-2">
-            {t.due?.date && (
-              <span className="inline-flex items-center gap-1">
-                📅 {t.due.date}
-              </span>
-            )}
-            {t.priority && (
-              <span className="inline-flex items-center gap-1">
-                🏷️ P{t.priority}
-              </span>
-            )}
-            <span className="inline-flex items-center gap-1">🆔 {t.id}</span>
+    <div className="card p-3">
+      <div className="flex items-start gap-2">
+        {selectable && (
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={!!selected}
+            onChange={(e) => onToggleSelect?.(id, e.target.checked)}
+          />
+        )}
+        <div className="flex-1">
+          <div className="text-sm font-medium">{content}</div>
+          <div className="text-xs text-zinc-500 mt-1 flex flex-wrap gap-2">
+            {projectName && <span>📁 {projectName}</span>}
+            {dueDate && <span>🗓 {dueDate}</span>}
+            {!dueDate && <span className="opacity-60">—</span>}
           </div>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 mt-1">
+      <div className="mt-3 flex flex-wrap gap-2">
         <button
-          className="btn h-8 px-3 text-sm bg-ink text-white"
-          onClick={complete}
-          disabled={busy !== null}
-          title="Oznacz jako ukończone"
+          className="btn bg-white"
+          onClick={completeOne}
+          disabled={busy || !userId}
+          title="Ukończ"
         >
-          {busy === "complete_task" ? "..." : "Ukończ"}
-        </button>
-        <button
-          className="btn h-8 px-3 text-sm bg-white"
-          onClick={moveTomorrow}
-          disabled={busy !== null}
-          title="Przełóż na jutro"
-        >
-          {busy === "move_to_tomorrow" ? "..." : "Jutro"}
-        </button>
-        <button
-          className="btn h-8 px-3 text-sm bg-white"
-          onClick={remove}
-          disabled={busy !== null}
-          title="Usuń zadanie"
-        >
-          {busy === "delete_task" ? "..." : "Usuń"}
+          Ukończ
         </button>
 
-        {/* NOWE: Pomoc do zadania (rozmowa) */}
+        {/* PRZEŁÓŻ – natychmiast pokaż datepicker */}
         <button
-          className="btn h-8 px-3 text-sm bg-accent text-white ml-auto"
-          onClick={help}
-          disabled={busy !== null}
-          title="Poproś asystenta o pomoc: pytania + rozbicie na kroki"
+          className="btn bg-white"
+          onClick={openDatePicker}
+          disabled={busy || !userId}
+          title="Przełóż"
         >
-          Pomóż mi
+          Przełóż
+        </button>
+        <input
+          ref={dateRef}
+          type="date"
+          className="hidden"
+          onChange={onDateChange}
+        />
+
+        <button
+          className="btn bg-indigo-600 text-white"
+          onClick={() => onAsk?.(`Pomóż mi z tym zadaniem: ${content}`)}
+          title="Pomóż mi z tym zadaniem"
+        >
+          Pomóż mi z tym
         </button>
       </div>
     </div>
