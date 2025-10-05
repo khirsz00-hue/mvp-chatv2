@@ -16,11 +16,6 @@ import {
 } from "@/lib/chatStore";
 import HatsGuided from "@/components/HatsGuided";
 
-// ...
-{selectedAssistantId === "six_hats" && user && (
-  <HatsGuided userId={user.id} />
-)}
-
 type Msg = ChatMsg;
 const stripTool = (t:string)=> t.replace(/```tool[\s\S]*?```/g,"").trim();
 
@@ -270,8 +265,8 @@ export default function Home(){
             </div>
           </header>
 
-          {assistant === 'hats' ? (
-            <HatsFlow userId={userId!} />
+          {assistant === 'six_hats' ? (
+            <HatsGuided userId={userId!} />
           ) : (
             <>
               {/* Quick actions */}
