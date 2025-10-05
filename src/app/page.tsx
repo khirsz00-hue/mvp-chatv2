@@ -1,20 +1,28 @@
+// src/app/page.tsx
 'use client';
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabaseClient";
+
 import { AssistantSelector } from "@/components/AssistantSelector";
 import { Bubble } from "@/components/MessageBubble";
-import { TaskCard } from "@/components/TaskCard";
+import { Toasts, type Toast } from "@/components/Toast";
+import { ChatSidebar } from "@/components/ChatSidebar";
+
+import type { AssistantId } from "@/assistants/types";
+import HatsGuided from "@/components/HatsGuided";
+
+// NEW: multiselect list & groupings
+import { TasksList } from "@/components/TasksList";
 import { GroupedTasks } from "@/components/GroupedTasks";
 import { GroupedByProject } from "@/components/GroupedByProject";
 import { GroupedByDay } from "@/components/GroupedByDay";
-import { Toasts, type Toast } from "@/components/Toast";
-import type { AssistantId } from "@/assistants/types";
-import { ChatSidebar } from "@/components/ChatSidebar";
+
+// local chat store (per-assistant history for Todoist)
 import {
   makeChat, loadChats, saveChats, updateTitleFromFirstUserMessage,
   type Chat, type Msg as ChatMsg
 } from "@/lib/chatStore";
-import HatsGuided from "@/components/HatsGuided";
 
 type Msg = ChatMsg;
 const stripTool = (t:string)=> t.replace(/```tool[\s\S]*?```/g,"").trim();
@@ -22,7 +30,7 @@ const stripTool = (t:string)=> t.replace(/```tool[\s\S]*?```/g,"").trim();
 export default function Home(){
   const sb = supabaseBrowser();
 
-  // auth
+  // auth session
   const [session, setSession] = useState<any>(null);
   useEffect(()=>{
     let mounted = true;
@@ -32,10 +40,10 @@ export default function Home(){
   },[]);
   const userId = session?.user?.id as string | undefined;
 
-  // assistant
+  // assistant picker (todoist | six_hats)
   const [assistant, setAssistant] = useState<AssistantId>('todoist');
 
-  // chats per assistant (dla Todoist – zachowujemy, Hats ma własny flow)
+  // chats/history only for Todoist (Six Hats ma własny flow i historię w Supabase)
   const [chats, setChats] = useState<Chat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | undefined>(undefined);
 
@@ -46,10 +54,10 @@ export default function Home(){
     setToasts(ts => [...ts, { id, text, type }]);
   },[]);
   const dropToast = useCallback((id:string)=>{
-    setToasts(ts => ts.filter(t=>t.id !== id));
+    setToasts(ts => ts.filter(t=> t.id !== id));
   },[]);
 
-  // ładowanie historii tylko dla todoist
+  // load chats for todoist only
   useEffect(()=>{
     if(!userId) return;
     if(assistant !== 'todoist') return;
@@ -75,17 +83,7 @@ export default function Home(){
   const activeChat = useMemo(()=> chats.find(c=> c.id === activeChatId), [chats, activeChatId]);
   const messages = activeChat?.messages ?? [];
 
-  // snapshot zadań (dla LLM context – tylko todoist)
-  const lastTasks = useMemo(() => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const m = messages[i];
-      if (Array.isArray(m.toolResult)) return m.toolResult as any[];
-      if (m.toolResult?.groups && m.toolResult?.tasks) return m.toolResult.tasks as any[];
-      if (m.toolResult?.tasks && m.toolResult?.week) return m.toolResult.tasks as any[];
-    }
-    return [] as any[];
-  }, [messages]);
-
+  // helper: remove task from a specific assistant message block (after complete/postpone)
   const removeTaskFromMessage = useCallback((msgIndex: number, taskId: string)=>{
     const idx = chats.findIndex(c=> c.id === activeChatId);
     if(idx === -1) return;
@@ -111,7 +109,7 @@ export default function Home(){
     copy[idx] = updated; persist(copy);
   }, [chats, activeChatId, persist]);
 
-  // connect/disconnect todoist
+  // connect/disconnect todoist (button only visible in Todoist assistant)
   const [connectingTodoist, setConnectingTodoist] = useState(false);
   const connectTodoist = ()=>{
     if(!userId) { pushToast("Najpierw zaloguj się.", "error"); return; }
@@ -149,6 +147,7 @@ export default function Home(){
     const arr = [...chats]; arr[idx] = updated; persist(arr);
   }, [chats, activeChatId, persist]);
 
+  // quick fetch helpers (today/tomorrow/week/overdue)
   async function quickFetch(
     action: "get_today_tasks" | "get_tomorrow_tasks" | "get_week_tasks" | "get_overdue_tasks"
   ) {
@@ -182,6 +181,7 @@ export default function Home(){
     }
   }
 
+  // main chat send for Todoist assistant (NLU commands etc.)
   async function sendMsg(text: string){
     if(!text.trim() || !userId) { pushToast("Brak userId – zaloguj się ponownie.", "error"); return; }
     pushUser(text.trim());
@@ -216,7 +216,7 @@ export default function Home(){
     pushAssistant(stripTool(data.content||""), toolResult);
   }
 
-  // sign-in
+  // sign-in gate
   if(!session){
     const SignIn = require("@/components/SignIn").SignIn;
     return <SignIn />;
@@ -225,7 +225,7 @@ export default function Home(){
   return (
     <div className="max-w-6xl mx-auto p-4">
       <div className="flex flex-col sm:flex-row gap-4">
-        {/* Sidebar: tylko dla Todoist (Hats ma własny stepper flow bez historii chatów) */}
+        {/* Sidebar historii tylko dla Todoist */}
         {assistant === 'todoist' && (
           <ChatSidebar
             chats={chats}
@@ -265,11 +265,12 @@ export default function Home(){
             </div>
           </header>
 
+          {/* Główny obszar: albo Six Hats guided, albo wątek Todoist */}
           {assistant === 'six_hats' ? (
             <HatsGuided userId={userId!} />
           ) : (
             <>
-              {/* Quick actions */}
+              {/* Szybkie akcje */}
               <div className="flex flex-wrap gap-2">
                 <button className="btn bg-ink text-white text-sm" onClick={()=>quickFetch("get_today_tasks")} disabled={!userId}>dzisiaj</button>
                 <button className="btn bg-ink text-white text-sm" onClick={()=>quickFetch("get_tomorrow_tasks")} disabled={!userId}>jutro</button>
@@ -277,7 +278,7 @@ export default function Home(){
                 <button className="btn bg-ink text-white text-sm" onClick={()=>quickFetch("get_overdue_tasks")} disabled={!userId}>przeterminowane</button>
               </div>
 
-              {/* Thread */}
+              {/* Wątek */}
               <main className="space-y-4">
                 {(activeChat?.messages ?? []).map((m, i) => (
                   <div key={i} className="space-y-2">
@@ -287,21 +288,18 @@ export default function Home(){
                       </div>
                     </Bubble>
 
+                    {/* Płaska lista zadań → multiselect */}
                     {m.toolResult && Array.isArray(m.toolResult) && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {m.toolResult.map((t: any) => (
-                          <TaskCard
-                            key={t.id}
-                            t={t}
-                            userId={userId}
-                            onRemoved={(id)=> removeTaskFromMessage(i, id)}
-                            notify={(txt,type)=> setToasts(ts=> [...ts, { id: Math.random().toString(36).slice(2), text: txt, type }])}
-                            onAsk={(txt)=> sendMsg(txt)}
-                          />
-                        ))}
-                      </div>
+                      <TasksList
+                        tasks={m.toolResult}
+                        userId={userId}
+                        onRemoved={(id)=> removeTaskFromMessage(i, id)}
+                        notify={(txt,type)=> setToasts(ts=> [...ts, { id: Math.random().toString(36).slice(2), text: txt, type }])}
+                        onAsk={(txt)=> sendMsg(txt)}
+                      />
                     )}
 
+                    {/* Grupowanie tematyczne (opcjonalne) */}
                     {m.toolResult?.groups && m.toolResult?.tasks && (
                       <GroupedTasks
                         groups={m.toolResult.groups}
@@ -309,24 +307,29 @@ export default function Home(){
                         userId={userId}
                         onRemoved={(id)=> removeTaskFromMessage(i, id)}
                         notify={(txt,type)=> setToasts(ts=> [...ts, { id: Math.random().toString(36).slice(2), text: txt, type }])}
+                        onAsk={(txt)=> sendMsg(txt)}
                       />
                     )}
 
+                    {/* Grupowanie po projektach */}
                     {m.toolResult?.groupByProject && m.toolResult?.tasks && (
                       <GroupedByProject
                         tasks={m.toolResult.tasks}
                         userId={userId}
                         onRemoved={(id)=> removeTaskFromMessage(i, id)}
                         notify={(txt,type)=> setToasts(ts=> [...ts, { id: Math.random().toString(36).slice(2), text: txt, type }])}
+                        onAsk={(txt)=> sendMsg(txt)}
                       />
                     )}
 
+                    {/* Grupowanie po dniach (tydzień) */}
                     {m.toolResult?.week && m.toolResult?.tasks && (
                       <GroupedByDay
                         tasks={m.toolResult.tasks}
                         userId={userId}
                         onRemoved={(id)=> removeTaskFromMessage(i, id)}
                         notify={(txt,type)=> setToasts(ts=> [...ts, { id: Math.random().toString(36).slice(2), text: txt, type }])}
+                        onAsk={(txt)=> sendMsg(txt)}
                       />
                     )}
                   </div>
@@ -366,7 +369,7 @@ export default function Home(){
         </div>
       </div>
 
-      <Toasts items={toasts} onDone={(id)=> setToasts(ts=> ts.filter(t=> t.id !== id))} />
+      <Toasts items={toasts} onDone={(id)=> dropToast(id)} />
     </div>
   );
 }
