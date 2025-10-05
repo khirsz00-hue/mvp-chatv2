@@ -11,12 +11,19 @@ export interface AssistantConfig {
   name: string;
   /** Opis (opcjonalny, np. do tooltipów / list). */
   description?: string;
-  /** Ikona/emoji (opcjonalna, jeżeli chcesz gdzieś pokazać). */
+  /** Ikona/emoji (opcjonalna). */
   icon?: string;
 
   /**
-   * Flagi specyficzne dla UI (opcjonalne).
-   * Np. czy pokazywać przycisk „Połącz Todoist” wyłącznie w Todoist Helper.
+   * Jeżeli true, /api/chat traktuje rozmowę jako bezstanową:
+   * bierze tylko system prompt + ostatnią wiadomość użytkownika.
+   * Przydatne dla asystentów, którzy mają własny flow/historię.
+   */
+  stateless?: boolean;
+
+  /**
+   * Flagi UI (opcjonalne).
+   * Np. czy pokazywać przycisk „Połącz Todoist” tylko w Todoist Helper.
    */
   ui?: {
     showTodoistConnect?: boolean;
