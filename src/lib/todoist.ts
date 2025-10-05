@@ -1,9 +1,11 @@
+// src/lib/todoist.ts
 import { createSupabaseServer } from "@/utils/supabase/server";
 
 const TODOIST_BASE = "https://api.todoist.com/rest/v2";
 const TODOIST_AUTH = "https://todoist.com/oauth/authorize";
 const TODOIST_TOKEN = "https://todoist.com/oauth/access_token";
 
+/** URL do autoryzacji Todoist (uid w state) */
 export function buildTodoistAuthUrl(uid: string) {
   const clientId = process.env.TODOIST_CLIENT_ID!;
   const redirect = process.env.TODOIST_REDIRECT_URI!;
@@ -15,6 +17,7 @@ export function buildTodoistAuthUrl(uid: string) {
   return url;
 }
 
+/** Wymiana code -> access_token */
 export async function exchangeTodoistCode(code: string) {
   const client_id = process.env.TODOIST_CLIENT_ID!;
   const client_secret = process.env.TODOIST_CLIENT_SECRET!;
@@ -28,6 +31,7 @@ export async function exchangeTodoistCode(code: string) {
   return r.json() as Promise<{ access_token: string }>;
 }
 
+/** Zapis/aktualizacja tokenu w supabase (tabela: user_tokens) */
 export async function saveTodoistToken(userId: string, access_token: string) {
   const sb = createSupabaseServer();
   const { error } = await sb.from("user_tokens").upsert(
@@ -37,20 +41,27 @@ export async function saveTodoistToken(userId: string, access_token: string) {
   if (error) throw new Error(error.message);
 }
 
+/** Usunięcie tokenu */
+export async function removeTodoistToken(userId: string) {
+  const sb = createSupabaseServer();
+  const { error } = await sb
+    .from("user_tokens")
+    .delete()
+    .eq("user_id", userId)
+    .eq("provider", "todoist");
+  if (error) throw new Error(error.message);
+}
+
 async function getToken(userId: string): Promise<string | null> {
   const sb = createSupabaseServer();
-  const { data } = await sb
+  const { data, error } = await sb
     .from("user_tokens")
     .select("access_token")
     .eq("user_id", userId)
     .eq("provider", "todoist")
     .maybeSingle();
+  if (error) throw new Error(error.message);
   return data?.access_token ?? null;
-}
-
-export async function removeTodoistToken(userId: string) {
-  const sb = createSupabaseServer();
-  await sb.from("user_tokens").delete().eq("user_id", userId).eq("provider", "todoist");
 }
 
 async function tfetch<T = any>(userId: string, path: string, init?: RequestInit): Promise<T> {
@@ -66,14 +77,14 @@ async function tfetch<T = any>(userId: string, path: string, init?: RequestInit)
     cache: "no-store",
   });
   if (!r.ok) {
-    const t = await r.text();
+    const t = await r.text().catch(() => "");
     throw new Error(t || `Todoist error: ${r.status}`);
   }
   if (r.status === 204) return {} as T;
   return r.json();
 }
 
-// === High-level helpers ===
+/** === High-level helpers === */
 export async function listToday(userId: string) {
   return tfetch(userId, `/tasks?filter=${encodeURIComponent("today | overdue")}`);
 }
