@@ -1,39 +1,47 @@
-'use client';
-import { TaskCard } from "@/components/TaskCard";
-
-type Task = { id:string; content:string; due?:{ date?:string }; project_id?:string; priority?:number; };
-
-function formatDay(dateStr?: string) {
-  if (!dateStr) return "Brak daty";
-  const date = new Date(dateStr);
-  return date.toLocaleDateString("pl-PL", { weekday: "long", day:"2-digit", month:"2-digit" });
-}
+"use client";
+import { useMemo, useState } from "react";
+import { TasksList } from "./TasksList";
 
 export function GroupedByDay({
-  tasks, userId, onRemoved, notify
-}:{
-  tasks: Task[];
+  tasks,
+  userId,
+  onRemoved,
+  notify,
+  onAsk,
+}: {
+  tasks: any[];
   userId?: string;
-  onRemoved?: (id:string)=>void;
-  notify?: (text:string, type?:'success'|'error'|'info')=>void;
+  onRemoved?: (id: string) => void;
+  notify?: (text: string, type?: "success" | "error" | "info") => void;
+  onAsk?: (text: string) => void;
 }) {
-  const groups = new Map<string, Task[]>();
-  for (const t of tasks) {
-    const key = formatDay(t.due?.date);
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(t);
-  }
+  const groups = useMemo(() => {
+    const map = new Map<string, any[]>();
+    for (const t of tasks) {
+      const d =
+        t.due?.date ||
+        (t.due?.datetime ? t.due.datetime.slice(0, 10) : t.due_date) ||
+        "Bez daty";
+      if (!map.has(d)) map.set(d, []);
+      map.get(d)!.push(t);
+    }
+    return Array.from(map.entries())
+      .map(([day, ts]) => ({ day, tasks: ts }))
+      .sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
+  }, [tasks]);
 
   return (
-    <div className="space-y-4">
-      {[...groups.entries()].map(([day, list])=>(
-        <section key={day} className="space-y-2">
-          <h3 className="text-sm font-semibold text-zinc-700 px-1">{day}</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {list.map((t)=>(
-              <TaskCard key={t.id} t={t} userId={userId} onRemoved={onRemoved} notify={notify} />
-            ))}
-          </div>
+    <div className="space-y-6">
+      {groups.map((g) => (
+        <section key={g.day} className="space-y-2">
+          <div className="text-sm font-semibold">🗓 {g.day}</div>
+          <TasksList
+            tasks={g.tasks}
+            userId={userId}
+            onRemoved={onRemoved}
+            notify={notify}
+            onAsk={onAsk}
+          />
         </section>
       ))}
     </div>
