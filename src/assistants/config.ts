@@ -9,6 +9,7 @@ export const assistants: Record<AssistantId, AssistantConfig> = {
     description:
       "Dodawaj/organizuj zadania, grupuj je, przenoś terminy i rozmawiaj o nich jak w czacie.",
     icon: "✅",
+    // domyślnie stateful (stateless=false), więc nie podajemy
     ui: { showTodoistConnect: true },
   },
   six_hats: {
@@ -17,6 +18,8 @@ export const assistants: Record<AssistantId, AssistantConfig> = {
     description:
       "Prowadzony proces decyzyjny (ADHD-friendly): jedno pytanie naraz, kapelusze, synteza.",
     icon: "🎩",
+    // Six Hats ma własny guided flow + historię, więc /api/chat traktujemy bezstanowo
+    stateless: true,
     ui: { showTodoistConnect: false },
   },
 };
