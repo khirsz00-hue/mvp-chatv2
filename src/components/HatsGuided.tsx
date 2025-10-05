@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { DEFAULT_SEQUENCE, HAT_LABEL, type HatMode } from "@/assistants/hats/prompt";
 
 type Msg = { role: "user" | "assistant"; content: string; hat?: HatMode };
@@ -10,11 +9,14 @@ function Bubble({ role, children }: { role: "user" | "assistant"; children: Reac
   const isUser = role === "user";
   return (
     <div className={`w-full flex ${isUser ? "justify-end" : "justify-start"}`}>
-      <div className={[
-        "max-w-[85%] rounded-2xl px-4 py-2 text-sm shadow-sm border",
-        isUser ? "bg-indigo-600 text-white border-indigo-600"
-               : "bg-white text-zinc-800 border-zinc-200"
-      ].join(" ")}>
+      <div
+        className={[
+          "max-w-[85%] rounded-2xl px-4 py-2 text-sm shadow-sm border",
+          "transition-all duration-200",
+          isUser ? "bg-indigo-600 text-white border-indigo-600"
+                 : "bg-white text-zinc-800 border-zinc-200"
+        ].join(" ")}
+      >
         {children}
       </div>
     </div>
@@ -34,23 +36,17 @@ function TypingDots() {
 }
 
 export default function HatsGuided({ userId }: { userId: string }) {
-  // aktywny kapelusz
   const [hat, setHat] = useState<HatMode>("blue_start");
-  // rozmowa
   const [messages, setMessages] = useState<Msg[]>([]);
-  // input
   const [input, setInput] = useState("");
-  // status
   const [busy, setBusy] = useState(false);
   const [started, setStarted] = useState(false);
   const [readyToSynthesize, setReadyToSynthesize] = useState(false);
   const [context, setContext] = useState("");
 
-  // historia
   const [sessions, setSessions] = useState<Array<{id:string; title:string|null; created_at:string}>>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
-  // autoscroll
   const bottomRef = useRef<HTMLDivElement>(null);
   useEffect(()=>{ bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, busy]);
 
@@ -80,11 +76,9 @@ export default function HatsGuided({ userId }: { userId: string }) {
     const data = await r.json();
     if (!r.ok) return;
     setSessionId(id);
-    // wczytaj wiadomości
     const msgs: Msg[] = (data.messages ?? []).map((m:any)=>({ role: m.role, content: m.content, hat: m.hat || undefined }));
     setMessages(msgs);
     setStarted(true);
-    // heurystyka: ustaw kapelusz na ostatni hat z asystenta, albo blue_start
     const lastHat = [...msgs].reverse().find(m=>m.hat)?.hat || "blue_start";
     setHat(lastHat as HatMode);
   }, [userId]);
@@ -196,7 +190,6 @@ export default function HatsGuided({ userId }: { userId: string }) {
     }
   }, [transcript, context, appendMessage]);
 
-  /** ---------- UI ---------- */
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4">
       {/* Panel historii */}
@@ -215,7 +208,7 @@ export default function HatsGuided({ userId }: { userId: string }) {
             <div
               key={s.id}
               className={[
-                "flex items-center justify-between gap-2 rounded-lg border px-2 py-2 text-sm cursor-pointer",
+                "flex items-center justify-between gap-2 rounded-lg border px-2 py-2 text-sm cursor-pointer transition-colors",
                 sessionId===s.id ? "border-indigo-500 bg-indigo-50" : "border-zinc-200 hover:bg-zinc-50"
               ].join(" ")}
               onClick={()=> loadSession(s.id)}
@@ -241,8 +234,7 @@ export default function HatsGuided({ userId }: { userId: string }) {
         <div className="relative flex flex-wrap gap-6 items-center">
           {DEFAULT_SEQUENCE.map((h)=>(
             <div key={h} className="relative">
-              <motion.div
-                layout
+              <div
                 className={[
                   "px-3 py-1 rounded-full text-xs border transition-colors",
                   hat===h ? "bg-indigo-600 text-white border-indigo-600"
@@ -250,20 +242,16 @@ export default function HatsGuided({ userId }: { userId: string }) {
                 ].join(" ")}
               >
                 {HAT_LABEL[h]}
-              </motion.div>
+              </div>
               {hat===h && (
-                <motion.div layoutId="underline" className="absolute left-0 right-0 -bottom-1 h-[3px] rounded-full bg-indigo-600" />
+                <div className="absolute left-0 right-0 -bottom-1 h-[3px] rounded-full bg-indigo-600" />
               )}
             </div>
           ))}
         </div>
 
-        {/* Intro */}
         {!started && (
-          <motion.div
-            initial={{ opacity:0, y:6 }} animate={{ opacity:1, y:0 }}
-            className="rounded-2xl border border-zinc-200 bg-white p-4 space-y-3"
-          >
+          <div className="rounded-2xl border border-zinc-200 bg-white p-4 space-y-3">
             <div className="text-sm text-zinc-700">
               Napisz krótko dylemat (opcjonalnie), a potem kliknij <b>Start</b>.  
               Asystent poprowadzi Cię kapeluszami – <b>jedno pytanie naraz</b>.
@@ -279,28 +267,24 @@ export default function HatsGuided({ userId }: { userId: string }) {
                 Start
               </button>
             </div>
-          </motion.div>
+          </div>
         )}
 
-        {/* Chat */}
         {started && (
           <>
             <div className="rounded-2xl border border-zinc-200 bg-white p-3 h-[62vh] overflow-y-auto">
-              <AnimatePresence initial={false}>
-                {messages.map((m,i)=>(
-                  <motion.div key={i} initial={{ opacity:0, y:6 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0 }} transition={{ duration:0.18 }} className="mb-2">
-                    <Bubble role={m.role}>
-                      {m.hat && <div className="text-[10px] opacity-60 mb-1">{HAT_LABEL[m.hat]}</div>}
-                      <div className="whitespace-pre-wrap">{m.content}</div>
-                    </Bubble>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
+              {messages.map((m,i)=>(
+                <div key={i} className="mb-2 animate-[fadeIn_.2s_ease]">
+                  <Bubble role={m.role}>
+                    {m.hat && <div className="text-[10px] opacity-60 mb-1">{HAT_LABEL[m.hat]}</div>}
+                    <div className="whitespace-pre-wrap">{m.content}</div>
+                  </Bubble>
+                </div>
+              ))}
               {busy && <TypingDots />}
               <div ref={bottomRef} />
             </div>
 
-            {/* Input */}
             <div className="flex gap-2">
               <input
                 value={input}
@@ -319,7 +303,6 @@ export default function HatsGuided({ userId }: { userId: string }) {
               </button>
             </div>
 
-            {/* Finał */}
             {readyToSynthesize && (
               <div className="flex justify-end">
                 <button
