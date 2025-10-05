@@ -14,7 +14,12 @@ import {
   makeChat, loadChats, saveChats, updateTitleFromFirstUserMessage,
   type Chat, type Msg as ChatMsg
 } from "@/lib/chatStore";
-import { HatsFlow } from "@/components/HatsFlow";
+import HatsGuided from "@/components/HatsGuided";
+
+// ...
+{selectedAssistantId === "six_hats" && user && (
+  <HatsGuided userId={user.id} />
+)}
 
 type Msg = ChatMsg;
 const stripTool = (t:string)=> t.replace(/```tool[\s\S]*?```/g,"").trim();
