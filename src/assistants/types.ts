@@ -9,7 +9,7 @@ export interface AssistantConfig {
   id: AssistantId;
   /** Nazwa wyświetlana w UI. */
   name: string;
-  /** Opis (opcjonalny, np. do tooltipów / list). */
+  /** Opis (opcjonalny). */
   description?: string;
   /** Ikona/emoji (opcjonalna). */
   icon?: string;
@@ -17,9 +17,22 @@ export interface AssistantConfig {
   /**
    * Jeżeli true, /api/chat traktuje rozmowę jako bezstanową:
    * bierze tylko system prompt + ostatnią wiadomość użytkownika.
-   * Przydatne dla asystentów, którzy mają własny flow/historię.
    */
   stateless?: boolean;
+
+  /**
+   * Ścieżka do pliku z system promptem (markdown/tekst).
+   * Np. "src/assistants/todoist/prompt.md".
+   * Opcjonalne – jeśli brak, serwer użyje fallbacku i zwróci pusty prompt.
+   */
+  systemPromptPath?: string;
+
+  /**
+   * Folder z wiedzą (pliki .md/.txt będą scalone do kontekstu).
+   * Np. "src/assistants/todoist/knowledge".
+   * Opcjonalne – jeśli brak/nie istnieje, zwracamy pusty string.
+   */
+  knowledgeDir?: string;
 
   /**
    * Flagi UI (opcjonalne).
@@ -30,7 +43,7 @@ export interface AssistantConfig {
   };
 }
 
-/** (Opcjonalnie) prosty meta typ, jeśli gdzieś masz listy z id+name. */
+/** Przydatne w listach, selektorach itp. */
 export interface AssistantMeta {
   id: AssistantId;
   name: string;
