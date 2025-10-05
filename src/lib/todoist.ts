@@ -1,230 +1,116 @@
-import { supabaseAdmin } from "@/lib/supabaseClient";
+import { createSupabaseServer } from "@/utils/supabase/server";
 
 const TODOIST_BASE = "https://api.todoist.com/rest/v2";
+const TODOIST_AUTH = "https://todoist.com/oauth/authorize";
+const TODOIST_TOKEN = "https://todoist.com/oauth/access_token";
 
-/* ----------------------------- helpers ----------------------------- */
-async function assertOk(res: Response, ctx: string) {
-  if (res.ok) return;
-  const text = await res.text().catch(() => "");
-  throw new Error(`${ctx} :: HTTP ${res.status} :: ${text}`);
+export function buildTodoistAuthUrl(uid: string) {
+  const clientId = process.env.TODOIST_CLIENT_ID!;
+  const redirect = process.env.TODOIST_REDIRECT_URI!;
+  const scope = "data:read_write";
+  const state = encodeURIComponent(uid);
+  const url = `${TODOIST_AUTH}?client_id=${clientId}&scope=${scope}&state=${state}&redirect_uri=${encodeURIComponent(
+    redirect
+  )}`;
+  return url;
 }
 
-const AUTH = (token: string) => ({
-  Authorization: `Bearer ${token}`,
-  "Content-Type": "application/json",
-});
+export async function exchangeTodoistCode(code: string) {
+  const client_id = process.env.TODOIST_CLIENT_ID!;
+  const client_secret = process.env.TODOIST_CLIENT_SECRET!;
+  const redirect_uri = process.env.TODOIST_REDIRECT_URI!;
+  const r = await fetch(TODOIST_TOKEN, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ client_id, client_secret, code, redirect_uri }),
+  });
+  if (!r.ok) throw new Error("Todoist token exchange failed");
+  return r.json() as Promise<{ access_token: string }>;
+}
 
-/* ----------------------------- tokens ------------------------------ */
-export async function getUserTodoistToken(userId: string) {
-  const sb = supabaseAdmin();
-  const { data, error } = await sb
+export async function saveTodoistToken(userId: string, access_token: string) {
+  const sb = createSupabaseServer();
+  const { error } = await sb.from("user_tokens").upsert(
+    { user_id: userId, provider: "todoist", access_token },
+    { onConflict: "provider,user_id" }
+  );
+  if (error) throw new Error(error.message);
+}
+
+async function getToken(userId: string): Promise<string | null> {
+  const sb = createSupabaseServer();
+  const { data } = await sb
     .from("user_tokens")
     .select("access_token")
     .eq("user_id", userId)
     .eq("provider", "todoist")
     .maybeSingle();
-  if (error) throw error;
-  return data?.access_token as string | undefined;
-}
-
-export async function saveTodoistToken(userId: string, token: string) {
-  const sb = supabaseAdmin();
-  const { error } = await sb
-    .from("user_tokens")
-    .upsert(
-      {
-        provider: "todoist",
-        user_id: userId,
-        access_token: token,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "provider,user_id" }
-    );
-  if (error) throw error;
+  return data?.access_token ?? null;
 }
 
 export async function removeTodoistToken(userId: string) {
-  const sb = supabaseAdmin();
-  const { error } = await sb
-    .from("user_tokens")
-    .delete()
-    .eq("user_id", userId)
-    .eq("provider", "todoist");
-  if (error) throw error;
+  const sb = createSupabaseServer();
+  await sb.from("user_tokens").delete().eq("user_id", userId).eq("provider", "todoist");
 }
 
-/* ----------------------------- oauth ------------------------------- */
-export function resolveBaseUrl(fallbackOrigin?: string) {
-  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  if (fallbackOrigin) return fallbackOrigin;
-  return "http://localhost:3000";
-}
-
-export function buildTodoistAuthUrl(opts: { origin?: string; uid: string }) {
-  const clientId = process.env.NEXT_PUBLIC_TODOIST_CLIENT_ID!;
-  const baseUrl = resolveBaseUrl(opts.origin);
-  const redirectUri = `${baseUrl}/api/todoist/callback`;
-  const scope = "data:read_write";
-  const state = encodeURIComponent(JSON.stringify({ uid: opts.uid }));
-  return (
-    `https://todoist.com/oauth/authorize` +
-    `?client_id=${encodeURIComponent(clientId)}` +
-    `&scope=${encodeURIComponent(scope)}` +
-    `&state=${state}` +
-    `&redirect_uri=${encodeURIComponent(redirectUri)}`
-  );
-}
-
-export async function exchangeCodeForToken(code: string) {
-  const res = await fetch("https://todoist.com/oauth/access_token", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      client_id: process.env.TODOIST_CLIENT_ID,
-      client_secret: process.env.TODOIST_CLIENT_SECRET,
-      code,
-    }),
+async function tfetch<T = any>(userId: string, path: string, init?: RequestInit): Promise<T> {
+  const token = await getToken(userId);
+  if (!token) throw new Error("Brak tokenu Todoist dla użytkownika.");
+  const r = await fetch(`${TODOIST_BASE}${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      ...(init?.headers || {}),
+    },
+    cache: "no-store",
   });
-  await assertOk(res, "Todoist token exchange");
-  return (await res.json()) as { access_token: string; token_type: string };
+  if (!r.ok) {
+    const t = await r.text();
+    throw new Error(t || `Todoist error: ${r.status}`);
+  }
+  if (r.status === 204) return {} as T;
+  return r.json();
 }
 
-/* ------------------------------ reads ------------------------------ */
-export async function listTodayTasks(userId: string) {
-  const token = await getUserTodoistToken(userId);
-  if (!token) throw new Error("Brak tokena Todoist");
-  const res = await fetch(
-    `${TODOIST_BASE}/tasks?filter=${encodeURIComponent("today")}`,
-    { headers: AUTH(token) }
-  );
-  await assertOk(res, "List today tasks");
-  return res.json();
+// === High-level helpers ===
+export async function listToday(userId: string) {
+  return tfetch(userId, `/tasks?filter=${encodeURIComponent("today | overdue")}`);
 }
-
-export async function listTomorrowTasks(userId: string) {
-  const token = await getUserTodoistToken(userId);
-  if (!token) throw new Error("Brak tokena Todoist");
-  const res = await fetch(
-    `${TODOIST_BASE}/tasks?filter=${encodeURIComponent("tomorrow")}`,
-    { headers: AUTH(token) }
-  );
-  await assertOk(res, "List tomorrow tasks");
-  return res.json();
+export async function listTomorrow(userId: string) {
+  return tfetch(userId, `/tasks?filter=${encodeURIComponent("tomorrow")}`);
 }
-
-export async function listWeekTasks(userId: string) {
-  const token = await getUserTodoistToken(userId);
-  if (!token) throw new Error("Brak tokena Todoist");
-  const res = await fetch(
-    `${TODOIST_BASE}/tasks?filter=${encodeURIComponent("7 days")}`,
-    { headers: AUTH(token) }
-  );
-  await assertOk(res, "List week tasks");
-  return res.json();
+export async function listWeek(userId: string) {
+  return tfetch(userId, `/tasks?filter=${encodeURIComponent("next 7 days")}`);
 }
-
-export async function listOverdueTasks(userId: string) {
-  const token = await getUserTodoistToken(userId);
-  if (!token) throw new Error("Brak tokena Todoist");
-  const res = await fetch(
-    `${TODOIST_BASE}/tasks?filter=${encodeURIComponent("overdue")}`,
-    { headers: AUTH(token) }
-  );
-  await assertOk(res, "List overdue tasks");
-  return res.json();
+export async function listOverdue(userId: string) {
+  return tfetch(userId, `/tasks?filter=${encodeURIComponent("overdue")}`);
 }
-
 export async function listProjects(userId: string) {
-  const token = await getUserTodoistToken(userId);
-  if (!token) throw new Error("Brak tokena Todoist");
-  const res = await fetch(`${TODOIST_BASE}/projects`, { headers: AUTH(token) });
-  await assertOk(res, "List projects");
-  return res.json();
+  return tfetch(userId, `/projects`);
 }
-
-/* ------------------------------ writes ----------------------------- */
 export async function addTask(
   userId: string,
-  input: { content: string; due_string?: string; project_id?: string; priority?: number }
+  payload: { content: string; due_string?: string; project_id?: string }
 ) {
-  const token = await getUserTodoistToken(userId);
-  if (!token) throw new Error("Brak tokena Todoist");
-  const res = await fetch(`${TODOIST_BASE}/tasks`, {
-    method: "POST",
-    headers: AUTH(token),
-    body: JSON.stringify(input),
-  });
-  await assertOk(res, "Add task");
-  return res.json();
+  return tfetch(userId, `/tasks`, { method: "POST", body: JSON.stringify(payload) });
 }
-
 export async function deleteTask(userId: string, taskId: string) {
-  const token = await getUserTodoistToken(userId);
-  if (!token) throw new Error("Brak tokena Todoist");
-  const res = await fetch(`${TODOIST_BASE}/tasks/${taskId}`, {
-    method: "DELETE",
-    headers: AUTH(token),
-  });
-  await assertOk(res, "Delete task");
-  return { ok: true };
+  return tfetch(userId, `/tasks/${taskId}`, { method: "DELETE", headers: {} });
 }
-
 export async function closeTask(userId: string, taskId: string) {
-  const token = await getUserTodoistToken(userId);
-  if (!token) throw new Error("Brak tokena Todoist");
-  const res = await fetch(`${TODOIST_BASE}/tasks/${taskId}/close`, {
-    method: "POST",
-    headers: AUTH(token),
-  });
-  await assertOk(res, "Close task");
-  return { ok: true };
+  return tfetch(userId, `/tasks/${taskId}/close`, { method: "POST", headers: {} });
 }
-
-export async function postponeToTomorrow(userId: string, taskId: string) {
-  const token = await getUserTodoistToken(userId);
-  if (!token) throw new Error("Brak tokena Todoist");
-  const res = await fetch(`${TODOIST_BASE}/tasks/${taskId}`, {
-    method: "POST",
-    headers: AUTH(token),
-    body: JSON.stringify({ due_string: "tomorrow" }),
-  });
-  await assertOk(res, "Postpone task to tomorrow");
-  return { ok: true };
+export async function closeTasksBatch(userId: string, ids: string[]) {
+  const results = await Promise.allSettled(ids.map((id) => closeTask(userId, id)));
+  const ok = results.filter((r) => r.status === "fulfilled").length;
+  const fail = results.length - ok;
+  return { ok, fail };
 }
-
-/** Przełóż na konkretną datę YYYY-MM-DD */
-export async function postponeToDate(userId: string, taskId: string, dateISO: string) {
-  const token = await getUserTodoistToken(userId);
-  if (!token) throw new Error("Brak tokena Todoist");
-  const res = await fetch(`${TODOIST_BASE}/tasks/${taskId}`, {
+export async function postponeTask(userId: string, taskId: string, due_string: string) {
+  // due_string może być naturalnym stringiem lub "YYYY-MM-DD"
+  return tfetch(userId, `/tasks/${taskId}`, {
     method: "POST",
-    headers: AUTH(token),
-    body: JSON.stringify({ due_date: dateISO }),
+    body: JSON.stringify({ due_string }),
   });
-  await assertOk(res, "Postpone task to specific date");
-  return { ok: true };
-}
-
-export async function moveOverdueToToday(userId: string) {
-  const token = await getUserTodoistToken(userId);
-  if (!token) throw new Error("Brak tokena Todoist");
-  const tasks = await listOverdueTasks(userId);
-  let moved = 0;
-  const ids: string[] = [];
-  for (const t of tasks) {
-    const res = await fetch(`${TODOIST_BASE}/tasks/${t.id}`, {
-      method: "POST",
-      headers: AUTH(token),
-      body: JSON.stringify({ due_string: "today" }),
-    });
-    if (res.ok) {
-      moved++;
-      ids.push(String(t.id));
-    } else {
-      const txt = await res.text().catch(() => "");
-      console.error("Move single overdue -> today failed", t.id, res.status, txt);
-    }
-  }
-  return { moved, ids };
 }
