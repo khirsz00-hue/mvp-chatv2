@@ -1,10 +1,7 @@
-export type AssistantId = "todoist" | "hats";
-export type AssistantConfig = {
+// src/assistants/types.ts
+export type AssistantId = 'todoist' | 'six_hats';
+
+export interface AssistantMeta {
   id: AssistantId;
   name: string;
-  systemPromptPath: string;
-  knowledgeDir?: string;
-  stateless?: boolean;
-  tools?: string[];
-  replyStyle?: "bubbles" | "plain";
-};
+}
