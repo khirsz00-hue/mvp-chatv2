@@ -1,135 +1,72 @@
-// src/app/api/todoist/actions/route.ts
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import {
-  // READS
-  listTodayTasks,
-  listTomorrowTasks,
-  listWeekTasks,
-  listOverdueTasks,
+  listToday,
+  listTomorrow,
+  listWeek,
+  listOverdue,
   listProjects,
-  // WRITES
   addTask,
   deleteTask,
   closeTask,
-  postponeToTomorrow,
-  postponeToDate,
-  moveOverdueToToday,
+  closeTasksBatch,
+  postponeTask,
 } from "@/lib/todoist";
 
-// Preflight (czasem przeglądarka wyśle OPTIONS)
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204 });
-}
-
-export async function POST(req: NextRequest) {
-  // --- DIAGNOSTYKA: nagłówki + body (bezpiecznie) ---
-  const ct = req.headers.get("content-type") || "none";
-  let raw = "";
-  let body: any = null;
-  try {
-    if ((ct || "").includes("application/json")) {
-      body = await req.json();
-    } else {
-      raw = await req.text();
-      try {
-        body = raw ? JSON.parse(raw) : {};
-      } catch {
-        body = { _raw: raw };
-      }
-    }
-  } catch (e: any) {
-    console.error("[/api/todoist/actions] body parse error:", e?.message);
-    body = null;
-  }
-
-  const userId = body?.userId;
-  const action = body?.action;
-  const payload = body?.payload ?? {};
-
-  console.log("[/api/todoist/actions] ct:", ct);
-  console.log("[/api/todoist/actions] body:", JSON.stringify(body)?.slice(0, 500));
-
+export async function POST(req: Request) {
+  const { userId, action, payload } = await req.json();
   if (!userId || !action) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "Missing params",
-        details: { hasUserId: !!userId, hasAction: !!action, contentType: ct, sampleBody: body },
-      },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "missing userId/action" }, { status: 400 });
   }
 
   try {
-    let result: any = null;
+    let result: any;
 
     switch (action) {
-      /* ---------- READS ---------- */
-      case "get_today_tasks": {
-        result = await listTodayTasks(userId);
+      case "get_today_tasks":
+        result = await listToday(userId);
         break;
-      }
-      case "get_tomorrow_tasks": {
-        result = await listTomorrowTasks(userId);
+      case "get_tomorrow_tasks":
+        result = await listTomorrow(userId);
         break;
-      }
-      case "get_week_tasks": {
-        result = await listWeekTasks(userId);
+      case "get_week_tasks":
+        result = await listWeek(userId);
         break;
-      }
-      case "get_overdue_tasks": {
-        result = await listOverdueTasks(userId);
+      case "get_overdue_tasks":
+        result = await listOverdue(userId);
         break;
-      }
-      case "list_projects": {
+      case "list_projects":
         result = await listProjects(userId);
         break;
-      }
-
-      /* ---------- WRITES ---------- */
-      case "add_task": {
+      case "add_task":
         result = await addTask(userId, payload);
         break;
-      }
-      case "delete_task": {
-        result = await deleteTask(userId, String(payload?.task_id));
+      case "delete_task":
+        result = await deleteTask(userId, payload.id);
+        break;
+      case "complete_task":
+        result = await closeTask(userId, payload.id);
+        break;
+      case "complete_tasks_batch": {
+        const ids: string[] = Array.isArray(payload?.ids) ? payload.ids : [];
+        result = await closeTasksBatch(userId, ids);
         break;
       }
-      case "complete_task": {
-        result = await closeTask(userId, String(payload?.task_id));
+      case "postpone_task": {
+        // payload: { id: string, due_string?: string, date?: "YYYY-MM-DD" }
+        const due_string: string | undefined =
+          payload?.date || payload?.due_string; // jeśli podasz date (YYYY-MM-DD), Todoist też przyjmie jako due_string
+        if (!due_string) {
+          return NextResponse.json({ error: "missing due date" }, { status: 400 });
+        }
+        result = await postponeTask(userId, payload.id, due_string);
         break;
       }
-      case "move_to_tomorrow": {
-        result = await postponeToTomorrow(userId, String(payload?.task_id));
-        break;
-      }
-      case "move_to_date": {
-        result = await postponeToDate(
-          userId,
-          String(payload?.task_id),
-          String(payload?.date)
-        );
-        break;
-      }
-      case "move_overdue_to_today": {
-        result = await moveOverdueToToday(userId);
-        break;
-      }
-
-      default: {
-        return NextResponse.json(
-          { ok: false, error: "Unknown action", action },
-          { status: 400 }
-        );
-      }
+      default:
+        return NextResponse.json({ error: "unknown action" }, { status: 400 });
     }
 
-    return NextResponse.json({ ok: true, result }, { status: 200 });
+    return NextResponse.json({ result });
   } catch (e: any) {
-    console.error("[/api/todoist/actions] handler error:", e?.message, e?.stack);
-    return NextResponse.json(
-      { ok: false, error: e?.message || "Todoist action failed", stack: e?.stack },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: e?.message || "failed" }, { status: 500 });
   }
 }
