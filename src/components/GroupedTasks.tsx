@@ -1,37 +1,41 @@
-'use client';
-
-import { TaskCard } from "@/components/TaskCard";
-
-type Task = { id: string; content: string; due?: { date?: string }; project_id?: string; priority?: number; };
-type Group = { title: string; task_ids: string[] };
+"use client";
+import { TasksList } from "./TasksList";
 
 export function GroupedTasks({
-  groups, tasks, userId, onRemoved, notify
-}:{
-  groups: Group[];
-  tasks: Task[];
+  groups,
+  tasks,
+  userId,
+  onRemoved,
+  notify,
+  onAsk,
+}: {
+  groups: Array<{ name: string; task_ids: string[] }>;
+  tasks: any[];
   userId?: string;
-  onRemoved?: (id:string)=>void;
-  notify?: (text: string, type?: 'success'|'error'|'info') => void;
+  onRemoved?: (id: string) => void;
+  notify?: (text: string, type?: "success" | "error" | "info") => void;
+  onAsk?: (text: string) => void;
 }) {
-  const map = new Map<string, Task>();
-  for (const t of tasks) map.set(String(t.id), t);
+  const byId: Record<string, any> = {};
+  for (const t of tasks) byId[String(t.id)] = t;
 
   return (
-    <div className="space-y-4">
-      {groups.map((g, idx) => (
-        <section key={idx} className="space-y-2">
-          <h3 className="text-sm font-semibold text-zinc-700 px-1">{g.title}</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {g.task_ids.map((id) => {
-              const t = map.get(String(id));
-              return t ? (
-                <TaskCard key={String(id)} t={t} userId={userId} onRemoved={onRemoved} notify={notify} />
-              ) : null;
-            })}
-          </div>
-        </section>
-      ))}
+    <div className="space-y-6">
+      {groups.map((g, idx) => {
+        const ts = g.task_ids.map((id) => byId[String(id)]).filter(Boolean);
+        return (
+          <section key={idx} className="space-y-2">
+            <div className="text-sm font-semibold">🔖 {g.name}</div>
+            <TasksList
+              tasks={ts}
+              userId={userId}
+              onRemoved={onRemoved}
+              notify={notify}
+              onAsk={onAsk}
+            />
+          </section>
+        );
+      })}
     </div>
   );
 }
