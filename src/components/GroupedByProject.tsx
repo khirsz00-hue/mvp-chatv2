@@ -1,34 +1,42 @@
-'use client';
-
-import { TaskCard } from "@/components/TaskCard";
-
-type Task = { id:string; content:string; due?:{ date?:string }; project_id?:string; priority?:number; };
+"use client";
+import { useMemo } from "react";
+import { TasksList } from "./TasksList";
 
 export function GroupedByProject({
-  tasks, userId, onRemoved, notify
-}:{
-  tasks: Task[];
+  tasks,
+  userId,
+  onRemoved,
+  notify,
+  onAsk,
+}: {
+  tasks: any[];
   userId?: string;
-  onRemoved?: (id:string)=>void;
-  notify?: (text: string, type?: 'success'|'error'|'info') => void;
-}){
-  const groups = new Map<string, Task[]>();
-  for (const t of tasks) {
-    const key = t.project_id || "Bez projektu";
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(t);
-  }
+  onRemoved?: (id: string) => void;
+  notify?: (text: string, type?: "success" | "error" | "info") => void;
+  onAsk?: (text: string) => void;
+}) {
+  const groups = useMemo(() => {
+    const map = new Map<string, any[]>();
+    for (const t of tasks) {
+      const p = t.project?.name || t.project || t.project_id || "Bez projektu";
+      if (!map.has(p)) map.set(p, []);
+      map.get(p)!.push(t);
+    }
+    return Array.from(map.entries()).map(([project, ts]) => ({ project, tasks: ts }));
+  }, [tasks]);
 
   return (
-    <div className="space-y-4">
-      {[...groups.entries()].map(([pid, list]) => (
-        <section key={pid} className="space-y-2">
-          <h3 className="text-sm font-semibold text-zinc-700 px-1">Projekt: {pid}</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {list.map((t)=> (
-              <TaskCard key={t.id} t={t} userId={userId} onRemoved={onRemoved} notify={notify} />
-            ))}
-          </div>
+    <div className="space-y-6">
+      {groups.map((g) => (
+        <section key={g.project} className="space-y-2">
+          <div className="text-sm font-semibold">📁 {g.project}</div>
+          <TasksList
+            tasks={g.tasks}
+            userId={userId}
+            onRemoved={onRemoved}
+            notify={notify}
+            onAsk={onAsk}
+          />
         </section>
       ))}
     </div>
