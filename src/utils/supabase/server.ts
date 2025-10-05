@@ -3,8 +3,8 @@ import { cookies } from "next/headers";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
 /**
- * Minimalny helper do pobrania zalogowanego użytkownika w App Router,
- * bez @supabase/auth-helpers-nextjs.
+ * Server-side Supabase client dla Next.js App Router.
+ * Ten wariant zapisuje/usuwa cookies, więc sesja nie "ginie" między żądaniami.
  */
 export function createSupabaseServer() {
   const cookieStore = cookies();
@@ -17,13 +17,13 @@ export function createSupabaseServer() {
         get(name: string) {
           return cookieStore.get(name)?.value;
         },
-        // set/remove są wymagane przez API, ale w SSR/route handlerach i tak zwykle nie ustawiamy.
-        // Implementujemy je jako no-op, żeby typy były zadowolone.
         set(name: string, value: string, options: CookieOptions) {
-          // no-op
+          // ważne: TRWAŁY zapis ciastek po stronie serwera
+          cookieStore.set(name, value, options);
         },
         remove(name: string, options: CookieOptions) {
-          // no-op
+          // ważne: usuwanie ciastek po stronie serwera
+          cookieStore.set(name, "", { ...options, maxAge: 0 });
         },
       },
     }
