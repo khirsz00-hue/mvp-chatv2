@@ -5,6 +5,7 @@ import Chat from '@/components/Chat'
 import Sidebar from '@/components/Sidebar'
 import { ChatMessage } from '@/lib/types'
 import { useToasts } from '@/components/Toasts'
+import TodoistConnection from '@/components/TodoistConnection'
 
 export default function HomePage() {
   const assistants = [
