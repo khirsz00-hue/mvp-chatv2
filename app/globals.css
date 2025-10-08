@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-gradient-to-b from-neutral-50 via-white to-neutral-50 text-neutral-900;
+  background-attachment: fixed;
+}
+
+.card {
+  @apply bg-white/90 backdrop-blur rounded-2xl shadow-sm border border-neutral-200 p-4;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-neutral-300 hover:bg-neutral-50 transition active:scale-[.98];
+}
+.btn-primary {
+  @apply bg-neutral-900 text-white border-neutral-900 hover:bg-neutral-800 shadow-glow;
+}
+.input {
+  @apply w-full rounded-xl border border-neutral-200 px-3 py-2 bg-white shadow-inner;
+}
+.toast {
+  @apply fixed right-4 bottom-4 bg-neutral-900 text-white px-4 py-2 rounded-xl shadow-lg;
+}
