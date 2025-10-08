@@ -19,5 +19,8 @@ export async function GET(req: Request) {
   })
 
   const data = await tokenRes.json()
-  return NextResponse.redirect(`/?todoist_token=${data.access_token}`)
+
+  // 🔧 tu jest poprawka ↓ — musimy użyć pełnego adresu
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://mvp-chatv2.vercel.app'
+  return NextResponse.redirect(`${baseUrl}/?todoist_token=${data.access_token}`)
 }
