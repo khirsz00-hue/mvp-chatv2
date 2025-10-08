@@ -50,10 +50,15 @@ export default function HomePage() {
           {assistants.find(a => a.id === active)?.name}
         </h1>
         <p className="text-neutral-600 mb-4">
-          {active === 'todoist'
-            ? 'Zarządzaj swoimi zadaniami, pytaj o plan i proś o rozbicie na kroki.'
-            : 'Analizuj decyzje metodą 6 kapeluszy myślowych – krok po kroku.'}
-        </p>
+  {active === 'todoist'
+    ? 'Zarządzaj swoimi zadaniami, pytaj o plan i proś o rozbicie na kroki.'
+    : 'Analizuj decyzje metodą 6 kapeluszy myślowych – krok po kroku.'}
+</p>
+
+{/* ✅ Sekcja integracji Todoist */}
+{active === 'todoist' && (
+  <TodoistConnection />
+)}
 
         <Chat onSend={handleSend} messages={messages} />
         <ToastComponent />
