@@ -28,20 +28,27 @@ export default function TodoistTasks({ token }: { token: string }) {
   if (tasks.length === 0) return <p className="text-sm text-neutral-500">Brak zadań dla filtru „{filter}”.</p>
 
   return (
-    <div className="space-y-2">
-      <div className="flex gap-2 mb-2">
-        {['today', 'tomorrow', 'overdue', '7 days'].map(f => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-3 py-1 rounded-lg border text-sm ${
-              filter === f ? 'bg-blue-100 border-blue-300' : 'border-neutral-200 hover:bg-neutral-100'
-            }`}
-          >
-            {f === 'today' ? 'Dziś' : f === 'tomorrow' ? 'Jutro' : f === 'overdue' ? 'Przeterminowane' : 'Tydzień'}
-          </button>
-        ))}
-      </div>
+    <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-neutral-200 py-2 px-2 flex gap-2">
+  {['today', 'tomorrow', 'overdue', '7 days'].map(f => (
+    <button
+      key={f}
+      onClick={() => onChangeFilter(f)}
+      className={`px-3 py-1 rounded-lg text-sm font-medium transition-all ${
+        filter === f
+          ? 'bg-blue-600 text-white shadow-sm'
+          : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+      }`}
+    >
+      {f === 'today'
+        ? 'Dziś'
+        : f === 'tomorrow'
+        ? 'Jutro'
+        : f === 'overdue'
+        ? 'Przeterminowane'
+        : 'Tydzień'}
+    </button>
+  ))}
+</div>
 
       <ul className="space-y-2">
         {tasks.map(t => (
