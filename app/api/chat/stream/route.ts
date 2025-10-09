@@ -1,22 +1,21 @@
 import { NextRequest } from 'next/server'
+import { addClient, removeClient } from './store'
 
-export const dynamic = 'force-dynamic' // 🧠 kluczowe: wyłącza statyczne generowanie
-
-let clients: any[] = []
+export const dynamic = 'force-dynamic' // 🚀 zapobiega static generation timeout
 
 export async function GET(req: NextRequest) {
   const stream = new ReadableStream({
     start(controller) {
-      const client = {
-        id: Date.now(),
-        send: (data: any) => {
-          controller.enqueue(`data: ${JSON.stringify(data)}\n\n`)
-        },
-      }
-      clients.push(client)
+      const id = Date.now()
 
+      // 💾 Rejestracja klienta
+      addClient((data: any) => {
+        controller.enqueue(`data: ${JSON.stringify(data)}\n\n`)
+      }, id)
+
+      // 🧹 Usunięcie klienta po rozłączeniu
       req.signal.addEventListener('abort', () => {
-        clients = clients.filter((c) => c.id !== client.id)
+        removeClient(id)
         controller.close()
       })
     },
