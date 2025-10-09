@@ -127,3 +127,17 @@ body {
 .animate-fadeIn {
   animation: fadeIn 0.25s ease-out;
 }
+
+
+/* 🩵 Poprawka: tekst usera na niebieskim tle */
+.markdown-user p,
+.markdown-user ul,
+.markdown-user li,
+.markdown-user strong,
+.markdown-user em,
+.markdown-user a,
+.markdown-user h1,
+.markdown-user h2,
+.markdown-user h3 {
+  color: white !important;
+}
