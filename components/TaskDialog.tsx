@@ -41,36 +41,17 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
   // 🧩 Wczytaj historię rozmowy + token
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const saved = localStorage.getItem(chatKey)
 
+    const saved = localStorage.getItem(chatKey)
     if (saved) {
       const parsedRaw = JSON.parse(saved)
+      let parsed: ChatMessage[] = []
 
-      // ✅ sprawdź czy timestamp już istnieje (dowolny typ)
-      const hasTimestamps =
-        Array.isArray(parsedRaw) &&
-        parsedRaw.length > 0 &&
-        parsedRaw.every((m: any) => m.timestamp !== undefined && m.timestamp !== null)
+      parsed = parsedRaw.map((m: any) => ({
+        ...m,
+        timestamp: m.timestamp ? Number(m.timestamp) : Date.now(),
+      }))
 
-      let parsed: ChatMessage[]
-
-      if (hasTimestamps) {
-        // nie zmieniaj istniejących timestampów
-        parsed = parsedRaw.map((m: any) => ({
-          ...m,
-          timestamp: Number(m.timestamp), // upewnij się, że jest liczbą
-        }))
-      } else {
-        // nadaj stabilne timestampy tylko raz
-        const now = Date.now()
-        parsed = parsedRaw.map((m: any, i: number) => ({
-          ...m,
-          timestamp: now + i,
-        }))
-        localStorage.setItem(chatKey, JSON.stringify(parsed))
-      }
-
-      // ⬆️ najnowsze wiadomości na górze
       setChat(parsed.sort((a, b) => b.timestamp - a.timestamp))
     }
 
@@ -79,23 +60,16 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     localStorage.setItem(titleKey, task.content)
   }, [chatKey, titleKey, task.content])
 
-  // 💾 Zapisuj rozmowę (nie nadpisuj timestampów)
+  // 💾 Zapisuj rozmowę (bez nadpisywania timestampów)
   useEffect(() => {
     if (typeof window !== 'undefined' && chat.length > 0) {
-      const stableChat = chat.map((m) => ({
-        ...m,
-        timestamp: typeof m.timestamp === 'number' ? m.timestamp : Date.now(),
-      }))
-      localStorage.setItem(chatKey, JSON.stringify(stableChat))
+      localStorage.setItem(chatKey, JSON.stringify(chat))
     }
   }, [chat, chatKey])
 
-  // 🔽 Auto-scroll — przy nowych wiadomościach przewijamy na górę
+  // 🔽 Auto-scroll na górę przy nowych wiadomościach
   useEffect(() => {
-    scrollRef.current?.scrollTo({
-      top: 0,
-      behavior: 'smooth',
-    })
+    scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
   }, [chat, loading])
 
   // 🔁 SSE – aktualizacja na żywo
@@ -112,7 +86,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
 
           setChat((prev) => [
             { role: data.role, content: data.message, timestamp: Date.now() },
-            ...prev, // ⬆️ nowe wiadomości na górze
+            ...prev,
           ])
         }
       } catch (err) {
@@ -134,7 +108,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     if (!text || loading) return
 
     const userMsg: ChatMessage = { role: 'user', content: text, timestamp: Date.now() }
-    const updated = [userMsg, ...chat] // nowe na górze
+    const updated = [userMsg, ...chat]
     setChat(updated)
     setInput('')
     setLoading(true)
@@ -144,17 +118,13 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text,
-          context: task?.content || '',
-        }),
+        body: JSON.stringify({ message: text, context: task?.content || '' }),
       })
 
       if (!res.ok) throw new Error('Błąd odpowiedzi z API')
       const data = await res.json()
       const reply = data.reply?.trim() || '⚠️ Brak odpowiedzi od modelu.'
 
-      // 📡 Rozesłanie do innych zakładek
       await Promise.all([
         fetch('/api/chat/send', {
           method: 'POST',
@@ -169,7 +139,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
       ])
 
       const aiMsg: ChatMessage = { role: 'assistant', content: reply, timestamp: Date.now() }
-      const newChat = [aiMsg, ...updated] // ⬆️ AI na górze
+      const newChat = [aiMsg, ...updated]
       setChat(newChat)
       localStorage.setItem(chatKey, JSON.stringify(newChat))
       await generateSynthesis(newChat)
@@ -219,10 +189,7 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
             Authorization: `Bearer ${todoistToken}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            task_id: task.id,
-            content: `[AI] ${synthesis}`,
-          }),
+          body: JSON.stringify({ task_id: task.id, content: `[AI] ${synthesis}` }),
         })
       }
     } catch (err) {
@@ -329,5 +296,7 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
     </AnimatePresence>
   )
 
-  return typeof window !== 'undefined' ? ReactDOM.createPortal(modal, document.body) : null
+  return typeof window !== 'undefined'
+    ? ReactDOM.createPortal(modal, document.body)
+    : null
 }
