@@ -10,7 +10,7 @@ interface GlobalChatProps {
   onOpenTaskChat: (t: any) => void
 }
 
-interface ChatMessage {
+type ChatMessage = {
   role: 'user' | 'assistant'
   content: string
 }
@@ -18,6 +18,7 @@ interface ChatMessage {
 export default function GlobalChat({ token, tasks, onOpenTaskChat }: GlobalChatProps) {
   const storageKey = 'chat_global'
   const summaryKey = 'summary_global'
+
   const [chat, setChat] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -26,16 +27,14 @@ export default function GlobalChat({ token, tasks, onOpenTaskChat }: GlobalChatP
 
   // 🧩 Wczytaj historię rozmowy
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(storageKey)
-      if (saved) setChat(JSON.parse(saved))
-
-      const savedSummary = localStorage.getItem(summaryKey)
-      if (savedSummary) setSummary(savedSummary)
-    }
+    if (typeof window === 'undefined') return
+    const saved = localStorage.getItem(storageKey)
+    if (saved) setChat(JSON.parse(saved))
+    const savedSummary = localStorage.getItem(summaryKey)
+    if (savedSummary) setSummary(savedSummary)
   }, [])
 
-  // 💾 Zapisuj każdą wiadomość
+  // 💾 Zapisuj rozmowę
   useEffect(() => {
     if (chat.length > 0 && typeof window !== 'undefined') {
       localStorage.setItem(storageKey, JSON.stringify(chat))
@@ -51,8 +50,8 @@ export default function GlobalChat({ token, tasks, onOpenTaskChat }: GlobalChatP
     const text = input.trim()
     if (!text || loading) return
 
-    const newMsg: ChatMessage = { role: 'user', content: text }
-    const updated = [...chat, newMsg]
+    const userMsg: ChatMessage = { role: 'user', content: text }
+    const updated = [...chat, userMsg]
     setChat(updated)
     setInput('')
     setLoading(true)
@@ -66,21 +65,19 @@ export default function GlobalChat({ token, tasks, onOpenTaskChat }: GlobalChatP
 
       if (!res.ok) throw new Error('Błąd odpowiedzi z API')
       const data = await res.json()
-      const reply = data.reply?.trim() || '⚠️ Brak odpowiedzi od modelu.'
+      const reply = (data.reply?.trim() || '⚠️ Brak odpowiedzi od modelu.') as string
 
-     const newChat: ChatMessage[] = [
-  ...updated,
-  { role: 'assistant' as const, content: reply },
-]
-setChat(newChat)
-localStorage.setItem(storageKey, JSON.stringify(newChat))
-await generateSynthesis(newChat)
+      const newChat: ChatMessage[] = [
+        ...updated,
+        { role: 'assistant' as const, content: reply },
+      ]
+
+      setChat(newChat)
       localStorage.setItem(storageKey, JSON.stringify(newChat))
-
       await generateSynthesis(newChat)
     } catch (err) {
       console.error('❌ Błąd komunikacji z AI:', err)
-      setChat((prev) => [
+      setChat(prev => [
         ...prev,
         { role: 'assistant', content: '⚠️ Wystąpił błąd podczas komunikacji z AI.' },
       ])
@@ -92,7 +89,7 @@ await generateSynthesis(newChat)
   // 🧠 SYNTEZA – zapis skrótu rozmowy
   const generateSynthesis = async (fullChat: ChatMessage[]) => {
     try {
-      const contextText = fullChat.map((m) => `${m.role}: ${m.content}`).join('\n')
+      const contextText = fullChat.map(m => `${m.role}: ${m.content}`).join('\n')
       const synthesisPrompt = `
 Podsumuj globalną rozmowę użytkownika w 2–3 zdaniach.
 Uwzględnij najważniejsze ustalenia, decyzje lub plany.
@@ -107,7 +104,7 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
 
       if (!res.ok) throw new Error('Błąd generowania syntezy')
       const data = await res.json()
-      const synthesis = data.reply?.trim() || 'Brak syntezy.'
+      const synthesis = (data.reply?.trim() || 'Brak syntezy.') as string
 
       localStorage.setItem(summaryKey, synthesis)
       setSummary(synthesis)
@@ -126,7 +123,10 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
       </div>
 
       {/* CZAT */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 text-sm text-gray-700 bg-gray-50">
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto p-4 space-y-3 text-sm text-gray-700 bg-gray-50"
+      >
         {chat.length === 0 && (
           <div className="bg-white p-3 rounded-lg shadow-sm border text-sm text-gray-800">
             👋 Cześć! Jestem Twoim asystentem produktywności.<br />
@@ -176,8 +176,8 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
         <input
           type="text"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && sendMessage()}
           placeholder="Zadaj pytanie np. „Pomóż mi zaplanować dzień...”"
           className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
