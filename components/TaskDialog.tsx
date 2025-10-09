@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -26,6 +27,14 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
   const [todoistToken, setTodoistToken] = useState<string>('')
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
+  // 🧭 Blokuj scroll strony przy otwartym modalu
+  useEffect(() => {
+    if (mode === 'help') document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [mode])
+
   // 🧩 Wczytaj historię rozmowy + token
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -35,7 +44,6 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
 
     const token = localStorage.getItem('todoist_token') || ''
     setTodoistToken(token)
-
     localStorage.setItem(titleKey, task.content)
   }, [chatKey, titleKey, task.content])
 
@@ -57,7 +65,6 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
   // 🔁 Odbiór wiadomości przez SSE (real-time)
   useEffect(() => {
     const es = new EventSource('/api/chat/stream')
-
     es.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data)
@@ -65,16 +72,13 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
           setChat((prev) => [...prev, { role: data.role, content: data.message }])
         }
       } catch (err) {
-        console.error('❌ Błąd parsowania wiadomości SSE:', err)
+        console.error('❌ Błąd SSE:', err)
       }
     }
-
-    es.onerror = (err) => {
-      console.warn('⚠️ Rozłączono SSE, ponawiam za 5s...')
+    es.onerror = () => {
       es.close()
       setTimeout(() => new EventSource('/api/chat/stream'), 5000)
     }
-
     return () => es.close()
   }, [task.id])
 
@@ -176,86 +180,94 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
     }
   }
 
+  // 🚫 Ukryj, gdy nieaktywny
   if (mode !== 'help') return null
 
   return (
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-3"
-      onClick={onClose}
-    >
-      <div
-        className="relative bg-white w-full max-w-lg rounded-2xl shadow-2xl flex flex-col border border-gray-200 overflow-hidden max-h-[90vh] animate-fadeIn"
-        onClick={(e) => e.stopPropagation()}
+    <AnimatePresence>
+      <motion.div
+        key="dialog"
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
+        className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-3"
+        onClick={onClose}
       >
-        {/* HEADER */}
-        <div className="sticky top-0 flex justify-between items-center px-5 py-3 border-b bg-gray-50 z-10">
-          <h2 className="text-lg font-semibold text-gray-800 truncate pr-4">
-            Pomoc z zadaniem
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-sm text-gray-500 hover:text-gray-700 transition"
-          >
-            ✕ Zamknij
-          </button>
-        </div>
-
-        {/* CZAT */}
         <div
-          ref={scrollRef}
-          className="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-gray-50 scroll-smooth"
+          className="relative bg-white w-full max-w-lg rounded-2xl shadow-2xl flex flex-col border border-gray-200 overflow-hidden max-h-[90vh]"
+          onClick={(e) => e.stopPropagation()}
         >
-          {chat.length === 0 && (
-            <div className="bg-white p-3 rounded-lg shadow-sm border text-sm text-gray-800 leading-relaxed">
-              🧠 Zajmijmy się zadaniem: <b>"{task.content}"</b>.<br />
-              Co chcesz osiągnąć i co Cię blokuje?
-            </div>
-          )}
-
-          {chat.map((msg, i) => (
-            <div
-              key={i}
-              className={`p-3 rounded-lg shadow-sm text-sm leading-relaxed transition-all duration-200 ${
-                msg.role === 'user'
-                  ? 'bg-blue-600 text-white self-end markdown-user'
-                  : 'bg-white border border-gray-200 text-gray-800'
-              }`}
+          {/* HEADER */}
+          <div className="sticky top-0 flex justify-between items-center px-5 py-3 border-b bg-gray-50 z-10">
+            <h2 className="text-lg font-semibold text-gray-800 truncate pr-4">
+              Pomoc z zadaniem
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-sm text-gray-500 hover:text-gray-700 transition"
             >
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                className={`prose prose-sm max-w-none prose-p:mb-1 prose-li:my-0.5 prose-a:underline ${
+              ✕ Zamknij
+            </button>
+          </div>
+
+          {/* CZAT */}
+          <div
+            ref={scrollRef}
+            className="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-gray-50 scroll-smooth"
+          >
+            {chat.length === 0 && (
+              <div className="bg-white p-3 rounded-lg shadow-sm border text-sm text-gray-800 leading-relaxed">
+                🧠 Zajmijmy się zadaniem: <b>"{task.content}"</b>.<br />
+                Co chcesz osiągnąć i co Cię blokuje?
+              </div>
+            )}
+
+            {chat.map((msg, i) => (
+              <div
+                key={i}
+                className={`p-3 rounded-lg shadow-sm text-sm leading-relaxed transition-all duration-200 ${
                   msg.role === 'user'
-                    ? 'text-white prose-headings:text-white prose-strong:text-white prose-a:text-white'
-                    : 'text-gray-800 prose-a:text-blue-600'
+                    ? 'bg-blue-600 text-white self-end markdown-user'
+                    : 'bg-white border border-gray-200 text-gray-800'
                 }`}
               >
-                {msg.content}
-              </ReactMarkdown>
-            </div>
-          ))}
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  className={`prose prose-sm max-w-none prose-p:mb-1 prose-li:my-0.5 prose-a:underline ${
+                    msg.role === 'user'
+                      ? 'text-white prose-headings:text-white prose-strong:text-white prose-a:text-white'
+                      : 'text-gray-800 prose-a:text-blue-600'
+                  }`}
+                >
+                  {msg.content}
+                </ReactMarkdown>
+              </div>
+            ))}
 
-          {loading && <div className="text-sm text-gray-500 animate-pulse">AI myśli...</div>}
-        </div>
+            {loading && <div className="text-sm text-gray-500 animate-pulse">AI myśli...</div>}
+          </div>
 
-        {/* INPUT */}
-        <div className="sticky bottom-0 border-t bg-white flex p-3 space-x-2">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-            placeholder="Napisz wiadomość..."
-            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            onClick={sendMessage}
-            disabled={loading}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition disabled:opacity-50"
-          >
-            Wyślij
-          </button>
+          {/* INPUT */}
+          <div className="sticky bottom-0 border-t bg-white flex p-3 space-x-2">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+              placeholder="Napisz wiadomość..."
+              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              onClick={sendMessage}
+              disabled={loading}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition disabled:opacity-50"
+            >
+              Wyślij
+            </button>
+          </div>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </AnimatePresence>
   )
 }
