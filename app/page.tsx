@@ -59,15 +59,16 @@ export default function HomePage() {
     }
   }, [])
 
+  useEffect(() => {
+    console.log('🔑 Aktualny token Todoist w React state:', token)
+  }, [token])
+
   // 💬 Helper do fetchowania z tokenem
   const sendMessage = async (
     message: string,
     assistant: 'global' | 'six_hats'
   ): Promise<string> => {
-    const todoistToken =
-      typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
-
-    console.log(`🟢 Wysyłam wiadomość (${assistant}) z tokenem:`, todoistToken)
+    console.log(`🟢 Wysyłam wiadomość (${assistant}) z tokenem:`, token)
 
     const res = await fetch('/api/chat', {
       method: 'POST',
@@ -75,14 +76,14 @@ export default function HomePage() {
       body: JSON.stringify({
         message,
         assistant,
-        todoist_token: todoistToken,
+        todoist_token: token, // ✅ token przekazywany ze stanu
       }),
     })
 
     if (!res.ok) throw new Error('Błąd odpowiedzi z AI')
     const data = await res.json()
 
-    // Jeśli to lista tasków, renderuj jako lista
+    // Jeśli to lista tasków — zbuduj listę
     if (data.type === 'tasks' && data.tasks?.length) {
       const taskList = data.tasks.map((t: any) => `• ${t.content}`).join('\n')
       return `${data.reply || 'Zadania na dziś:'}\n\n${taskList}`
@@ -104,14 +105,12 @@ export default function HomePage() {
 
     try {
       const reply = await sendMessage(message, 'six_hats')
-
       const aiMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
         content: reply,
         timestamp: Date.now(),
       }
-
       setSixHatsMessages([...updated, aiMsg])
     } catch (err) {
       console.error('❌ Błąd komunikacji z AI:', err)
@@ -140,14 +139,12 @@ export default function HomePage() {
 
     try {
       const reply = await sendMessage(message, 'global')
-
       const aiMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
         content: reply,
         timestamp: Date.now(),
       }
-
       setGlobalMessages([...updated, aiMsg])
     } catch (err) {
       console.error('❌ Błąd komunikacji z AI:', err)
