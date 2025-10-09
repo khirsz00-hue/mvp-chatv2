@@ -59,6 +59,38 @@ export default function HomePage() {
     }
   }, [])
 
+  // 💬 Helper do fetchowania z tokenem
+  const sendMessage = async (
+    message: string,
+    assistant: 'global' | 'six_hats'
+  ): Promise<string> => {
+    const todoistToken =
+      typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
+
+    console.log(`🟢 Wysyłam wiadomość (${assistant}) z tokenem:`, todoistToken)
+
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message,
+        assistant,
+        todoist_token: todoistToken,
+      }),
+    })
+
+    if (!res.ok) throw new Error('Błąd odpowiedzi z AI')
+    const data = await res.json()
+
+    // Jeśli to lista tasków, renderuj jako lista
+    if (data.type === 'tasks' && data.tasks?.length) {
+      const taskList = data.tasks.map((t: any) => `• ${t.content}`).join('\n')
+      return `${data.reply || 'Zadania na dziś:'}\n\n${taskList}`
+    }
+
+    return data.reply || '⚠️ Brak odpowiedzi od AI.'
+  }
+
   // 💬 Wysyłanie — Six Hats
   const handleSendSixHats = async (message: string) => {
     const userMsg: ChatMessage = {
@@ -71,27 +103,12 @@ export default function HomePage() {
     setSixHatsMessages(updated)
 
     try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message,
-          assistant: 'six_hats',
-          todoist_token: localStorage.getItem('todoist_token'),
-        }),
-      })
-
-      if (!res.ok) throw new Error('Błąd odpowiedzi z AI')
-      const data = await res.json()
+      const reply = await sendMessage(message, 'six_hats')
 
       const aiMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content:
-          data.reply ||
-          (data.type === 'tasks'
-            ? '✅ Pobrano zadania z Todoista.'
-            : '⚠️ Brak odpowiedzi od AI.'),
+        content: reply,
         timestamp: Date.now(),
       }
 
@@ -122,29 +139,12 @@ export default function HomePage() {
     setGlobalMessages(updated)
 
     try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message,
-          assistant: 'global',
-          todoist_token: localStorage.getItem('todoist_token'),
-        }),
-      })
-
-      if (!res.ok) throw new Error('Błąd odpowiedzi z AI')
-      const data = await res.json()
-
-      let aiText = data.reply || '⚠️ Brak odpowiedzi od AI.'
-      if (data.type === 'tasks' && data.tasks?.length) {
-        const taskList = data.tasks.map((t: any) => `• ${t.content}`).join('\n')
-        aiText = `${data.reply || 'Zadania na dziś:'}\n\n${taskList}`
-      }
+      const reply = await sendMessage(message, 'global')
 
       const aiMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: aiText,
+        content: reply,
         timestamp: Date.now(),
       }
 
