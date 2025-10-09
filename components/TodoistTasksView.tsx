@@ -10,46 +10,61 @@ export default function TodoistTasksView({ token }: { token: string }) {
 
   const handleRefresh = (updated?: any[]) => updated && setTasks(updated)
 
-  // 🔁 Automatyczne nasłuchiwanie eventów z Todoist (SSE)
+  // 🔁 Automatyczne nasłuchiwanie webhooków Todoist (SSE)
   useEffect(() => {
     if (!token) return
 
-    const es = new EventSource('/api/todoist/stream')
+    let es: EventSource | null = null
 
-    es.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data)
-        if (data.event?.startsWith('item:')) {
-          console.log('🔁 Otrzymano event Todoist:', data)
-          // 🔄 Odświeżenie zadań
-          window.dispatchEvent(new Event('taskUpdated'))
+    const connect = () => {
+      es = new EventSource('/api/todoist/stream')
+      console.log('📡 Połączono z Todoist streamem...')
 
-          // 💬 Toast powiadomienia
-          const msg =
-            data.event === 'item:added'
-              ? '🆕 Dodano nowe zadanie'
-              : data.event === 'item:completed'
-              ? '✅ Zadanie ukończone'
-              : data.event === 'item:updated'
-              ? '✏️ Zmieniono zadanie'
-              : '🔄 Lista zadań zaktualizowana'
+      es.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data)
+          if (data.event?.startsWith('item:')) {
+            console.log('🔁 Otrzymano event Todoist:', data)
 
-          setToast(msg)
-          setTimeout(() => setToast(null), 2500)
+            // 🔄 Odświeżenie listy zadań
+            window.dispatchEvent(new Event('taskUpdated'))
+
+            // 💬 Toast powiadomienia
+            const msg =
+              data.event === 'item:added'
+                ? '🆕 Dodano nowe zadanie'
+                : data.event === 'item:completed'
+                ? '✅ Zadanie ukończone'
+                : data.event === 'item:updated'
+                ? '✏️ Zmieniono zadanie'
+                : '🔄 Lista zadań zaktualizowana'
+
+            setToast(msg)
+            setTimeout(() => setToast(null), 2500)
+          }
+        } catch (err) {
+          console.error('❌ Błąd parsowania SSE:', err)
         }
-      } catch (err) {
-        console.error('❌ Błąd parsowania SSE:', err)
+      }
+
+      es.onerror = (err) => {
+        console.warn('⚠️ Błąd SSE, ponowne łączenie za 5s...', err)
+        es?.close()
+        setTimeout(connect, 5000)
       }
     }
 
-    es.onerror = (err) => {
-      console.warn('⚠️ Błąd połączenia z SSE:', err)
-      es.close()
-      // automatyczne ponowne połączenie po 5s
-      setTimeout(() => new EventSource('/api/todoist/stream'), 5000)
-    }
+    connect()
 
-    return () => es.close()
+    // 🫀 Ping utrzymujący połączenie (co 25 sekund)
+    const ping = setInterval(() => {
+      fetch('/api/todoist/stream/ping').catch(() => {})
+    }, 25000)
+
+    return () => {
+      clearInterval(ping)
+      es?.close()
+    }
   }, [token])
 
   return (
