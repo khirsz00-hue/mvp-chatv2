@@ -10,7 +10,7 @@ interface TodoistConnectionProps {
 }
 
 export default function TodoistConnection({ token, onDisconnect }: TodoistConnectionProps) {
-  const [filter, setFilter] = useState<'today' | 'tomorrow' | 'week'>('today')
+  const [filter, setFilter] = useState<'today' | 'tomorrow' | 'overdue' | '7 days'>('today')
   const [tasks, setTasks] = useState<any[]>([])
 
   // 🔄 Odświeżenie listy po zmianie
@@ -18,7 +18,7 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
     if (updated) setTasks(updated)
   }
 
-  // 🧠 Chat interpretujący polecenia
+  // 🧠 Chat interpretujący polecenia użytkownika
   const handleChatCommand = async (message: string) => {
     const text = message.toLowerCase()
 
@@ -33,7 +33,12 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
     }
 
     if (text.includes('tydzień') || text.includes('tygodniu')) {
-      setFilter('week')
+      setFilter('7 days')
+      return
+    }
+
+    if (text.includes('przeterminowane') || text.includes('zaległe')) {
+      setFilter('overdue')
       return
     }
 
@@ -49,7 +54,7 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
         body: JSON.stringify({
           message: `
 Zaproponuj optymalną kolejność wykonania tych zadań:
-${tasks.map(t => `- ${t.content}`).join('\n')}
+${tasks.map((t) => `- ${t.content}`).join('\n')}
 Uwzględnij priorytety, terminy i logiczny sens.
           `.trim(),
         }),
@@ -63,7 +68,7 @@ Uwzględnij priorytety, terminy i logiczny sens.
     alert('🤖 Nie rozumiem tej komendy jeszcze.')
   }
 
-  // 🧩 Grupowanie w przyszłości
+  // 🧩 Grupowanie
   const groupTasks = (mode: 'topics' | 'project') => {
     if (mode === 'topics') {
       alert('🧩 Grupowanie tematyczne — w przygotowaniu.')
@@ -75,7 +80,7 @@ Uwzględnij priorytety, terminy i logiczny sens.
   return (
     <div className="flex flex-col h-[calc(100vh-140px)] bg-gray-50 rounded-xl shadow-inner overflow-hidden border border-green-200">
       {/* 🟢 HEADER */}
-      <div className="flex justify-between items-center p-3 border-b bg-white sticky top-0 z-10">
+      <div className="flex justify-between items-center p-3 border-b bg-white sticky top-0 z-20">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-green-700">✅ Połączono z Todoist</span>
           <button
@@ -88,7 +93,7 @@ Uwzględnij priorytety, terminy i logiczny sens.
       </div>
 
       {/* 🧭 PRZYCISKI FILTRÓW */}
-      <div className="flex justify-between items-center px-3 py-2 border-b bg-green-50 sticky top-[42px] z-9">
+      <div className="flex justify-between items-center px-3 py-2 border-b bg-green-50 sticky top-[42px] z-10">
         <div className="flex gap-2">
           <button
             onClick={() => setFilter('today')}
@@ -107,12 +112,20 @@ Uwzględnij priorytety, terminy i logiczny sens.
             ➡️ Jutro
           </button>
           <button
-            onClick={() => setFilter('week')}
+            onClick={() => setFilter('7 days')}
             className={`px-3 py-1 text-sm rounded-lg transition ${
-              filter === 'week' ? 'bg-green-600 text-white' : 'bg-white border text-green-700'
+              filter === '7 days' ? 'bg-green-600 text-white' : 'bg-white border text-green-700'
             }`}
           >
             🗓️ Tydzień
+          </button>
+          <button
+            onClick={() => setFilter('overdue')}
+            className={`px-3 py-1 text-sm rounded-lg transition ${
+              filter === 'overdue' ? 'bg-green-600 text-white' : 'bg-white border text-green-700'
+            }`}
+          >
+            ⚠️ Przeterminowane
           </button>
         </div>
 
@@ -138,7 +151,7 @@ Uwzględnij priorytety, terminy i logiczny sens.
       </div>
 
       {/* 💬 CZAT DOCK */}
-      <div className="border-t bg-white p-3 sticky bottom-0">
+      <div className="border-t bg-white p-3 sticky bottom-0 z-20">
         <ChatDock onSend={handleChatCommand} />
       </div>
     </div>
