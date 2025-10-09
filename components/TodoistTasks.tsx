@@ -16,9 +16,16 @@ interface TodoistTasksProps {
   filter: 'today' | 'tomorrow' | 'overdue' | '7 days'
   onChangeFilter: (filter: 'today' | 'tomorrow' | 'overdue' | '7 days') => void
   onUpdate?: (tasks: Task[]) => void
+  onOpenTaskChat?: (task: Task) => void   // ✅ DODANE — dla czatu
 }
 
-export default function TodoistTasks({ token, filter, onChangeFilter, onUpdate }: TodoistTasksProps) {
+export default function TodoistTasks({
+  token,
+  filter,
+  onChangeFilter,
+  onUpdate,
+  onOpenTaskChat,
+}: TodoistTasksProps) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -32,7 +39,7 @@ export default function TodoistTasks({ token, filter, onChangeFilter, onUpdate }
       .then((data) => {
         const t = data.tasks || []
         setTasks(t)
-        if (onUpdate) onUpdate(t)
+        onUpdate?.(t)
       })
       .catch((err) => console.error('❌ Błąd pobierania zadań:', err))
       .finally(() => setLoading(false))
@@ -105,7 +112,13 @@ export default function TodoistTasks({ token, filter, onChangeFilter, onUpdate }
                 </h3>
                 <div className="space-y-2">
                   {groupedByDate[date].map((t) => (
-                    <TaskCard key={t.id} task={t} token={token} onAction={() => {}} />
+                    <div
+                      key={t.id}
+                      className="cursor-pointer transition hover:bg-green-50 rounded-lg"
+                      onClick={() => onOpenTaskChat?.(t)}   // ✅ Klik = otwarcie czatu
+                    >
+                      <TaskCard task={t} token={token} onAction={() => {}} />
+                    </div>
                   ))}
                 </div>
               </div>
@@ -117,7 +130,13 @@ export default function TodoistTasks({ token, filter, onChangeFilter, onUpdate }
         ) : (
           <ul className="space-y-2">
             {tasks.map((t) => (
-              <TaskCard key={t.id} task={t} token={token} onAction={() => {}} />
+              <li
+                key={t.id}
+                className="cursor-pointer transition hover:bg-green-50 rounded-lg"
+                onClick={() => onOpenTaskChat?.(t)}   // ✅ Klik = otwarcie czatu
+              >
+                <TaskCard task={t} token={token} onAction={() => {}} />
+              </li>
             ))}
           </ul>
         )}
