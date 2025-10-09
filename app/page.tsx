@@ -3,15 +3,8 @@
 import { useState, useEffect } from 'react'
 import TodoistConnection from '@/components/TodoistConnection'
 import TodoistAuthButton from '@/components/TodoistAuthButton'
-import Chat from '@/components/Chat'
+import Chat, { ChatMessage } from '@/components/Chat' // ✅ importujemy typ z komponentu
 import ChatSidebar from '@/components/ChatSidebar'
-
-interface ChatMessage {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  timestamp: number
-}
 
 export default function HomePage() {
   const [active, setActive] = useState<'todoist' | 'six_hats'>('todoist')
@@ -169,11 +162,7 @@ export default function HomePage() {
                 Zadawaj pytania, a asystent pomoże Ci spojrzeć na problem z sześciu perspektyw
                 myślenia (biała, czerwona, czarna, żółta, zielona, niebieska).
               </p>
-              <Chat
-                onSend={handleSendSixHats}
-                messages={sixHatsMessages}
-                assistant="six_hats"
-              />
+              <Chat onSend={handleSendSixHats} messages={sixHatsMessages} />
             </div>
           )}
         </div>
