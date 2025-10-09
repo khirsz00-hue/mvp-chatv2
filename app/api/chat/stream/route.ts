@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
+import { addClient, removeClient } from './store'
 
-let clients: any[] = []
-
+// 🔁 Główna trasa SSE
 export async function GET(req: NextRequest) {
   const stream = new ReadableStream({
     start(controller) {
@@ -11,10 +11,11 @@ export async function GET(req: NextRequest) {
           controller.enqueue(`data: ${JSON.stringify(data)}\n\n`)
         },
       }
-      clients.push(client)
+
+      addClient(client)
 
       req.signal.addEventListener('abort', () => {
-        clients = clients.filter((c) => c.id !== client.id)
+        removeClient(client.id)
         controller.close()
       })
     },
@@ -27,9 +28,4 @@ export async function GET(req: NextRequest) {
       Connection: 'keep-alive',
     },
   })
-}
-
-// 📨 Funkcja broadcastu
-export function broadcastMessage(message: any) {
-  clients.forEach((client) => client.send(message))
 }
