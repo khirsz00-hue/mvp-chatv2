@@ -9,11 +9,25 @@ interface ChatSidebarProps {
   ) => void
 }
 
+type ChatPreview = {
+  content: string
+  date: string
+  timestamp: number
+}
+
+type TaskPreview = {
+  id: string
+  title: string
+  last: string
+  date: string
+  timestamp: number
+}
+
 export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
   const [tab, setTab] = useState<'global' | 'task' | 'six_hats'>('global')
-  const [globalChats, setGlobalChats] = useState<{ content: string; date: string }[]>([])
-  const [taskChats, setTaskChats] = useState<{ id: string; title: string; last: string; date: string }[]>([])
-  const [sixHatsChats, setSixHatsChats] = useState<{ content: string; date: string }[]>([])
+  const [globalChats, setGlobalChats] = useState<ChatPreview[]>([])
+  const [taskChats, setTaskChats] = useState<TaskPreview[]>([])
+  const [sixHatsChats, setSixHatsChats] = useState<ChatPreview[]>([])
 
   // 🔄 Wczytaj dane z localStorage
   useEffect(() => {
@@ -21,7 +35,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
 
     const loadChats = () => {
       // 🌍 Global
-      const global = JSON.parse(localStorage.getItem('chat_global') || '[]')
+      const global: ChatPreview[] = JSON.parse(localStorage.getItem('chat_global') || '[]')
         .filter((m: any) => m.role === 'user')
         .map((m: any) => ({
           content: m.content,
@@ -35,14 +49,14 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
             : 'brak daty',
           timestamp: m.timestamp || 0,
         }))
-        .sort((a, b) => b.timestamp - a.timestamp)
+        .sort((a: ChatPreview, b: ChatPreview) => b.timestamp - a.timestamp)
         .slice(0, 10)
       setGlobalChats(global)
 
       // ✅ Taski
-      const tasks = Object.keys(localStorage)
-        .filter(k => k.startsWith('chat_task_'))
-        .map(k => {
+      const tasks: TaskPreview[] = Object.keys(localStorage)
+        .filter((k) => k.startsWith('chat_task_'))
+        .map((k) => {
           const chat = JSON.parse(localStorage.getItem(k) || '[]')
           const lastMsg = chat[chat.length - 1]
           const id = k.replace('chat_task_', '')
@@ -63,12 +77,12 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
             timestamp: lastMsg?.timestamp || 0,
           }
         })
-        .sort((a, b) => b.timestamp - a.timestamp)
+        .sort((a: TaskPreview, b: TaskPreview) => b.timestamp - a.timestamp)
         .slice(0, 10)
       setTaskChats(tasks)
 
       // 🎩 Six Hats
-      const sixHats = JSON.parse(localStorage.getItem('chat_six_hats') || '[]')
+      const sixHats: ChatPreview[] = JSON.parse(localStorage.getItem('chat_six_hats') || '[]')
         .filter((m: any) => m.role === 'user')
         .map((m: any) => ({
           content: m.content,
@@ -82,7 +96,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
             : 'brak daty',
           timestamp: m.timestamp || 0,
         }))
-        .sort((a, b) => b.timestamp - a.timestamp)
+        .sort((a: ChatPreview, b: ChatPreview) => b.timestamp - a.timestamp)
         .slice(0, 10)
       setSixHatsChats(sixHats)
     }
