@@ -2,143 +2,112 @@
 
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
-interface TaskDialogProps {
-  task: { id: string; content: string }
-  mode: 'help' | 'none'
+type Props = {
+  task: any
+  mode: 'none' | 'help'
   onClose: () => void
 }
 
-interface ChatMessage {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-}
-
-export default function TaskDialog({ task, mode, onClose }: TaskDialogProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+export default function TaskDialog({ task, mode, onClose }: Props) {
+  const [step, setStep] = useState<'choose' | 'chat'>('choose')
+  const [chat, setChat] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
   const [input, setInput] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-
-  // 🔹 Pierwsza wiadomość od AI po otwarciu
-  useState(() => {
-    if (mode === 'help') {
-      const intro: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: `🧠 Zajmijmy się zadaniem: **"${task.content}"**.  
-Na czym dokładnie ono polega? Co chcesz osiągnąć i co Cię blokuje?`,
-      }
-      setMessages([intro])
-    }
-  })
+  const [loading, setLoading] = useState(false)
 
   const sendMessage = async () => {
     if (!input.trim()) return
-
-    const userMsg: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content: input.trim(),
-    }
-
-    setMessages((prev) => [...prev, userMsg])
+    const newMessage = { role: 'user' as const, content: input }
+    setChat(prev => [...prev, newMessage])
     setInput('')
-    setIsLoading(true)
+    setLoading(true)
 
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: `Pomóż mi z zadaniem "${task.content}". ${input}`,
-          context: `Zadanie: ${task.content}`,
+          messages: [
+            ...chat,
+            newMessage,
+            {
+              role: 'system',
+              content: `Pomóż zrealizować zadanie: "${task.content}". 
+              Zadawaj doprecyzowujące pytania zanim udzielisz odpowiedzi. 
+              Udzielaj praktycznych, uporządkowanych rad w formie listy.`,
+            },
+          ],
         }),
       })
 
+      if (!res.ok) throw new Error('Błąd odpowiedzi z API')
       const data = await res.json()
-      const reply: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: data.reply || '🤖 Brak odpowiedzi od AI.',
-      }
-
-      setMessages((prev) => [...prev, reply])
+      setChat(prev => [...prev, { role: 'assistant', content: data.reply }])
     } catch (err) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: '⚠️ Wystąpił błąd podczas komunikacji z AI.',
-        },
-      ])
+      setChat(prev => [...prev, { role: 'assistant', content: '⚠️ Wystąpił błąd podczas komunikacji z AI.' }])
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
+  if (mode !== 'help') return null
+
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg flex flex-col overflow-hidden animate-fadeIn">
-        {/* 🔹 Nagłówek */}
-        <div className="flex justify-between items-center px-4 py-3 border-b border-neutral-200 bg-neutral-50">
-          <h3 className="text-lg font-semibold">Pomoc z zadaniem</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+      <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl overflow-hidden flex flex-col border border-gray-200">
+        <div className="flex justify-between items-center px-5 py-3 border-b bg-gray-50">
+          <h2 className="text-lg font-semibold text-gray-800">Pomoc z zadaniem</h2>
           <button
             onClick={onClose}
-            className="text-sm text-neutral-500 hover:text-neutral-800"
+            className="text-sm text-gray-500 hover:text-gray-700 transition"
           >
             ✕ Zamknij
           </button>
         </div>
 
-        {/* 🔹 Czat */}
-        <div className="flex-1 p-4 space-y-3 overflow-y-auto max-h-[65vh] bg-neutral-50/30">
-          {messages.map((msg) => (
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-gray-50">
+          <div className="bg-white p-3 rounded-lg shadow-sm border text-sm text-gray-800 leading-relaxed">
+            🧠 Zajmijmy się zadaniem: <b>"{task.content}"</b>.<br />
+            Na czym dokładnie ono polega? Co chcesz osiągnąć i co Cię blokuje?
+          </div>
+
+          {chat.map((msg, i) => (
             <div
-              key={msg.id}
-              className={`px-3 py-2 rounded-xl leading-relaxed text-sm whitespace-pre-wrap max-w-[90%] ${
-                msg.role === 'assistant'
-                  ? 'bg-white border border-neutral-200 text-neutral-800 shadow-sm'
-                  : 'bg-blue-600 text-white ml-auto'
+              key={i}
+              className={`p-3 rounded-lg shadow-sm text-sm leading-relaxed ${
+                msg.role === 'user'
+                  ? 'bg-blue-600 text-white self-end'
+                  : 'bg-white border border-gray-200 text-gray-800'
               }`}
             >
               <ReactMarkdown
-                className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-2 prose-li:my-0.5 prose-strong:font-semibold"
-                components={{
-                  h3: ({ node, ...props }) => (
-                    <h3 className="text-base font-semibold mt-2 mb-1" {...props} />
-                  ),
-                  strong: ({ node, ...props }) => (
-                    <strong className="font-semibold text-blue-700" {...props} />
-                  ),
-                  li: ({ node, ...props }) => (
-                    <li className="list-disc ml-4" {...props} />
-                  ),
-                }}
+                remarkPlugins={[remarkGfm]}
+                className="prose prose-sm max-w-none prose-headings:mb-2 prose-p:mb-2 prose-ul:list-disc prose-ul:ml-5 prose-li:my-0.5 prose-a:text-blue-600 prose-a:underline"
               >
                 {msg.content}
               </ReactMarkdown>
             </div>
           ))}
-          {isLoading && (
-            <div className="text-sm text-neutral-500 italic">Piszę...</div>
+
+          {loading && (
+            <div className="text-sm text-gray-500 animate-pulse">AI myśli...</div>
           )}
         </div>
 
-        {/* 🔹 Input */}
-        <div className="border-t border-neutral-200 bg-white p-3 flex items-center gap-2">
+        <div className="border-t bg-white flex p-3 space-x-2">
           <input
             type="text"
-            placeholder="Napisz wiadomość..."
             value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-            className="flex-1 rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && sendMessage()}
+            placeholder="Napisz wiadomość..."
+            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <button
             onClick={sendMessage}
-            disabled={isLoading}
-            className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-lg disabled:opacity-60"
+            disabled={loading}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition disabled:opacity-50"
           >
             Wyślij
           </button>
