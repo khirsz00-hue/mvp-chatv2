@@ -7,7 +7,7 @@ import TodoistAuthButton from '@/components/TodoistAuthButton'
 
 interface ChatMessage {
   id: string
-  role: string
+  role: 'user' | 'assistant'
   content: string
 }
 
