@@ -16,17 +16,21 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const scrollRef = useRef<HTMLDivElement | null>(null)
-  const todoistToken = localStorage.getItem('todoist_token') || '' // jeśli przechowujesz token
+  const [todoistToken, setTodoistToken] = useState<string>('')
 
-  // 🧩 Wczytaj historię rozmowy
+  // 🔹 Bezpieczny dostęp do localStorage
   useEffect(() => {
-    const saved = localStorage.getItem(storageKey)
-    if (saved) setChat(JSON.parse(saved))
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(storageKey)
+      if (saved) setChat(JSON.parse(saved))
+      const token = localStorage.getItem('todoist_token') || ''
+      setTodoistToken(token)
+    }
   }, [storageKey])
 
   // 💾 Zapisz każdą zmianę rozmowy
   useEffect(() => {
-    if (chat.length > 0) {
+    if (typeof window !== 'undefined' && chat.length > 0) {
       localStorage.setItem(storageKey, JSON.stringify(chat))
     }
   }, [chat, storageKey])
@@ -46,7 +50,6 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     setLoading(true)
 
     try {
-      // 🔹 Wyślij wiadomość do API
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -61,10 +64,11 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
       const reply =
         typeof data.reply === 'string' ? data.reply.trim() : '⚠️ Brak odpowiedzi od modelu.'
 
-      setChat(prev => [...prev, { role: 'assistant', content: reply }])
+      const newChat = [...chat, newMessage, { role: 'assistant', content: reply }]
+      setChat(newChat)
 
-      // 🔹 Generuj syntezę po odpowiedzi asystenta
-      await generateSynthesis([...chat, newMessage, { role: 'assistant', content: reply }])
+      // 🔹 Generuj syntezę po odpowiedzi
+      await generateSynthesis(newChat)
     } catch (err) {
       console.error('❌ Błąd komunikacji z AI:', err)
       setChat(prev => [
@@ -81,8 +85,8 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     try {
       const contextText = fullChat.map(m => `${m.role}: ${m.content}`).join('\n')
       const synthesisPrompt = `
-Podsumuj rozmowę o zadaniu "${task.content}" w 2 zdaniach. 
-Uwzględnij konkretne ustalenia, pomysły lub plan działania.
+Podsumuj rozmowę o zadaniu "${task.content}" w 2-3 zdaniach. 
+Uwzględnij najważniejsze ustalenia lub wnioski. 
 Napisz po polsku, zaczynając od "Wnioski AI:".
       `.trim()
 
@@ -97,9 +101,10 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
       const synthesis = synthesisData.reply?.trim() || 'Brak syntezy.'
 
       // 💾 zapisz lokalnie
-      localStorage.setItem(`summary_${task.id}`, synthesis)
-      // 🔁 powiadom TaskCard
-      window.dispatchEvent(new Event('taskUpdated'))
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`summary_${task.id}`, synthesis)
+        window.dispatchEvent(new Event('taskUpdated'))
+      }
 
       // 💬 wyślij jako komentarz do Todoist
       if (todoistToken) {
@@ -173,9 +178,7 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
             </div>
           ))}
 
-          {loading && (
-            <div className="text-sm text-gray-500 animate-pulse">AI myśli...</div>
-          )}
+          {loading && <div className="text-sm text-gray-500 animate-pulse">AI myśli...</div>}
         </div>
 
         {/* INPUT */}
