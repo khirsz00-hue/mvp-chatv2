@@ -28,8 +28,8 @@ export default function TaskCard({
   task,
   token,
   onAction,
-  selectable = false,
-  selected = false,
+  selectable,
+  selected,
   onSelectChange,
 }: TaskCardProps) {
   const [showDialog, setShowDialog] = useState(false)
@@ -39,7 +39,6 @@ export default function TaskCard({
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null)
   const dateInputRef = useRef<HTMLInputElement>(null)
 
-  // 🧠 Wczytaj lokalną syntezę (AI summary)
   useEffect(() => {
     const saved = localStorage.getItem(`summary_${task.id}`)
     setSummary(saved || null)
@@ -51,7 +50,6 @@ export default function TaskCard({
     setTimeout(() => setToast(null), 2500)
   }
 
-  // ✅ Ukończ zadanie
   const handleComplete = async () => {
     await fetch('/api/todoist/complete', {
       method: 'POST',
@@ -62,7 +60,6 @@ export default function TaskCard({
     setTimeout(() => onAction('completed'), 400)
   }
 
-  // 🗑 Usuń zadanie
   const handleDelete = async () => {
     await fetch('/api/todoist/delete', {
       method: 'POST',
@@ -73,7 +70,6 @@ export default function TaskCard({
     setTimeout(() => onAction('deleted'), 400)
   }
 
-  // 📅 Przełóż zadanie
   const handlePostpone = async (newDate: string) => {
     if (!newDate) return
     await fetch('/api/todoist/postpone', {
@@ -92,33 +88,45 @@ export default function TaskCard({
       {!isHidden && (
         <motion.div
           key={task.id}
-          initial={{ opacity: 0, y: 8, scale: 0.99 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -10, scale: 0.97 }}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.25 }}
-          className={`relative border border-gray-200 rounded-md p-2.5 bg-white shadow-sm hover:shadow-md transition-all group overflow-visible ${
-            selected ? 'ring-2 ring-blue-400' : ''
+          className={`relative border border-gray-200 rounded-lg p-3 bg-white shadow-sm hover:shadow-md transition-all overflow-visible ${
+            selected ? 'ring-2 ring-blue-300' : ''
           }`}
         >
-          {/* 📄 Główna sekcja */}
-          <div className="flex justify-between items-start gap-2 relative">
-            {/* ✅ Checkbox (dla batch-actions) */}
-            {selectable && (
-              <input
-                type="checkbox"
-                checked={selected}
-                onChange={(e) => onSelectChange?.(e.target.checked)}
-                className="mt-[2px] accent-blue-600 cursor-pointer"
-              />
-            )}
+          <div className="flex items-start justify-between gap-3">
+            {/* Checkbox + treść */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start gap-2">
+                {selectable && (
+                  <input
+                    type="checkbox"
+                    checked={selected}
+                    onChange={(e) => onSelectChange?.(e.target.checked)}
+                    className="mt-1 accent-blue-600 cursor-pointer"
+                  />
+                )}
+                <p className="font-medium text-gray-800 text-[13px] leading-snug break-words">
+                  {task.content}
+                </p>
+                {summary && (
+                  <div
+                    className="ml-1 text-yellow-500 cursor-pointer select-none hover:scale-110 transition-transform"
+                    onMouseEnter={(e) =>
+                      setTooltipPos({ x: e.clientX, y: e.clientY + 24 })
+                    }
+                    onMouseMove={(e) =>
+                      setTooltipPos({ x: e.clientX, y: e.clientY + 24 })
+                    }
+                    onMouseLeave={() => setTooltipPos(null)}
+                  >
+                    💡
+                  </div>
+                )}
+              </div>
 
-            {/* 📝 Treść zadania */}
-            <div className="flex-1 pr-2">
-              <p className="font-medium text-gray-800 text-[13px] leading-snug">
-                {task.content}
-              </p>
-
-              {/* 📅 Szczegóły */}
               <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-gray-500">
                 {task.due && (
                   <span>{new Date(task.due).toLocaleDateString('pl-PL')}</span>
@@ -138,94 +146,72 @@ export default function TaskCard({
                 ))}
               </div>
             </div>
-
-            {/* 💡 Tooltip z AI Summary */}
-            {summary && (
-              <div className="ml-2 relative group/summary z-[1000]">
-                <span
-                  className="text-yellow-500 text-base cursor-pointer select-none hover:scale-110 transition-transform"
-                  onMouseEnter={(e) =>
-                    setTooltipPos({ x: e.clientX, y: e.clientY + 24 })
-                  }
-                  onMouseMove={(e) =>
-                    setTooltipPos({ x: e.clientX, y: e.clientY + 24 })
-                  }
-                  onMouseLeave={() => setTooltipPos(null)}
-                >
-                  💡
-                </span>
-
-                {/* Portal tooltipa */}
-                {tooltipPos && (
-                  <TooltipPortal>
-                    <motion.div
-                      initial={{ opacity: 0, y: -4, scale: 0.97 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -4, scale: 0.97 }}
-                      transition={{ duration: 0.15 }}
-                      className="fixed z-[99999] bg-white border border-gray-200 text-gray-700 text-xs rounded-md p-2.5 w-64 shadow-2xl pointer-events-none"
-                      style={{
-                        top: tooltipPos.y,
-                        left: tooltipPos.x - 256,
-                      }}
-                    >
-                      <p className="font-semibold text-gray-800">🧠 Wnioski AI:</p>
-                      <p className="mt-1 text-gray-600 whitespace-pre-line leading-snug">
-                        {summary}
-                      </p>
-                    </motion.div>
-                  </TooltipPortal>
-                )}
-              </div>
-            )}
           </div>
 
+          {/* Tooltip 💡 */}
+          {tooltipPos && summary && (
+            <TooltipPortal>
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.15 }}
+                className="fixed z-[99999] bg-white border border-gray-200 text-gray-700 text-xs rounded-md p-2.5 w-64 shadow-2xl pointer-events-none"
+                style={{
+                  top: tooltipPos.y,
+                  left: tooltipPos.x - 260,
+                }}
+              >
+                <p className="font-semibold text-gray-800 mb-1">🧠 Wnioski AI:</p>
+                <p className="text-gray-600 whitespace-pre-line leading-snug">
+                  {summary}
+                </p>
+              </motion.div>
+            </TooltipPortal>
+          )}
+
           {/* 🔘 Przyciski akcji */}
-          <div className="flex justify-end gap-1 mt-2 relative z-10">
+          <div className="flex flex-wrap justify-end gap-2 mt-3 text-xs">
             <motion.button
-              whileTap={{ scale: 0.95 }}
+              whileTap={{ scale: 0.96 }}
               whileHover={{ scale: 1.05 }}
               onClick={handleComplete}
-              title="Ukończ"
-              className="px-2.5 py-0.5 text-xs rounded-md bg-green-100 hover:bg-green-200 text-green-700 font-medium"
+              className="flex items-center gap-1 px-2 py-1 rounded-md bg-green-50 hover:bg-green-100 text-green-700 border border-green-200"
             >
-              ✅
+              ✅ <span>Ukończ</span>
             </motion.button>
 
             <motion.button
-              whileTap={{ scale: 0.95 }}
+              whileTap={{ scale: 0.96 }}
               whileHover={{ scale: 1.05 }}
               onClick={openDatePicker}
-              title="Przełóż"
-              className="px-2.5 py-0.5 text-xs rounded-md bg-blue-100 hover:bg-blue-200 text-blue-700 font-medium"
+              className="flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200"
             >
-              📅
+              📅 <span>Przenieś</span>
             </motion.button>
             <input
               ref={dateInputRef}
               type="date"
-              className="fixed top-1/2 left-1/2 translate-x-[-50%] translate-y-[-50%] opacity-0 pointer-events-auto"
+              className="hidden"
               onChange={(e) => handlePostpone(e.target.value)}
             />
 
             <motion.button
-              whileTap={{ scale: 0.95 }}
+              whileTap={{ scale: 0.96 }}
               whileHover={{ scale: 1.05 }}
               onClick={handleDelete}
-              title="Usuń"
-              className="px-2.5 py-0.5 text-xs rounded-md bg-red-100 hover:bg-red-200 text-red-700 font-medium"
+              className="flex items-center gap-1 px-2 py-1 rounded-md bg-red-50 hover:bg-red-100 text-red-700 border border-red-200"
             >
-              🗑
+              🗑 <span>Usuń</span>
             </motion.button>
 
             <motion.button
-              whileTap={{ scale: 0.95 }}
+              whileTap={{ scale: 0.96 }}
               whileHover={{ scale: 1.05 }}
               onClick={() => setShowDialog(true)}
-              title="Pomóż mi"
-              className="px-2.5 py-0.5 text-xs rounded-md bg-purple-100 hover:bg-purple-200 text-purple-700 font-medium"
+              className="flex items-center gap-1 px-2 py-1 rounded-md bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200"
             >
-              💬
+              💬 <span>Pomóż mi</span>
             </motion.button>
           </div>
 
