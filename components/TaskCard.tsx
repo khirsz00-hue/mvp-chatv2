@@ -80,20 +80,21 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
       {!isHidden && (
         <motion.div
           key={task.id}
-          initial={{ opacity: 0, y: 10, scale: 0.98 }}
+          initial={{ opacity: 0, y: 8, scale: 0.99 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -15, scale: 0.96 }}
+          exit={{ opacity: 0, y: -10, scale: 0.97 }}
           transition={{ duration: 0.25 }}
-          className="relative border rounded-lg p-3 bg-white shadow-sm hover:shadow-md transition-all group overflow-visible"
+          className="relative border border-gray-200 rounded-md p-2.5 bg-white shadow-sm hover:shadow-md transition-all group overflow-visible"
         >
-          <div className="flex justify-between items-start">
+          {/* 📄 Główna sekcja */}
+          <div className="flex justify-between items-start gap-1 relative">
             {/* 📝 Treść zadania */}
             <div className="flex-1 pr-2">
               <p className="font-medium text-gray-800 text-[13px] leading-snug">
                 {task.content}
               </p>
 
-              {/* 📅 Szczegóły pod treścią */}
+              {/* 📅 Szczegóły */}
               <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-gray-500">
                 {task.due && (
                   <span>{new Date(task.due).toLocaleDateString('pl-PL')}</span>
@@ -103,32 +104,37 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
                     {task.project_name}
                   </span>
                 )}
-                {task.labels?.length
-                  ? task.labels.map((label) => (
-                      <span
-                        key={label}
-                        className="bg-gray-100 px-1.5 py-[1px] rounded text-gray-600"
-                      >
-                        #{label}
-                      </span>
-                    ))
-                  : null}
+                {task.labels?.map((label) => (
+                  <span
+                    key={label}
+                    className="bg-gray-100 px-1.5 py-[1px] rounded text-gray-600"
+                  >
+                    #{label}
+                  </span>
+                ))}
               </div>
             </div>
 
             {/* 💡 Tooltip z AI Summary */}
             {summary && (
-              <div className="ml-2 relative group/summary z-50">
+              <div className="ml-2 relative group/summary z-[1000]">
                 <span className="text-yellow-500 text-base cursor-pointer select-none hover:scale-110 transition-transform">
                   💡
                 </span>
-                {/* Tooltip zawsze nad wszystkimi elementami */}
-                <div className="absolute right-0 top-6 z-[9999] opacity-0 scale-95 group-hover/summary:opacity-100 group-hover/summary:scale-100 transition-all duration-200 bg-white border border-gray-200 text-gray-700 text-xs rounded-md p-2.5 w-64 shadow-2xl">
+
+                {/* Tooltip – fade + slide */}
+                <motion.div
+                  initial={{ opacity: 0, y: -4, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -4, scale: 0.97 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute right-0 top-6 z-[9999] hidden group-hover/summary:block bg-white border border-gray-200 text-gray-700 text-xs rounded-md p-2.5 w-64 shadow-2xl"
+                >
                   <p className="font-semibold text-gray-800">🧠 Wnioski AI:</p>
                   <p className="mt-1 text-gray-600 whitespace-pre-line leading-snug">
                     {summary}
                   </p>
-                </div>
+                </motion.div>
               </div>
             )}
           </div>
