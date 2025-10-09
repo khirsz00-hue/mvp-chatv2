@@ -10,7 +10,6 @@ export async function GET(req: Request) {
   }
 
   try {
-    // ✅ Pobierz WSZYSTKIE zadania z Todoist (bez filtrowania po stronie API)
     const res = await fetch('https://api.todoist.com/rest/v2/tasks', {
       headers: { Authorization: `Bearer ${token}` },
       cache: 'no-store',
@@ -23,49 +22,49 @@ export async function GET(req: Request) {
 
     const allTasks = await res.json()
 
-    // 🕒 Pomocnicza funkcja — konwersja daty UTC → lokalna (PL)
-    const toLocalDate = (isoDate: string) => {
-      const utcDate = new Date(isoDate)
-      // Przesuń o offset strefy czasowej
-      const localTime = new Date(utcDate.getTime() + utcDate.getTimezoneOffset() * 60000)
-      return localTime
-    }
+    // 🕒 Offset strefy czasowej (w milisekundach)
+    const tzOffset = new Date().getTimezoneOffset() * 60000
 
-    // 📆 Zakresy lokalnych dat
+    // 📆 Zakresy dni z uwzględnieniem offsetu
     const now = new Date()
-    const startOfToday = new Date(now)
-    startOfToday.setHours(0, 0, 0, 0)
-    const endOfToday = new Date(now)
-    endOfToday.setHours(23, 59, 59, 999)
+    const todayStart = new Date(now)
+    todayStart.setHours(0, 0, 0, 0)
+    const todayEnd = new Date(now)
+    todayEnd.setHours(23, 59, 59, 999)
 
-    const startOfTomorrow = new Date(startOfToday)
-    startOfTomorrow.setDate(startOfToday.getDate() + 1)
-    const endOfTomorrow = new Date(endOfToday)
-    endOfTomorrow.setDate(endOfTomorrow.getDate() + 1)
+    // uwzględnij przesunięcie UTC — dla "today" traktuj dzień +2h tolerancji
+    const todayStartUTC = new Date(todayStart.getTime() - tzOffset - 2 * 60 * 60 * 1000)
+    const todayEndUTC = new Date(todayEnd.getTime() - tzOffset + 2 * 60 * 60 * 1000)
 
-    const in7Days = new Date(startOfToday)
-    in7Days.setDate(startOfToday.getDate() + 7)
+    const tomorrowStart = new Date(todayEnd)
+    tomorrowStart.setDate(todayEnd.getDate() + 1)
+    tomorrowStart.setHours(0, 0, 0, 0)
+    const tomorrowEnd = new Date(tomorrowStart)
+    tomorrowEnd.setHours(23, 59, 59, 999)
 
-    // 🧠 Filtrowanie po stronie backendu
+    const in7Days = new Date(todayStart)
+    in7Days.setDate(todayStart.getDate() + 7)
+
+    // 🧩 Filtrowanie
     const filtered = allTasks.filter((t: any) => {
       if (!t.due?.date) return false
-      const dueDate = toLocalDate(t.due.date)
+      const due = new Date(t.due.date)
 
       switch (filter) {
         case 'today':
-          return dueDate >= startOfToday && dueDate <= endOfToday
+          return due >= todayStartUTC && due <= todayEndUTC
         case 'tomorrow':
-          return dueDate >= startOfTomorrow && dueDate <= endOfTomorrow
+          return due >= tomorrowStart && due <= tomorrowEnd
         case 'overdue':
-          return dueDate < startOfToday
+          return due < todayStartUTC
         case '7 days':
-          return dueDate <= in7Days
+          return due <= in7Days
         default:
           return true
       }
     })
 
-    // 🎯 Upraszczamy dane dla frontu
+    // 🎯 Upraszczamy dane
     const simplified = filtered.map((t: any) => ({
       id: t.id,
       content: t.content,
