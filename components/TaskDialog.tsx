@@ -63,23 +63,31 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     })
   }, [chat, loading])
 
-  // 🔁 Odbiór wiadomości przez SSE (real-time)
+  // 🔁 Odbiór wiadomości przez SSE (real-time) — z antyduplikatem
   useEffect(() => {
+    let lastMessage = ''
     const es = new EventSource('/api/chat/stream')
+
     es.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data)
         if (data.type === 'chat_message' && data.taskId === task.id) {
+          const serialized = `${data.role}:${data.message}`
+          if (serialized === lastMessage) return // 🚫 ignoruj duplikaty
+          lastMessage = serialized
+
           setChat((prev) => [...prev, { role: data.role, content: data.message }])
         }
       } catch (err) {
         console.error('❌ Błąd SSE:', err)
       }
     }
+
     es.onerror = () => {
       es.close()
       setTimeout(() => new EventSource('/api/chat/stream'), 5000)
     }
+
     return () => es.close()
   }, [task.id])
 
@@ -113,7 +121,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
       setChat(newChat)
       localStorage.setItem(chatKey, JSON.stringify(newChat))
 
-      // 📢 Broadcast (dla innych okien)
+      // 📢 Broadcast (dla innych otwartych kart)
       await Promise.all([
         fetch('/api/chat/send', {
           method: 'POST',
