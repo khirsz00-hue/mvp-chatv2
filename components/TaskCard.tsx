@@ -1,5 +1,6 @@
 'use client'
-import { useState } from 'react'
+
+import { useEffect, useState } from 'react'
 import TaskDialog from './TaskDialog'
 
 interface Task {
@@ -19,6 +20,21 @@ interface TaskCardProps {
 export default function TaskCard({ task, token, onAction }: TaskCardProps) {
   const [showDialog, setShowDialog] = useState(false)
   const [dialogMode, setDialogMode] = useState<'none' | 'help'>('none')
+  const [summary, setSummary] = useState<string | null>(null)
+
+  // 🔁 wczytywanie lokalnej syntezy (AI summary)
+  const loadSummary = () => {
+    const saved = localStorage.getItem(`summary_${task.id}`)
+    setSummary(saved || null)
+  }
+
+  useEffect(() => {
+    loadSummary()
+    // nasłuchuj eventu "taskUpdated" aby automatycznie odświeżać tooltip
+    const handler = () => loadSummary()
+    window.addEventListener('taskUpdated', handler)
+    return () => window.removeEventListener('taskUpdated', handler)
+  }, [])
 
   const handleComplete = async () => {
     await fetch('/api/todoist/complete', {
@@ -45,14 +61,26 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
   }
 
   return (
-    <div className="border rounded-xl p-3 bg-white shadow-sm hover:shadow-md transition">
-      <div className="flex justify-between items-center mb-2">
-        <div>
-          <p className="font-medium">{task.content}</p>
+    <div className="border rounded-xl p-4 bg-white shadow-sm hover:shadow-md transition relative group">
+      {/* Główna treść */}
+      <div className="flex justify-between items-start mb-2">
+        <div className="flex-1">
+          <p className="font-medium text-gray-800 leading-snug">{task.content}</p>
           {task.due && (
-            <span className="text-xs text-neutral-500">{task.due}</span>
+            <span className="text-xs text-gray-500">{task.due}</span>
           )}
         </div>
+
+        {/* 💡 Ikona syntezy */}
+        {summary && (
+          <div className="ml-2 relative group/summary">
+            <span className="text-yellow-500 text-lg cursor-pointer">💡</span>
+            <div className="absolute right-0 top-6 z-20 hidden group-hover/summary:block bg-white border border-gray-200 text-gray-700 text-xs rounded-md p-2 w-64 shadow-lg">
+              <b>Synteza AI:</b>
+              <p className="mt-1 text-gray-600 whitespace-pre-line">{summary}</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 🔹 Przyciski akcji */}
@@ -91,6 +119,7 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
         </button>
       </div>
 
+      {/* Popup czatu */}
       {showDialog && (
         <TaskDialog
           task={task}
