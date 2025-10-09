@@ -29,20 +29,20 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
     }
   }, [task.id, task.content])
 
-  // 🔁 wczytywanie lokalnej syntezy (AI summary)
-  const loadSummary = () => {
-    const saved = localStorage.getItem(`summary_${task.id}`)
-    setSummary(saved || null)
-  }
-
+  // 🔁 wczytaj lokalną syntezę (AI summary)
   useEffect(() => {
+    const loadSummary = () => {
+      const saved = localStorage.getItem(`summary_${task.id}`)
+      setSummary(saved || null)
+    }
+
     loadSummary()
-    // nasłuchuj eventu "taskUpdated" aby automatycznie odświeżać tooltip po nowej syntezie
     const handler = () => loadSummary()
     window.addEventListener('taskUpdated', handler)
     return () => window.removeEventListener('taskUpdated', handler)
-  }, [])
+  }, [task.id])
 
+  // 🟢 Ukończ zadanie
   const handleComplete = async () => {
     await fetch('/api/todoist/complete', {
       method: 'POST',
@@ -51,6 +51,7 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
     onAction('completed')
   }
 
+  // 🗑 Usuń zadanie
   const handleDelete = async () => {
     await fetch('/api/todoist/delete', {
       method: 'POST',
@@ -59,7 +60,9 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
     onAction('deleted')
   }
 
+  // 📅 Przełóż zadanie
   const handlePostpone = async (newDate: string) => {
+    if (!newDate) return
     await fetch('/api/todoist/postpone', {
       method: 'POST',
       body: JSON.stringify({ id: task.id, token, newDate }),
@@ -69,16 +72,18 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
 
   return (
     <div className="border rounded-xl p-4 bg-white shadow-sm hover:shadow-md transition relative group">
-      {/* Główna treść */}
+      {/* 📋 Treść zadania */}
       <div className="flex justify-between items-start mb-2">
-        <div className="flex-1">
+        <div className="flex-1 pr-2">
           <p className="font-medium text-gray-800 leading-snug">{task.content}</p>
           {task.due && (
-            <span className="text-xs text-gray-500">{task.due}</span>
+            <span className="text-xs text-gray-500">
+              {new Date(task.due).toLocaleDateString('pl-PL')}
+            </span>
           )}
         </div>
 
-        {/* 💡 Ikona syntezy */}
+        {/* 💡 Tooltip z AI Summary */}
         {summary && (
           <div className="ml-2 relative group/summary">
             <span className="text-yellow-500 text-lg cursor-pointer select-none">💡</span>
@@ -90,16 +95,17 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
         )}
       </div>
 
-      {/* 🔹 Przyciski akcji */}
-      <div className="flex justify-end gap-2 mt-2 flex-wrap">
+      {/* 🔘 Przyciski akcji */}
+      <div className="flex justify-end flex-wrap gap-2 mt-3">
         <button
           onClick={handleComplete}
-          className="px-2 py-1 text-xs rounded-lg bg-green-100 hover:bg-green-200 text-green-700"
+          className="px-3 py-1 text-xs rounded-lg bg-green-100 hover:bg-green-200 text-green-700 font-medium transition-all"
         >
           ✅ Ukończ
         </button>
 
-        <label className="relative px-2 py-1 text-xs rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-700 cursor-pointer">
+        {/* 📅 Date Picker */}
+        <label className="relative inline-flex items-center px-3 py-1 text-xs rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-700 cursor-pointer font-medium transition-all">
           📅 Przełóż
           <input
             type="date"
@@ -110,9 +116,9 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
 
         <button
           onClick={handleDelete}
-          className="px-2 py-1 text-xs rounded-lg bg-red-100 hover:bg-red-200 text-red-700"
+          className="px-3 py-1 text-xs rounded-lg bg-red-100 hover:bg-red-200 text-red-700 font-medium transition-all"
         >
-          🗑️ Usuń
+          🗑 Usuń
         </button>
 
         <button
@@ -120,13 +126,13 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
             setDialogMode('help')
             setShowDialog(true)
           }}
-          className="px-2 py-1 text-xs rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-700"
+          className="px-3 py-1 text-xs rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-700 font-medium transition-all"
         >
           💬 Pomóż mi
         </button>
       </div>
 
-      {/* Popup czatu */}
+      {/* 💬 Modal z czatem (tylko po kliknięciu „Pomóż mi”) */}
       {showDialog && (
         <TaskDialog
           task={task}
