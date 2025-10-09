@@ -10,15 +10,20 @@ type Props = {
   onClose: () => void
 }
 
+type ChatMessage = {
+  role: 'user' | 'assistant'
+  content: string
+}
+
 export default function TaskDialog({ task, mode, onClose }: Props) {
   const storageKey = `chat_${task?.id || task?.content?.slice(0, 30)}`
-  const [chat, setChat] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
+  const [chat, setChat] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const [todoistToken, setTodoistToken] = useState<string>('')
 
-  // 🔹 Bezpieczny dostęp do localStorage
+  // 🔹 Wczytaj historię i token tylko raz
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(storageKey)
@@ -28,7 +33,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     }
   }, [storageKey])
 
-  // 💾 Zapisz każdą zmianę rozmowy
+  // 💾 Zapisz rozmowę przy każdej zmianie
   useEffect(() => {
     if (typeof window !== 'undefined' && chat.length > 0) {
       localStorage.setItem(storageKey, JSON.stringify(chat))
@@ -44,12 +49,14 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     const userMessage = input.trim()
     if (!userMessage || loading) return
 
-    const newMessage = { role: 'user' as const, content: userMessage }
-    setChat(prev => [...prev, newMessage])
+    const newMessage: ChatMessage = { role: 'user', content: userMessage }
+    const updatedChat = [...chat, newMessage]
+    setChat(updatedChat)
     setInput('')
     setLoading(true)
 
     try {
+      // 🔹 Wyślij wiadomość do API
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -64,7 +71,10 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
       const reply =
         typeof data.reply === 'string' ? data.reply.trim() : '⚠️ Brak odpowiedzi od modelu.'
 
-      const newChat = [...chat, newMessage, { role: 'assistant', content: reply }]
+      const newChat: ChatMessage[] = [
+        ...updatedChat,
+        { role: 'assistant', content: reply },
+      ]
       setChat(newChat)
 
       // 🔹 Generuj syntezę po odpowiedzi
@@ -80,8 +90,8 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     }
   }
 
-  // 🧠 SYNTEZA: generuje skrót rozmowy i zapisuje w Todoist
-  const generateSynthesis = async (fullChat: { role: string; content: string }[]) => {
+  // 🧠 SYNTEZA – generuje skrót rozmowy i wysyła do Todoist
+  const generateSynthesis = async (fullChat: ChatMessage[]) => {
     try {
       const contextText = fullChat.map(m => `${m.role}: ${m.content}`).join('\n')
       const synthesisPrompt = `
@@ -100,13 +110,13 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
       const synthesisData = await synthesisRes.json()
       const synthesis = synthesisData.reply?.trim() || 'Brak syntezy.'
 
-      // 💾 zapisz lokalnie
+      // 💾 Zapisz lokalnie
       if (typeof window !== 'undefined') {
         localStorage.setItem(`summary_${task.id}`, synthesis)
         window.dispatchEvent(new Event('taskUpdated'))
       }
 
-      // 💬 wyślij jako komentarz do Todoist
+      // 💬 Wyślij komentarz do Todoist
       if (todoistToken) {
         await fetch('https://api.todoist.com/rest/v2/comments', {
           method: 'POST',
