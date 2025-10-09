@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import ReactDOM from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -183,7 +184,8 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
   // 🚫 Ukryj, gdy nieaktywny
   if (mode !== 'help') return null
 
-  return (
+  // 🪄 Modal renderowany w portalu (poza kontenerem listy)
+  const modal = (
     <AnimatePresence>
       <motion.div
         key="dialog"
@@ -270,4 +272,6 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
       </motion.div>
     </AnimatePresence>
   )
+
+  return typeof window !== 'undefined' ? ReactDOM.createPortal(modal, document.body) : null
 }
