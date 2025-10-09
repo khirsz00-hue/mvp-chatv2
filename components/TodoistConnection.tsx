@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import TodoistTasks from '@/components/TodoistTasks'
 
 export default function TodoistConnection() {
   const [token, setToken] = useState<string | null>(null)
@@ -40,12 +41,15 @@ export default function TodoistConnection() {
     )
   }
 
-  return (
-    <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl flex items-center justify-between">
-      <span className="text-sm text-green-700">✅ Połączono z Todoist</span>
-      <button onClick={handleDisconnect} className="btn text-sm">
-        Odłącz
-      </button>
+    return (
+    <div className="mb-6 p-3 bg-green-50 border border-green-200 rounded-xl">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-sm text-green-700">✅ Połączono z Todoist</span>
+        <button onClick={handleDisconnect} className="btn text-sm">Odłącz</button>
+      </div>
+      <div className="border-t border-green-200 pt-3">
+        <TodoistTasks token={token} />
+      </div>
     </div>
   )
 }
