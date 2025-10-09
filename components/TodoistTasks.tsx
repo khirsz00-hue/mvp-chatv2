@@ -16,7 +16,7 @@ interface TodoistTasksProps {
   filter: 'today' | 'tomorrow' | 'overdue' | '7 days'
   onChangeFilter: (filter: 'today' | 'tomorrow' | 'overdue' | '7 days') => void
   onUpdate?: (tasks: Task[]) => void
-  onOpenTaskChat?: (task: Task) => void   // ✅ DODANE — dla czatu
+  onOpenTaskChat?: (task: Task) => void
 }
 
 export default function TodoistTasks({
@@ -35,23 +35,23 @@ export default function TodoistTasks({
     setLoading(true)
 
     fetch(`/api/todoist/tasks?token=${token}&filter=${filter}`)
-      .then((res) => res.json())
-      .then((data) => {
+      .then(res => res.json())
+      .then(data => {
         const t = data.tasks || []
         setTasks(t)
         onUpdate?.(t)
       })
-      .catch((err) => console.error('❌ Błąd pobierania zadań:', err))
+      .catch(err => console.error('❌ Błąd pobierania zadań:', err))
       .finally(() => setLoading(false))
   }, [token, filter])
 
-  // 🔁 Reaguj na aktualizacje (np. gdy AI doda komentarz)
+  // 🔁 Reaguj na aktualizacje (np. po akcji AI)
   useEffect(() => {
     const handleUpdate = () => {
       fetch(`/api/todoist/tasks?token=${token}&filter=${filter}`)
-        .then((res) => res.json())
-        .then((data) => setTasks(data.tasks || []))
-        .catch((err) => console.error('❌ Błąd odświeżenia:', err))
+        .then(res => res.json())
+        .then(data => setTasks(data.tasks || []))
+        .catch(err => console.error('❌ Błąd odświeżenia:', err))
     }
     window.addEventListener('taskUpdated', handleUpdate)
     return () => window.removeEventListener('taskUpdated', handleUpdate)
@@ -70,25 +70,25 @@ export default function TodoistTasks({
 
   return (
     <div className="space-y-4">
-      {/* 🔹 Sticky belka filtrów */}
-      <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-md border-b border-neutral-200 py-2 px-2 flex gap-2">
-        {(['today', 'tomorrow', 'overdue', '7 days'] as const).map((f) => (
+      {/* 🔹 Elegancka belka filtrów */}
+      <div className="sticky top-0 z-20 border-b bg-gradient-to-r from-green-50 via-emerald-100 to-green-50 backdrop-blur-md px-3 py-3 flex flex-wrap gap-2 justify-center shadow-sm">
+        {[
+          { key: 'today', label: '📅 Dziś', color: 'bg-green-600' },
+          { key: 'tomorrow', label: '➡️ Jutro', color: 'bg-blue-600' },
+          { key: '7 days', label: '🗓️ Tydzień', color: 'bg-purple-600' },
+          { key: 'overdue', label: '⚠️ Przeterminowane', color: 'bg-red-600' },
+        ].map(({ key, label, color }) => (
           <button
-            key={f}
-            onClick={() => onChangeFilter(f)}
-            className={`px-3 py-1 rounded-lg text-sm font-medium transition-all ${
-              filter === f
-                ? 'bg-green-600 text-white shadow-sm'
-                : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
-            }`}
+            key={key}
+            onClick={() => onChangeFilter(key as any)}
+            className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200
+              ${
+                filter === key
+                  ? `${color} text-white shadow-lg scale-105`
+                  : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-100'
+              }`}
           >
-            {f === 'today'
-              ? 'Dziś'
-              : f === 'tomorrow'
-              ? 'Jutro'
-              : f === 'overdue'
-              ? 'Przeterminowane'
-              : 'Tydzień'}
+            {label}
           </button>
         ))}
       </div>
@@ -98,7 +98,7 @@ export default function TodoistTasks({
         {filter === '7 days' ? (
           Object.keys(groupedByDate)
             .sort()
-            .map((date) => (
+            .map(date => (
               <div key={date} className="mb-6">
                 <h3 className="text-sm font-semibold text-neutral-700 mb-2 border-b pb-1 flex items-center gap-1">
                   📅{' '}
@@ -111,11 +111,11 @@ export default function TodoistTasks({
                       })}
                 </h3>
                 <div className="space-y-2">
-                  {groupedByDate[date].map((t) => (
+                  {groupedByDate[date].map(t => (
                     <div
                       key={t.id}
                       className="cursor-pointer transition hover:bg-green-50 rounded-lg"
-                      onClick={() => onOpenTaskChat?.(t)}   // ✅ Klik = otwarcie czatu
+                      onClick={() => onOpenTaskChat?.(t)}
                     >
                       <TaskCard task={t} token={token} onAction={() => {}} />
                     </div>
@@ -129,11 +129,11 @@ export default function TodoistTasks({
           </p>
         ) : (
           <ul className="space-y-2">
-            {tasks.map((t) => (
+            {tasks.map(t => (
               <li
                 key={t.id}
                 className="cursor-pointer transition hover:bg-green-50 rounded-lg"
-                onClick={() => onOpenTaskChat?.(t)}   // ✅ Klik = otwarcie czatu
+                onClick={() => onOpenTaskChat?.(t)}
               >
                 <TaskCard task={t} token={token} onAction={() => {}} />
               </li>
