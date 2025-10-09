@@ -51,13 +51,13 @@ export default function TodoistTasks({
         fetch(`/api/todoist/projects?token=${token}`).then((r) => r.json()),
       ])
 
-      const allTasks = tasksRes.tasks || []
-      const allProjects = projectsRes.projects || []
+      const allTasks: Task[] = tasksRes.tasks || []
+      const allProjects: Project[] = projectsRes.projects || []
 
       const enriched = allTasks.map((t: Task) => ({
         ...t,
         project_name:
-          allProjects.find((p) => p.id === t.project_id)?.name || 'Brak projektu',
+          allProjects.find((p: Project) => p.id === t.project_id)?.name || 'Brak projektu',
       }))
 
       setTasks(enriched)
@@ -140,7 +140,7 @@ export default function TodoistTasks({
           className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
         >
           <option value="all">📁 Wszystkie projekty</option>
-          {projects.map((p) => (
+          {projects.map((p: Project) => (
             <option key={p.id} value={p.id}>
               💼 {p.name}
             </option>
