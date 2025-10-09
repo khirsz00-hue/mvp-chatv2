@@ -10,36 +10,52 @@ export default function TodoistTasksView({ token }: { token: string }) {
 
   const handleRefresh = (updated?: any[]) => updated && setTasks(updated)
 
-  // 🔁 Słuchanie webhook streamu Todoist (SSE)
+  // 🔁 Automatyczne nasłuchiwanie eventów z Todoist (SSE)
   useEffect(() => {
+    if (!token) return
+
     const es = new EventSource('/api/todoist/stream')
 
     es.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data)
         if (data.event?.startsWith('item:')) {
-          console.log('🔁 Aktualizacja Todoist:', data.event)
+          console.log('🔁 Otrzymano event Todoist:', data)
+          // 🔄 Odświeżenie zadań
           window.dispatchEvent(new Event('taskUpdated'))
-          setToast('🔄 Lista zadań zaktualizowana')
+
+          // 💬 Toast powiadomienia
+          const msg =
+            data.event === 'item:added'
+              ? '🆕 Dodano nowe zadanie'
+              : data.event === 'item:completed'
+              ? '✅ Zadanie ukończone'
+              : data.event === 'item:updated'
+              ? '✏️ Zmieniono zadanie'
+              : '🔄 Lista zadań zaktualizowana'
+
+          setToast(msg)
           setTimeout(() => setToast(null), 2500)
         }
       } catch (err) {
-        console.error('Błąd streamu Todoist:', err)
+        console.error('❌ Błąd parsowania SSE:', err)
       }
     }
 
     es.onerror = (err) => {
-      console.warn('⚠️ Błąd połączenia SSE, ponawianie...', err)
+      console.warn('⚠️ Błąd połączenia z SSE:', err)
+      es.close()
+      // automatyczne ponowne połączenie po 5s
+      setTimeout(() => new EventSource('/api/todoist/stream'), 5000)
     }
 
     return () => es.close()
-  }, [])
+  }, [token])
 
   return (
     <div className="flex h-full bg-gray-50 rounded-b-xl overflow-hidden relative">
       {/* 📋 Główna sekcja */}
       <div className="flex-1 flex flex-col">
-        {/* 🗒️ Lista zadań */}
         <div className="flex-1 overflow-y-auto p-3">
           <TodoistTasks
             token={token}
@@ -50,7 +66,7 @@ export default function TodoistTasksView({ token }: { token: string }) {
         </div>
       </div>
 
-      {/* ✅ Toast powiadomień */}
+      {/* 🔔 Toast powiadomień */}
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-blue-600 text-white text-sm px-4 py-2 rounded-lg shadow-lg animate-[fadeInUp_0.3s_ease-out]">
           {toast}
