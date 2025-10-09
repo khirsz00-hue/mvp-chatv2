@@ -11,14 +11,30 @@ type Props = {
 }
 
 export default function TaskDialog({ task, mode, onClose }: Props) {
+  const storageKey = `chat_${task?.id || task?.content?.slice(0, 30)}`
   const [chat, setChat] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const messagesEndRef = useRef<HTMLDivElement | null>(null)
+  const scrollRef = useRef<HTMLDivElement | null>(null)
 
-  // auto-scroll po każdej wiadomości
+  // 🧩 Wczytaj historię rozmowy z localStorage
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (mode === 'help') {
+      const saved = localStorage.getItem(storageKey)
+      if (saved) setChat(JSON.parse(saved))
+    }
+  }, [mode, storageKey])
+
+  // 💾 Zapisz każdą zmianę rozmowy
+  useEffect(() => {
+    if (chat.length > 0) {
+      localStorage.setItem(storageKey, JSON.stringify(chat))
+    }
+  }, [chat, storageKey])
+
+  // 🔽 Auto-scroll do ostatniej wiadomości
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [chat, loading])
 
   const sendMessage = async () => {
@@ -41,7 +57,6 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
       })
 
       if (!res.ok) throw new Error('Błąd odpowiedzi z API')
-
       const data = await res.json()
       const reply =
         typeof data.reply === 'string'
@@ -64,11 +79,11 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-3"
       onClick={onClose}
     >
       <div
-        className="bg-white w-full max-w-lg rounded-2xl shadow-xl flex flex-col border border-gray-200 overflow-hidden animate-fadeIn"
+        className="bg-white w-full max-w-lg rounded-2xl shadow-xl flex flex-col border border-gray-200 overflow-hidden animate-fadeIn max-h-[90vh]"
         onClick={e => e.stopPropagation()}
       >
         {/* HEADER */}
@@ -83,12 +98,16 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
         </div>
 
         {/* CZAT */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-gray-50">
-          {/* Pytanie wstępne */}
-          <div className="bg-white p-3 rounded-lg shadow-sm border text-sm text-gray-800 leading-relaxed">
-            🧠 Zajmijmy się zadaniem: <b>"{task.content}"</b>.<br />
-            Na czym dokładnie ono polega? Co chcesz osiągnąć i co Cię blokuje?
-          </div>
+        <div
+          ref={scrollRef}
+          className="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-gray-50"
+        >
+          {chat.length === 0 && (
+            <div className="bg-white p-3 rounded-lg shadow-sm border text-sm text-gray-800 leading-relaxed">
+              🧠 Zajmijmy się zadaniem: <b>"{task.content}"</b>.<br />
+              Na czym dokładnie ono polega? Co chcesz osiągnąć i co Cię blokuje?
+            </div>
+          )}
 
           {chat.map((msg, i) => (
             <div
@@ -101,7 +120,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
             >
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
-                className="prose prose-sm max-w-none prose-headings:mb-1 prose-p:mb-1 prose-ul:list-disc prose-ul:ml-5 prose-li:my-0.5 prose-a:text-blue-600 prose-a:underline"
+                className="prose prose-sm max-w-none prose-p:mb-1 prose-li:my-0.5 prose-a:text-blue-600 prose-a:underline"
               >
                 {msg.content}
               </ReactMarkdown>
@@ -111,29 +130,14 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
           {loading && (
             <div className="text-sm text-gray-500 animate-pulse">AI myśli...</div>
           )}
-
-          <div ref={messagesEndRef} />
         </div>
 
         {/* INPUT */}
-        <div className="border-t bg-white flex p-3 space-x-2">
+        <div className="border-t bg-white flex p-3 space-x-2 sticky bottom-0">
           <input
             type="text"
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && sendMessage()}
             placeholder="Napisz wiadomość..."
-            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            onClick={sendMessage}
-            disabled={loading}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition disabled:opacity-50"
-          >
-            Wyślij
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
+            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-
