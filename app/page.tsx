@@ -10,6 +10,7 @@ interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
   content: string
+  timestamp: number
 }
 
 export default function HomePage() {
@@ -18,7 +19,7 @@ export default function HomePage() {
   const [sixHatsMessages, setSixHatsMessages] = useState<ChatMessage[]>([])
   const [token, setToken] = useState<string | null>(null)
 
-  // 🧩 Zapamiętaj historię oddzielnie w localStorage
+  // 🧩 Wczytaj historię rozmów
   useEffect(() => {
     if (typeof window === 'undefined') return
 
@@ -29,17 +30,22 @@ export default function HomePage() {
     if (sixHatsSaved) setSixHatsMessages(JSON.parse(sixHatsSaved))
   }, [])
 
+  // 💾 Zapisuj historię po zmianach
   useEffect(() => {
-    if (todoistMessages.length > 0)
+    if (todoistMessages.length > 0) {
       localStorage.setItem('chat_todoist', JSON.stringify(todoistMessages))
+      window.dispatchEvent(new Event('chatUpdated'))
+    }
   }, [todoistMessages])
 
   useEffect(() => {
-    if (sixHatsMessages.length > 0)
+    if (sixHatsMessages.length > 0) {
       localStorage.setItem('chat_six_hats', JSON.stringify(sixHatsMessages))
+      window.dispatchEvent(new Event('chatUpdated'))
+    }
   }, [sixHatsMessages])
 
-  // 🔹 Pobierz token Todoista
+  // 🔹 Obsługa tokena Todoista
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const urlToken = urlParams.get('todoist_token')
@@ -54,9 +60,14 @@ export default function HomePage() {
     }
   }, [])
 
-  // 💬 Wysyłanie wiadomości — oddzielnie dla każdego asystenta
+  // 💬 Wysyłanie do Six Hats
   const handleSendSixHats = async (message: string) => {
-    const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: message }
+    const userMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: message,
+      timestamp: Date.now(),
+    }
     const updated = [...sixHatsMessages, userMsg]
     setSixHatsMessages(updated)
 
@@ -64,36 +75,48 @@ export default function HomePage() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, assistant: 'six_hats' }),
       })
+
+      if (!res.ok) throw new Error('Błąd odpowiedzi z AI')
       const data = await res.json()
 
       const aiMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: data.reply,
+        content: data.reply || '⚠️ Brak odpowiedzi od AI.',
+        timestamp: Date.now(),
       }
 
       setSixHatsMessages([...updated, aiMsg])
     } catch (err) {
-      setSixHatsMessages(prev => [
+      console.error('❌ Błąd komunikacji z AI:', err)
+      setSixHatsMessages((prev) => [
         ...prev,
-        { id: crypto.randomUUID(), role: 'assistant', content: '⚠️ Błąd komunikacji z AI.' },
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: '⚠️ Błąd komunikacji z AI.',
+          timestamp: Date.now(),
+        },
       ])
     }
   }
 
+  // 💬 Wysyłanie do Todoista (placeholder)
   const handleSendTodoist = async (message: string) => {
-    const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: message }
-    const updated = [...todoistMessages, userMsg]
-    setTodoistMessages(updated)
-
-    // (tu może być osobny endpoint np. /api/todoist-chat)
+    const userMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: message,
+      timestamp: Date.now(),
+    }
+    setTodoistMessages((prev) => [...prev, userMsg])
   }
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      {/* Górny pasek */}
+      {/* 🔹 Nagłówek */}
       <header className="flex items-center justify-between px-6 py-3 bg-white border-b shadow-sm">
         <h1 className="text-lg font-semibold text-gray-800">AI Assistants PRO</h1>
         <nav className="flex gap-2">
@@ -116,7 +139,7 @@ export default function HomePage() {
         </nav>
       </header>
 
-      {/* Główna sekcja */}
+      {/* 🔸 Główna sekcja */}
       <main className="flex flex-1 overflow-hidden">
         <ChatSidebar />
 
@@ -146,7 +169,11 @@ export default function HomePage() {
                 Zadawaj pytania, a asystent pomoże Ci spojrzeć na problem z sześciu perspektyw
                 myślenia (biała, czerwona, czarna, żółta, zielona, niebieska).
               </p>
-              <Chat onSend={handleSendSixHats} messages={sixHatsMessages} />
+              <Chat
+                onSend={handleSendSixHats}
+                messages={sixHatsMessages}
+                assistant="six_hats"
+              />
             </div>
           )}
         </div>
