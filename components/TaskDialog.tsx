@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -11,14 +11,21 @@ type Props = {
 }
 
 export default function TaskDialog({ task, mode, onClose }: Props) {
-  const [step, setStep] = useState<'choose' | 'chat'>('choose')
   const [chat, setChat] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement | null>(null)
+
+  // auto-scroll po każdej wiadomości
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chat, loading])
 
   const sendMessage = async () => {
-    if (!input.trim()) return
-    const newMessage = { role: 'user' as const, content: input }
+    const userMessage = input.trim()
+    if (!userMessage || loading) return
+
+    const newMessage = { role: 'user' as const, content: userMessage }
     setChat(prev => [...prev, newMessage])
     setInput('')
     setLoading(true)
@@ -28,24 +35,26 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [
-            ...chat,
-            newMessage,
-            {
-              role: 'system',
-              content: `Pomóż zrealizować zadanie: "${task.content}". 
-              Zadawaj doprecyzowujące pytania zanim udzielisz odpowiedzi. 
-              Udzielaj praktycznych, uporządkowanych rad w formie listy.`,
-            },
-          ],
+          message: userMessage,
+          context: task?.content || '',
         }),
       })
 
       if (!res.ok) throw new Error('Błąd odpowiedzi z API')
+
       const data = await res.json()
-      setChat(prev => [...prev, { role: 'assistant', content: data.reply }])
+      const reply =
+        typeof data.reply === 'string'
+          ? data.reply.trim()
+          : '⚠️ Brak odpowiedzi od modelu.'
+
+      setChat(prev => [...prev, { role: 'assistant', content: reply }])
     } catch (err) {
-      setChat(prev => [...prev, { role: 'assistant', content: '⚠️ Wystąpił błąd podczas komunikacji z AI.' }])
+      console.error('❌ Błąd podczas komunikacji z AI:', err)
+      setChat(prev => [
+        ...prev,
+        { role: 'assistant', content: '⚠️ Wystąpił błąd podczas komunikacji z AI.' },
+      ])
     } finally {
       setLoading(false)
     }
@@ -54,8 +63,15 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
   if (mode !== 'help') return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-      <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl overflow-hidden flex flex-col border border-gray-200">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white w-full max-w-lg rounded-2xl shadow-xl flex flex-col border border-gray-200 overflow-hidden animate-fadeIn"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* HEADER */}
         <div className="flex justify-between items-center px-5 py-3 border-b bg-gray-50">
           <h2 className="text-lg font-semibold text-gray-800">Pomoc z zadaniem</h2>
           <button
@@ -66,7 +82,9 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
           </button>
         </div>
 
+        {/* CZAT */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-gray-50">
+          {/* Pytanie wstępne */}
           <div className="bg-white p-3 rounded-lg shadow-sm border text-sm text-gray-800 leading-relaxed">
             🧠 Zajmijmy się zadaniem: <b>"{task.content}"</b>.<br />
             Na czym dokładnie ono polega? Co chcesz osiągnąć i co Cię blokuje?
@@ -75,7 +93,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
           {chat.map((msg, i) => (
             <div
               key={i}
-              className={`p-3 rounded-lg shadow-sm text-sm leading-relaxed ${
+              className={`p-3 rounded-lg shadow-sm text-sm leading-relaxed transition-all duration-200 ${
                 msg.role === 'user'
                   ? 'bg-blue-600 text-white self-end'
                   : 'bg-white border border-gray-200 text-gray-800'
@@ -83,7 +101,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
             >
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
-                className="prose prose-sm max-w-none prose-headings:mb-2 prose-p:mb-2 prose-ul:list-disc prose-ul:ml-5 prose-li:my-0.5 prose-a:text-blue-600 prose-a:underline"
+                className="prose prose-sm max-w-none prose-headings:mb-1 prose-p:mb-1 prose-ul:list-disc prose-ul:ml-5 prose-li:my-0.5 prose-a:text-blue-600 prose-a:underline"
               >
                 {msg.content}
               </ReactMarkdown>
@@ -93,8 +111,11 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
           {loading && (
             <div className="text-sm text-gray-500 animate-pulse">AI myśli...</div>
           )}
+
+          <div ref={messagesEndRef} />
         </div>
 
+        {/* INPUT */}
         <div className="border-t bg-white flex p-3 space-x-2">
           <input
             type="text"
