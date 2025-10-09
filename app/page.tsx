@@ -14,10 +14,32 @@ interface ChatMessage {
 
 export default function HomePage() {
   const [active, setActive] = useState<'todoist' | 'six_hats'>('todoist')
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [todoistMessages, setTodoistMessages] = useState<ChatMessage[]>([])
+  const [sixHatsMessages, setSixHatsMessages] = useState<ChatMessage[]>([])
   const [token, setToken] = useState<string | null>(null)
 
-  // 🔹 Pobierz token Todoista z URL lub localStorage
+  // 🧩 Zapamiętaj historię oddzielnie w localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const todoistSaved = localStorage.getItem('chat_todoist')
+    const sixHatsSaved = localStorage.getItem('chat_six_hats')
+
+    if (todoistSaved) setTodoistMessages(JSON.parse(todoistSaved))
+    if (sixHatsSaved) setSixHatsMessages(JSON.parse(sixHatsSaved))
+  }, [])
+
+  useEffect(() => {
+    if (todoistMessages.length > 0)
+      localStorage.setItem('chat_todoist', JSON.stringify(todoistMessages))
+  }, [todoistMessages])
+
+  useEffect(() => {
+    if (sixHatsMessages.length > 0)
+      localStorage.setItem('chat_six_hats', JSON.stringify(sixHatsMessages))
+  }, [sixHatsMessages])
+
+  // 🔹 Pobierz token Todoista
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const urlToken = urlParams.get('todoist_token')
@@ -32,11 +54,11 @@ export default function HomePage() {
     }
   }, [])
 
-  // 💬 Obsługa czatu (dla 6 Hats Assistant)
-  const handleSend = async (message: string) => {
+  // 💬 Wysyłanie wiadomości — oddzielnie dla każdego asystenta
+  const handleSendSixHats = async (message: string) => {
     const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: message }
-    const updated = [...messages, userMsg]
-    setMessages(updated)
+    const updated = [...sixHatsMessages, userMsg]
+    setSixHatsMessages(updated)
 
     try {
       const res = await fetch('/api/chat', {
@@ -52,18 +74,26 @@ export default function HomePage() {
         content: data.reply,
       }
 
-      setMessages([...updated, aiMsg])
+      setSixHatsMessages([...updated, aiMsg])
     } catch (err) {
-      setMessages(prev => [
+      setSixHatsMessages(prev => [
         ...prev,
         { id: crypto.randomUUID(), role: 'assistant', content: '⚠️ Błąd komunikacji z AI.' },
       ])
     }
   }
 
+  const handleSendTodoist = async (message: string) => {
+    const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: message }
+    const updated = [...todoistMessages, userMsg]
+    setTodoistMessages(updated)
+
+    // (tu może być osobny endpoint np. /api/todoist-chat)
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      {/* 🔹 Górny pasek */}
+      {/* Górny pasek */}
       <header className="flex items-center justify-between px-6 py-3 bg-white border-b shadow-sm">
         <h1 className="text-lg font-semibold text-gray-800">AI Assistants PRO</h1>
         <nav className="flex gap-2">
@@ -86,12 +116,10 @@ export default function HomePage() {
         </nav>
       </header>
 
-      {/* 🔸 Główna sekcja */}
+      {/* Główna sekcja */}
       <main className="flex flex-1 overflow-hidden">
-        {/* 🔹 Sidebar historii czatów (stały po lewej) */}
         <ChatSidebar />
 
-        {/* 🔹 Główna część treści */}
         <div className="flex-1 p-4 overflow-y-auto">
           {active === 'todoist' && (
             <>
@@ -118,7 +146,7 @@ export default function HomePage() {
                 Zadawaj pytania, a asystent pomoże Ci spojrzeć na problem z sześciu perspektyw
                 myślenia (biała, czerwona, czarna, żółta, zielona, niebieska).
               </p>
-              <Chat onSend={handleSend} messages={messages} />
+              <Chat onSend={handleSendSixHats} messages={sixHatsMessages} />
             </div>
           )}
         </div>
