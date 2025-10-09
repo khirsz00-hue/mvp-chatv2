@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { broadcastMessage } from '../chat/stream/store' // ✅ poprawna ścieżka
+import { broadcastMessage } from '../stream/store' // ✅ poprawna ścieżka
 
 export async function POST(req: Request) {
   const { taskId, message, role } = await req.json()
