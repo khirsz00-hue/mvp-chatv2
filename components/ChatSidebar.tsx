@@ -37,7 +37,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
             : 'brak daty',
           timestamp: m.timestamp || 0,
         }))
-        .sort((a, b) => b.timestamp - a.timestamp)
+        .sort((a: { timestamp: number }, b: { timestamp: number }) => b.timestamp - a.timestamp)
         .slice(0, 10)
       setGlobalChats(global)
 
@@ -65,7 +65,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
             timestamp: lastMsg?.timestamp || 0,
           }
         })
-        .sort((a, b) => b.timestamp - a.timestamp)
+        .sort((a: { timestamp: number }, b: { timestamp: number }) => b.timestamp - a.timestamp)
         .slice(0, 10)
       setTaskChats(tasks)
 
@@ -84,7 +84,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
             : 'brak daty',
           timestamp: m.timestamp || 0,
         }))
-        .sort((a, b) => b.timestamp - a.timestamp)
+        .sort((a: { timestamp: number }, b: { timestamp: number }) => b.timestamp - a.timestamp)
         .slice(0, 10)
       setSixHatsChats(sixHats)
     }
@@ -218,7 +218,6 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
             }`}
             onClick={e => e.stopPropagation()}
           >
-            {/* HEADER */}
             <div className="flex justify-between items-center px-5 py-3 border-b bg-gray-50">
               <h2 className="text-lg font-semibold text-gray-800 truncate">
                 {openChat.mode === 'global'
@@ -235,7 +234,6 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
               </button>
             </div>
 
-            {/* TREŚĆ */}
             <div className="flex-1 overflow-y-auto">
               {openChat.mode === 'global' ? (
                 <GlobalDialog onClose={handleClose} />
