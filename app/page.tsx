@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import TodoistConnection from '@/components/TodoistConnection'
 import TodoistAuthButton from '@/components/TodoistAuthButton'
 import Chat from '@/components/Chat'
+import ChatSidebar from '@/components/ChatSidebar'
 
 interface ChatMessage {
   id: string
@@ -86,35 +87,41 @@ export default function HomePage() {
       </header>
 
       {/* 🔸 Główna sekcja */}
-      <main className="flex-1 flex flex-col p-4">
-        {active === 'todoist' && (
-          <>
-            {!token ? (
-              <div className="flex items-center justify-center h-full">
-                <TodoistAuthButton />
-              </div>
-            ) : (
-              <TodoistConnection
-                token={token}
-                onDisconnect={() => {
-                  localStorage.removeItem('todoist_token')
-                  setToken(null)
-                }}
-              />
-            )}
-          </>
-        )}
+      <main className="flex flex-1 overflow-hidden">
+        {/* 🔹 Sidebar historii czatów (stały po lewej) */}
+        <ChatSidebar />
 
-        {active === 'six_hats' && (
-          <div className="max-w-4xl mx-auto w-full bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-3">🎩 Six Hats Assistant</h2>
-            <p className="text-sm text-gray-600 mb-4">
-              Zadawaj pytania, a asystent pomoże Ci spojrzeć na problem z sześciu perspektyw
-              myślenia (biała, czerwona, czarna, żółta, zielona, niebieska).
-            </p>
-            <Chat onSend={handleSend} messages={messages} />
-          </div>
-        )}
+        {/* 🔹 Główna część treści */}
+        <div className="flex-1 p-4 overflow-y-auto">
+          {active === 'todoist' && (
+            <>
+              {!token ? (
+                <div className="flex items-center justify-center h-full">
+                  <TodoistAuthButton />
+                </div>
+              ) : (
+                <TodoistConnection
+                  token={token}
+                  onDisconnect={() => {
+                    localStorage.removeItem('todoist_token')
+                    setToken(null)
+                  }}
+                />
+              )}
+            </>
+          )}
+
+          {active === 'six_hats' && (
+            <div className="max-w-4xl mx-auto w-full bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+              <h2 className="text-lg font-semibold text-gray-800 mb-3">🎩 Six Hats Assistant</h2>
+              <p className="text-sm text-gray-600 mb-4">
+                Zadawaj pytania, a asystent pomoże Ci spojrzeć na problem z sześciu perspektyw
+                myślenia (biała, czerwona, czarna, żółta, zielona, niebieska).
+              </p>
+              <Chat onSend={handleSend} messages={messages} />
+            </div>
+          )}
+        </div>
       </main>
     </div>
   )
