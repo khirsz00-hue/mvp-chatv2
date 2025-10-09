@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import TodoistTasksView from './TodoistTasksView'
 import TodoistAIView from './TodoistAIView'
-import ChatHistoryPanel from './ChatHistoryPanel'
 import GlobalDialog from './GlobalDialog'
 import TaskDialog from './TaskDialog'
 
@@ -14,24 +13,15 @@ interface TodoistConnectionProps {
 
 export default function TodoistConnection({ token, onDisconnect }: TodoistConnectionProps) {
   const [mode, setMode] = useState<'tasks' | 'ai'>('tasks')
-  const [historyOpen, setHistoryOpen] = useState(false)
   const [selectedChat, setSelectedChat] = useState<{ key: string; title: string } | null>(null)
 
   return (
     <div className="relative flex flex-col h-[calc(100vh-100px)] bg-gray-50 border border-green-200 rounded-xl overflow-hidden">
       {/* 🔘 Pasek górny */}
       <div className="flex justify-between items-center p-2 px-4 bg-white border-b shadow-sm">
-        <div className="flex items-center gap-2">
-          {/* 💬 Historia */}
-          <button
-            onClick={() => setHistoryOpen(true)}
-            className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 transition"
-          >
-            💬 Historia
-          </button>
-
+        <div className="flex items-center gap-3">
           {/* 🧭 Przełącznik widoków */}
-          <div className="flex bg-gray-100 rounded-lg overflow-hidden ml-2">
+          <div className="flex bg-gray-100 rounded-lg overflow-hidden">
             <button
               onClick={() => setMode('tasks')}
               className={`px-4 py-1.5 text-sm font-medium transition ${
@@ -55,7 +45,7 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
           </div>
         </div>
 
-        {/* 🔌 Status */}
+        {/* 🔌 Status połączenia */}
         <div className="flex items-center gap-3">
           <span className="text-sm font-semibold text-green-700 whitespace-nowrap">
             ✅ Połączono z Todoist
@@ -78,21 +68,7 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
         )}
       </div>
 
-      {/* 💬 Wysuwany panel historii */}
-      <ChatHistoryPanel
-        isOpen={historyOpen}
-        onClose={() => setHistoryOpen(false)}
-        onSelectChat={(chatKey) => {
-          const title =
-            chatKey === 'chat_global'
-              ? 'Globalny czat'
-              : localStorage.getItem(`task_title_${chatKey.replace('chat_', '')}`) || chatKey
-          setSelectedChat({ key: chatKey, title })
-          setHistoryOpen(false)
-        }}
-      />
-
-      {/* 🧠 Modal kontynuacji czatu */}
+      {/* 🧠 Modal kontynuacji czatu (po kliknięciu np. z listy) */}
       {selectedChat && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-3"
