@@ -1,38 +1,38 @@
 import { NextResponse } from 'next/server'
 
-// ⛔️ SSR/Static Export off
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
-  // 🔁 Utwórz strumień SSE (Server-Sent Events)
+  const encoder = new TextEncoder()
+
   const stream = new ReadableStream({
     start(controller) {
-      const encoder = new TextEncoder()
+      let lastTimestamp = 0
 
-      // natychmiast wyślij sygnał, że połączenie działa
-      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ event: 'connected' })}\n\n`))
-
-      // co 3s sprawdzaj, czy pojawił się nowy event
       const interval = setInterval(() => {
         const lastEvent = (globalThis as any).lastTodoistEvent
-        if (lastEvent) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(lastEvent)}\n\n`))
-          delete (globalThis as any).lastTodoistEvent // wyczyść po wysłaniu
-        }
-      }, 3000)
 
-      // 🔒 zamknij połączenie po 60s, jeśli klient nie odświeży
-      setTimeout(() => {
-        clearInterval(interval)
-        controller.close()
-      }, 60000)
+        if (lastEvent && lastEvent.ts > lastTimestamp) {
+          lastTimestamp = lastEvent.ts
+
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify(lastEvent)}\n\n`)
+          )
+
+          console.log('📡 [SSE] Wysłano event →', lastEvent.event)
+        }
+      }, 1000)
+
+      // czyszczenie po zamknięciu połączenia
+      const close = () => clearInterval(interval)
+      ;(controller as any).close = close
     },
   })
 
-  return new Response(stream, {
+  return new NextResponse(stream, {
     headers: {
       'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache, no-transform',
+      'Cache-Control': 'no-cache',
       Connection: 'keep-alive',
     },
   })
