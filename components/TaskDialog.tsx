@@ -42,14 +42,24 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
   useEffect(() => {
     if (typeof window === 'undefined') return
     const saved = localStorage.getItem(chatKey)
+
     if (saved) {
       const parsedRaw = JSON.parse(saved)
-      let baseTime = Date.now() - parsedRaw.length * 1000
+      const hasTimestamps = parsedRaw.some((m: any) => !!m.timestamp)
+      let parsed: ChatMessage[]
 
-      const parsed: ChatMessage[] = parsedRaw.map((m: any, i: number) => ({
-        ...m,
-        timestamp: m.timestamp ?? baseTime + i * 1000, // 🔥 stabilny fallback
-      }))
+      if (hasTimestamps) {
+        // ✅ jeśli timestampy już istnieją, nic nie zmieniamy
+        parsed = parsedRaw as ChatMessage[]
+      } else {
+        // 🧠 nadaj im stabilne czasy tylko przy pierwszym odczycie
+        const baseTime = Date.now() - parsedRaw.length * 1000
+        parsed = parsedRaw.map((m: any, i: number) => ({
+          ...m,
+          timestamp: baseTime + i * 1000,
+        }))
+        localStorage.setItem(chatKey, JSON.stringify(parsed)) // zapisujemy z timestampami
+      }
 
       setChat(parsed.sort((a, b) => a.timestamp - b.timestamp))
     }
