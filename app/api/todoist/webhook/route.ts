@@ -1,21 +1,18 @@
 import { NextResponse } from 'next/server'
-import { broadcast } from '../todoistStream'
+
+let lastEventTime = 0
 
 export async function POST(req: Request) {
-  try {
-    const body = await req.json()
-    console.log('📩 [TODOIST WEBHOOK]', body.event_name, body.event_data?.content)
+  const body = await req.json()
+  console.log('🔔 Webhook Todoist:', body.event_name)
 
-    // Wyślij event do wszystkich aktywnych klientów SSE
-    broadcast({
-      event: body.event_name,
-      data: body.event_data || {},
-      ts: Date.now(),
-    })
+  // zapamiętaj timestamp ostatniego eventu
+  lastEventTime = Date.now()
 
-    return NextResponse.json({ ok: true })
-  } catch (err) {
-    console.error('❌ Błąd webhooka Todoist:', err)
-    return NextResponse.json({ error: 'Błąd webhooka' }, { status: 500 })
-  }
+  return NextResponse.json({ ok: true })
+}
+
+export async function GET() {
+  // zwracamy timestamp ostatniego eventu (do porównania z frontem)
+  return NextResponse.json({ lastEventTime })
 }
