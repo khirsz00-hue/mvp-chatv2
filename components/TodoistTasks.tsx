@@ -37,6 +37,7 @@ export default function TodoistTasks({
   const [tasks, setTasks] = useState<Task[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProject, setSelectedProject] = useState<string>('all')
+  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const lastUpdate = useRef<number>(0)
 
@@ -95,13 +96,26 @@ export default function TodoistTasks({
       ? tasks
       : tasks.filter((t) => t.project_id === selectedProject)
 
-  // 📅 Grupowanie dla filtru "7 dni"
+  // ✅ Zaznaczanie wielu zadań
+  const toggleSelect = (id: string, checked: boolean) => {
+    setSelectedTasks((prev) => {
+      const copy = new Set(prev)
+      checked ? copy.add(id) : copy.delete(id)
+      return copy
+    })
+  }
+
+  // 📅 Grupowanie dla “7 dni” i “przeterminowanych”
   const groupedByDate = visibleTasks.reduce((acc, t) => {
     const date = t.due || 'Brak terminu'
     if (!acc[date]) acc[date] = []
     acc[date].push(t)
     return acc
   }, {} as Record<string, Task[]>)
+
+  const sortedDates = Object.keys(groupedByDate).sort(
+    (a, b) => new Date(a).getTime() - new Date(b).getTime()
+  )
 
   if (loading)
     return <p className="text-sm text-neutral-500 mt-4 text-center">⏳ Wczytywanie zadań...</p>
@@ -149,44 +163,53 @@ export default function TodoistTasks({
       </div>
 
       {/* 🔹 Lista zadań */}
-      <div className="relative overflow-visible">
+      <div className="relative overflow-visible pb-16">
         <AnimatePresence mode="popLayout">
-          {filter === '7 days' ? (
-            Object.keys(groupedByDate)
-              .sort()
-              .map((date) => (
-                <motion.div
-                  key={date}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                  className="mb-6"
-                >
-                  <h3 className="text-sm font-semibold text-neutral-700 mb-2 border-b pb-1 flex items-center gap-1">
-                    📅{' '}
-                    {date === 'Brak terminu'
-                      ? 'Brak terminu'
-                      : new Date(date).toLocaleDateString('pl-PL', {
-                          weekday: 'long',
-                          day: '2-digit',
-                          month: '2-digit',
-                        })}
-                  </h3>
-                  <div className="space-y-2 overflow-visible">
-                    {groupedByDate[date].map((t) => (
-                      <motion.div
-                        key={t.id}
-                        whileHover={{ scale: 1.01 }}
-                        className="cursor-pointer transition rounded-lg hover:bg-gray-50 overflow-visible"
-                        onClick={() => onOpenTaskChat?.(t)}
-                      >
-                        <TaskCard task={t} token={token} onAction={() => {}} />
-                      </motion.div>
-                    ))}
-                  </div>
-                </motion.div>
-              ))
+          {['7 days', 'overdue'].includes(filter) ? (
+            sortedDates.map((date) => (
+              <motion.div
+                key={date}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="mb-6"
+              >
+                <h3 className="text-sm font-semibold text-neutral-700 mb-2 border-b pb-1 flex items-center gap-1">
+                  {filter === 'overdue' ? '⏰' : '📅'}{' '}
+                  {date === 'Brak terminu'
+                    ? 'Brak terminu'
+                    : new Date(date).toLocaleDateString('pl-PL', {
+                        weekday: 'long',
+                        day: '2-digit',
+                        month: '2-digit',
+                      })}
+                </h3>
+                <div className="space-y-2 overflow-visible">
+                  {groupedByDate[date].map((t) => (
+                    <motion.div
+                      key={t.id}
+                      whileHover={{ scale: 1.01 }}
+                      className="cursor-pointer transition rounded-lg hover:bg-gray-50 overflow-visible"
+                      onClick={(e) => {
+                        // Blokuj kliknięcie, gdy zaznaczasz checkbox
+                        if ((e.target as HTMLElement).tagName === 'INPUT') return
+                        onOpenTaskChat?.(t)
+                      }}
+                    >
+                      <TaskCard
+                        task={t}
+                        token={token}
+                        onAction={() => {}}
+                        selectable
+                        selected={selectedTasks.has(t.id)}
+                        onSelectChange={(checked) => toggleSelect(t.id, checked)}
+                      />
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+            ))
           ) : visibleTasks.length === 0 ? (
             <motion.p
               initial={{ opacity: 0 }}
@@ -202,15 +225,96 @@ export default function TodoistTasks({
                   key={t.id}
                   whileHover={{ scale: 1.01 }}
                   className="cursor-pointer transition rounded-lg hover:bg-gray-50 overflow-visible"
-                  onClick={() => onOpenTaskChat?.(t)}
+                  onClick={(e) => {
+                    if ((e.target as HTMLElement).tagName === 'INPUT') return
+                    onOpenTaskChat?.(t)
+                  }}
                 >
-                  <TaskCard task={t} token={token} onAction={() => {}} />
+                  <TaskCard
+                    task={t}
+                    token={token}
+                    onAction={() => {}}
+                    selectable
+                    selected={selectedTasks.has(t.id)}
+                    onSelectChange={(checked) => toggleSelect(t.id, checked)}
+                  />
                 </motion.li>
               ))}
             </ul>
           )}
         </AnimatePresence>
       </div>
+
+      {/* 🧰 Pasek działań masowych */}
+      <AnimatePresence>
+        {selectedTasks.size > 0 && (
+          <motion.div
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="fixed bottom-0 left-0 right-0 z-[9999] bg-gray-900 text-white py-2 px-4 flex items-center justify-between shadow-lg"
+          >
+            <span className="text-sm">
+              Wybrano {selectedTasks.size}{' '}
+              {selectedTasks.size === 1 ? 'zadanie' : 'zadań'}
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  for (const id of selectedTasks)
+                    await fetch('/api/todoist/complete', {
+                      method: 'POST',
+                      body: JSON.stringify({ id, token }),
+                    })
+                  window.dispatchEvent(new Event('taskUpdated'))
+                  setSelectedTasks(new Set())
+                }}
+                className="bg-green-600 hover:bg-green-700 px-3 py-1 rounded-md text-sm"
+              >
+                ✅ Ukończ
+              </button>
+
+              <button
+                onClick={async () => {
+                  for (const id of selectedTasks)
+                    await fetch('/api/todoist/delete', {
+                      method: 'POST',
+                      body: JSON.stringify({ id, token }),
+                    })
+                  window.dispatchEvent(new Event('taskUpdated'))
+                  setSelectedTasks(new Set())
+                }}
+                className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded-md text-sm"
+              >
+                🗑 Usuń
+              </button>
+
+              <button
+                onClick={() => {
+                  const input = document.createElement('input')
+                  input.type = 'date'
+                  input.onchange = async (e: any) => {
+                    const newDate = e.target.value
+                    for (const id of selectedTasks)
+                      await fetch('/api/todoist/postpone', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id, token, newDate }),
+                      })
+                    window.dispatchEvent(new Event('taskUpdated'))
+                    setSelectedTasks(new Set())
+                  }
+                  input.click()
+                }}
+                className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded-md text-sm"
+              >
+                📅 Przenieś
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
