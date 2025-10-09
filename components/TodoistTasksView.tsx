@@ -1,21 +1,28 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import TodoistTasks from './TodoistTasks'
 
 export default function TodoistTasksView({ token }: { token: string }) {
-  const [filter, setFilter] = useState<'today' | 'tomorrow' | 'overdue' | '7 days'>('today')
+  const [filter, setFilter] = useState<'today' | 'tomorrow' | 'overdue' | '7 days'>(
+    () => (localStorage.getItem('todoist_filter') as any) || 'today'
+  )
   const [tasks, setTasks] = useState<any[]>([])
   const [toast, setToast] = useState<string | null>(null)
+  const lastEvent = useRef<string>('')
 
   const handleRefresh = (updated?: any[]) => updated && setTasks(updated)
+
+  // 💾 Zapamiętuj filtr lokalnie (żeby nie resetował się po re-renderze)
+  useEffect(() => {
+    localStorage.setItem('todoist_filter', filter)
+  }, [filter])
 
   useEffect(() => {
     if (!token) return
 
     let es: EventSource | null = null
 
-    // 📡 Połączenie SSE (działa lokalnie, na Vercel może być ubijane)
     const connectSSE = () => {
       try {
         es = new EventSource('/api/todoist/stream')
@@ -25,9 +32,11 @@ export default function TodoistTasksView({ token }: { token: string }) {
           try {
             const data = JSON.parse(event.data)
             if (data.event?.startsWith('item:')) {
-              console.log('🔁 Otrzymano event Todoist:', data)
+              // 🧠 zapobieganie wielokrotnemu odświeżeniu przy tym samym evencie
+              if (lastEvent.current === data.event) return
+              lastEvent.current = data.event
 
-              // 🔄 Odświeżenie listy
+              console.log('🔁 Otrzymano event Todoist:', data)
               window.dispatchEvent(new Event('taskUpdated'))
 
               const msg =
@@ -59,16 +68,16 @@ export default function TodoistTasksView({ token }: { token: string }) {
 
     connectSSE()
 
-    // 🫀 Ping (utrzymuje połączenie przy życiu lokalnie)
+    // 🫀 Ping (utrzymuje połączenie lokalnie)
     const ping = setInterval(() => {
       fetch('/api/todoist/stream/ping').catch(() => {})
     }, 25000)
 
-    // 🔁 Polling zapasowy (działa zawsze, również na Vercel)
+    // 🧩 Polling awaryjny (na Vercel)
     const poll = setInterval(() => {
-      console.log('🔁 Polling Todoist – odświeżenie listy')
+      console.log('🔁 Polling Todoist – ciche odświeżenie listy')
       window.dispatchEvent(new Event('taskUpdated'))
-    }, 5000)
+    }, 30000)
 
     return () => {
       clearInterval(ping)
@@ -79,7 +88,7 @@ export default function TodoistTasksView({ token }: { token: string }) {
 
   return (
     <div className="flex h-full bg-gray-50 rounded-b-xl overflow-hidden relative">
-      {/* 📋 Główna sekcja */}
+      {/* 📋 Sekcja zadań */}
       <div className="flex-1 flex flex-col">
         <div className="flex-1 overflow-y-auto p-3">
           <TodoistTasks
@@ -93,7 +102,7 @@ export default function TodoistTasksView({ token }: { token: string }) {
 
       {/* 🔔 Toast powiadomień */}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-blue-600 text-white text-sm px-4 py-2 rounded-lg shadow-lg animate-[fadeInUp_0.3s_ease-out]">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white text-sm px-4 py-2 rounded-lg shadow-lg backdrop-blur-sm animate-[fadeInUp_0.3s_ease-out]">
           {toast}
         </div>
       )}
