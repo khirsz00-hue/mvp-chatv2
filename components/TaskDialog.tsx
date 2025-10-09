@@ -17,13 +17,11 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
   const [loading, setLoading] = useState(false)
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
-  // 🧩 Wczytaj historię rozmowy z localStorage
+  // 🧩 Wczytaj historię rozmowy z localStorage tylko raz
   useEffect(() => {
-    if (mode === 'help') {
-      const saved = localStorage.getItem(storageKey)
-      if (saved) setChat(JSON.parse(saved))
-    }
-  }, [mode, storageKey])
+    const saved = localStorage.getItem(storageKey)
+    if (saved) setChat(JSON.parse(saved))
+  }, [storageKey])
 
   // 💾 Zapisz każdą zmianę rozmowy
   useEffect(() => {
@@ -32,7 +30,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     }
   }, [chat, storageKey])
 
-  // 🔽 Auto-scroll do ostatniej wiadomości
+  // 🔽 Auto-scroll
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [chat, loading])
@@ -58,14 +56,11 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
 
       if (!res.ok) throw new Error('Błąd odpowiedzi z API')
       const data = await res.json()
-      const reply =
-        typeof data.reply === 'string'
-          ? data.reply.trim()
-          : '⚠️ Brak odpowiedzi od modelu.'
+      const reply = typeof data.reply === 'string' ? data.reply.trim() : '⚠️ Brak odpowiedzi od modelu.'
 
       setChat(prev => [...prev, { role: 'assistant', content: reply }])
     } catch (err) {
-      console.error('❌ Błąd podczas komunikacji z AI:', err)
+      console.error('❌ Błąd komunikacji z AI:', err)
       setChat(prev => [
         ...prev,
         { role: 'assistant', content: '⚠️ Wystąpił błąd podczas komunikacji z AI.' },
@@ -98,10 +93,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
         </div>
 
         {/* CZAT */}
-        <div
-          ref={scrollRef}
-          className="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-gray-50"
-        >
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-gray-50">
           {chat.length === 0 && (
             <div className="bg-white p-3 rounded-lg shadow-sm border text-sm text-gray-800 leading-relaxed">
               🧠 Zajmijmy się zadaniem: <b>"{task.content}"</b>.<br />
@@ -114,13 +106,17 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
               key={i}
               className={`p-3 rounded-lg shadow-sm text-sm leading-relaxed transition-all duration-200 ${
                 msg.role === 'user'
-                  ? 'bg-blue-600 text-white self-end'
+                  ? 'bg-blue-600 text-white self-end markdown-user'
                   : 'bg-white border border-gray-200 text-gray-800'
               }`}
             >
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
-                className="prose prose-sm max-w-none prose-p:mb-1 prose-li:my-0.5 prose-a:text-blue-600 prose-a:underline"
+                className={`prose prose-sm max-w-none prose-p:mb-1 prose-li:my-0.5 prose-a:underline ${
+                  msg.role === 'user'
+                    ? 'text-white prose-headings:text-white prose-strong:text-white prose-a:text-white'
+                    : 'text-gray-800 prose-a:text-blue-600'
+                }`}
               >
                 {msg.content}
               </ReactMarkdown>
@@ -153,4 +149,4 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
       </div>
     </div>
   )
-} // 👈 brakowało tego zamknięcia
+}
