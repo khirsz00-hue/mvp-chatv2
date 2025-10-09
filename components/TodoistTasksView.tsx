@@ -123,14 +123,16 @@ export default function TodoistTasksView({ token }: { token: string }) {
     <div className="flex h-full bg-gray-50 rounded-b-xl overflow-hidden relative">
       {/* 📋 Sekcja zadań */}
       <div className="flex-1 flex flex-col">
-        <div className="flex-1 overflow-y-auto p-3">
-          <TodoistTasks
-            token={token}
-            filter={filter}
-            onChangeFilter={setFilter}
-            onUpdate={handleRefresh}
-          />
-        </div>
+       <div className="flex-1 p-3 overflow-visible">
+  <div className="max-h-[calc(100vh-150px)] overflow-y-auto rounded-xl">
+    <TodoistTasks
+      token={token}
+      filter={filter}
+      onChangeFilter={setFilter}
+      onUpdate={handleRefresh}
+    />
+  </div>
+</div>
       </div>
 
       {/* 🔔 Toast powiadomień */}
