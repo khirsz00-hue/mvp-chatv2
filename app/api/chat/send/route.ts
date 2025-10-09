@@ -1,6 +1,5 @@
-// app/api/chat/send/route.ts
 import { NextResponse } from 'next/server'
-import { broadcastMessage } from '../stream/broadcast'
+import { broadcastMessage } from '../chat/stream/store' // ✅ poprawna ścieżka
 
 export async function POST(req: Request) {
   const { taskId, message, role } = await req.json()
@@ -13,6 +12,5 @@ export async function POST(req: Request) {
   }
 
   broadcastMessage(payload)
-
   return NextResponse.json({ ok: true })
 }
