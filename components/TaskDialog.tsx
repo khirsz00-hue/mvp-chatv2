@@ -19,7 +19,9 @@ export default function TaskDialog({ task, mode, onClose }: TaskDialogProps) {
   const [step, setStep] = useState<'choose' | 'chat'>('choose')
   const [chat, setChat] = useState<{ role: string; content: string }[]>([])
   const [input, setInput] = useState('')
-  const [selectedAction, setSelectedAction] = useState<'break' | 'solve' | null>(null)
+  const [selectedAction, setSelectedAction] = useState<'break' | 'solve' | null>(
+    null
+  )
 
   const startChat = (action: 'break' | 'solve') => {
     setSelectedAction(action)
