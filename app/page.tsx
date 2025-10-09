@@ -26,7 +26,7 @@ export default function HomePage() {
     if (globalSaved) setGlobalMessages(JSON.parse(globalSaved))
   }, [])
 
-  // 💾 Zapisuj historię po zmianach
+  // 💾 Funkcja zapisu i notyfikacji
   const saveAndNotify = (key: string, data: ChatMessage[]) => {
     localStorage.setItem(key, JSON.stringify(data))
     window.dispatchEvent(new Event('chatUpdated'))
@@ -74,7 +74,11 @@ export default function HomePage() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, assistant: 'six_hats' }),
+        body: JSON.stringify({
+          message,
+          assistant: 'six_hats',
+          todoist_token: localStorage.getItem('todoist_token'),
+        }),
       })
 
       if (!res.ok) throw new Error('Błąd odpowiedzi z AI')
@@ -83,14 +87,18 @@ export default function HomePage() {
       const aiMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: data.reply || '⚠️ Brak odpowiedzi od AI.',
+        content:
+          data.reply ||
+          (data.type === 'tasks'
+            ? '✅ Pobrano zadania z Todoista.'
+            : '⚠️ Brak odpowiedzi od AI.'),
         timestamp: Date.now(),
       }
 
       setSixHatsMessages([...updated, aiMsg])
     } catch (err) {
       console.error('❌ Błąd komunikacji z AI:', err)
-      setSixHatsMessages(prev => [
+      setSixHatsMessages((prev) => [
         ...prev,
         {
           id: crypto.randomUUID(),
@@ -117,23 +125,33 @@ export default function HomePage() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, assistant: 'global' }),
+        body: JSON.stringify({
+          message,
+          assistant: 'global',
+          todoist_token: localStorage.getItem('todoist_token'),
+        }),
       })
 
       if (!res.ok) throw new Error('Błąd odpowiedzi z AI')
       const data = await res.json()
 
+      let aiText = data.reply || '⚠️ Brak odpowiedzi od AI.'
+      if (data.type === 'tasks' && data.tasks?.length) {
+        const taskList = data.tasks.map((t: any) => `• ${t.content}`).join('\n')
+        aiText = `${data.reply || 'Zadania na dziś:'}\n\n${taskList}`
+      }
+
       const aiMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: data.reply || '⚠️ Brak odpowiedzi od AI.',
+        content: aiText,
         timestamp: Date.now(),
       }
 
       setGlobalMessages([...updated, aiMsg])
     } catch (err) {
       console.error('❌ Błąd komunikacji z AI:', err)
-      setGlobalMessages(prev => [
+      setGlobalMessages((prev) => [
         ...prev,
         {
           id: crypto.randomUUID(),
@@ -153,7 +171,7 @@ export default function HomePage() {
       content: message,
       timestamp: Date.now(),
     }
-    setTodoistMessages(prev => [...prev, userMsg])
+    setTodoistMessages((prev) => [...prev, userMsg])
   }
 
   return (
@@ -165,7 +183,9 @@ export default function HomePage() {
           <button
             onClick={() => setActive('todoist')}
             className={`px-3 py-1.5 text-sm rounded-lg font-medium transition ${
-              active === 'todoist' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'
+              active === 'todoist'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-200 text-gray-700'
             }`}
           >
             Todoist Helper
@@ -173,7 +193,9 @@ export default function HomePage() {
           <button
             onClick={() => setActive('six_hats')}
             className={`px-3 py-1.5 text-sm rounded-lg font-medium transition ${
-              active === 'six_hats' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'
+              active === 'six_hats'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-200 text-gray-700'
             }`}
           >
             6 Hats Assistant
@@ -181,7 +203,9 @@ export default function HomePage() {
           <button
             onClick={() => setActive('global')}
             className={`px-3 py-1.5 text-sm rounded-lg font-medium transition ${
-              active === 'global' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'
+              active === 'global'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-200 text-gray-700'
             }`}
           >
             Global Chat
@@ -200,6 +224,7 @@ export default function HomePage() {
         />
 
         <div className="flex-1 p-4 overflow-y-auto">
+          {/* 🧩 TODOIST */}
           {active === 'todoist' && (
             <>
               {!token ? (
@@ -218,24 +243,37 @@ export default function HomePage() {
             </>
           )}
 
+          {/* 🎩 SIX HATS */}
           {active === 'six_hats' && (
             <div className="max-w-4xl mx-auto w-full bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-              <h2 className="text-lg font-semibold text-gray-800 mb-3">🎩 Six Hats Assistant</h2>
+              <h2 className="text-lg font-semibold text-gray-800 mb-3">
+                🎩 Six Hats Assistant
+              </h2>
               <p className="text-sm text-gray-600 mb-4">
-                Zadawaj pytania, a asystent pomoże Ci spojrzeć na problem z sześciu perspektyw
-                myślenia (biała, czerwona, czarna, żółta, zielona, niebieska).
+                Zadawaj pytania, a asystent pomoże Ci spojrzeć na problem z sześciu
+                perspektyw myślenia (biała, czerwona, czarna, żółta, zielona,
+                niebieska).
               </p>
               <Chat onSend={handleSendSixHats} messages={sixHatsMessages} hideHistory />
             </div>
           )}
 
+          {/* 🌍 GLOBAL */}
           {active === 'global' && (
             <div className="max-w-4xl mx-auto w-full bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-              <h2 className="text-lg font-semibold text-gray-800 mb-3">🌍 Global Chat</h2>
+              <h2 className="text-lg font-semibold text-gray-800 mb-3">
+                🌍 Global Chat
+              </h2>
               <p className="text-sm text-gray-600 mb-4">
-                Tu możesz prowadzić ogólne rozmowy z asystentem o celach, planach i decyzjach.
+                Tu możesz prowadzić ogólne rozmowy z asystentem o celach, planach i
+                decyzjach.
               </p>
-              <Chat onSend={handleSendGlobal} messages={globalMessages} assistant="global" hideHistory />
+              <Chat
+                onSend={handleSendGlobal}
+                messages={globalMessages}
+                assistant="global"
+                hideHistory
+              />
             </div>
           )}
         </div>
