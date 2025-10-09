@@ -30,7 +30,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const recentMessages = useRef<Set<string>>(new Set())
 
-  // 🧭 Blokuj scroll strony przy otwartym modalu
+  // 🧭 Zablokuj scroll strony, gdy modal otwarty
   useEffect(() => {
     if (mode === 'help') document.body.style.overflow = 'hidden'
     return () => {
@@ -46,29 +46,32 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     if (saved) {
       const parsedRaw = JSON.parse(saved)
 
-      // 🔒 Sprawdź, czy timestampy już istnieją i są poprawne
+      // ✅ sprawdź czy timestamp już istnieje (dowolny typ)
       const hasTimestamps =
         Array.isArray(parsedRaw) &&
         parsedRaw.length > 0 &&
-        parsedRaw.every((m: any) => typeof m.timestamp === 'number')
+        parsedRaw.every((m: any) => m.timestamp !== undefined && m.timestamp !== null)
 
       let parsed: ChatMessage[]
 
       if (hasTimestamps) {
-        // ✅ timestampy istnieją – nic nie zmieniaj
-        parsed = parsedRaw
+        // nie zmieniaj istniejących timestampów
+        parsed = parsedRaw.map((m: any) => ({
+          ...m,
+          timestamp: Number(m.timestamp), // upewnij się, że jest liczbą
+        }))
       } else {
-        // 🧠 nadaj im stabilne czasy tylko raz
+        // nadaj stabilne timestampy tylko raz
         const now = Date.now()
         parsed = parsedRaw.map((m: any, i: number) => ({
           ...m,
-          timestamp: now + i, // unikalny, ale stabilny
+          timestamp: now + i,
         }))
-        // 💾 zapisujemy raz z timestampami
         localStorage.setItem(chatKey, JSON.stringify(parsed))
       }
 
-      setChat(parsed.sort((a, b) => a.timestamp - b.timestamp))
+      // ⬆️ najnowsze wiadomości na górze
+      setChat(parsed.sort((a, b) => b.timestamp - a.timestamp))
     }
 
     const token = localStorage.getItem('todoist_token') || ''
@@ -76,7 +79,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     localStorage.setItem(titleKey, task.content)
   }, [chatKey, titleKey, task.content])
 
-  // 💾 Zapisuj każdą zmianę rozmowy (ale nie nadpisuj timestampów!)
+  // 💾 Zapisuj rozmowę (nie nadpisuj timestampów)
   useEffect(() => {
     if (typeof window !== 'undefined' && chat.length > 0) {
       const stableChat = chat.map((m) => ({
@@ -87,15 +90,15 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     }
   }, [chat, chatKey])
 
-  // 🔽 Auto-scroll
+  // 🔽 Auto-scroll — przy nowych wiadomościach przewijamy na górę
   useEffect(() => {
     scrollRef.current?.scrollTo({
-      top: scrollRef.current.scrollHeight,
+      top: 0,
       behavior: 'smooth',
     })
   }, [chat, loading])
 
-  // 🔁 SSE z ochroną przed duplikatami
+  // 🔁 SSE – aktualizacja na żywo
   useEffect(() => {
     const es = new EventSource('/api/chat/stream')
 
@@ -108,8 +111,8 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
           recentMessages.current.add(id)
 
           setChat((prev) => [
-            ...prev,
             { role: data.role, content: data.message, timestamp: Date.now() },
+            ...prev, // ⬆️ nowe wiadomości na górze
           ])
         }
       } catch (err) {
@@ -131,7 +134,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     if (!text || loading) return
 
     const userMsg: ChatMessage = { role: 'user', content: text, timestamp: Date.now() }
-    const updated = [...chat, userMsg]
+    const updated = [userMsg, ...chat] // nowe na górze
     setChat(updated)
     setInput('')
     setLoading(true)
@@ -151,7 +154,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
       const data = await res.json()
       const reply = data.reply?.trim() || '⚠️ Brak odpowiedzi od modelu.'
 
-      // 📡 Broadcast
+      // 📡 Rozesłanie do innych zakładek
       await Promise.all([
         fetch('/api/chat/send', {
           method: 'POST',
@@ -165,31 +168,31 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
         }),
       ])
 
-      // 💬 Odpowiedź AI z timestampem
       const aiMsg: ChatMessage = { role: 'assistant', content: reply, timestamp: Date.now() }
-      const newChat = [...updated, aiMsg]
+      const newChat = [aiMsg, ...updated] // ⬆️ AI na górze
       setChat(newChat)
       localStorage.setItem(chatKey, JSON.stringify(newChat))
       await generateSynthesis(newChat)
     } catch (err) {
       console.error('❌ Błąd komunikacji z AI:', err)
       setChat((prev) => [
+        { role: 'assistant', content: '⚠️ Błąd podczas komunikacji z AI.', timestamp: Date.now() },
         ...prev,
-        {
-          role: 'assistant',
-          content: '⚠️ Wystąpił błąd podczas komunikacji z AI.',
-          timestamp: Date.now(),
-        },
       ])
     } finally {
       setLoading(false)
     }
   }
 
-  // 🧠 SYNTEZA – skrót rozmowy i zapis do Todoist
+  // 🧠 Synteza (podsumowanie rozmowy)
   const generateSynthesis = async (fullChat: ChatMessage[]) => {
     try {
-      const contextText = fullChat.map((m) => `${m.role}: ${m.content}`).join('\n')
+      const contextText = fullChat
+        .slice()
+        .reverse()
+        .map((m) => `${m.role}: ${m.content}`)
+        .join('\n')
+
       const synthesisPrompt = `
 Podsumuj rozmowę o zadaniu "${task.content}" w 2–3 zdaniach.
 Uwzględnij najważniejsze ustalenia, decyzje lub plan działania.
@@ -229,7 +232,7 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
 
   if (mode !== 'help') return null
 
-  // 🪄 Portal modalu
+  // 🪄 Modal
   const modal = (
     <AnimatePresence>
       <motion.div
@@ -261,9 +264,9 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
           {/* CZAT */}
           <div
             ref={scrollRef}
-            className="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-gray-50 scroll-smooth"
+            className="flex-1 overflow-y-auto flex flex-col-reverse px-5 py-4 space-y-4 bg-gray-50 scroll-smooth"
           >
-            {[...chat].sort((a, b) => a.timestamp - b.timestamp).map((msg, i) => (
+            {chat.map((msg, i) => (
               <div
                 key={i}
                 className={`p-3 rounded-lg shadow-sm text-sm leading-relaxed transition-all duration-200 ${
@@ -274,7 +277,7 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
               >
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
-                  className={`prose prose-sm max-w-none prose-p:mb-1 prose-li:my-0.5 prose-a:underline ${
+                  className={`prose prose-sm max-w-none ${
                     msg.role === 'user'
                       ? 'text-white prose-headings:text-white prose-strong:text-white prose-a:text-white'
                       : 'text-gray-800 prose-a:text-blue-600'
