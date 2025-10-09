@@ -38,9 +38,9 @@ export default function TodoistTasks({
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProject, setSelectedProject] = useState<string>('all')
   const [loading, setLoading] = useState(true)
-  const lastUpdate = useRef<number>(0) // ⏱ zabezpieczenie przed spamowaniem fetchami
+  const lastUpdate = useRef<number>(0)
 
-  // ✅ Bezpieczne pobieranie danych
+  // 📦 Pobieranie zadań i projektów
   const loadTasks = async (silent = false) => {
     if (!token) return
     if (!silent) setLoading(true)
@@ -70,32 +70,32 @@ export default function TodoistTasks({
     }
   }
 
-  // 🧠 Inicjalne ładowanie przy zmianie filtru
+  // 🔄 Pierwsze ładowanie po zmianie filtru
   useEffect(() => {
     loadTasks()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter]) // 👈 tylko zmiana filtru, nie tokenu
+  }, [filter])
 
-  // 🔄 Odświeżanie po eventach "taskUpdated"
+  // 🔁 Odświeżanie po eventach
   useEffect(() => {
     const handleUpdate = () => {
       const now = Date.now()
-      if (now - lastUpdate.current < 2000) return // ⏳ antyspam: max 1 fetch na 2s
+      if (now - lastUpdate.current < 2000) return
       lastUpdate.current = now
-      loadTasks(true) // ciche odświeżenie
+      loadTasks(true)
     }
 
     window.addEventListener('taskUpdated', handleUpdate)
     return () => window.removeEventListener('taskUpdated', handleUpdate)
-  }, []) // 🔒 działa tylko raz
+  }, [])
 
-  // 📂 Filtrowanie po projekcie
+  // 🗂 Filtrowanie po projekcie
   const visibleTasks =
     selectedProject === 'all'
       ? tasks
       : tasks.filter((t) => t.project_id === selectedProject)
 
-  // 🧭 Grupowanie po dacie (dla filtru "7 days")
+  // 📅 Grupowanie dla filtru "7 dni"
   const groupedByDate = visibleTasks.reduce((acc, t) => {
     const date = t.due || 'Brak terminu'
     if (!acc[date]) acc[date] = []
@@ -107,9 +107,9 @@ export default function TodoistTasks({
     return <p className="text-sm text-neutral-500 mt-4 text-center">⏳ Wczytywanie zadań...</p>
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 relative overflow-visible">
       {/* 🔹 Pasek filtrów + projekty */}
-      <div className="sticky top-0 z-20 flex flex-col md:flex-row items-center justify-between gap-2 px-3 py-3 bg-white/70 backdrop-blur-md border-b border-gray-200 shadow-sm rounded-b-xl">
+      <div className="sticky top-0 z-30 flex flex-col md:flex-row items-center justify-between gap-2 px-3 py-3 bg-white/80 backdrop-blur-md border-b border-gray-200 shadow-sm rounded-b-xl">
         <div className="flex flex-wrap justify-center gap-2">
           {[
             { key: 'today', label: 'Dziś' },
@@ -149,66 +149,68 @@ export default function TodoistTasks({
       </div>
 
       {/* 🔹 Lista zadań */}
-      <AnimatePresence mode="popLayout">
-        {filter === '7 days' ? (
-          Object.keys(groupedByDate)
-            .sort()
-            .map((date) => (
-              <motion.div
-                key={date}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-                className="mb-6"
-              >
-                <h3 className="text-sm font-semibold text-neutral-700 mb-2 border-b pb-1 flex items-center gap-1">
-                  📅{' '}
-                  {date === 'Brak terminu'
-                    ? 'Brak terminu'
-                    : new Date(date).toLocaleDateString('pl-PL', {
-                        weekday: 'long',
-                        day: '2-digit',
-                        month: '2-digit',
-                      })}
-                </h3>
-                <div className="space-y-2">
-                  {groupedByDate[date].map((t) => (
-                    <motion.div
-                      key={t.id}
-                      whileHover={{ scale: 1.01 }}
-                      className="cursor-pointer transition rounded-lg hover:bg-gray-50"
-                      onClick={() => onOpenTaskChat?.(t)}
-                    >
-                      <TaskCard task={t} token={token} onAction={() => {}} />
-                    </motion.div>
-                  ))}
-                </div>
-              </motion.div>
-            ))
-        ) : visibleTasks.length === 0 ? (
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-sm text-neutral-500 mt-4 text-center"
-          >
-            Brak zadań dla tego filtru.
-          </motion.p>
-        ) : (
-          <ul className="space-y-2">
-            {visibleTasks.map((t) => (
-              <motion.li
-                key={t.id}
-                whileHover={{ scale: 1.01 }}
-                className="cursor-pointer transition rounded-lg hover:bg-gray-50"
-                onClick={() => onOpenTaskChat?.(t)}
-              >
-                <TaskCard task={t} token={token} onAction={() => {}} />
-              </motion.li>
-            ))}
-          </ul>
-        )}
-      </AnimatePresence>
+      <div className="relative overflow-visible">
+        <AnimatePresence mode="popLayout">
+          {filter === '7 days' ? (
+            Object.keys(groupedByDate)
+              .sort()
+              .map((date) => (
+                <motion.div
+                  key={date}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                  className="mb-6"
+                >
+                  <h3 className="text-sm font-semibold text-neutral-700 mb-2 border-b pb-1 flex items-center gap-1">
+                    📅{' '}
+                    {date === 'Brak terminu'
+                      ? 'Brak terminu'
+                      : new Date(date).toLocaleDateString('pl-PL', {
+                          weekday: 'long',
+                          day: '2-digit',
+                          month: '2-digit',
+                        })}
+                  </h3>
+                  <div className="space-y-2 overflow-visible">
+                    {groupedByDate[date].map((t) => (
+                      <motion.div
+                        key={t.id}
+                        whileHover={{ scale: 1.01 }}
+                        className="cursor-pointer transition rounded-lg hover:bg-gray-50 overflow-visible"
+                        onClick={() => onOpenTaskChat?.(t)}
+                      >
+                        <TaskCard task={t} token={token} onAction={() => {}} />
+                      </motion.div>
+                    ))}
+                  </div>
+                </motion.div>
+              ))
+          ) : visibleTasks.length === 0 ? (
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-sm text-neutral-500 mt-4 text-center"
+            >
+              Brak zadań dla tego filtru.
+            </motion.p>
+          ) : (
+            <ul className="space-y-2 overflow-visible">
+              {visibleTasks.map((t) => (
+                <motion.li
+                  key={t.id}
+                  whileHover={{ scale: 1.01 }}
+                  className="cursor-pointer transition rounded-lg hover:bg-gray-50 overflow-visible"
+                  onClick={() => onOpenTaskChat?.(t)}
+                >
+                  <TaskCard task={t} token={token} onAction={() => {}} />
+                </motion.li>
+              ))}
+            </ul>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   )
 }
