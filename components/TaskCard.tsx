@@ -21,6 +21,7 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
   const [showDialog, setShowDialog] = useState(false)
   const [dialogMode, setDialogMode] = useState<'none' | 'help'>('none')
   const [summary, setSummary] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
   const dateInputRef = useRef<HTMLInputElement>(null)
 
   // 📦 zapisz nazwę taska (dla historii czatów)
@@ -72,6 +73,14 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
       })
       const data = await res.json()
       console.log('📦 POSTPONE result:', data)
+
+      // 🔄 Odświeżenie listy
+      window.dispatchEvent(new Event('taskUpdated'))
+
+      // ✅ Toast
+      setToast(`✅ Zadanie przeniesione na ${new Date(newDate).toLocaleDateString('pl-PL')}`)
+      setTimeout(() => setToast(null), 2500)
+
       onAction('postponed')
     } catch (err) {
       console.error('❌ POSTPONE error:', err)
@@ -84,7 +93,7 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
   }
 
   return (
-    <div className="border rounded-xl p-4 bg-white shadow-sm hover:shadow-md transition relative group">
+    <div className="relative border rounded-xl p-4 bg-white shadow-sm hover:shadow-md transition group">
       {/* 📋 Treść zadania */}
       <div className="flex justify-between items-start mb-2">
         <div className="flex-1 pr-2">
@@ -127,7 +136,7 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
         <input
           ref={dateInputRef}
           type="date"
-          className="hidden"
+          className="fixed top-1/2 left-1/2 translate-x-[-50%] translate-y-[-50%] opacity-0 pointer-events-auto"
           onChange={(e) => handlePostpone(e.target.value)}
         />
 
@@ -149,13 +158,20 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
         </button>
       </div>
 
-      {/* 💬 Modal czatu (po kliknięciu „Pomóż mi”) */}
+      {/* 💬 Modal czatu */}
       {showDialog && (
         <TaskDialog
           task={task}
           mode={dialogMode}
           onClose={() => setShowDialog(false)}
         />
+      )}
+
+      {/* ✅ Toast */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white text-sm px-4 py-2 rounded-lg shadow-lg animate-[fadeInUp_0.3s_ease-out]">
+          {toast}
+        </div>
       )}
     </div>
   )
