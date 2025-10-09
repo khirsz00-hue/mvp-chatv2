@@ -135,7 +135,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
       recentMessages.current.add(`assistant:${reply}`)
 
       // 🧠 synteza
-     const newChat = [...updated, { role: 'assistant' as const, content: reply }]
+      const newChat: ChatMessage[] = [...updated, { role: 'assistant' as const, content: reply }]
       setChat(newChat)
       localStorage.setItem(chatKey, JSON.stringify(newChat))
       await generateSynthesis(newChat)
