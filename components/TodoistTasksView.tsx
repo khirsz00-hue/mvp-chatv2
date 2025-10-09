@@ -17,29 +17,7 @@ export default function TodoistTasksView({ token }: { token: string }) {
     <div className="flex h-full bg-gray-50 rounded-b-xl overflow-hidden">
       {/* 📋 Główna sekcja bez bocznego panelu */}
       <div className="flex-1 flex flex-col">
-        {/* 🔘 Filtry */}
-        <div className="flex justify-between items-center p-3 border-b bg-white sticky top-0 z-20">
-          <div className="flex gap-2 flex-wrap">
-            {[
-              { key: 'today', label: '📅 Dziś' },
-              { key: 'tomorrow', label: '➡️ Jutro' },
-              { key: '7 days', label: '🗓️ Tydzień' },
-              { key: 'overdue', label: '⚠️ Przeterminowane' },
-            ].map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setFilter(key as any)}
-                className={`px-3 py-1 text-sm rounded-lg transition ${
-                  filter === key
-                    ? 'bg-green-600 text-white'
-                    : 'bg-white border text-green-700'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
+       
 
         {/* 🗒️ Lista zadań */}
         <div className="flex-1 overflow-y-auto p-3">
