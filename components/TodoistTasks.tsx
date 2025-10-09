@@ -40,6 +40,7 @@ export default function TodoistTasks({
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const lastUpdate = useRef<number>(0)
+  const batchDateRef = useRef<HTMLInputElement>(null)
 
   // 📦 Pobieranie zadań i projektów
   const loadTasks = async (silent = false) => {
@@ -192,7 +193,6 @@ export default function TodoistTasks({
                       whileHover={{ scale: 1.01 }}
                       className="cursor-pointer transition rounded-lg hover:bg-gray-50 overflow-visible"
                       onClick={(e) => {
-                        // Blokuj kliknięcie, gdy zaznaczasz checkbox
                         if ((e.target as HTMLElement).tagName === 'INPUT') return
                         onOpenTaskChat?.(t)
                       }}
@@ -259,7 +259,9 @@ export default function TodoistTasks({
               Wybrano {selectedTasks.size}{' '}
               {selectedTasks.size === 1 ? 'zadanie' : 'zadań'}
             </span>
+
             <div className="flex gap-2">
+              {/* ✅ Ukończ */}
               <button
                 onClick={async () => {
                   for (const id of selectedTasks)
@@ -275,6 +277,7 @@ export default function TodoistTasks({
                 ✅ Ukończ
               </button>
 
+              {/* 🗑 Usuń */}
               <button
                 onClick={async () => {
                   for (const id of selectedTasks)
@@ -290,31 +293,23 @@ export default function TodoistTasks({
                 🗑 Usuń
               </button>
 
+              {/* 📅 Przenieś */}
               <button
-                onClick={() => {
-                  const input = document.createElement('input')
-                  input.type = 'date'
-                  input.onchange = async (e: any) => {
-                    const newDate = e.target.value
-                    for (const id of selectedTasks)
-                      await fetch('/api/todoist/postpone', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ id, token, newDate }),
-                      })
-                    window.dispatchEvent(new Event('taskUpdated'))
-                    setSelectedTasks(new Set())
-                  }
-                  input.click()
-                }}
+                onClick={() => batchDateRef.current?.showPicker?.()}
                 className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded-md text-sm"
               >
                 📅 Przenieś
               </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  )
-}
+
+              {/* Ukryty input date */}
+              <input
+                ref={batchDateRef}
+                type="date"
+                className="hidden"
+                onChange={async (e) => {
+                  const newDate = e.target.value
+                  if (!newDate) return
+                  for (const id of selectedTasks)
+                    await fetch('/api/todoist/postpone', {
+                      method: 'POST',
+                      headers: { 'Content
