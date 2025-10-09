@@ -45,20 +45,27 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
 
     if (saved) {
       const parsedRaw = JSON.parse(saved)
-      const hasTimestamps = parsedRaw.some((m: any) => !!m.timestamp)
+
+      // 🔒 Sprawdź, czy timestampy już istnieją i są poprawne
+      const hasTimestamps =
+        Array.isArray(parsedRaw) &&
+        parsedRaw.length > 0 &&
+        parsedRaw.every((m: any) => typeof m.timestamp === 'number')
+
       let parsed: ChatMessage[]
 
       if (hasTimestamps) {
-        // ✅ jeśli timestampy już istnieją, nic nie zmieniamy
-        parsed = parsedRaw as ChatMessage[]
+        // ✅ timestampy istnieją – nic nie zmieniaj
+        parsed = parsedRaw
       } else {
-        // 🧠 nadaj im stabilne czasy tylko przy pierwszym odczycie
-        const baseTime = Date.now() - parsedRaw.length * 1000
+        // 🧠 nadaj im stabilne czasy tylko raz
+        const now = Date.now()
         parsed = parsedRaw.map((m: any, i: number) => ({
           ...m,
-          timestamp: baseTime + i * 1000,
+          timestamp: now + i, // unikalny, ale stabilny
         }))
-        localStorage.setItem(chatKey, JSON.stringify(parsed)) // zapisujemy z timestampami
+        // 💾 zapisujemy raz z timestampami
+        localStorage.setItem(chatKey, JSON.stringify(parsed))
       }
 
       setChat(parsed.sort((a, b) => a.timestamp - b.timestamp))
@@ -69,10 +76,14 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     localStorage.setItem(titleKey, task.content)
   }, [chatKey, titleKey, task.content])
 
-  // 💾 Zapisuj każdą zmianę rozmowy
+  // 💾 Zapisuj każdą zmianę rozmowy (ale nie nadpisuj timestampów!)
   useEffect(() => {
     if (typeof window !== 'undefined' && chat.length > 0) {
-      localStorage.setItem(chatKey, JSON.stringify(chat))
+      const stableChat = chat.map((m) => ({
+        ...m,
+        timestamp: typeof m.timestamp === 'number' ? m.timestamp : Date.now(),
+      }))
+      localStorage.setItem(chatKey, JSON.stringify(stableChat))
     }
   }, [chat, chatKey])
 
