@@ -11,6 +11,7 @@ interface Task {
   priority?: number
   project_id?: string
   project_name?: string
+  labels?: string[]
 }
 
 interface Project {
@@ -37,81 +38,65 @@ export default function TodoistTasks({
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProject, setSelectedProject] = useState<string>('all')
   const [loading, setLoading] = useState(true)
-  const refreshTimeout = useRef<NodeJS.Timeout | null>(null)
+  const lastUpdate = useRef<number>(0) // ⏱ zabezpieczenie przed spamowaniem fetchami
 
-  // 🗂 Pobierz projekty (raz)
-  useEffect(() => {
+  // ✅ Bezpieczne pobieranie danych
+  const loadTasks = async (silent = false) => {
     if (!token) return
-    fetch(`/api/todoist/projects?token=${token}`)
-      .then(res => res.json())
-      .then(data => setProjects(data.projects || []))
-      .catch(err => console.error('❌ Błąd pobierania projektów:', err))
-  }, [token])
-
-  // 🧩 Pobierz zadania
-  const loadTasks = async () => {
-    if (!token) return
-    setLoading(true)
-    let isMounted = true
+    if (!silent) setLoading(true)
 
     try {
       const [tasksRes, projectsRes] = await Promise.all([
-        fetch(`/api/todoist/tasks?token=${token}&filter=${filter}`).then(r => r.json()),
-        fetch(`/api/todoist/projects?token=${token}`).then(r => r.json()),
+        fetch(`/api/todoist/tasks?token=${token}&filter=${filter}`).then((r) => r.json()),
+        fetch(`/api/todoist/projects?token=${token}`).then((r) => r.json()),
       ])
 
-      if (!isMounted) return
       const allTasks = tasksRes.tasks || []
-      const projectsList = projectsRes.projects || []
+      const allProjects = projectsRes.projects || []
 
-      const tasksWithProjects = allTasks.map((t: any) => ({
+      const enriched = allTasks.map((t: Task) => ({
         ...t,
         project_name:
-          projectsList.find((p: Project) => p.id === t.project_id)?.name || 'Brak projektu',
+          allProjects.find((p) => p.id === t.project_id)?.name || 'Brak projektu',
       }))
 
-      setTasks(tasksWithProjects)
-      onUpdate?.(tasksWithProjects)
+      setTasks(enriched)
+      setProjects(allProjects)
+      onUpdate?.(enriched)
     } catch (err) {
-      console.error('❌ Błąd pobierania zadań:', err)
+      console.error('❌ Błąd ładowania:', err)
     } finally {
-      if (isMounted) setLoading(false)
-    }
-
-    return () => {
-      isMounted = false
+      if (!silent) setLoading(false)
     }
   }
 
-  // 🔄 Ładowanie przy zmianie filtru
+  // 🧠 Inicjalne ładowanie przy zmianie filtru
   useEffect(() => {
     loadTasks()
-  }, [filter, token])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter]) // 👈 tylko zmiana filtru, nie tokenu
 
-  // 🔁 Reaguj na event „taskUpdated” (z debounce)
+  // 🔄 Odświeżanie po eventach "taskUpdated"
   useEffect(() => {
     const handleUpdate = () => {
-      if (refreshTimeout.current) clearTimeout(refreshTimeout.current)
-      refreshTimeout.current = setTimeout(() => {
-        loadTasks()
-      }, 1000)
+      const now = Date.now()
+      if (now - lastUpdate.current < 2000) return // ⏳ antyspam: max 1 fetch na 2s
+      lastUpdate.current = now
+      loadTasks(true) // ciche odświeżenie
     }
 
     window.addEventListener('taskUpdated', handleUpdate)
-    return () => {
-      if (refreshTimeout.current) clearTimeout(refreshTimeout.current)
-      window.removeEventListener('taskUpdated', handleUpdate)
-    }
-  }, []) // 👈 brak depsów — tylko raz przy montowaniu
+    return () => window.removeEventListener('taskUpdated', handleUpdate)
+  }, []) // 🔒 działa tylko raz
 
-  // 🧮 Filtrowanie po projekcie
-  const filteredTasks =
+  // 📂 Filtrowanie po projekcie
+  const visibleTasks =
     selectedProject === 'all'
       ? tasks
-      : tasks.filter(t => t.project_id === selectedProject)
+      : tasks.filter((t) => t.project_id === selectedProject)
 
-  // 🔧 Grupowanie po dacie (dla filtru "7 days")
-  const groupedByDate = filteredTasks.reduce((acc, t) => {
+  // 🧭 Grupowanie po dacie (dla filtru "7 days")
+  const groupedByDate = visibleTasks.reduce((acc, t) => {
     const date = t.due || 'Brak terminu'
     if (!acc[date]) acc[date] = []
     acc[date].push(t)
@@ -123,16 +108,15 @@ export default function TodoistTasks({
 
   return (
     <div className="space-y-4">
-      {/* 🔹 Pasek filtrów */}
+      {/* 🔹 Pasek filtrów + projekty */}
       <div className="sticky top-0 z-20 flex flex-col md:flex-row items-center justify-between gap-2 px-3 py-3 bg-white/70 backdrop-blur-md border-b border-gray-200 shadow-sm rounded-b-xl">
-        {/* Filtry dat */}
         <div className="flex flex-wrap justify-center gap-2">
           {[
             { key: 'today', label: 'Dziś' },
             { key: 'tomorrow', label: 'Jutro' },
             { key: '7 days', label: 'Tydzień' },
             { key: 'overdue', label: 'Przeterminowane' },
-          ].map(f => (
+          ].map((f) => (
             <motion.button
               key={f.key}
               onClick={() => onChangeFilter(f.key as any)}
@@ -149,21 +133,19 @@ export default function TodoistTasks({
           ))}
         </div>
 
-        {/* Dropdown projektów */}
-        <div className="relative">
-          <select
-            value={selectedProject}
-            onChange={(e) => setSelectedProject(e.target.value)}
-            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
-          >
-            <option value="all">📁 Wszystkie projekty</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                💼 {p.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* Projekty */}
+        <select
+          value={selectedProject}
+          onChange={(e) => setSelectedProject(e.target.value)}
+          className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
+        >
+          <option value="all">📁 Wszystkie projekty</option>
+          {projects.map((p) => (
+            <option key={p.id} value={p.id}>
+              💼 {p.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* 🔹 Lista zadań */}
@@ -171,7 +153,7 @@ export default function TodoistTasks({
         {filter === '7 days' ? (
           Object.keys(groupedByDate)
             .sort()
-            .map(date => (
+            .map((date) => (
               <motion.div
                 key={date}
                 initial={{ opacity: 0, y: 10 }}
@@ -191,7 +173,7 @@ export default function TodoistTasks({
                       })}
                 </h3>
                 <div className="space-y-2">
-                  {groupedByDate[date].map(t => (
+                  {groupedByDate[date].map((t) => (
                     <motion.div
                       key={t.id}
                       whileHover={{ scale: 1.01 }}
@@ -204,7 +186,7 @@ export default function TodoistTasks({
                 </div>
               </motion.div>
             ))
-        ) : filteredTasks.length === 0 ? (
+        ) : visibleTasks.length === 0 ? (
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -214,7 +196,7 @@ export default function TodoistTasks({
           </motion.p>
         ) : (
           <ul className="space-y-2">
-            {filteredTasks.map(t => (
+            {visibleTasks.map((t) => (
               <motion.li
                 key={t.id}
                 whileHover={{ scale: 1.01 }}
