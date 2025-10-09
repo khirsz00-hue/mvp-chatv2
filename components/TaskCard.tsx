@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import TaskDialog from './TaskDialog'
 
 interface Task {
@@ -21,6 +21,7 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
   const [showDialog, setShowDialog] = useState(false)
   const [dialogMode, setDialogMode] = useState<'none' | 'help'>('none')
   const [summary, setSummary] = useState<string | null>(null)
+  const dateInputRef = useRef<HTMLInputElement>(null)
 
   // 📦 zapisz nazwę taska (dla historii czatów)
   useEffect(() => {
@@ -29,7 +30,7 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
     }
   }, [task.id, task.content])
 
-  // 🔁 wczytaj lokalną syntezę (AI summary)
+  // 🧠 wczytaj lokalną syntezę (AI summary)
   useEffect(() => {
     const loadSummary = () => {
       const saved = localStorage.getItem(`summary_${task.id}`)
@@ -42,7 +43,7 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
     return () => window.removeEventListener('taskUpdated', handler)
   }, [task.id])
 
-  // 🟢 Ukończ zadanie
+  // ✅ Ukończ zadanie
   const handleComplete = async () => {
     await fetch('/api/todoist/complete', {
       method: 'POST',
@@ -63,11 +64,23 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
   // 📅 Przełóż zadanie
   const handlePostpone = async (newDate: string) => {
     if (!newDate) return
-    await fetch('/api/todoist/postpone', {
-      method: 'POST',
-      body: JSON.stringify({ id: task.id, token, newDate }),
-    })
-    onAction('postponed')
+    try {
+      const res = await fetch('/api/todoist/postpone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: task.id, token, newDate }),
+      })
+      const data = await res.json()
+      console.log('📦 POSTPONE result:', data)
+      onAction('postponed')
+    } catch (err) {
+      console.error('❌ POSTPONE error:', err)
+    }
+  }
+
+  // 📆 Otwórz date pickera
+  const openDatePicker = () => {
+    dateInputRef.current?.showPicker?.()
   }
 
   return (
@@ -104,15 +117,19 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
           ✅ Ukończ
         </button>
 
-        {/* 📅 Date Picker */}
-        <label className="relative inline-flex items-center px-3 py-1 text-xs rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-700 cursor-pointer font-medium transition-all">
+        {/* 📅 Przełóż */}
+        <button
+          onClick={openDatePicker}
+          className="px-3 py-1 text-xs rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-700 font-medium transition-all"
+        >
           📅 Przełóż
-          <input
-            type="date"
-            className="absolute inset-0 opacity-0 cursor-pointer"
-            onChange={(e) => handlePostpone(e.target.value)}
-          />
-        </label>
+        </button>
+        <input
+          ref={dateInputRef}
+          type="date"
+          className="hidden"
+          onChange={(e) => handlePostpone(e.target.value)}
+        />
 
         <button
           onClick={handleDelete}
@@ -132,7 +149,7 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
         </button>
       </div>
 
-      {/* 💬 Modal z czatem (tylko po kliknięciu „Pomóż mi”) */}
+      {/* 💬 Modal czatu (po kliknięciu „Pomóż mi”) */}
       {showDialog && (
         <TaskDialog
           task={task}
