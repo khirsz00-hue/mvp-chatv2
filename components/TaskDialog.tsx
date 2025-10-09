@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import ReactMarkdown from 'react-markdown'
 
 interface TaskDialogProps {
   task: { id: string; content: string }
@@ -19,28 +20,26 @@ export default function TaskDialog({ task, mode, onClose }: TaskDialogProps) {
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
-  // 🔹 Początkowe pytanie od AI
   useState(() => {
     if (mode === 'help') {
-      const intro: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: `🧠 Zajmijmy się zadaniem: "${task.content}".  
+      setMessages([
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: `🧠 Zajmijmy się zadaniem: **"${task.content}"**.  
 Na czym dokładnie ono polega? Co chcesz osiągnąć i co Cię blokuje?`,
-      }
-      setMessages([intro])
+        },
+      ])
     }
   })
 
   const sendMessage = async () => {
     if (!input.trim()) return
-
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
       content: input.trim(),
     }
-
     setMessages((prev) => [...prev, userMsg])
     setInput('')
     setIsLoading(true)
@@ -53,14 +52,12 @@ Na czym dokładnie ono polega? Co chcesz osiągnąć i co Cię blokuje?`,
           context: `Zadanie: ${task.content}`,
         }),
       })
-
       const data = await res.json()
       const reply: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
         content: data.reply || '🤖 Brak odpowiedzi od AI.',
       }
-
       setMessages((prev) => [...prev, reply])
     } catch (err) {
       setMessages((prev) => [
@@ -91,21 +88,25 @@ Na czym dokładnie ono polega? Co chcesz osiągnąć i co Cię blokuje?`,
         </div>
 
         {/* 🔹 Czat */}
-        <div className="flex-1 p-4 space-y-2 overflow-y-auto max-h-[60vh]">
+        <div className="flex-1 p-4 space-y-3 overflow-y-auto max-h-[60vh]">
           {messages.map((msg) => (
             <div
               key={msg.id}
-              className={`p-2 rounded-lg max-w-[85%] ${
+              className={`p-2 rounded-lg max-w-[85%] prose prose-sm ${
                 msg.role === 'assistant'
-                  ? 'bg-neutral-100 text-neutral-900 self-start'
+                  ? 'bg-neutral-100 text-neutral-900 prose-p:my-1 prose-ul:my-1'
                   : 'bg-blue-500 text-white self-end ml-auto'
               }`}
             >
-              {msg.content}
+              {msg.role === 'assistant' ? (
+                <ReactMarkdown>{msg.content}</ReactMarkdown>
+              ) : (
+                msg.content
+              )}
             </div>
           ))}
           {isLoading && (
-            <div className="text-sm text-neutral-500 italic">Piszę...</div>
+            <div className="text-sm text-neutral-500 italic">Piszę…</div>
           )}
         </div>
 
@@ -113,7 +114,7 @@ Na czym dokładnie ono polega? Co chcesz osiągnąć i co Cię blokuje?`,
         <div className="border-t border-neutral-200 p-3 flex items-center gap-2">
           <input
             type="text"
-            placeholder="Napisz wiadomość..."
+            placeholder="Napisz wiadomość…"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
