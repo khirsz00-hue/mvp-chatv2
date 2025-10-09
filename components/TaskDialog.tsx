@@ -28,7 +28,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
   const [loading, setLoading] = useState(false)
   const [todoistToken, setTodoistToken] = useState<string>('')
   const scrollRef = useRef<HTMLDivElement | null>(null)
-  const recentMessages = useRef<Set<string>>(new Set()) // 🔒 ochrona przed duplikatami
+  const recentMessages = useRef<Set<string>>(new Set())
 
   // 🧭 Blokuj scroll strony przy otwartym modalu
   useEffect(() => {
@@ -41,13 +41,16 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
   // 🧩 Wczytaj historię rozmowy + token
   useEffect(() => {
     if (typeof window === 'undefined') return
-
     const saved = localStorage.getItem(chatKey)
     if (saved) {
-      const parsed: ChatMessage[] = JSON.parse(saved).map((m: any) => ({
+      const parsedRaw = JSON.parse(saved)
+      let baseTime = Date.now() - parsedRaw.length * 1000
+
+      const parsed: ChatMessage[] = parsedRaw.map((m: any, i: number) => ({
         ...m,
-        timestamp: m.timestamp || Date.now(), // fallback
+        timestamp: m.timestamp ?? baseTime + i * 1000, // 🔥 stabilny fallback
       }))
+
       setChat(parsed.sort((a, b) => a.timestamp - b.timestamp))
     }
 
@@ -127,7 +130,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
       const data = await res.json()
       const reply = data.reply?.trim() || '⚠️ Brak odpowiedzi od modelu.'
 
-      // 📡 Broadcast (dla innych kart)
+      // 📡 Broadcast
       await Promise.all([
         fetch('/api/chat/send', {
           method: 'POST',
@@ -146,8 +149,6 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
       const newChat = [...updated, aiMsg]
       setChat(newChat)
       localStorage.setItem(chatKey, JSON.stringify(newChat))
-
-      // 🧠 Synteza po zakończeniu
       await generateSynthesis(newChat)
     } catch (err) {
       console.error('❌ Błąd komunikacji z AI:', err)
@@ -261,7 +262,12 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
                   {msg.content}
                 </ReactMarkdown>
                 <div className="text-[10px] mt-1 opacity-70 text-right">
-                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {new Date(msg.timestamp).toLocaleString([], {
+                    day: '2-digit',
+                    month: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
                 </div>
               </div>
             ))}
