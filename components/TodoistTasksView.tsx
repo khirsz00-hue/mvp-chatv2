@@ -1,15 +1,15 @@
 'use client'
 
-
 import { useEffect, useState, useRef } from 'react'
-import { AnimatePresence, motion } from 'framer-motion' // 🧩 DODAJ TO!
+import { AnimatePresence, motion } from 'framer-motion'
 import TodoistTasks from './TodoistTasks'
 
 export default function TodoistTasksView({ token }: { token: string }) {
   const [filter, setFilter] = useState<'today' | 'tomorrow' | 'overdue' | '7 days'>(
-    () => (typeof window !== 'undefined'
-      ? (localStorage.getItem('todoist_filter') as any) || 'today'
-      : 'today')
+    () =>
+      typeof window !== 'undefined'
+        ? ((localStorage.getItem('todoist_filter') as any) || 'today')
+        : 'today'
   )
   const [tasks, setTasks] = useState<any[]>([])
   const [toast, setToast] = useState<string | null>(null)
@@ -24,7 +24,7 @@ export default function TodoistTasksView({ token }: { token: string }) {
     }
   }, [filter])
 
-  // 🔁 SSE + Polling + Webhook check
+  // 🔁 SSE + Webhook + Polling
   useEffect(() => {
     if (!token) return
     console.log('🚀 Uruchomiono Todoist listener...')
@@ -32,7 +32,6 @@ export default function TodoistTasksView({ token }: { token: string }) {
     let es: EventSource | null = null
     let lastWebhookTime = 0
 
-    // ✅ Połączenie SSE (działa lokalnie)
     const connectSSE = () => {
       try {
         es = new EventSource('/api/todoist/stream')
@@ -43,11 +42,16 @@ export default function TodoistTasksView({ token }: { token: string }) {
             const data = JSON.parse(event.data)
             if (data.event?.startsWith('item:')) {
               const now = Date.now()
-              if (now - lastEvent.current < 2000) return // antyspam
-              lastEvent.current = now
-
-              console.log('🔁 Event Todoist:', data.event)
-              window.dispatchEvent(new Event('taskUpdated'))
+              if (data.event === 'item:added') {
+                // ⏱ odświeżenie z opóźnieniem dla nowych zadań
+                setTimeout(() => {
+                  console.log('🕒 Odświeżenie po dodaniu nowego zadania')
+                  window.dispatchEvent(new Event('taskUpdated'))
+                }, 1500)
+              } else if (now - lastEvent.current > 1500) {
+                lastEvent.current = now
+                window.dispatchEvent(new Event('taskUpdated'))
+              }
 
               const msg =
                 data.event === 'item:added'
@@ -78,30 +82,30 @@ export default function TodoistTasksView({ token }: { token: string }) {
 
     connectSSE()
 
-    // 🫀 Ping utrzymujący połączenie (lokalnie)
+    // 🫀 Ping utrzymujący połączenie
     const ping = setInterval(() => {
       fetch('/api/todoist/stream/ping').catch(() => {})
     }, 25000)
 
-    // 🧩 Sprawdzanie webhooka (działa na Vercel)
+    // 🧩 Webhook checker (Vercel)
     const checkWebhook = async () => {
       try {
         const res = await fetch('/api/todoist/webhook')
         const data = await res.json()
         if (data.lastEventTime && data.lastEventTime > lastWebhookTime) {
           lastWebhookTime = data.lastEventTime
-          console.log('🔔 Nowy webhook Todoist – odświeżam')
+          console.log('🔔 Webhook Todoist – odświeżam')
           window.dispatchEvent(new Event('taskUpdated'))
           setToast('🔄 Lista zadań zaktualizowana')
           setTimeout(() => setToast(null), 2000)
         }
-      } catch (err) {
+      } catch {
         // ciche błędy
       }
     }
     const webhookInterval = setInterval(checkWebhook, 5000)
 
-    // 🧩 Polling awaryjny co 45s (gdyby inne zawiodły)
+    // 🧩 Polling awaryjny co 45 s
     const poll = setInterval(() => {
       console.log('🪄 Polling Todoist – ciche odświeżenie')
       window.dispatchEvent(new Event('taskUpdated'))
