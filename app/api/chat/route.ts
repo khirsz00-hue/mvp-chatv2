@@ -4,66 +4,61 @@ export const runtime = 'nodejs'
 
 export async function POST(req: Request) {
   try {
-    const { message, context, todoist_token } = await req.json()
+    const authHeader = req.headers.get('authorization')
+    const todoist_token = authHeader?.startsWith('Bearer ')
+      ? authHeader.replace('Bearer ', '').trim()
+      : null
 
-    // 🧩 Walidacja wiadomości
+    const { message, context } = await req.json().catch(() => ({}))
+
     if (typeof message !== 'string' || !message.trim()) {
-      return NextResponse.json(
-        { error: 'Nieprawidłowa wiadomość — oczekiwano tekstu.' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Brak wiadomości.' }, { status: 400 })
     }
 
-    // 🧩 Komendy związane z Todoist
     const taskKeywords = ['zadania', 'taski', 'lista', 'na dziś', 'na dzis', 'co mam dziś', 'co mam dzis']
 
+    // --- OBSŁUGA TODOIST ---
     if (taskKeywords.some(k => message.toLowerCase().includes(k))) {
       if (!todoist_token) {
         console.error('❌ Brak tokena Todoist!')
         return NextResponse.json({
-          reply: 'Nie udało się pobrać zadań — brak tokena Todoist 😞',
+          reply: 'Brak tokena Todoist — zaloguj się w Todoist Helper 🔒',
           type: 'error',
         })
       }
 
       try {
-        console.log('🔑 Używam tokena Todoist:', todoist_token.slice(0, 8) + '...')
-
+        console.log('🔑 Używam tokena Todoist (z nagłówka):', todoist_token.slice(0, 8) + '...')
         const res = await fetch('https://api.todoist.com/rest/v2/tasks', {
           headers: { Authorization: `Bearer ${todoist_token}` },
           cache: 'no-store',
         })
 
-        // 🧾 Logujemy odpowiedź Todoista — kluczowy krok diagnostyczny
-        const rawText = await res.text()
-        console.log('🪪 Todoist fetch result:', res.status, rawText)
+        const raw = await res.text()
+        console.log('🪪 Todoist API odpowiedź:', res.status, raw)
 
-        if (!res.ok) {
-          throw new Error(`Błąd Todoist API: ${res.status}`)
-        }
+        if (!res.ok) throw new Error(`Błąd Todoist API: ${res.status}`)
+        const tasks = JSON.parse(raw)
 
-        // 🔄 Spróbuj sparsować JSON dopiero po logowaniu
-        const tasks = JSON.parse(rawText)
         const today = new Date().toISOString().split('T')[0]
-        const todaysTasks = tasks.filter((t: any) => t.due?.date === today)
+        const todays = tasks.filter((t: any) => t.due?.date === today)
 
-        if (todaysTasks.length === 0) {
+        if (todays.length === 0)
           return NextResponse.json({
             type: 'tasks',
             tasks: [],
             reply: 'Nie masz dziś żadnych zaplanowanych zadań ✅',
           })
-        }
 
         return NextResponse.json({
           type: 'tasks',
-          tasks: todaysTasks.map((t: any) => ({
+          reply: 'Oto Twoje zadania na dziś:',
+          tasks: todays.map((t: any) => ({
             id: t.id,
             content: t.content,
-            due: t.due?.date || null,
+            due: t.due?.date,
             priority: t.priority,
           })),
-          reply: 'Oto Twoje zadania na dziś:',
         })
       } catch (err) {
         console.error('❌ Błąd Todoist:', err)
@@ -74,16 +69,10 @@ export async function POST(req: Request) {
       }
     }
 
-    // 🧩 Sprawdzenie API keya OpenAI
-    if (!process.env.OPENAI_API_KEY) {
-      console.error('❌ Brak OPENAI_API_KEY w środowisku!')
-      return NextResponse.json(
-        { error: 'Brak konfiguracji OpenAI API Key.' },
-        { status: 500 }
-      )
-    }
+    // --- OBSŁUGA OPENAI ---
+    if (!process.env.OPENAI_API_KEY)
+      return NextResponse.json({ error: 'Brak OpenAI API key' }, { status: 500 })
 
-    // 🧠 Klient OpenAI
     const OpenAI = (await import('openai')).default
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -106,15 +95,11 @@ export async function POST(req: Request) {
     })
 
     const reply =
-      completion.choices?.[0]?.message?.content?.trim() ||
-      '⚠️ Brak odpowiedzi od modelu.'
+      completion.choices?.[0]?.message?.content?.trim() || '⚠️ Brak odpowiedzi od modelu.'
 
     return NextResponse.json({ reply, type: 'text' })
   } catch (error: any) {
     console.error('❌ Błąd w /api/chat:', error)
-    return NextResponse.json(
-      { error: error.message || 'Nieoczekiwany błąd serwera.' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: error.message || 'Błąd serwera.' }, { status: 500 })
   }
 }
