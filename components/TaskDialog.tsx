@@ -15,6 +15,7 @@ type Props = {
 type ChatMessage = {
   role: 'user' | 'assistant'
   content: string
+  timestamp: number
 }
 
 export default function TaskDialog({ task, mode, onClose }: Props) {
@@ -27,7 +28,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
   const [loading, setLoading] = useState(false)
   const [todoistToken, setTodoistToken] = useState<string>('')
   const scrollRef = useRef<HTMLDivElement | null>(null)
-  const recentMessages = useRef<Set<string>>(new Set()) // 🔒 pamięć antyduplikatowa
+  const recentMessages = useRef<Set<string>>(new Set()) // 🔒 ochrona przed duplikatami
 
   // 🧭 Blokuj scroll strony przy otwartym modalu
   useEffect(() => {
@@ -42,7 +43,13 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     if (typeof window === 'undefined') return
 
     const saved = localStorage.getItem(chatKey)
-    if (saved) setChat(JSON.parse(saved))
+    if (saved) {
+      const parsed: ChatMessage[] = JSON.parse(saved).map((m: any) => ({
+        ...m,
+        timestamp: m.timestamp || Date.now(), // fallback
+      }))
+      setChat(parsed.sort((a, b) => a.timestamp - b.timestamp))
+    }
 
     const token = localStorage.getItem('todoist_token') || ''
     setTodoistToken(token)
@@ -51,7 +58,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
 
   // 💾 Zapisuj każdą zmianę rozmowy
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && chat.length > 0) {
       localStorage.setItem(chatKey, JSON.stringify(chat))
     }
   }, [chat, chatKey])
@@ -75,7 +82,11 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
           const id = `${data.role}:${data.message}`
           if (recentMessages.current.has(id)) return
           recentMessages.current.add(id)
-          setChat((prev) => [...prev, { role: data.role, content: data.message }])
+
+          setChat((prev) => [
+            ...prev,
+            { role: data.role, content: data.message, timestamp: Date.now() },
+          ])
         }
       } catch (err) {
         console.error('❌ Błąd SSE:', err)
@@ -95,7 +106,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     const text = input.trim()
     if (!text || loading) return
 
-    const userMsg: ChatMessage = { role: 'user', content: text }
+    const userMsg: ChatMessage = { role: 'user', content: text, timestamp: Date.now() }
     const updated = [...chat, userMsg]
     setChat(updated)
     setInput('')
@@ -103,7 +114,6 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     recentMessages.current.add(`user:${text}`)
 
     try {
-      // 🧠 zapytanie do AI
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -117,7 +127,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
       const data = await res.json()
       const reply = data.reply?.trim() || '⚠️ Brak odpowiedzi od modelu.'
 
-      // 📢 wysyłka przez broadcast
+      // 📡 Broadcast (dla innych kart)
       await Promise.all([
         fetch('/api/chat/send', {
           method: 'POST',
@@ -131,19 +141,23 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
         }),
       ])
 
-      // 🔒 antyduplikat AI
-      recentMessages.current.add(`assistant:${reply}`)
-
-      // 🧠 synteza
-      const newChat: ChatMessage[] = [...updated, { role: 'assistant' as const, content: reply }]
+      // 💬 Odpowiedź AI z timestampem
+      const aiMsg: ChatMessage = { role: 'assistant', content: reply, timestamp: Date.now() }
+      const newChat = [...updated, aiMsg]
       setChat(newChat)
       localStorage.setItem(chatKey, JSON.stringify(newChat))
+
+      // 🧠 Synteza po zakończeniu
       await generateSynthesis(newChat)
     } catch (err) {
       console.error('❌ Błąd komunikacji z AI:', err)
       setChat((prev) => [
         ...prev,
-        { role: 'assistant', content: '⚠️ Wystąpił błąd podczas komunikacji z AI.' },
+        {
+          role: 'assistant',
+          content: '⚠️ Wystąpił błąd podczas komunikacji z AI.',
+          timestamp: Date.now(),
+        },
       ])
     } finally {
       setLoading(false)
@@ -193,6 +207,7 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
 
   if (mode !== 'help') return null
 
+  // 🪄 Portal modalu
   const modal = (
     <AnimatePresence>
       <motion.div
@@ -208,9 +223,10 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
           className="relative bg-white w-full max-w-lg rounded-2xl shadow-2xl flex flex-col border border-gray-200 overflow-hidden max-h-[90vh]"
           onClick={(e) => e.stopPropagation()}
         >
+          {/* HEADER */}
           <div className="sticky top-0 flex justify-between items-center px-5 py-3 border-b bg-gray-50 z-10">
             <h2 className="text-lg font-semibold text-gray-800 truncate pr-4">
-              Pomoc z zadaniem
+              {task.content || 'Rozmowa'}
             </h2>
             <button
               onClick={onClose}
@@ -220,18 +236,12 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
             </button>
           </div>
 
+          {/* CZAT */}
           <div
             ref={scrollRef}
             className="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-gray-50 scroll-smooth"
           >
-            {chat.length === 0 && (
-              <div className="bg-white p-3 rounded-lg shadow-sm border text-sm text-gray-800 leading-relaxed">
-                🧠 Zajmijmy się zadaniem: <b>"{task.content}"</b>.<br />
-                Co chcesz osiągnąć i co Cię blokuje?
-              </div>
-            )}
-
-            {chat.map((msg, i) => (
+            {[...chat].sort((a, b) => a.timestamp - b.timestamp).map((msg, i) => (
               <div
                 key={i}
                 className={`p-3 rounded-lg shadow-sm text-sm leading-relaxed transition-all duration-200 ${
@@ -250,12 +260,23 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
                 >
                   {msg.content}
                 </ReactMarkdown>
+                <div className="text-[10px] mt-1 opacity-70 text-right">
+                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
               </div>
             ))}
+
+            {chat.length === 0 && (
+              <div className="bg-white p-3 rounded-lg shadow-sm border text-sm text-gray-800 leading-relaxed">
+                🧠 Zajmijmy się zadaniem: <b>"{task.content}"</b>.<br />
+                Co chcesz osiągnąć i co Cię blokuje?
+              </div>
+            )}
 
             {loading && <div className="text-sm text-gray-500 animate-pulse">AI myśli...</div>}
           </div>
 
+          {/* INPUT */}
           <div className="sticky bottom-0 border-t bg-white flex p-3 space-x-2">
             <input
               type="text"
