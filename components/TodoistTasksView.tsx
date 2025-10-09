@@ -1,6 +1,8 @@
 'use client'
 
+
 import { useEffect, useState, useRef } from 'react'
+import { AnimatePresence, motion } from 'framer-motion' // 🧩 DODAJ TO!
 import TodoistTasks from './TodoistTasks'
 
 export default function TodoistTasksView({ token }: { token: string }) {
