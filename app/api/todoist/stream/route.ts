@@ -1,35 +1,22 @@
-import { NextResponse } from 'next/server'
-
-export const dynamic = 'force-dynamic'
+import { registerClient } from '../todoistStream'
 
 export async function GET() {
-  const encoder = new TextEncoder()
-
   const stream = new ReadableStream({
     start(controller) {
-      let lastTimestamp = 0
+      const encoder = new TextEncoder()
 
-      const interval = setInterval(() => {
-        const lastEvent = (globalThis as any).lastTodoistEvent
+      const send = (msg: string) => controller.enqueue(encoder.encode(`data: ${msg}\n\n`))
+      const res = {
+        write: (chunk: string) => send(chunk),
+        closed: false,
+      }
 
-        if (lastEvent && lastEvent.ts > lastTimestamp) {
-          lastTimestamp = lastEvent.ts
-
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify(lastEvent)}\n\n`)
-          )
-
-          console.log('📡 [SSE] Wysłano event →', lastEvent.event)
-        }
-      }, 1000)
-
-      // czyszczenie po zamknięciu połączenia
-      const close = () => clearInterval(interval)
-      ;(controller as any).close = close
+      registerClient(res)
+      send(JSON.stringify({ event: 'connected', ts: Date.now() }))
     },
   })
 
-  return new NextResponse(stream, {
+  return new Response(stream, {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
