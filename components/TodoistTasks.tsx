@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import TaskCard from './TaskCard'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -37,8 +37,9 @@ export default function TodoistTasks({
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProject, setSelectedProject] = useState<string>('all')
   const [loading, setLoading] = useState(true)
+  const refreshTimeout = useRef<NodeJS.Timeout | null>(null)
 
-  // 🗂 Pobierz projekty
+  // 🗂 Pobierz projekty (raz)
   useEffect(() => {
     if (!token) return
     fetch(`/api/todoist/projects?token=${token}`)
@@ -47,40 +48,61 @@ export default function TodoistTasks({
       .catch(err => console.error('❌ Błąd pobierania projektów:', err))
   }, [token])
 
-  // 🧩 Pobierz zadania z backendu API
-  const loadTasks = () => {
+  // 🧩 Pobierz zadania
+  const loadTasks = async () => {
     if (!token) return
     setLoading(true)
+    let isMounted = true
 
-    Promise.all([
-      fetch(`/api/todoist/tasks?token=${token}&filter=${filter}`).then(r => r.json()),
-      fetch(`/api/todoist/projects?token=${token}`).then(r => r.json()),
-    ])
-      .then(([tasksRes, projectsRes]) => {
-        const allTasks = tasksRes.tasks || []
-        const projectsList = projectsRes.projects || []
+    try {
+      const [tasksRes, projectsRes] = await Promise.all([
+        fetch(`/api/todoist/tasks?token=${token}&filter=${filter}`).then(r => r.json()),
+        fetch(`/api/todoist/projects?token=${token}`).then(r => r.json()),
+      ])
 
-        // dopisanie nazwy projektu
-        const tasksWithProjects = allTasks.map((t: any) => ({
-          ...t,
-          project_name: projectsList.find((p: Project) => p.id === t.project_id)?.name || 'Brak projektu',
-        }))
+      if (!isMounted) return
+      const allTasks = tasksRes.tasks || []
+      const projectsList = projectsRes.projects || []
 
-        setTasks(tasksWithProjects)
-        onUpdate?.(tasksWithProjects)
-      })
-      .catch(err => console.error('❌ Błąd pobierania zadań:', err))
-      .finally(() => setLoading(false))
+      const tasksWithProjects = allTasks.map((t: any) => ({
+        ...t,
+        project_name:
+          projectsList.find((p: Project) => p.id === t.project_id)?.name || 'Brak projektu',
+      }))
+
+      setTasks(tasksWithProjects)
+      onUpdate?.(tasksWithProjects)
+    } catch (err) {
+      console.error('❌ Błąd pobierania zadań:', err)
+    } finally {
+      if (isMounted) setLoading(false)
+    }
+
+    return () => {
+      isMounted = false
+    }
   }
 
-  useEffect(loadTasks, [token, filter])
-
-  // 🔁 Reaguj na aktualizacje (np. po akcji AI)
+  // 🔄 Ładowanie przy zmianie filtru
   useEffect(() => {
-    const handleUpdate = () => loadTasks()
+    loadTasks()
+  }, [filter, token])
+
+  // 🔁 Reaguj na event „taskUpdated” (z debounce)
+  useEffect(() => {
+    const handleUpdate = () => {
+      if (refreshTimeout.current) clearTimeout(refreshTimeout.current)
+      refreshTimeout.current = setTimeout(() => {
+        loadTasks()
+      }, 1000)
+    }
+
     window.addEventListener('taskUpdated', handleUpdate)
-    return () => window.removeEventListener('taskUpdated', handleUpdate)
-  }, [token, filter])
+    return () => {
+      if (refreshTimeout.current) clearTimeout(refreshTimeout.current)
+      window.removeEventListener('taskUpdated', handleUpdate)
+    }
+  }, []) // 👈 brak depsów — tylko raz przy montowaniu
 
   // 🧮 Filtrowanie po projekcie
   const filteredTasks =
