@@ -6,28 +6,19 @@ export async function POST(req: Request) {
   try {
     const { message, context, todoist_token } = await req.json()
 
-    // 🧩 Walidacja wejścia
-    if (typeof message !== 'string' || !message.trim()) {
-      return NextResponse.json(
-        { error: 'Nieprawidłowa wiadomość — oczekiwano tekstu.' },
-        { status: 400 }
-      )
+    if (!message?.trim()) {
+      return NextResponse.json({ error: 'Brak wiadomości.' }, { status: 400 })
     }
 
     const lower = message.toLowerCase()
-    const taskKeywords = [
-      'zadania',
-      'taski',
-      'lista',
-      'na dziś',
-      'na dzis',
-      'co mam dziś',
-      'co mam dzis',
-      'todo',
-    ]
+    const taskKeywords = ['zadania', 'taski', 'lista', 'na dziś', 'na dzis', 'co mam dziś', 'co mam dzis']
 
-    // 🔹 Token Todoista (najpierw użytkownika, potem fallback .env)
+    // 🔹 Token Todoista
     const token = todoist_token || process.env.TODOIST_API_TOKEN
+    if (!token) {
+      console.error('🚫 Brak tokena Todoist!')
+      return NextResponse.json({ reply: 'Nie znaleziono tokena Todoist 😞', type: 'error' })
+    }
 
     // 🧠 Jeśli wiadomość dotyczy zadań
     if (taskKeywords.some((k) => lower.includes(k))) {
@@ -40,14 +31,12 @@ export async function POST(req: Request) {
         })
 
         if (!res.ok) {
-          console.error('❌ Błąd Todoist API:', res.status)
+          console.error('❌ Błąd Todoist API:', await res.text())
           throw new Error(`Błąd Todoist API: ${res.status}`)
         }
 
         const tasks = await res.json()
         const today = new Date().toISOString().split('T')[0]
-
-        // 🔹 Zadania na dziś
         const todaysTasks = tasks.filter((t: any) => t.due?.date === today)
 
         if (todaysTasks.length === 0) {
@@ -77,22 +66,13 @@ export async function POST(req: Request) {
       }
     }
 
-    // 🧩 Sprawdzenie API keya OpenAI
-    if (!process.env.OPENAI_API_KEY) {
-      console.error('❌ Brak OPENAI_API_KEY w środowisku!')
-      return NextResponse.json(
-        { error: 'Brak konfiguracji OpenAI API Key.' },
-        { status: 500 }
-      )
-    }
-
-    // 🔮 OpenAI
+    // 🧩 OpenAI (reszta bez zmian)
     const OpenAI = (await import('openai')).default
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
     const systemPrompt = `
       Jesteś asystentem produktywności, który pomaga użytkownikowi wykonać zadanie krok po kroku.
-      Jeśli użytkownik pyta o listę zadań, zawsze używaj API Todoista (nie wymyślaj odpowiedzi).
+      Jeśli użytkownik pyta o listę zadań, zawsze używaj API Todoista.
       Zawsze odpowiadaj po polsku, jasno i konkretnie.
       ${context ? `Kontekst zadania: ${context}` : ''}
     `.trim()
@@ -113,10 +93,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ reply, type: 'text' })
   } catch (error: any) {
     console.error('❌ Błąd w /api/chat:', error)
-    const errorMessage =
-      error?.response?.data?.error?.message ||
-      error?.message ||
-      'Nieoczekiwany błąd serwera.'
-    return NextResponse.json({ error: errorMessage }, { status: 500 })
+    return NextResponse.json(
+      { error: error.message || 'Nieoczekiwany błąd serwera.' },
+      { status: 500 }
+    )
   }
 }
