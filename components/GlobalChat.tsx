@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import ChatDock from './ChatDock'
+import { useEffect, useRef, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface GlobalChatProps {
   token: string
@@ -9,89 +10,179 @@ interface GlobalChatProps {
   onOpenTaskChat: (t: any) => void
 }
 
-interface ChatPreview {
+interface ChatMessage {
+  role: 'user' | 'assistant'
   content: string
-  date: string
 }
 
 export default function GlobalChat({ token, tasks, onOpenTaskChat }: GlobalChatProps) {
-  const [history, setHistory] = useState<ChatPreview[]>([])
+  const storageKey = 'chat_global'
+  const summaryKey = 'summary_global'
+  const [chat, setChat] = useState<ChatMessage[]>([])
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [summary, setSummary] = useState<string | null>(null)
+  const scrollRef = useRef<HTMLDivElement | null>(null)
 
-  // 🔹 Wczytaj historię czatu globalnego z localStorage
+  // 🧩 Wczytaj historię rozmowy
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('chat_global')
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        const previews = parsed
-          .filter((m: any) => m.role === 'user')
-          .slice(-5)
-          .map((m: any) => ({
-            content: m.content,
-            date: new Date().toLocaleString('pl-PL', {
-              hour: '2-digit',
-              minute: '2-digit',
-              day: '2-digit',
-              month: '2-digit',
-            }),
-          }))
-        setHistory(previews.reverse())
-      }
+      const saved = localStorage.getItem(storageKey)
+      if (saved) setChat(JSON.parse(saved))
+
+      const savedSummary = localStorage.getItem(summaryKey)
+      if (savedSummary) setSummary(savedSummary)
     }
   }, [])
 
+  // 💾 Zapisuj każdą wiadomość
+  useEffect(() => {
+    if (chat.length > 0 && typeof window !== 'undefined') {
+      localStorage.setItem(storageKey, JSON.stringify(chat))
+    }
+  }, [chat])
+
+  // 🔽 Auto-scroll
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+  }, [chat, loading])
+
+  const sendMessage = async () => {
+    const text = input.trim()
+    if (!text || loading) return
+
+    const newMsg: ChatMessage = { role: 'user', content: text }
+    const updated = [...chat, newMsg]
+    setChat(updated)
+    setInput('')
+    setLoading(true)
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text }),
+      })
+
+      if (!res.ok) throw new Error('Błąd odpowiedzi z API')
+      const data = await res.json()
+      const reply = data.reply?.trim() || '⚠️ Brak odpowiedzi od modelu.'
+
+      const newChat = [...updated, { role: 'assistant', content: reply }]
+      setChat(newChat)
+      localStorage.setItem(storageKey, JSON.stringify(newChat))
+
+      await generateSynthesis(newChat)
+    } catch (err) {
+      console.error('❌ Błąd komunikacji z AI:', err)
+      setChat((prev) => [
+        ...prev,
+        { role: 'assistant', content: '⚠️ Wystąpił błąd podczas komunikacji z AI.' },
+      ])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 🧠 SYNTEZA – zapis skrótu rozmowy
+  const generateSynthesis = async (fullChat: ChatMessage[]) => {
+    try {
+      const contextText = fullChat.map((m) => `${m.role}: ${m.content}`).join('\n')
+      const synthesisPrompt = `
+Podsumuj globalną rozmowę użytkownika w 2–3 zdaniach.
+Uwzględnij najważniejsze ustalenia, decyzje lub plany.
+Napisz po polsku, zaczynając od "Wnioski AI:".
+      `.trim()
+
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: synthesisPrompt + '\n\n' + contextText }),
+      })
+
+      if (!res.ok) throw new Error('Błąd generowania syntezy')
+      const data = await res.json()
+      const synthesis = data.reply?.trim() || 'Brak syntezy.'
+
+      localStorage.setItem(summaryKey, synthesis)
+      setSummary(synthesis)
+      window.dispatchEvent(new Event('globalChatUpdated'))
+    } catch (err) {
+      console.error('⚠️ Błąd syntezy globalnej:', err)
+    }
+  }
+
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-white">
       {/* HEADER */}
       <div className="border-b bg-gray-50 p-3 flex justify-between items-center">
         <h2 className="font-semibold text-gray-700 text-sm">🤖 Asystent Todoist AI</h2>
         <span className="text-xs text-gray-400">Tryb ogólny</span>
       </div>
 
-      {/* TREŚĆ */}
-      <div className="flex-1 overflow-y-auto p-4 text-sm text-gray-700 space-y-4">
-        {/* Sekcja pomocy */}
-        <div>
-          <p className="mb-3 font-medium">💡 Możesz zapytać np.:</p>
-          <ul className="list-disc ml-4 text-gray-600 space-y-1">
-            <li>„Pokaż zadania na dziś”</li>
-            <li>„Zaproponuj kolejność realizacji”</li>
-            <li>„Które zadania są przeterminowane?”</li>
-            <li>„Pogrupuj moje zadania tematycznie”</li>
-          </ul>
-        </div>
-
-        {/* Sekcja historii */}
-        <div className="pt-4 border-t border-gray-200">
-          <p className="font-medium mb-2">🕓 Ostatnie rozmowy:</p>
-          {history.length > 0 ? (
-            <ul className="space-y-2">
-              {history.map((h, i) => (
-                <li
-                  key={i}
-                  className="p-2 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 cursor-pointer transition"
-                  title={h.content}
-                  onClick={() => {
-                    navigator.clipboard.writeText(h.content)
-                    alert('📋 Skopiowano do schowka: ' + h.content)
-                  }}
-                >
-                  <p className="text-xs text-gray-500">{h.date}</p>
-                  <p className="text-sm text-gray-800 truncate">{h.content}</p>
-                </li>
-              ))}
+      {/* CZAT */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 text-sm text-gray-700 bg-gray-50">
+        {chat.length === 0 && (
+          <div className="bg-white p-3 rounded-lg shadow-sm border text-sm text-gray-800">
+            👋 Cześć! Jestem Twoim asystentem produktywności.<br />
+            Możesz zapytać np.:
+            <ul className="list-disc ml-5 mt-2 text-gray-600">
+              <li>„Pokaż zadania na dziś”</li>
+              <li>„Zaproponuj kolejność zadań”</li>
+              <li>„Pomóż mi zaplanować dzień”</li>
+              <li>„Które zadania są przeterminowane?”</li>
             </ul>
-          ) : (
-            <p className="text-xs text-gray-500 italic">
-              Brak historii rozmów — rozpocznij czat z AI poniżej.
-            </p>
-          )}
-        </div>
+          </div>
+        )}
+
+        {chat.map((msg, i) => (
+          <div
+            key={i}
+            className={`p-3 rounded-lg shadow-sm leading-relaxed transition-all ${
+              msg.role === 'user'
+                ? 'bg-blue-600 text-white self-end'
+                : 'bg-white border border-gray-200 text-gray-800'
+            }`}
+          >
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              className={`prose prose-sm max-w-none ${
+                msg.role === 'user'
+                  ? 'text-white prose-headings:text-white prose-strong:text-white'
+                  : 'text-gray-800 prose-a:text-blue-600'
+              }`}
+            >
+              {msg.content}
+            </ReactMarkdown>
+          </div>
+        ))}
+
+        {loading && <div className="text-sm text-gray-500 animate-pulse">AI myśli...</div>}
+
+        {summary && (
+          <div className="mt-3 text-xs text-gray-500 italic border-t pt-2">
+            {summary}
+          </div>
+        )}
       </div>
 
-      {/* CZAT */}
-      <div className="border-t bg-white p-3">
-        <ChatDock mode="global" token={token} tasks={tasks} />
+      {/* INPUT */}
+      <div className="border-t bg-white flex p-3 space-x-2">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+          placeholder="Zadaj pytanie np. „Pomóż mi zaplanować dzień...”"
+          className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <button
+          onClick={sendMessage}
+          disabled={loading}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition disabled:opacity-50"
+        >
+          Wyślij
+        </button>
       </div>
     </div>
   )
