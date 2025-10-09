@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react'
 import TodoistConnection from '@/components/TodoistConnection'
 import TodoistAuthButton from '@/components/TodoistAuthButton'
-import Chat, { ChatMessage } from '@/components/Chat' // ✅ importujemy typ z komponentu
+import Chat, { ChatMessage } from '@/components/Chat'
 import ChatSidebar from '@/components/ChatSidebar'
 
 export default function HomePage() {
-  const [active, setActive] = useState<'todoist' | 'six_hats'>('todoist')
+  const [active, setActive] = useState<'todoist' | 'six_hats' | 'global'>('todoist')
   const [todoistMessages, setTodoistMessages] = useState<ChatMessage[]>([])
   const [sixHatsMessages, setSixHatsMessages] = useState<ChatMessage[]>([])
+  const [globalMessages, setGlobalMessages] = useState<ChatMessage[]>([])
   const [token, setToken] = useState<string | null>(null)
 
   // 🧩 Wczytaj historię rozmów
@@ -18,25 +19,30 @@ export default function HomePage() {
 
     const todoistSaved = localStorage.getItem('chat_todoist')
     const sixHatsSaved = localStorage.getItem('chat_six_hats')
+    const globalSaved = localStorage.getItem('chat_global')
 
     if (todoistSaved) setTodoistMessages(JSON.parse(todoistSaved))
     if (sixHatsSaved) setSixHatsMessages(JSON.parse(sixHatsSaved))
+    if (globalSaved) setGlobalMessages(JSON.parse(globalSaved))
   }, [])
 
   // 💾 Zapisuj historię po zmianach
+  const saveAndNotify = (key: string, data: ChatMessage[]) => {
+    localStorage.setItem(key, JSON.stringify(data))
+    window.dispatchEvent(new Event('chatUpdated'))
+  }
+
   useEffect(() => {
-    if (todoistMessages.length > 0) {
-      localStorage.setItem('chat_todoist', JSON.stringify(todoistMessages))
-      window.dispatchEvent(new Event('chatUpdated'))
-    }
+    if (todoistMessages.length > 0) saveAndNotify('chat_todoist', todoistMessages)
   }, [todoistMessages])
 
   useEffect(() => {
-    if (sixHatsMessages.length > 0) {
-      localStorage.setItem('chat_six_hats', JSON.stringify(sixHatsMessages))
-      window.dispatchEvent(new Event('chatUpdated'))
-    }
+    if (sixHatsMessages.length > 0) saveAndNotify('chat_six_hats', sixHatsMessages)
   }, [sixHatsMessages])
+
+  useEffect(() => {
+    if (globalMessages.length > 0) saveAndNotify('chat_global', globalMessages)
+  }, [globalMessages])
 
   // 🔹 Obsługa tokena Todoista
   useEffect(() => {
@@ -53,7 +59,7 @@ export default function HomePage() {
     }
   }, [])
 
-  // 💬 Wysyłanie do Six Hats
+  // 💬 Wysyłanie — Six Hats
   const handleSendSixHats = async (message: string) => {
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
@@ -84,7 +90,7 @@ export default function HomePage() {
       setSixHatsMessages([...updated, aiMsg])
     } catch (err) {
       console.error('❌ Błąd komunikacji z AI:', err)
-      setSixHatsMessages((prev) => [
+      setSixHatsMessages(prev => [
         ...prev,
         {
           id: crypto.randomUUID(),
@@ -96,7 +102,50 @@ export default function HomePage() {
     }
   }
 
-  // 💬 Wysyłanie do Todoista (placeholder)
+  // 💬 Wysyłanie — Global
+  const handleSendGlobal = async (message: string) => {
+    const userMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: message,
+      timestamp: Date.now(),
+    }
+    const updated = [...globalMessages, userMsg]
+    setGlobalMessages(updated)
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, assistant: 'global' }),
+      })
+
+      if (!res.ok) throw new Error('Błąd odpowiedzi z AI')
+      const data = await res.json()
+
+      const aiMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: data.reply || '⚠️ Brak odpowiedzi od AI.',
+        timestamp: Date.now(),
+      }
+
+      setGlobalMessages([...updated, aiMsg])
+    } catch (err) {
+      console.error('❌ Błąd komunikacji z AI:', err)
+      setGlobalMessages(prev => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: '⚠️ Błąd komunikacji z AI.',
+          timestamp: Date.now(),
+        },
+      ])
+    }
+  }
+
+  // 💬 Wysyłanie — Todoist (placeholder)
   const handleSendTodoist = async (message: string) => {
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
@@ -104,7 +153,7 @@ export default function HomePage() {
       content: message,
       timestamp: Date.now(),
     }
-    setTodoistMessages((prev) => [...prev, userMsg])
+    setTodoistMessages(prev => [...prev, userMsg])
   }
 
   return (
@@ -129,12 +178,26 @@ export default function HomePage() {
           >
             6 Hats Assistant
           </button>
+          <button
+            onClick={() => setActive('global')}
+            className={`px-3 py-1.5 text-sm rounded-lg font-medium transition ${
+              active === 'global' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'
+            }`}
+          >
+            Global Chat
+          </button>
         </nav>
       </header>
 
       {/* 🔸 Główna sekcja */}
       <main className="flex flex-1 overflow-hidden">
-        <ChatSidebar />
+        <ChatSidebar
+          onSelectChat={(mode) => {
+            if (mode === 'six_hats') setActive('six_hats')
+            else if (mode === 'global') setActive('global')
+            else if (mode === 'task') setActive('todoist')
+          }}
+        />
 
         <div className="flex-1 p-4 overflow-y-auto">
           {active === 'todoist' && (
@@ -162,7 +225,17 @@ export default function HomePage() {
                 Zadawaj pytania, a asystent pomoże Ci spojrzeć na problem z sześciu perspektyw
                 myślenia (biała, czerwona, czarna, żółta, zielona, niebieska).
               </p>
-              <Chat onSend={handleSendSixHats} messages={sixHatsMessages} />
+              <Chat onSend={handleSendSixHats} messages={sixHatsMessages} hideHistory />
+            </div>
+          )}
+
+          {active === 'global' && (
+            <div className="max-w-4xl mx-auto w-full bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+              <h2 className="text-lg font-semibold text-gray-800 mb-3">🌍 Global Chat</h2>
+              <p className="text-sm text-gray-600 mb-4">
+                Tu możesz prowadzić ogólne rozmowy z asystentem o celach, planach i decyzjach.
+              </p>
+              <Chat onSend={handleSendGlobal} messages={globalMessages} assistant="global" hideHistory />
             </div>
           )}
         </div>
