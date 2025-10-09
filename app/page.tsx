@@ -16,7 +16,6 @@ export default function HomePage() {
   // 🧩 Wczytaj historię rozmów
   useEffect(() => {
     if (typeof window === 'undefined') return
-
     const todoistSaved = localStorage.getItem('chat_todoist')
     const sixHatsSaved = localStorage.getItem('chat_six_hats')
     const globalSaved = localStorage.getItem('chat_global')
@@ -60,30 +59,25 @@ export default function HomePage() {
   }, [])
 
   useEffect(() => {
-    console.log('🔑 Aktualny token Todoist w React state:', token)
+    console.log('🔑 Aktualny token Todoist:', token)
   }, [token])
 
-  // 💬 Helper do fetchowania z tokenem
-  const sendMessage = async (
-    message: string,
-    assistant: 'global' | 'six_hats'
-  ): Promise<string> => {
+  // 💬 Helper do fetchowania z tokenem przez nagłówek Authorization
+  const sendMessage = async (message: string, assistant: 'global' | 'six_hats'): Promise<string> => {
     console.log(`🟢 Wysyłam wiadomość (${assistant}) z tokenem:`, token)
 
     const res = await fetch('/api/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message,
-        assistant,
-        todoist_token: token, // ✅ token przekazywany ze stanu
-      }),
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ message, assistant }),
     })
 
     if (!res.ok) throw new Error('Błąd odpowiedzi z AI')
     const data = await res.json()
 
-    // Jeśli to lista tasków — zbuduj listę
     if (data.type === 'tasks' && data.tasks?.length) {
       const taskList = data.tasks.map((t: any) => `• ${t.content}`).join('\n')
       return `${data.reply || 'Zadania na dziś:'}\n\n${taskList}`
@@ -114,7 +108,7 @@ export default function HomePage() {
       setSixHatsMessages([...updated, aiMsg])
     } catch (err) {
       console.error('❌ Błąd komunikacji z AI:', err)
-      setSixHatsMessages((prev) => [
+      setSixHatsMessages(prev => [
         ...prev,
         {
           id: crypto.randomUUID(),
@@ -148,7 +142,7 @@ export default function HomePage() {
       setGlobalMessages([...updated, aiMsg])
     } catch (err) {
       console.error('❌ Błąd komunikacji z AI:', err)
-      setGlobalMessages((prev) => [
+      setGlobalMessages(prev => [
         ...prev,
         {
           id: crypto.randomUUID(),
@@ -168,7 +162,7 @@ export default function HomePage() {
       content: message,
       timestamp: Date.now(),
     }
-    setTodoistMessages((prev) => [...prev, userMsg])
+    setTodoistMessages(prev => [...prev, userMsg])
   }
 
   return (
@@ -247,9 +241,7 @@ export default function HomePage() {
                 🎩 Six Hats Assistant
               </h2>
               <p className="text-sm text-gray-600 mb-4">
-                Zadawaj pytania, a asystent pomoże Ci spojrzeć na problem z sześciu
-                perspektyw myślenia (biała, czerwona, czarna, żółta, zielona,
-                niebieska).
+                Zadawaj pytania, a asystent pomoże Ci spojrzeć na problem z sześciu perspektyw.
               </p>
               <Chat onSend={handleSendSixHats} messages={sixHatsMessages} hideHistory />
             </div>
@@ -262,8 +254,7 @@ export default function HomePage() {
                 🌍 Global Chat
               </h2>
               <p className="text-sm text-gray-600 mb-4">
-                Tu możesz prowadzić ogólne rozmowy z asystentem o celach, planach i
-                decyzjach.
+                Tu możesz prowadzić ogólne rozmowy z asystentem o celach, planach i decyzjach.
               </p>
               <Chat
                 onSend={handleSendGlobal}
