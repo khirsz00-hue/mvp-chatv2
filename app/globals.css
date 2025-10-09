@@ -23,3 +23,92 @@ body {
 .toast {
   @apply fixed right-4 bottom-4 bg-neutral-900 text-white px-4 py-2 rounded-xl shadow-lg;
 }
+
+/* === MARKDOWN STYLING === */
+
+.prose {
+  @apply text-gray-800 leading-relaxed;
+}
+
+.prose h1,
+.prose h2,
+.prose h3 {
+  @apply font-semibold text-gray-900 mt-4 mb-2;
+}
+
+.prose h1 {
+  @apply text-2xl border-b border-gray-200 pb-1;
+}
+
+.prose h2 {
+  @apply text-xl text-gray-800 mt-3 mb-2;
+}
+
+.prose h3 {
+  @apply text-lg text-gray-700 mt-2 mb-1;
+}
+
+.prose p {
+  @apply mb-2 text-gray-700;
+}
+
+.prose strong {
+  @apply font-semibold text-gray-900;
+}
+
+.prose em {
+  @apply italic text-gray-700;
+}
+
+.prose ul,
+.prose ol {
+  @apply pl-5 my-2;
+}
+
+.prose li {
+  @apply mb-1 text-gray-700;
+}
+
+.prose code {
+  @apply bg-gray-100 text-gray-800 px-1 py-0.5 rounded text-sm font-mono;
+}
+
+.prose pre {
+  @apply bg-gray-900 text-gray-100 p-3 rounded-lg overflow-x-auto text-sm my-3;
+}
+
+.prose a {
+  @apply text-blue-600 underline hover:text-blue-700 transition;
+}
+
+.prose blockquote {
+  @apply border-l-4 border-blue-400 pl-4 italic text-gray-600 bg-blue-50 rounded-r-md py-1 my-2;
+}
+
+.prose table {
+  @apply border border-gray-200 rounded-md my-3 w-full text-sm;
+}
+
+.prose th,
+.prose td {
+  @apply border border-gray-200 px-3 py-1;
+}
+
+.prose th {
+  @apply bg-gray-100 font-semibold;
+}
+
+/* === DODATKOWE POPRAWKI DO CHAT DIALOGU === */
+
+.prose-sm {
+  @apply text-[0.92rem] leading-relaxed;
+}
+
+.prose-sm p {
+  @apply mb-2;
+}
+
+.prose-sm ul,
+.prose-sm ol {
+  @apply my-1.5;
+}
