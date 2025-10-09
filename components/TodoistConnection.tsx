@@ -3,8 +3,6 @@
 import { useState } from 'react'
 import TodoistTasksView from './TodoistTasksView'
 import TodoistAIView from './TodoistAIView'
-import GlobalDialog from './GlobalDialog'
-import TaskDialog from './TaskDialog'
 
 interface TodoistConnectionProps {
   token: string
@@ -13,7 +11,6 @@ interface TodoistConnectionProps {
 
 export default function TodoistConnection({ token, onDisconnect }: TodoistConnectionProps) {
   const [mode, setMode] = useState<'tasks' | 'ai'>('tasks')
-  const [selectedChat, setSelectedChat] = useState<{ key: string; title: string } | null>(null)
 
   return (
     <div className="relative flex flex-col h-[calc(100vh-100px)] bg-gray-50 border border-green-200 rounded-xl overflow-hidden">
@@ -67,44 +64,6 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
           <TodoistAIView token={token} />
         )}
       </div>
-
-      {/* 🧠 Modal kontynuacji czatu (po kliknięciu np. z listy) */}
-      {selectedChat && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-3"
-          onClick={() => setSelectedChat(null)}
-        >
-          <div
-            className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border border-gray-200 overflow-hidden animate-fadeIn max-h-[90vh]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex justify-between items-center px-5 py-3 border-b bg-gray-50">
-              <h2 className="text-lg font-semibold text-gray-800">
-                💬 {selectedChat.title}
-              </h2>
-              <button
-                onClick={() => setSelectedChat(null)}
-                className="text-sm text-gray-500 hover:text-gray-700 transition"
-              >
-                ✕ Zamknij
-              </button>
-            </div>
-
-            {selectedChat.key === 'chat_global' ? (
-              <GlobalDialog onClose={() => setSelectedChat(null)} />
-            ) : (
-              <TaskDialog
-                task={{
-                  id: selectedChat.key.replace('chat_', ''),
-                  content: selectedChat.title,
-                }}
-                mode="help"
-                onClose={() => setSelectedChat(null)}
-              />
-            )}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
