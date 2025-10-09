@@ -11,33 +11,49 @@ interface Task {
   project_id?: string
 }
 
-export default function TodoistTasks({
-  token,
-  filter,
-  onChangeFilter,
-}: {
+interface TodoistTasksProps {
   token: string
-  filter: string
-  onChangeFilter: (f: string) => void
-}) {
+  filter: 'today' | 'tomorrow' | 'overdue' | '7 days'
+  onChangeFilter: (filter: 'today' | 'tomorrow' | 'overdue' | '7 days') => void
+  onUpdate?: (tasks: Task[]) => void
+}
+
+export default function TodoistTasks({ token, filter, onChangeFilter, onUpdate }: TodoistTasksProps) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
 
+  // 🔹 Pobierz zadania z backendu API
   useEffect(() => {
     if (!token) return
     setLoading(true)
+
     fetch(`/api/todoist/tasks?token=${token}&filter=${filter}`)
       .then((res) => res.json())
-      .then((data) => setTasks(data.tasks || []))
+      .then((data) => {
+        const t = data.tasks || []
+        setTasks(t)
+        if (onUpdate) onUpdate(t)
+      })
+      .catch((err) => console.error('❌ Błąd pobierania zadań:', err))
       .finally(() => setLoading(false))
   }, [token, filter])
 
-  if (loading)
-    return (
-      <p className="text-sm text-neutral-500 mt-4">⏳ Wczytywanie zadań...</p>
-    )
+  // 🔁 Reaguj na aktualizacje (np. gdy AI doda komentarz)
+  useEffect(() => {
+    const handleUpdate = () => {
+      fetch(`/api/todoist/tasks?token=${token}&filter=${filter}`)
+        .then((res) => res.json())
+        .then((data) => setTasks(data.tasks || []))
+        .catch((err) => console.error('❌ Błąd odświeżenia:', err))
+    }
+    window.addEventListener('taskUpdated', handleUpdate)
+    return () => window.removeEventListener('taskUpdated', handleUpdate)
+  }, [token, filter])
 
-  // 🔧 Grupowanie po dacie
+  if (loading)
+    return <p className="text-sm text-neutral-500 mt-4">⏳ Wczytywanie zadań...</p>
+
+  // 🔧 Grupowanie po dacie (dla filtru "7 days")
   const groupedByDate = tasks.reduce((acc, t) => {
     const date = t.due || 'Brak terminu'
     if (!acc[date]) acc[date] = []
@@ -48,14 +64,14 @@ export default function TodoistTasks({
   return (
     <div className="space-y-4">
       {/* 🔹 Sticky belka filtrów */}
-      <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-neutral-200 py-2 px-2 flex gap-2">
-        {['today', 'tomorrow', 'overdue', '7 days'].map((f) => (
+      <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-md border-b border-neutral-200 py-2 px-2 flex gap-2">
+        {(['today', 'tomorrow', 'overdue', '7 days'] as const).map((f) => (
           <button
             key={f}
             onClick={() => onChangeFilter(f)}
             className={`px-3 py-1 rounded-lg text-sm font-medium transition-all ${
               filter === f
-                ? 'bg-blue-600 text-white shadow-sm'
+                ? 'bg-green-600 text-white shadow-sm'
                 : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
             }`}
           >
@@ -77,7 +93,7 @@ export default function TodoistTasks({
             .sort()
             .map((date) => (
               <div key={date} className="mb-6">
-                <h3 className="text-sm font-semibold text-neutral-700 mb-2 border-b pb-1">
+                <h3 className="text-sm font-semibold text-neutral-700 mb-2 border-b pb-1 flex items-center gap-1">
                   📅{' '}
                   {date === 'Brak terminu'
                     ? 'Brak terminu'
@@ -89,18 +105,13 @@ export default function TodoistTasks({
                 </h3>
                 <div className="space-y-2">
                   {groupedByDate[date].map((t) => (
-                    <TaskCard
-                      key={t.id}
-                      task={t}
-                      token={token}
-                      onAction={() => {}}
-                    />
+                    <TaskCard key={t.id} task={t} token={token} onAction={() => {}} />
                   ))}
                 </div>
               </div>
             ))
         ) : tasks.length === 0 ? (
-          <p className="text-sm text-neutral-500 mt-2">
+          <p className="text-sm text-neutral-500 mt-2 text-center">
             Brak zadań dla filtru „{filter}”.
           </p>
         ) : (
