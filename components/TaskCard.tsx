@@ -19,9 +19,19 @@ interface TaskCardProps {
   task: Task
   token: string
   onAction: (action: 'completed' | 'deleted' | 'postponed') => void
+  selectable?: boolean
+  selected?: boolean
+  onSelectChange?: (checked: boolean) => void
 }
 
-export default function TaskCard({ task, token, onAction }: TaskCardProps) {
+export default function TaskCard({
+  task,
+  token,
+  onAction,
+  selectable = false,
+  selected = false,
+  onSelectChange,
+}: TaskCardProps) {
   const [showDialog, setShowDialog] = useState(false)
   const [summary, setSummary] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
@@ -86,10 +96,22 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -10, scale: 0.97 }}
           transition={{ duration: 0.25 }}
-          className="relative border border-gray-200 rounded-md p-2.5 bg-white shadow-sm hover:shadow-md transition-all group overflow-visible"
+          className={`relative border border-gray-200 rounded-md p-2.5 bg-white shadow-sm hover:shadow-md transition-all group overflow-visible ${
+            selected ? 'ring-2 ring-blue-400' : ''
+          }`}
         >
           {/* 📄 Główna sekcja */}
-          <div className="flex justify-between items-start gap-1 relative">
+          <div className="flex justify-between items-start gap-2 relative">
+            {/* ✅ Checkbox (dla batch-actions) */}
+            {selectable && (
+              <input
+                type="checkbox"
+                checked={selected}
+                onChange={(e) => onSelectChange?.(e.target.checked)}
+                className="mt-[2px] accent-blue-600 cursor-pointer"
+              />
+            )}
+
             {/* 📝 Treść zadania */}
             <div className="flex-1 pr-2">
               <p className="font-medium text-gray-800 text-[13px] leading-snug">
@@ -144,7 +166,7 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
                       className="fixed z-[99999] bg-white border border-gray-200 text-gray-700 text-xs rounded-md p-2.5 w-64 shadow-2xl pointer-events-none"
                       style={{
                         top: tooltipPos.y,
-                        left: tooltipPos.x - 256, // po lewej stronie kursora
+                        left: tooltipPos.x - 256,
                       }}
                     >
                       <p className="font-semibold text-gray-800">🧠 Wnioski AI:</p>
