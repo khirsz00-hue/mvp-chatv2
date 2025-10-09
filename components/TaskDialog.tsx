@@ -36,7 +36,6 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     const token = localStorage.getItem('todoist_token') || ''
     setTodoistToken(token)
 
-    // zapisz nazwę zadania dla historii w sidebarze
     localStorage.setItem(titleKey, task.content)
   }, [chatKey, titleKey, task.content])
 
@@ -47,26 +46,39 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     }
   }, [chat, chatKey])
 
-  // 🔽 Auto-scroll
+  // 🔽 Auto-scroll do dołu
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+    scrollRef.current?.scrollTo({
+      top: scrollRef.current.scrollHeight,
+      behavior: 'smooth',
+    })
   }, [chat, loading])
 
-  // 🔁 Real-time odbiór wiadomości (SSE)
+  // 🔁 Odbiór wiadomości przez SSE (real-time)
   useEffect(() => {
     const es = new EventSource('/api/chat/stream')
+
     es.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data)
-        if (data.taskId !== task.id) return
-        setChat((prev) => [...prev, { role: data.role, content: data.message }])
+        if (data.type === 'chat_message' && data.taskId === task.id) {
+          setChat((prev) => [...prev, { role: data.role, content: data.message }])
+        }
       } catch (err) {
         console.error('❌ Błąd parsowania wiadomości SSE:', err)
       }
     }
+
+    es.onerror = (err) => {
+      console.warn('⚠️ Rozłączono SSE, ponawiam za 5s...')
+      es.close()
+      setTimeout(() => new EventSource('/api/chat/stream'), 5000)
+    }
+
     return () => es.close()
   }, [task.id])
 
+  // ✉️ Wysyłanie wiadomości
   const sendMessage = async () => {
     const text = input.trim()
     if (!text || loading) return
@@ -78,7 +90,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     setLoading(true)
 
     try {
-      // 📡 Wyślij do API chatowego
+      // 🧠 Zapytanie do AI
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -92,28 +104,25 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
       const data = await res.json()
       const reply = data.reply?.trim() || '⚠️ Brak odpowiedzi od modelu.'
 
-      const newChat: ChatMessage[] = [
-        ...updated,
-        { role: 'assistant' as const, content: reply as string },
-      ]
+      const newChat = [...updated, { role: 'assistant' as const, content: reply }]
       setChat(newChat)
-
-      // 💾 zapis
       localStorage.setItem(chatKey, JSON.stringify(newChat))
 
-      // 📤 broadcast wiadomości (dla innych otwartych czatów)
-      await fetch('/api/chat/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId: task.id, message: text, role: 'user' }),
-      })
-      await fetch('/api/chat/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId: task.id, message: reply, role: 'assistant' }),
-      })
+      // 📢 Broadcast (dla innych okien)
+      await Promise.all([
+        fetch('/api/chat/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskId: task.id, message: text, role: 'user' }),
+        }),
+        fetch('/api/chat/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskId: task.id, message: reply, role: 'assistant' }),
+        }),
+      ])
 
-      // 🧠 generuj syntezę
+      // 🧩 Synteza po zakończeniu rozmowy
       await generateSynthesis(newChat)
     } catch (err) {
       console.error('❌ Błąd komunikacji z AI:', err)
@@ -126,7 +135,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     }
   }
 
-  // 🧠 SYNTEZA – generuje skrót rozmowy i wysyła do Todoist
+  // 🧠 SYNTEZA – generuje skrót rozmowy i zapisuje w Todoist
   const generateSynthesis = async (fullChat: ChatMessage[]) => {
     try {
       const contextText = fullChat.map((m) => `${m.role}: ${m.content}`).join('\n')
@@ -146,11 +155,9 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
       const data = await res.json()
       const synthesis = data.reply?.trim() || 'Brak syntezy.'
 
-      // 💾 lokalny zapis
       localStorage.setItem(summaryKey, synthesis)
       window.dispatchEvent(new Event('taskUpdated'))
 
-      // 💬 komentarz w Todoist
       if (todoistToken) {
         await fetch('https://api.todoist.com/rest/v2/comments', {
           method: 'POST',
@@ -173,16 +180,18 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-3"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-3"
       onClick={onClose}
     >
       <div
-        className="bg-white w-full max-w-lg rounded-2xl shadow-xl flex flex-col border border-gray-200 overflow-hidden animate-fadeIn max-h-[90vh]"
+        className="relative bg-white w-full max-w-lg rounded-2xl shadow-2xl flex flex-col border border-gray-200 overflow-hidden max-h-[90vh] animate-fadeIn"
         onClick={(e) => e.stopPropagation()}
       >
         {/* HEADER */}
-        <div className="flex justify-between items-center px-5 py-3 border-b bg-gray-50">
-          <h2 className="text-lg font-semibold text-gray-800">Pomoc z zadaniem</h2>
+        <div className="sticky top-0 flex justify-between items-center px-5 py-3 border-b bg-gray-50 z-10">
+          <h2 className="text-lg font-semibold text-gray-800 truncate pr-4">
+            Pomoc z zadaniem
+          </h2>
           <button
             onClick={onClose}
             className="text-sm text-gray-500 hover:text-gray-700 transition"
@@ -192,7 +201,10 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
         </div>
 
         {/* CZAT */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-gray-50">
+        <div
+          ref={scrollRef}
+          className="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-gray-50 scroll-smooth"
+        >
           {chat.length === 0 && (
             <div className="bg-white p-3 rounded-lg shadow-sm border text-sm text-gray-800 leading-relaxed">
               🧠 Zajmijmy się zadaniem: <b>"{task.content}"</b>.<br />
@@ -226,7 +238,7 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
         </div>
 
         {/* INPUT */}
-        <div className="border-t bg-white flex p-3 space-x-2 sticky bottom-0">
+        <div className="sticky bottom-0 border-t bg-white flex p-3 space-x-2">
           <input
             type="text"
             value={input}
