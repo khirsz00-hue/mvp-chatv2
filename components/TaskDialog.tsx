@@ -42,7 +42,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
 
   // 💾 Zapisuj każdą zmianę rozmowy
   useEffect(() => {
-    if (typeof window !== 'undefined' && chat.length > 0) {
+    if (typeof window !== 'undefined') {
       localStorage.setItem(chatKey, JSON.stringify(chat))
     }
   }, [chat, chatKey])
@@ -51,6 +51,21 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [chat, loading])
+
+  // 🔁 Real-time odbiór wiadomości (SSE)
+  useEffect(() => {
+    const es = new EventSource('/api/chat/stream')
+    es.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        if (data.taskId !== task.id) return
+        setChat((prev) => [...prev, { role: data.role, content: data.message }])
+      } catch (err) {
+        console.error('❌ Błąd parsowania wiadomości SSE:', err)
+      }
+    }
+    return () => es.close()
+  }, [task.id])
 
   const sendMessage = async () => {
     const text = input.trim()
@@ -63,6 +78,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     setLoading(true)
 
     try {
+      // 📡 Wyślij do API chatowego
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -77,13 +93,27 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
       const reply = data.reply?.trim() || '⚠️ Brak odpowiedzi od modelu.'
 
       const newChat: ChatMessage[] = [
-  ...updated,
-  { role: 'assistant' as const, content: reply as string },
-]
-setChat(newChat)
+        ...updated,
+        { role: 'assistant' as const, content: reply as string },
+      ]
+      setChat(newChat)
 
-      // 💾 zapisz rozmowę i generuj syntezę
+      // 💾 zapis
       localStorage.setItem(chatKey, JSON.stringify(newChat))
+
+      // 📤 broadcast wiadomości (dla innych otwartych czatów)
+      await fetch('/api/chat/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId: task.id, message: text, role: 'user' }),
+      })
+      await fetch('/api/chat/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId: task.id, message: reply, role: 'assistant' }),
+      })
+
+      // 🧠 generuj syntezę
       await generateSynthesis(newChat)
     } catch (err) {
       console.error('❌ Błąd komunikacji z AI:', err)
