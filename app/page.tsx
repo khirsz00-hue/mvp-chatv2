@@ -31,7 +31,7 @@ export default function HomePage() {
     }
   }, [])
 
-  // 💬 Funkcja do wysyłania wiadomości (dla 6 Hats Assistant)
+  // 💬 Obsługa czatu (dla 6 Hats Assistant)
   const handleSend = async (message: string) => {
     const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: message }
     const updated = [...messages, userMsg]
@@ -62,7 +62,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      {/* Górny pasek nawigacji */}
+      {/* 🔹 Górny pasek */}
       <header className="flex items-center justify-between px-6 py-3 bg-white border-b shadow-sm">
         <h1 className="text-lg font-semibold text-gray-800">AI Assistants PRO</h1>
         <nav className="flex gap-2">
@@ -85,7 +85,7 @@ export default function HomePage() {
         </nav>
       </header>
 
-      {/* Główna treść */}
+      {/* 🔸 Główna sekcja */}
       <main className="flex-1 flex flex-col p-4">
         {active === 'todoist' && (
           <>
