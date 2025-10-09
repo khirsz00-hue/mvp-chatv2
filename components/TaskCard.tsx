@@ -22,6 +22,13 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
   const [dialogMode, setDialogMode] = useState<'none' | 'help'>('none')
   const [summary, setSummary] = useState<string | null>(null)
 
+  // 📦 zapisz nazwę taska (dla historii czatów)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`task_title_${task.id}`, task.content)
+    }
+  }, [task.id, task.content])
+
   // 🔁 wczytywanie lokalnej syntezy (AI summary)
   const loadSummary = () => {
     const saved = localStorage.getItem(`summary_${task.id}`)
@@ -30,7 +37,7 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
 
   useEffect(() => {
     loadSummary()
-    // nasłuchuj eventu "taskUpdated" aby automatycznie odświeżać tooltip
+    // nasłuchuj eventu "taskUpdated" aby automatycznie odświeżać tooltip po nowej syntezie
     const handler = () => loadSummary()
     window.addEventListener('taskUpdated', handler)
     return () => window.removeEventListener('taskUpdated', handler)
@@ -74,17 +81,17 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
         {/* 💡 Ikona syntezy */}
         {summary && (
           <div className="ml-2 relative group/summary">
-            <span className="text-yellow-500 text-lg cursor-pointer">💡</span>
-            <div className="absolute right-0 top-6 z-20 hidden group-hover/summary:block bg-white border border-gray-200 text-gray-700 text-xs rounded-md p-2 w-64 shadow-lg">
-              <b>Synteza AI:</b>
-              <p className="mt-1 text-gray-600 whitespace-pre-line">{summary}</p>
+            <span className="text-yellow-500 text-lg cursor-pointer select-none">💡</span>
+            <div className="absolute right-0 top-6 z-20 hidden group-hover/summary:block bg-white border border-gray-200 text-gray-700 text-xs rounded-md p-3 w-64 shadow-xl">
+              <p className="font-semibold text-gray-800">🧠 Wnioski AI:</p>
+              <p className="mt-1 text-gray-600 whitespace-pre-line leading-snug">{summary}</p>
             </div>
           </div>
         )}
       </div>
 
       {/* 🔹 Przyciski akcji */}
-      <div className="flex justify-end gap-2 mt-2">
+      <div className="flex justify-end gap-2 mt-2 flex-wrap">
         <button
           onClick={handleComplete}
           className="px-2 py-1 text-xs rounded-lg bg-green-100 hover:bg-green-200 text-green-700"
