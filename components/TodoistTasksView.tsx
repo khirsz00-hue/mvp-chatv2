@@ -10,59 +10,69 @@ export default function TodoistTasksView({ token }: { token: string }) {
 
   const handleRefresh = (updated?: any[]) => updated && setTasks(updated)
 
-  // 🔁 Automatyczne nasłuchiwanie webhooków Todoist (SSE)
   useEffect(() => {
     if (!token) return
 
     let es: EventSource | null = null
 
-    const connect = () => {
-      es = new EventSource('/api/todoist/stream')
-      console.log('📡 Połączono z Todoist streamem...')
+    // 📡 Połączenie SSE (działa lokalnie, na Vercel może być ubijane)
+    const connectSSE = () => {
+      try {
+        es = new EventSource('/api/todoist/stream')
+        console.log('📡 Połączono z Todoist streamem...')
 
-      es.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data)
-          if (data.event?.startsWith('item:')) {
-            console.log('🔁 Otrzymano event Todoist:', data)
+        es.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data)
+            if (data.event?.startsWith('item:')) {
+              console.log('🔁 Otrzymano event Todoist:', data)
 
-            // 🔄 Odświeżenie listy zadań
-            window.dispatchEvent(new Event('taskUpdated'))
+              // 🔄 Odświeżenie listy
+              window.dispatchEvent(new Event('taskUpdated'))
 
-            // 💬 Toast powiadomienia
-            const msg =
-              data.event === 'item:added'
-                ? '🆕 Dodano nowe zadanie'
-                : data.event === 'item:completed'
-                ? '✅ Zadanie ukończone'
-                : data.event === 'item:updated'
-                ? '✏️ Zmieniono zadanie'
-                : '🔄 Lista zadań zaktualizowana'
+              const msg =
+                data.event === 'item:added'
+                  ? '🆕 Dodano nowe zadanie'
+                  : data.event === 'item:completed'
+                  ? '✅ Zadanie ukończone'
+                  : data.event === 'item:updated'
+                  ? '✏️ Zmieniono zadanie'
+                  : '🔄 Lista zadań zaktualizowana'
 
-            setToast(msg)
-            setTimeout(() => setToast(null), 2500)
+              setToast(msg)
+              setTimeout(() => setToast(null), 2500)
+            }
+          } catch (err) {
+            console.error('❌ Błąd parsowania SSE:', err)
           }
-        } catch (err) {
-          console.error('❌ Błąd parsowania SSE:', err)
         }
-      }
 
-      es.onerror = (err) => {
-        console.warn('⚠️ Błąd SSE, ponowne łączenie za 5s...', err)
-        es?.close()
-        setTimeout(connect, 5000)
+        es.onerror = (err) => {
+          console.warn('⚠️ Błąd SSE, ponowne łączenie za 5s...', err)
+          es?.close()
+          setTimeout(connectSSE, 5000)
+        }
+      } catch (err) {
+        console.warn('❌ Nie udało się połączyć z SSE:', err)
       }
     }
 
-    connect()
+    connectSSE()
 
-    // 🫀 Ping utrzymujący połączenie (co 25 sekund)
+    // 🫀 Ping (utrzymuje połączenie przy życiu lokalnie)
     const ping = setInterval(() => {
       fetch('/api/todoist/stream/ping').catch(() => {})
     }, 25000)
 
+    // 🔁 Polling zapasowy (działa zawsze, również na Vercel)
+    const poll = setInterval(() => {
+      console.log('🔁 Polling Todoist – odświeżenie listy')
+      window.dispatchEvent(new Event('taskUpdated'))
+    }, 5000)
+
     return () => {
       clearInterval(ping)
+      clearInterval(poll)
       es?.close()
     }
   }, [token])
