@@ -58,7 +58,10 @@ export default function HomePage() {
 
 {/* ✅ Sekcja integracji Todoist */}
 {active === 'todoist' && (
-  <TodoistConnection />
+  <TodoistConnection
+    token={token}
+    onDisconnect={() => setToken('')}
+  />
 )}
 
         <Chat onSend={handleSend} messages={messages} />
