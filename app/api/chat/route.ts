@@ -6,32 +6,33 @@ export async function POST(req: Request) {
   try {
     const { message, context, todoist_token } = await req.json()
 
-    if (!message?.trim()) {
-      return NextResponse.json({ error: 'Brak wiadomości.' }, { status: 400 })
+    // 🧩 Walidacja
+    if (typeof message !== 'string' || !message.trim()) {
+      return NextResponse.json(
+        { error: 'Nieprawidłowa wiadomość — oczekiwano tekstu.' },
+        { status: 400 }
+      )
     }
 
-    const lower = message.toLowerCase()
+    // 🧩 Obsługa komend z Todoista
     const taskKeywords = ['zadania', 'taski', 'lista', 'na dziś', 'na dzis', 'co mam dziś', 'co mam dzis']
 
-    // 🔹 Token Todoista
-    const token = todoist_token || process.env.TODOIST_API_TOKEN
-    if (!token) {
-      console.error('🚫 Brak tokena Todoist!')
-      return NextResponse.json({ reply: 'Nie znaleziono tokena Todoist 😞', type: 'error' })
-    }
+    if (taskKeywords.some(k => message.toLowerCase().includes(k))) {
+      if (!todoist_token) {
+        console.error('❌ Brak tokena Todoist!')
+        return NextResponse.json({
+          reply: 'Nie udało się pobrać zadań — brak tokena Todoist 😞',
+          type: 'error',
+        })
+      }
 
-    // 🧠 Jeśli wiadomość dotyczy zadań
-    if (taskKeywords.some((k) => lower.includes(k))) {
       try {
+        console.log('🔑 Używam tokena Todoist:', todoist_token.slice(0, 8) + '...')
         const res = await fetch('https://api.todoist.com/rest/v2/tasks', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          cache: 'no-store',
+          headers: { Authorization: `Bearer ${todoist_token}` },
         })
 
         if (!res.ok) {
-          console.error('❌ Błąd Todoist API:', await res.text())
           throw new Error(`Błąd Todoist API: ${res.status}`)
         }
 
@@ -55,7 +56,7 @@ export async function POST(req: Request) {
             due: t.due?.date || null,
             priority: t.priority,
           })),
-          reply: `Znalazłem ${todaysTasks.length} zadań na dziś ✅`,
+          reply: 'Oto Twoje zadania na dziś:',
         })
       } catch (err) {
         console.error('❌ Błąd Todoist:', err)
@@ -66,16 +67,27 @@ export async function POST(req: Request) {
       }
     }
 
-    // 🧩 OpenAI (reszta bez zmian)
+    // 🧩 Sprawdzenie OpenAI
+    if (!process.env.OPENAI_API_KEY) {
+      console.error('❌ Brak OPENAI_API_KEY w środowisku!')
+      return NextResponse.json(
+        { error: 'Brak konfiguracji OpenAI API Key.' },
+        { status: 500 }
+      )
+    }
+
+    // 🧠 OpenAI client
     const OpenAI = (await import('openai')).default
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
-    const systemPrompt = `
-      Jesteś asystentem produktywności, który pomaga użytkownikowi wykonać zadanie krok po kroku.
-      Jeśli użytkownik pyta o listę zadań, zawsze używaj API Todoista.
-      Zawsze odpowiadaj po polsku, jasno i konkretnie.
-      ${context ? `Kontekst zadania: ${context}` : ''}
-    `.trim()
+    const systemPrompt = [
+      'Jesteś asystentem produktywności, który pomaga użytkownikowi wykonać zadania krok po kroku.',
+      'Zadawaj pytania pomocnicze, jeśli coś jest niejasne.',
+      'Zawsze odpowiadaj po polsku, jasno i konkretnie.',
+      context ? `Kontekst: ${context}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n')
 
     const completion = await client.chat.completions.create({
       model: 'gpt-4o-mini',
