@@ -1,7 +1,9 @@
 import { NextRequest } from 'next/server'
-import { addClient, removeClient } from './store'
 
-// 🔁 Główna trasa SSE
+export const dynamic = 'force-dynamic' // 🧠 kluczowe: wyłącza statyczne generowanie
+
+let clients: any[] = []
+
 export async function GET(req: NextRequest) {
   const stream = new ReadableStream({
     start(controller) {
@@ -11,11 +13,10 @@ export async function GET(req: NextRequest) {
           controller.enqueue(`data: ${JSON.stringify(data)}\n\n`)
         },
       }
-
-      addClient(client)
+      clients.push(client)
 
       req.signal.addEventListener('abort', () => {
-        removeClient(client.id)
+        clients = clients.filter((c) => c.id !== client.id)
         controller.close()
       })
     },
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest) {
   return new Response(stream, {
     headers: {
       'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
+      'Cache-Control': 'no-cache, no-transform',
       Connection: 'keep-alive',
     },
   })
