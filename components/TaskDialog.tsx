@@ -16,29 +16,36 @@ type ChatMessage = {
 }
 
 export default function TaskDialog({ task, mode, onClose }: Props) {
-  const storageKey = `chat_${task?.id || task?.content?.slice(0, 30)}`
+  const chatKey = `chat_task_${task?.id}`
+  const summaryKey = `summary_${task?.id}`
+  const titleKey = `task_title_${task?.id}`
+
   const [chat, setChat] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const scrollRef = useRef<HTMLDivElement | null>(null)
   const [todoistToken, setTodoistToken] = useState<string>('')
+  const scrollRef = useRef<HTMLDivElement | null>(null)
 
-  // 🔹 Wczytaj historię i token tylko raz
+  // 🧩 Wczytaj historię rozmowy + token
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(storageKey)
-      if (saved) setChat(JSON.parse(saved))
-      const token = localStorage.getItem('todoist_token') || ''
-      setTodoistToken(token)
-    }
-  }, [storageKey])
+    if (typeof window === 'undefined') return
 
-  // 💾 Zapisz rozmowę przy każdej zmianie
+    const saved = localStorage.getItem(chatKey)
+    if (saved) setChat(JSON.parse(saved))
+
+    const token = localStorage.getItem('todoist_token') || ''
+    setTodoistToken(token)
+
+    // zapisz nazwę zadania dla historii w sidebarze
+    localStorage.setItem(titleKey, task.content)
+  }, [chatKey, titleKey, task.content])
+
+  // 💾 Zapisuj każdą zmianę rozmowy
   useEffect(() => {
     if (typeof window !== 'undefined' && chat.length > 0) {
-      localStorage.setItem(storageKey, JSON.stringify(chat))
+      localStorage.setItem(chatKey, JSON.stringify(chat))
     }
-  }, [chat, storageKey])
+  }, [chat, chatKey])
 
   // 🔽 Auto-scroll
   useEffect(() => {
@@ -46,42 +53,38 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
   }, [chat, loading])
 
   const sendMessage = async () => {
-    const userMessage = input.trim()
-    if (!userMessage || loading) return
+    const text = input.trim()
+    if (!text || loading) return
 
-    const newMessage: ChatMessage = { role: 'user', content: userMessage }
-    const updatedChat = [...chat, newMessage]
-    setChat(updatedChat)
+    const newMsg: ChatMessage = { role: 'user', content: text }
+    const updated = [...chat, newMsg]
+    setChat(updated)
     setInput('')
     setLoading(true)
 
     try {
-      // 🔹 Wyślij wiadomość do API
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: userMessage,
+          message: text,
           context: task?.content || '',
         }),
       })
 
       if (!res.ok) throw new Error('Błąd odpowiedzi z API')
       const data = await res.json()
-      const reply =
-        typeof data.reply === 'string' ? data.reply.trim() : '⚠️ Brak odpowiedzi od modelu.'
+      const reply = data.reply?.trim() || '⚠️ Brak odpowiedzi od modelu.'
 
-      const newChat: ChatMessage[] = [
-        ...updatedChat,
-        { role: 'assistant', content: reply },
-      ]
+      const newChat = [...updated, { role: 'assistant', content: reply }]
       setChat(newChat)
 
-      // 🔹 Generuj syntezę po odpowiedzi
+      // 💾 zapisz rozmowę i generuj syntezę
+      localStorage.setItem(chatKey, JSON.stringify(newChat))
       await generateSynthesis(newChat)
     } catch (err) {
       console.error('❌ Błąd komunikacji z AI:', err)
-      setChat(prev => [
+      setChat((prev) => [
         ...prev,
         { role: 'assistant', content: '⚠️ Wystąpił błąd podczas komunikacji z AI.' },
       ])
@@ -93,30 +96,28 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
   // 🧠 SYNTEZA – generuje skrót rozmowy i wysyła do Todoist
   const generateSynthesis = async (fullChat: ChatMessage[]) => {
     try {
-      const contextText = fullChat.map(m => `${m.role}: ${m.content}`).join('\n')
+      const contextText = fullChat.map((m) => `${m.role}: ${m.content}`).join('\n')
       const synthesisPrompt = `
-Podsumuj rozmowę o zadaniu "${task.content}" w 2-3 zdaniach. 
-Uwzględnij najważniejsze ustalenia lub wnioski. 
+Podsumuj rozmowę o zadaniu "${task.content}" w 2–3 zdaniach.
+Uwzględnij najważniejsze ustalenia, decyzje lub plan działania.
 Napisz po polsku, zaczynając od "Wnioski AI:".
       `.trim()
 
-      const synthesisRes = await fetch('/api/chat', {
+      const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: synthesisPrompt + '\n\n' + contextText }),
       })
 
-      if (!synthesisRes.ok) throw new Error('Błąd generowania syntezy')
-      const synthesisData = await synthesisRes.json()
-      const synthesis = synthesisData.reply?.trim() || 'Brak syntezy.'
+      if (!res.ok) throw new Error('Błąd generowania syntezy')
+      const data = await res.json()
+      const synthesis = data.reply?.trim() || 'Brak syntezy.'
 
-      // 💾 Zapisz lokalnie
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(`summary_${task.id}`, synthesis)
-        window.dispatchEvent(new Event('taskUpdated'))
-      }
+      // 💾 lokalny zapis
+      localStorage.setItem(summaryKey, synthesis)
+      window.dispatchEvent(new Event('taskUpdated'))
 
-      // 💬 Wyślij komentarz do Todoist
+      // 💬 komentarz w Todoist
       if (todoistToken) {
         await fetch('https://api.todoist.com/rest/v2/comments', {
           method: 'POST',
@@ -144,7 +145,7 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
     >
       <div
         className="bg-white w-full max-w-lg rounded-2xl shadow-xl flex flex-col border border-gray-200 overflow-hidden animate-fadeIn max-h-[90vh]"
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* HEADER */}
         <div className="flex justify-between items-center px-5 py-3 border-b bg-gray-50">
@@ -162,7 +163,7 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
           {chat.length === 0 && (
             <div className="bg-white p-3 rounded-lg shadow-sm border text-sm text-gray-800 leading-relaxed">
               🧠 Zajmijmy się zadaniem: <b>"{task.content}"</b>.<br />
-              Na czym dokładnie ono polega? Co chcesz osiągnąć i co Cię blokuje?
+              Co chcesz osiągnąć i co Cię blokuje?
             </div>
           )}
 
@@ -196,8 +197,8 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
           <input
             type="text"
             value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && sendMessage()}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
             placeholder="Napisz wiadomość..."
             className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
