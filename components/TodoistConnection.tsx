@@ -1,54 +1,40 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import TodoistTasks from '@/components/TodoistTasks'
+import { useState } from 'react'
+import TodoistTasks from './TodoistTasks'
 
-export default function TodoistConnection() {
-  const [token, setToken] = useState<string | null>(null)
+interface TodoistConnectionProps {
+  token: string
+  onDisconnect: () => void
+}
 
-  useEffect(() => {
-    // sprawdź token w URL po przekierowaniu z Todoist
-    const urlParams = new URLSearchParams(window.location.search)
-    const accessToken = urlParams.get('todoist_token')
-    if (accessToken) {
-      localStorage.setItem('todoist_token', accessToken)
-      setToken(accessToken)
-      window.history.replaceState({}, document.title, window.location.pathname)
-    } else {
-      const saved = localStorage.getItem('todoist_token')
-      if (saved) setToken(saved)
-    }
-  }, [])
+export default function TodoistConnection({
+  token,
+  onDisconnect,
+}: TodoistConnectionProps) {
+  const [filter, setFilter] = useState('today')
 
-  const handleDisconnect = () => {
-    localStorage.removeItem('todoist_token')
-    setToken(null)
-  }
-
-  if (!token) {
-    return (
-      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl">
-        <p className="text-sm text-blue-800 mb-2">
-          🔗 Połącz konto Todoist, aby zarządzać swoimi zadaniami.
+  return (
+    <div className="border border-green-200 rounded-xl p-4 bg-green-50">
+      <div className="flex justify-between items-center mb-3">
+        <p className="text-sm font-medium text-green-800">
+          ✅ Połączono z Todoist
         </p>
-        <a
-          href="/api/todoist/auth"
-          className="btn btn-primary text-sm"
+        <button
+          onClick={onDisconnect}
+          className="text-sm px-2 py-1 rounded-lg bg-red-100 hover:bg-red-200 text-red-700"
         >
-          Połącz z Todoist
-        </a>
+          Odłącz
+        </button>
       </div>
-    )
-  }
 
-    return (
-    <div className="mb-6 p-3 bg-green-50 border border-green-200 rounded-xl">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-sm text-green-700">✅ Połączono z Todoist</span>
-        <button onClick={handleDisconnect} className="btn text-sm">Odłącz</button>
-      </div>
+      {/* 🔹 Lista zadań Todoist */}
       <div className="border-t border-green-200 pt-3">
-        <TodoistTasks token={token} />
+        <TodoistTasks
+          token={token}
+          filter={filter}
+          onChangeFilter={setFilter}
+        />
       </div>
     </div>
   )
