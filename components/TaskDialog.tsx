@@ -76,8 +76,11 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
       const data = await res.json()
       const reply = data.reply?.trim() || '⚠️ Brak odpowiedzi od modelu.'
 
-      const newChat = [...updated, { role: 'assistant', content: reply }]
-      setChat(newChat)
+      const newChat: ChatMessage[] = [
+  ...updated,
+  { role: 'assistant' as const, content: reply as string },
+]
+setChat(newChat)
 
       // 💾 zapisz rozmowę i generuj syntezę
       localStorage.setItem(chatKey, JSON.stringify(newChat))
