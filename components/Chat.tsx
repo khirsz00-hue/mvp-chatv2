@@ -14,9 +14,10 @@ interface ChatProps {
   onSend: (msg: string) => Promise<void>
   messages: ChatMessage[]
   assistant?: 'global' | 'six_hats'
+  hideHistory?: boolean // 🔹 dodany prop – ukrywa starsze wiadomości
 }
 
-export default function Chat({ onSend, messages, assistant = 'six_hats' }: ChatProps) {
+export default function Chat({ onSend, messages, assistant = 'six_hats', hideHistory = true }: ChatProps) {
   const [input, setInput] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -42,12 +43,15 @@ export default function Chat({ onSend, messages, assistant = 'six_hats' }: ChatP
     await onSend(msg)
   }
 
+  // 🔹 Jeśli `hideHistory` = true, pokazuj tylko ostatnie 2 wiadomości (user + AI)
+  const visibleMessages = hideHistory ? messages.slice(-2) : messages
+
   return (
     <div className="flex flex-col h-[70vh] rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
       {/* CZAT */}
       <div className="flex-1 overflow-y-auto space-y-3 p-4 bg-gray-50">
         <AnimatePresence>
-          {messages.map((m) => (
+          {visibleMessages.map((m) => (
             <motion.div
               key={m.id}
               initial={{ opacity: 0, y: 10 }}
