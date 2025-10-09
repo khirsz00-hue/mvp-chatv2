@@ -27,6 +27,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
   const [loading, setLoading] = useState(false)
   const [todoistToken, setTodoistToken] = useState<string>('')
   const scrollRef = useRef<HTMLDivElement | null>(null)
+  const recentMessages = useRef<Set<string>>(new Set()) // 🔒 pamięć antyduplikatowa
 
   // 🧭 Blokuj scroll strony przy otwartym modalu
   useEffect(() => {
@@ -55,7 +56,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     }
   }, [chat, chatKey])
 
-  // 🔽 Auto-scroll do dołu
+  // 🔽 Auto-scroll
   useEffect(() => {
     scrollRef.current?.scrollTo({
       top: scrollRef.current.scrollHeight,
@@ -63,19 +64,17 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     })
   }, [chat, loading])
 
-  // 🔁 Odbiór wiadomości przez SSE (real-time) — z antyduplikatem
+  // 🔁 SSE z ochroną przed duplikatami
   useEffect(() => {
-    let lastMessage = ''
     const es = new EventSource('/api/chat/stream')
 
     es.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data)
         if (data.type === 'chat_message' && data.taskId === task.id) {
-          const serialized = `${data.role}:${data.message}`
-          if (serialized === lastMessage) return // 🚫 ignoruj duplikaty
-          lastMessage = serialized
-
+          const id = `${data.role}:${data.message}`
+          if (recentMessages.current.has(id)) return
+          recentMessages.current.add(id)
           setChat((prev) => [...prev, { role: data.role, content: data.message }])
         }
       } catch (err) {
@@ -96,14 +95,15 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     const text = input.trim()
     if (!text || loading) return
 
-    const newMsg: ChatMessage = { role: 'user', content: text }
-    const updated = [...chat, newMsg]
+    const userMsg: ChatMessage = { role: 'user', content: text }
+    const updated = [...chat, userMsg]
     setChat(updated)
     setInput('')
     setLoading(true)
+    recentMessages.current.add(`user:${text}`)
 
     try {
-      // 🧠 Zapytanie do AI
+      // 🧠 zapytanie do AI
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -117,11 +117,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
       const data = await res.json()
       const reply = data.reply?.trim() || '⚠️ Brak odpowiedzi od modelu.'
 
-      const newChat = [...updated, { role: 'assistant' as const, content: reply }]
-      setChat(newChat)
-      localStorage.setItem(chatKey, JSON.stringify(newChat))
-
-      // 📢 Broadcast (dla innych otwartych kart)
+      // 📢 wysyłka przez broadcast
       await Promise.all([
         fetch('/api/chat/send', {
           method: 'POST',
@@ -135,7 +131,13 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
         }),
       ])
 
-      // 🧩 Synteza po zakończeniu rozmowy
+      // 🔒 antyduplikat AI
+      recentMessages.current.add(`assistant:${reply}`)
+
+      // 🧠 synteza
+      const newChat = [...updated, { role: 'assistant', content: reply }]
+      setChat(newChat)
+      localStorage.setItem(chatKey, JSON.stringify(newChat))
       await generateSynthesis(newChat)
     } catch (err) {
       console.error('❌ Błąd komunikacji z AI:', err)
@@ -148,7 +150,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     }
   }
 
-  // 🧠 SYNTEZA – generuje skrót rozmowy i zapisuje w Todoist
+  // 🧠 SYNTEZA – skrót rozmowy i zapis do Todoist
   const generateSynthesis = async (fullChat: ChatMessage[]) => {
     try {
       const contextText = fullChat.map((m) => `${m.role}: ${m.content}`).join('\n')
@@ -189,10 +191,8 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
     }
   }
 
-  // 🚫 Ukryj, gdy nieaktywny
   if (mode !== 'help') return null
 
-  // 🪄 Modal renderowany w portalu (poza kontenerem listy)
   const modal = (
     <AnimatePresence>
       <motion.div
@@ -208,7 +208,6 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
           className="relative bg-white w-full max-w-lg rounded-2xl shadow-2xl flex flex-col border border-gray-200 overflow-hidden max-h-[90vh]"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* HEADER */}
           <div className="sticky top-0 flex justify-between items-center px-5 py-3 border-b bg-gray-50 z-10">
             <h2 className="text-lg font-semibold text-gray-800 truncate pr-4">
               Pomoc z zadaniem
@@ -221,7 +220,6 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
             </button>
           </div>
 
-          {/* CZAT */}
           <div
             ref={scrollRef}
             className="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-gray-50 scroll-smooth"
@@ -258,7 +256,6 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
             {loading && <div className="text-sm text-gray-500 animate-pulse">AI myśli...</div>}
           </div>
 
-          {/* INPUT */}
           <div className="sticky bottom-0 border-t bg-white flex p-3 space-x-2">
             <input
               type="text"
