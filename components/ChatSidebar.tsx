@@ -3,7 +3,10 @@
 import { useEffect, useState } from 'react'
 
 interface ChatSidebarProps {
-  onSelectChat?: (mode: 'global' | 'task' | 'six_hats', task?: { id: string; content: string }) => void
+  onSelectChat?: (
+    mode: 'global' | 'task' | 'six_hats',
+    task?: { id: string; content: string }
+  ) => void
 }
 
 export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
@@ -30,9 +33,10 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
                 minute: '2-digit',
               })
             : 'brak daty',
+          timestamp: m.timestamp || 0,
         }))
-        .slice(-10)
-        .reverse()
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, 10)
       setGlobalChats(global)
 
       // ✅ Taski
@@ -51,10 +55,16 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
                 minute: '2-digit',
               })
             : 'brak daty'
-          return { id, title, last: lastMsg?.content || '(brak)', date }
+          return {
+            id,
+            title,
+            last: lastMsg?.content || '(brak)',
+            date,
+            timestamp: lastMsg?.timestamp || 0,
+          }
         })
-        .slice(-10)
-        .reverse()
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, 10)
       setTaskChats(tasks)
 
       // 🎩 Six Hats
@@ -70,9 +80,10 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
                 minute: '2-digit',
               })
             : 'brak daty',
+          timestamp: m.timestamp || 0,
         }))
-        .slice(-10)
-        .reverse()
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, 10)
       setSixHatsChats(sixHats)
     }
 
