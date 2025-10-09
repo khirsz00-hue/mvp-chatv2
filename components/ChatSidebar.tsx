@@ -5,7 +5,10 @@ import GlobalDialog from './GlobalDialog'
 import TaskDialog from './TaskDialog'
 
 interface ChatSidebarProps {
-  onSelectChat?: (mode: 'global' | 'task' | 'six_hats', task?: { id: string; content: string }) => void
+  onSelectChat?: (
+    mode: 'global' | 'task' | 'six_hats',
+    task?: { id: string; content: string }
+  ) => void
 }
 
 export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
@@ -15,18 +18,22 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
     { id: string; title: string; last: string; date: string }[]
   >([])
   const [sixHatsChats, setSixHatsChats] = useState<{ content: string; date: string }[]>([])
-  const [openChat, setOpenChat] = useState<{ mode: 'global' | 'task' | 'six_hats'; id?: string; title?: string } | null>(null)
+  const [openChat, setOpenChat] = useState<
+    { mode: 'global' | 'task' | 'six_hats'; id?: string; title?: string } | null
+  >(null)
   const [isVisible, setIsVisible] = useState(false)
 
+  // 🔄 Ładowanie historii z localStorage
   useEffect(() => {
     if (typeof window === 'undefined') return
 
     const loadChats = () => {
-      // 🌍 Globalne rozmowy
+      // 🌍 GLOBAL
       const global = JSON.parse(localStorage.getItem('chat_global') || '[]')
         .filter((m: any) => m.role === 'user')
         .map((m: any) => ({
           content: m.content,
+          timestamp: m.timestamp || 0,
           date: m.timestamp
             ? new Date(m.timestamp).toLocaleString('pl-PL', {
                 day: '2-digit',
@@ -35,17 +42,17 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
                 minute: '2-digit',
               })
             : 'brak daty',
-          timestamp: m.timestamp || 0,
         }))
         .sort((a: { timestamp: number }, b: { timestamp: number }) => b.timestamp - a.timestamp)
         .slice(0, 10)
       setGlobalChats(global)
 
-      // ✅ Zadania (Todoist)
+      // ✅ TASK CHATY
       const tasks = Object.keys(localStorage)
-        .filter(k => k.startsWith('chat_task_'))
-        .map(k => {
+        .filter((k) => k.startsWith('chat_task_'))
+        .map((k) => {
           const chat = JSON.parse(localStorage.getItem(k) || '[]')
+          if (!chat.length) return null
           const lastMsg = chat[chat.length - 1]
           const id = k.replace('chat_task_', '')
           const title = localStorage.getItem(`task_title_${id}`) || 'Zadanie bez nazwy'
@@ -54,6 +61,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
             id,
             title,
             last: lastMsg?.content || '(brak wiadomości)',
+            timestamp: lastMsg?.timestamp || 0,
             date: lastMsg?.timestamp
               ? new Date(lastMsg.timestamp).toLocaleString('pl-PL', {
                   day: '2-digit',
@@ -62,18 +70,19 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
                   minute: '2-digit',
                 })
               : 'brak daty',
-            timestamp: lastMsg?.timestamp || 0,
           }
         })
-        .sort((a: { timestamp: number }, b: { timestamp: number }) => b.timestamp - a.timestamp)
+        .filter(Boolean)
+        .sort((a: any, b: any) => b.timestamp - a.timestamp)
         .slice(0, 10)
-      setTaskChats(tasks)
+      setTaskChats(tasks as any)
 
-      // 🎩 Six Hats rozmowy
+      // 🎩 SIX HATS
       const sixHats = JSON.parse(localStorage.getItem('chat_six_hats') || '[]')
         .filter((m: any) => m.role === 'user')
         .map((m: any) => ({
           content: m.content,
+          timestamp: m.timestamp || 0,
           date: m.timestamp
             ? new Date(m.timestamp).toLocaleString('pl-PL', {
                 day: '2-digit',
@@ -82,23 +91,28 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
                 minute: '2-digit',
               })
             : 'brak daty',
-          timestamp: m.timestamp || 0,
         }))
         .sort((a: { timestamp: number }, b: { timestamp: number }) => b.timestamp - a.timestamp)
         .slice(0, 10)
       setSixHatsChats(sixHats)
     }
 
+    // 🔁 Załaduj dane raz i po każdej aktualizacji
     loadChats()
     window.addEventListener('storage', loadChats)
     window.addEventListener('chatUpdated', loadChats)
+
     return () => {
       window.removeEventListener('storage', loadChats)
       window.removeEventListener('chatUpdated', loadChats)
     }
   }, [])
 
-  const handleOpenChat = (mode: 'global' | 'task' | 'six_hats', task?: { id: string; content: string }) => {
+  // 🪄 Otwieranie czatu
+  const handleOpenChat = (
+    mode: 'global' | 'task' | 'six_hats',
+    task?: { id: string; content: string }
+  ) => {
     if (onSelectChat) onSelectChat(mode, task)
     else {
       if (mode === 'global' || mode === 'six_hats') setOpenChat({ mode })
@@ -114,44 +128,31 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
 
   return (
     <>
-      {/* 🧭 Sidebar */}
+      {/* 🧭 SIDEBAR */}
       <div className="w-[260px] border-r border-gray-200 bg-gray-50 flex flex-col h-full">
         <div className="p-3 border-b bg-white flex justify-between items-center">
           <h2 className="font-semibold text-gray-700 text-sm">💬 Historia czatów</h2>
         </div>
 
-        {/* 🔘 Przełącznik */}
+        {/* 🔘 TABS */}
         <div className="flex border-b bg-gray-100">
-          <button
-            className={`flex-1 py-2 text-sm ${
-              tab === 'global' ? 'bg-white font-semibold text-green-700' : 'text-gray-600'
-            }`}
-            onClick={() => setTab('global')}
-          >
-            Globalne
-          </button>
-          <button
-            className={`flex-1 py-2 text-sm ${
-              tab === 'task' ? 'bg-white font-semibold text-green-700' : 'text-gray-600'
-            }`}
-            onClick={() => setTab('task')}
-          >
-            Zadania
-          </button>
-          <button
-            className={`flex-1 py-2 text-sm ${
-              tab === 'six_hats' ? 'bg-white font-semibold text-green-700' : 'text-gray-600'
-            }`}
-            onClick={() => setTab('six_hats')}
-          >
-            Six Hats
-          </button>
+          {['global', 'task', 'six_hats'].map((t) => (
+            <button
+              key={t}
+              className={`flex-1 py-2 text-sm ${
+                tab === t ? 'bg-white font-semibold text-green-700' : 'text-gray-600'
+              }`}
+              onClick={() => setTab(t as any)}
+            >
+              {t === 'global' ? 'Globalne' : t === 'task' ? 'Zadania' : 'Six Hats'}
+            </button>
+          ))}
         </div>
 
-        {/* 📋 Lista rozmów */}
+        {/* 📋 HISTORIA */}
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
-          {tab === 'global' && (
-            globalChats.length === 0 ? (
+          {tab === 'global' &&
+            (globalChats.length === 0 ? (
               <p className="text-sm text-gray-500 italic">Brak rozmów globalnych.</p>
             ) : (
               globalChats.map((chat, i) => (
@@ -164,11 +165,10 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
                   <p className="text-sm text-gray-800 truncate">{chat.content}</p>
                 </div>
               ))
-            )
-          )}
+            ))}
 
-          {tab === 'task' && (
-            taskChats.length === 0 ? (
+          {tab === 'task' &&
+            (taskChats.length === 0 ? (
               <p className="text-sm text-gray-500 italic">Brak rozmów z zadaniami.</p>
             ) : (
               taskChats.map((t, i) => (
@@ -182,11 +182,10 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
                   <p className="text-xs text-gray-600 italic line-clamp-2">{t.last}</p>
                 </div>
               ))
-            )
-          )}
+            ))}
 
-          {tab === 'six_hats' && (
-            sixHatsChats.length === 0 ? (
+          {tab === 'six_hats' &&
+            (sixHatsChats.length === 0 ? (
               <p className="text-sm text-gray-500 italic">Brak rozmów Six Hats.</p>
             ) : (
               sixHatsChats.map((chat, i) => (
@@ -199,12 +198,11 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
                   <p className="text-sm text-gray-800 truncate">{chat.content}</p>
                 </div>
               ))
-            )
-          )}
+            ))}
         </div>
       </div>
 
-      {/* 💬 Wysuwany panel czatu */}
+      {/* 💬 PANEL */}
       {openChat && (
         <div
           className={`fixed inset-0 z-50 flex items-stretch bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${
@@ -216,7 +214,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
             className={`bg-white w-full max-w-lg h-full shadow-2xl border-r border-gray-200 transform transition-transform duration-300 ${
               isVisible ? 'translate-x-0' : '-translate-x-full'
             }`}
-            onClick={e => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center px-5 py-3 border-b bg-gray-50">
               <h2 className="text-lg font-semibold text-gray-800 truncate">
@@ -236,7 +234,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
 
             <div className="flex-1 overflow-y-auto">
               {openChat.mode === 'global' ? (
-                <GlobalDialog onClose={handleClose} />
+                <GlobalDialog onClose={handleClose} assistant="global" />
               ) : openChat.mode === 'six_hats' ? (
                 <GlobalDialog onClose={handleClose} assistant="six_hats" />
               ) : (
