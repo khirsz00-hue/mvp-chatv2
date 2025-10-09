@@ -1,15 +1,15 @@
-let clients: any[] = []
+// 🧩 Globalny store dla klientów SSE
+const clients: any[] = []
 
-export function addClient(client: any) {
-  clients.push(client)
+export function addClient(send: (data: any) => void, id: number) {
+  clients.push({ id, send })
 }
 
 export function removeClient(id: number) {
-  clients = clients.filter((c) => c.id !== id)
+  const index = clients.findIndex((c) => c.id === id)
+  if (index !== -1) clients.splice(index, 1)
 }
 
 export function broadcastMessage(message: any) {
-  for (const client of clients) {
-    client.send(message)
-  }
+  clients.forEach((client) => client.send(message))
 }
