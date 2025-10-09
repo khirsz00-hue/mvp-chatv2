@@ -5,17 +5,21 @@ import Chat from '@/components/Chat'
 import TodoistConnection from '@/components/TodoistConnection'
 import TodoistAuthButton from '@/components/TodoistAuthButton'
 
+interface ChatMessage {
+  id: string
+  role: string
+  content: string
+}
+
 export default function HomePage() {
   const [active, setActive] = useState<'todoist' | 'six_hats'>('todoist')
-  const [messages, setMessages] = useState<{ role: string; content: string }[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [token, setToken] = useState<string | null>(null)
 
-  // 🔹 Sprawdzamy, czy token istnieje w URL lub localStorage
+  // 🔹 Wczytaj token z URL lub localStorage
   useEffect(() => {
-    // po autoryzacji wraca `?todoist_token=XYZ`
     const urlParams = new URLSearchParams(window.location.search)
     const urlToken = urlParams.get('todoist_token')
-
     if (urlToken) {
       localStorage.setItem('todoist_token', urlToken)
       setToken(urlToken)
@@ -27,15 +31,28 @@ export default function HomePage() {
   }, [])
 
   const handleSend = async (message: string) => {
-    setMessages((prev) => [...prev, { role: 'user', content: message }])
+    const userMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: message,
+    }
+
+    setMessages((prev) => [...prev, userMsg])
 
     const res = await fetch('/api/chat', {
       method: 'POST',
       body: JSON.stringify({ message }),
     })
+
     const data = await res.json()
 
-    setMessages((prev) => [...prev, { role: 'assistant', content: data.reply }])
+    const aiMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'assistant',
+      content: data.reply,
+    }
+
+    setMessages((prev) => [...prev, aiMsg])
   }
 
   return (
