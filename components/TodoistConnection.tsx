@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import TodoistTasks from './TodoistTasks'
 import ChatDock from './ChatDock'
 import GlobalChat from './GlobalChat'
+import ChatSidebar from './ChatSidebar'
 
 interface TodoistConnectionProps {
   token: string
@@ -16,7 +17,7 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
   const [activeChat, setActiveChat] = useState<'global' | 'task'>('global')
   const [activeTask, setActiveTask] = useState<any | null>(null)
 
-  // 🔄 Odświeżenie listy po zmianie
+  // 🔄 Odświeżanie zadań po zmianie
   const handleRefresh = (updated?: any[]) => {
     if (updated) setTasks(updated)
   }
@@ -25,6 +26,10 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
   const openTaskChat = (task: any) => {
     setActiveChat('task')
     setActiveTask(task)
+    // 📦 Zapisz nazwę, by sidebar mógł ją później odczytać
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`task_title_${task.id}`, task.content)
+    }
   }
 
   const backToGlobalChat = () => {
@@ -32,7 +37,7 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
     setActiveTask(null)
   }
 
-  // 🧠 Chat interpretujący polecenia globalne
+  // 🧠 Globalny czat interpretujący polecenia
   const handleChatCommand = async (message: string) => {
     const text = message.toLowerCase()
 
@@ -91,10 +96,23 @@ Uwzględnij priorytety, terminy i logiczny sens.
     }
   }
 
+  // 🧠 Obsługa wyboru czatu z sidebaru
+  const handleSelectChat = (mode: 'global' | 'task', task?: { id: string; content: string }) => {
+    if (mode === 'global') {
+      backToGlobalChat()
+    } else if (task) {
+      setActiveChat('task')
+      setActiveTask({ id: task.id.replace('chat_task_', ''), content: task.content })
+    }
+  }
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 h-[calc(100vh-120px)] bg-gray-50 rounded-xl overflow-hidden border border-green-200">
-      {/* 🟩 LEWA STRONA — LISTA ZADAŃ */}
-      <div className="flex flex-col border-r border-green-200">
+    <div className="flex h-[calc(100vh-120px)] bg-gray-50 rounded-xl overflow-hidden border border-green-200">
+      {/* 🟪 SIDEBAR — historia czatów */}
+      <ChatSidebar onSelectChat={handleSelectChat} />
+
+      {/* 🟩 LEWA STRONA — lista zadań */}
+      <div className="flex flex-col border-r border-green-200 flex-1 md:flex-[1.2]">
         {/* HEADER */}
         <div className="flex justify-between items-center p-3 border-b bg-white sticky top-0 z-20">
           <div className="flex items-center gap-2">
@@ -157,11 +175,12 @@ Uwzględnij priorytety, terminy i logiczny sens.
         </div>
       </div>
 
-      {/* 🟦 PRAWA STRONA — CZAT */}
-      <div className="flex flex-col h-full bg-white">
+      {/* 🟦 PRAWA STRONA — czat globalny / czat zadania */}
+      <div className="flex flex-col flex-[1.5] h-full bg-white">
         {activeChat === 'global' && (
           <GlobalChat token={token} tasks={tasks} onOpenTaskChat={openTaskChat} />
         )}
+
         {activeChat === 'task' && activeTask && (
           <div className="flex flex-col h-full">
             <div className="flex items-center justify-between border-b p-3 bg-gray-50">
