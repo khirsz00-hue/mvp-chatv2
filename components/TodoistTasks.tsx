@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import TaskCard from './TaskCard'
+import { motion, AnimatePresence } from 'framer-motion'
 
 interface Task {
   id: string
@@ -45,7 +46,7 @@ export default function TodoistTasks({
       .finally(() => setLoading(false))
   }, [token, filter])
 
-  // 🔁 Reaguj na aktualizacje (np. po akcji AI)
+  // 🔁 Reaguj na aktualizacje
   useEffect(() => {
     const handleUpdate = () => {
       fetch(`/api/todoist/tasks?token=${token}&filter=${filter}`)
@@ -58,7 +59,7 @@ export default function TodoistTasks({
   }, [token, filter])
 
   if (loading)
-    return <p className="text-sm text-neutral-500 mt-4">⏳ Wczytywanie zadań...</p>
+    return <p className="text-sm text-neutral-500 mt-4 text-center">⏳ Wczytywanie zadań...</p>
 
   // 🔧 Grupowanie po dacie (dla filtru "7 days")
   const groupedByDate = tasks.reduce((acc, t) => {
@@ -70,77 +71,95 @@ export default function TodoistTasks({
 
   return (
     <div className="space-y-4">
-      {/* 🔹 Elegancka belka filtrów */}
-      <div className="sticky top-0 z-20 border-b bg-gradient-to-r from-green-50 via-emerald-100 to-green-50 backdrop-blur-md px-3 py-3 flex flex-wrap gap-2 justify-center shadow-sm">
-        {[
-          { key: 'today', label: '📅 Dziś', color: 'bg-green-600' },
-          { key: 'tomorrow', label: '➡️ Jutro', color: 'bg-blue-600' },
-          { key: '7 days', label: '🗓️ Tydzień', color: 'bg-purple-600' },
-          { key: 'overdue', label: '⚠️ Przeterminowane', color: 'bg-red-600' },
-        ].map(({ key, label, color }) => (
-          <button
-            key={key}
-            onClick={() => onChangeFilter(key as any)}
-            className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200
-              ${
-                filter === key
-                  ? `${color} text-white shadow-lg scale-105`
-                  : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-100'
+      {/* 🔹 Nowoczesny pasek filtrów */}
+      <div className="sticky top-0 z-20 flex justify-center py-3 bg-white/70 backdrop-blur-md border-b border-gray-200 shadow-sm rounded-b-xl">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white/70 backdrop-blur-md shadow-sm">
+          {[
+            { key: 'today', label: 'Dziś' },
+            { key: 'tomorrow', label: 'Jutro' },
+            { key: '7 days', label: 'Tydzień' },
+            { key: 'overdue', label: 'Przeterminowane' },
+          ].map((f) => (
+            <motion.button
+              key={f.key}
+              onClick={() => onChangeFilter(f.key as any)}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.97 }}
+              className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+                filter === f.key
+                  ? 'bg-gray-900 text-white shadow-sm'
+                  : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
               }`}
-          >
-            {label}
-          </button>
-        ))}
+            >
+              {f.label}
+            </motion.button>
+          ))}
+        </div>
       </div>
 
       {/* 🔹 Lista zadań */}
-      <div className="mt-3">
-        {filter === '7 days' ? (
-          Object.keys(groupedByDate)
-            .sort()
-            .map(date => (
-              <div key={date} className="mb-6">
-                <h3 className="text-sm font-semibold text-neutral-700 mb-2 border-b pb-1 flex items-center gap-1">
-                  📅{' '}
-                  {date === 'Brak terminu'
-                    ? 'Brak terminu'
-                    : new Date(date).toLocaleDateString('pl-PL', {
-                        weekday: 'long',
-                        day: '2-digit',
-                        month: '2-digit',
-                      })}
-                </h3>
-                <div className="space-y-2">
-                  {groupedByDate[date].map(t => (
-                    <div
-                      key={t.id}
-                      className="cursor-pointer transition hover:bg-green-50 rounded-lg"
-                      onClick={() => onOpenTaskChat?.(t)}
-                    >
-                      <TaskCard task={t} token={token} onAction={() => {}} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))
-        ) : tasks.length === 0 ? (
-          <p className="text-sm text-neutral-500 mt-2 text-center">
-            Brak zadań dla filtru „{filter}”.
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {tasks.map(t => (
-              <li
-                key={t.id}
-                className="cursor-pointer transition hover:bg-green-50 rounded-lg"
-                onClick={() => onOpenTaskChat?.(t)}
-              >
-                <TaskCard task={t} token={token} onAction={() => {}} />
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <AnimatePresence mode="popLayout">
+        <div className="mt-3">
+          {filter === '7 days' ? (
+            Object.keys(groupedByDate)
+              .sort()
+              .map(date => (
+                <motion.div
+                  key={date}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                  className="mb-6"
+                >
+                  <h3 className="text-sm font-semibold text-neutral-700 mb-2 border-b pb-1 flex items-center gap-1">
+                    📅{' '}
+                    {date === 'Brak terminu'
+                      ? 'Brak terminu'
+                      : new Date(date).toLocaleDateString('pl-PL', {
+                          weekday: 'long',
+                          day: '2-digit',
+                          month: '2-digit',
+                        })}
+                  </h3>
+                  <div className="space-y-2">
+                    {groupedByDate[date].map(t => (
+                      <motion.div
+                        key={t.id}
+                        whileHover={{ scale: 1.01 }}
+                        className="cursor-pointer transition rounded-lg hover:bg-gray-50"
+                        onClick={() => onOpenTaskChat?.(t)}
+                      >
+                        <TaskCard task={t} token={token} onAction={() => {}} />
+                      </motion.div>
+                    ))}
+                  </div>
+                </motion.div>
+              ))
+          ) : tasks.length === 0 ? (
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-sm text-neutral-500 mt-4 text-center"
+            >
+              Brak zadań dla filtru „{filter}”.
+            </motion.p>
+          ) : (
+            <ul className="space-y-2">
+              {tasks.map(t => (
+                <motion.li
+                  key={t.id}
+                  whileHover={{ scale: 1.01 }}
+                  className="cursor-pointer transition rounded-lg hover:bg-gray-50"
+                  onClick={() => onOpenTaskChat?.(t)}
+                >
+                  <TaskCard task={t} token={token} onAction={() => {}} />
+                </motion.li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </AnimatePresence>
     </div>
   )
 }
