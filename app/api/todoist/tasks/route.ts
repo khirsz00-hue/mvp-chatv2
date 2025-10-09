@@ -23,50 +23,49 @@ export async function GET(req: Request) {
 
     const allTasks = await res.json()
 
-    // 🕒 Przygotuj zakresy dat lokalnych (PL)
-    const today = new Date()
-    const tomorrow = new Date(today)
-    tomorrow.setDate(today.getDate() + 1)
+    // 🕒 Pomocnicza funkcja — konwersja daty UTC → lokalna (PL)
+    const toLocalDate = (isoDate: string) => {
+      const utcDate = new Date(isoDate)
+      // Przesuń o offset strefy czasowej
+      const localTime = new Date(utcDate.getTime() + utcDate.getTimezoneOffset() * 60000)
+      return localTime
+    }
 
-    const startOfToday = new Date(today)
+    // 📆 Zakresy lokalnych dat
+    const now = new Date()
+    const startOfToday = new Date(now)
     startOfToday.setHours(0, 0, 0, 0)
-    const endOfToday = new Date(today)
+    const endOfToday = new Date(now)
     endOfToday.setHours(23, 59, 59, 999)
 
-    const startOfTomorrow = new Date(tomorrow)
-    startOfTomorrow.setHours(0, 0, 0, 0)
-    const endOfTomorrow = new Date(tomorrow)
-    endOfTomorrow.setHours(23, 59, 59, 999)
+    const startOfTomorrow = new Date(startOfToday)
+    startOfTomorrow.setDate(startOfToday.getDate() + 1)
+    const endOfTomorrow = new Date(endOfToday)
+    endOfTomorrow.setDate(endOfTomorrow.getDate() + 1)
 
-    // 🧠 Filtrowanie lokalne zamiast API
+    const in7Days = new Date(startOfToday)
+    in7Days.setDate(startOfToday.getDate() + 7)
+
+    // 🧠 Filtrowanie po stronie backendu
     const filtered = allTasks.filter((t: any) => {
-      const dueDate = t.due?.date ? new Date(t.due.date) : null
+      if (!t.due?.date) return false
+      const dueDate = toLocalDate(t.due.date)
 
       switch (filter) {
         case 'today':
-          return (
-            dueDate &&
-            dueDate.getTime() >= startOfToday.getTime() &&
-            dueDate.getTime() <= endOfToday.getTime()
-          )
+          return dueDate >= startOfToday && dueDate <= endOfToday
         case 'tomorrow':
-          return (
-            dueDate &&
-            dueDate.getTime() >= startOfTomorrow.getTime() &&
-            dueDate.getTime() <= endOfTomorrow.getTime()
-          )
+          return dueDate >= startOfTomorrow && dueDate <= endOfTomorrow
         case 'overdue':
-          return dueDate && dueDate.getTime() < startOfToday.getTime()
+          return dueDate < startOfToday
         case '7 days':
-          const in7Days = new Date()
-          in7Days.setDate(today.getDate() + 7)
-          return dueDate && dueDate <= in7Days
+          return dueDate <= in7Days
         default:
           return true
       }
     })
 
-    // 🎯 Upraszczamy dane do frontu
+    // 🎯 Upraszczamy dane dla frontu
     const simplified = filtered.map((t: any) => ({
       id: t.id,
       content: t.content,
