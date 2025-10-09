@@ -8,16 +8,28 @@ export type ChatMessage = {
   role: 'user' | 'assistant'
   content: string
   timestamp: number
+  type?: 'text' | 'tasks'
+  tasks?: {
+    id: string
+    content: string
+    due?: string | null
+    priority?: number
+  }[]
 }
 
 interface ChatProps {
   onSend: (msg: string) => Promise<void>
   messages: ChatMessage[]
   assistant?: 'global' | 'six_hats'
-  hideHistory?: boolean // 🔹 dodany prop – ukrywa starsze wiadomości
+  hideHistory?: boolean
 }
 
-export default function Chat({ onSend, messages, assistant = 'six_hats', hideHistory = true }: ChatProps) {
+export default function Chat({
+  onSend,
+  messages,
+  assistant = 'six_hats',
+  hideHistory = true,
+}: ChatProps) {
   const [input, setInput] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -31,7 +43,7 @@ export default function Chat({ onSend, messages, assistant = 'six_hats', hideHis
     }
   }, [messages, storageKey])
 
-  // 🔽 Auto-scroll
+  // 🔽 Auto-scroll do dołu
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
@@ -43,8 +55,8 @@ export default function Chat({ onSend, messages, assistant = 'six_hats', hideHis
     await onSend(msg)
   }
 
-  // 🔹 Jeśli `hideHistory` = true, pokazuj tylko ostatnie 2 wiadomości (user + AI)
-  const visibleMessages = hideHistory ? messages.slice(-2) : messages
+  // 🔹 Jeśli `hideHistory` = true, pokazuj tylko ostatnie wiadomości (np. user + AI)
+  const visibleMessages = hideHistory ? messages.slice(-8) : messages
 
   return (
     <div className="flex flex-col h-[70vh] rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
@@ -57,14 +69,49 @@ export default function Chat({ onSend, messages, assistant = 'six_hats', hideHis
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className={`p-3 rounded-xl max-w-[80%] whitespace-pre-wrap text-sm leading-relaxed ${
+              className={`p-3 rounded-xl max-w-[85%] whitespace-pre-wrap text-sm leading-relaxed ${
                 m.role === 'user'
                   ? 'ml-auto bg-blue-600 text-white'
                   : 'bg-white border border-gray-200 text-gray-800'
               }`}
             >
-              {m.content}
-              <div className="text-[10px] mt-1 opacity-60 text-right">
+              {/* 🧠 Wiadomości tekstowe */}
+              {m.type !== 'tasks' && <div>{m.content}</div>}
+
+              {/* ✅ Wiadomości z zadaniami */}
+              {m.type === 'tasks' && (
+                <div className="space-y-2 mt-1">
+                  {m.tasks && m.tasks.length > 0 ? (
+                    m.tasks.map((t) => (
+                      <div
+                        key={t.id}
+                        className="p-3 rounded-lg bg-gray-50 border border-gray-200 shadow-sm hover:bg-gray-100 transition"
+                      >
+                        <p className="font-medium text-gray-800">{t.content}</p>
+                        <div className="text-xs text-gray-500 flex gap-2 mt-1">
+                          {t.due && (
+                            <span>📅 {new Date(t.due).toLocaleDateString('pl-PL')}</span>
+                          )}
+                          {t.priority && t.priority > 1 && (
+                            <span>⭐ Priorytet: {t.priority}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="italic text-gray-500 text-sm">
+                      Brak zadań do wyświetlenia.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* ⏱ Czas wiadomości */}
+              <div
+                className={`text-[10px] mt-1 opacity-60 text-right ${
+                  m.role === 'user' ? 'text-white' : 'text-gray-500'
+                }`}
+              >
                 {new Date(m.timestamp).toLocaleTimeString('pl-PL', {
                   hour: '2-digit',
                   minute: '2-digit',
@@ -85,7 +132,7 @@ export default function Chat({ onSend, messages, assistant = 'six_hats', hideHis
           placeholder={
             assistant === 'six_hats'
               ? 'Zadaj pytanie np. "Przeanalizuj problem metodą 6 kapeluszy..."'
-              : 'Napisz wiadomość...'
+              : 'Napisz wiadomość np. "Daj taski na dziś"'
           }
           className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
