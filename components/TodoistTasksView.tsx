@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import TodoistTasks from './TodoistTasks'
-import ChatSidebar from './ChatSidebar'
 import ChatDock from './ChatDock'
 
 export default function TodoistTasksView({ token }: { token: string }) {
@@ -15,13 +14,10 @@ export default function TodoistTasksView({ token }: { token: string }) {
   const closeTaskChat = () => setActiveTask(null)
 
   return (
-    <div className="flex h-full">
-      {/* 🧭 Sidebar z historią czatów zadań */}
-      <ChatSidebar onSelectChat={() => {}} />
-
-      {/* 📋 Główna sekcja */}
-      <div className="flex-1 flex flex-col bg-gray-50">
-        {/* Filtry */}
+    <div className="flex h-full bg-gray-50 rounded-b-xl overflow-hidden">
+      {/* 📋 Główna sekcja bez bocznego panelu */}
+      <div className="flex-1 flex flex-col">
+        {/* 🔘 Filtry */}
         <div className="flex justify-between items-center p-3 border-b bg-white sticky top-0 z-20">
           <div className="flex gap-2 flex-wrap">
             {[
@@ -34,7 +30,9 @@ export default function TodoistTasksView({ token }: { token: string }) {
                 key={key}
                 onClick={() => setFilter(key as any)}
                 className={`px-3 py-1 text-sm rounded-lg transition ${
-                  filter === key ? 'bg-green-600 text-white' : 'bg-white border text-green-700'
+                  filter === key
+                    ? 'bg-green-600 text-white'
+                    : 'bg-white border text-green-700'
                 }`}
               >
                 {label}
@@ -43,7 +41,7 @@ export default function TodoistTasksView({ token }: { token: string }) {
           </div>
         </div>
 
-        {/* Lista zadań */}
+        {/* 🗒️ Lista zadań */}
         <div className="flex-1 overflow-y-auto p-3">
           <TodoistTasks
             token={token}
@@ -56,7 +54,7 @@ export default function TodoistTasksView({ token }: { token: string }) {
 
         {/* 💬 Czat konkretnego zadania */}
         {activeTask && (
-          <div className="border-t bg-white p-3">
+          <div className="border-t bg-white p-3 sticky bottom-0">
             <div className="flex justify-between items-center mb-2">
               <span className="text-sm font-semibold text-gray-700 truncate max-w-[80%]">
                 💬 {activeTask.content}
