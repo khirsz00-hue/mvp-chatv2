@@ -15,7 +15,9 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
     { id: string; title: string; last: string; date: string }[]
   >([])
   const [openChat, setOpenChat] = useState<{ mode: 'global' | 'task'; id?: string; title?: string } | null>(null)
+  const [isVisible, setIsVisible] = useState(false)
 
+  // 🔄 Wczytaj dane po załadowaniu
   useEffect(() => {
     if (typeof window === 'undefined') return
 
@@ -36,7 +38,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
         }))
       setGlobalChats(global)
 
-      // 🔹 Czat z zadaniami
+      // 🔹 Rozmowy z zadaniami
       const tasks = Object.keys(localStorage)
         .filter(k => k.startsWith('chat_task_'))
         .map(k => {
@@ -71,7 +73,13 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
     else {
       if (mode === 'global') setOpenChat({ mode })
       else if (task) setOpenChat({ mode, id: task.id, title: task.content })
+      setTimeout(() => setIsVisible(true), 20) // delikatne opóźnienie by odpalić animację
     }
+  }
+
+  const handleClose = () => {
+    setIsVisible(false)
+    setTimeout(() => setOpenChat(null), 250) // czas na zakończenie animacji
   }
 
   return (
@@ -137,40 +145,48 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
         </div>
       </div>
 
-      {/* 💬 Modal z czatem */}
+      {/* 💬 Wysuwany panel czatu */}
       {openChat && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-3"
-          onClick={() => setOpenChat(null)}
+          className={`fixed inset-0 z-50 flex items-stretch bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${
+            isVisible ? 'opacity-100' : 'opacity-0'
+          }`}
+          onClick={handleClose}
         >
           <div
-            className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border border-gray-200 overflow-hidden animate-fadeIn max-h-[90vh]"
+            className={`bg-white w-full max-w-lg h-full shadow-2xl border-r border-gray-200 transform transition-transform duration-300 ${
+              isVisible ? 'translate-x-0' : '-translate-x-full'
+            }`}
             onClick={e => e.stopPropagation()}
           >
+            {/* HEADER */}
             <div className="flex justify-between items-center px-5 py-3 border-b bg-gray-50">
-              <h2 className="text-lg font-semibold text-gray-800">
+              <h2 className="text-lg font-semibold text-gray-800 truncate">
                 {openChat.mode === 'global' ? '💬 Globalny czat' : `💬 ${openChat.title}`}
               </h2>
               <button
-                onClick={() => setOpenChat(null)}
+                onClick={handleClose}
                 className="text-sm text-gray-500 hover:text-gray-700 transition"
               >
-                ✕ Zamknij
+                ✕
               </button>
             </div>
 
-            {openChat.mode === 'global' ? (
-              <GlobalDialog onClose={() => setOpenChat(null)} />
-            ) : (
-              <TaskDialog
-                task={{
-                  id: openChat.id || '',
-                  content: openChat.title || '',
-                }}
-                mode="help"
-                onClose={() => setOpenChat(null)}
-              />
-            )}
+            {/* TREŚĆ */}
+            <div className="flex-1 overflow-y-auto">
+              {openChat.mode === 'global' ? (
+                <GlobalDialog onClose={handleClose} />
+              ) : (
+                <TaskDialog
+                  task={{
+                    id: openChat.id || '',
+                    content: openChat.title || '',
+                  }}
+                  mode="help"
+                  onClose={handleClose}
+                />
+              )}
+            </div>
           </div>
         </div>
       )}
