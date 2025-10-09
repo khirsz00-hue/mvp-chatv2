@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import TaskDialog from './TaskDialog'
+import TooltipPortal from './TooltipPortal'
 
 interface Task {
   id: string
@@ -25,6 +26,7 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
   const [summary, setSummary] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [isHidden, setIsHidden] = useState(false)
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null)
   const dateInputRef = useRef<HTMLInputElement>(null)
 
   // 🧠 Wczytaj lokalną syntezę (AI summary)
@@ -118,23 +120,40 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
             {/* 💡 Tooltip z AI Summary */}
             {summary && (
               <div className="ml-2 relative group/summary z-[1000]">
-                <span className="text-yellow-500 text-base cursor-pointer select-none hover:scale-110 transition-transform">
+                <span
+                  className="text-yellow-500 text-base cursor-pointer select-none hover:scale-110 transition-transform"
+                  onMouseEnter={(e) =>
+                    setTooltipPos({ x: e.clientX, y: e.clientY + 24 })
+                  }
+                  onMouseMove={(e) =>
+                    setTooltipPos({ x: e.clientX, y: e.clientY + 24 })
+                  }
+                  onMouseLeave={() => setTooltipPos(null)}
+                >
                   💡
                 </span>
 
-                {/* Tooltip – fade + slide */}
-                <motion.div
-                  initial={{ opacity: 0, y: -4, scale: 0.97 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -4, scale: 0.97 }}
-                  transition={{ duration: 0.15 }}
-                  className="absolute right-0 top-6 z-[9999] hidden group-hover/summary:block bg-white border border-gray-200 text-gray-700 text-xs rounded-md p-2.5 w-64 shadow-2xl"
-                >
-                  <p className="font-semibold text-gray-800">🧠 Wnioski AI:</p>
-                  <p className="mt-1 text-gray-600 whitespace-pre-line leading-snug">
-                    {summary}
-                  </p>
-                </motion.div>
+                {/* Portal tooltipa */}
+                {tooltipPos && (
+                  <TooltipPortal>
+                    <motion.div
+                      initial={{ opacity: 0, y: -4, scale: 0.97 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -4, scale: 0.97 }}
+                      transition={{ duration: 0.15 }}
+                      className="fixed z-[99999] bg-white border border-gray-200 text-gray-700 text-xs rounded-md p-2.5 w-64 shadow-2xl pointer-events-none"
+                      style={{
+                        top: tooltipPos.y,
+                        left: tooltipPos.x - 256, // po lewej stronie kursora
+                      }}
+                    >
+                      <p className="font-semibold text-gray-800">🧠 Wnioski AI:</p>
+                      <p className="mt-1 text-gray-600 whitespace-pre-line leading-snug">
+                        {summary}
+                      </p>
+                    </motion.div>
+                  </TooltipPortal>
+                )}
               </div>
             )}
           </div>
