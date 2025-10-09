@@ -73,6 +73,8 @@ export default function GlobalChat({ token, tasks, onOpenTaskChat }: GlobalChatP
   { role: 'assistant' as const, content: reply },
 ]
 setChat(newChat)
+localStorage.setItem(storageKey, JSON.stringify(newChat))
+await generateSynthesis(newChat)
       localStorage.setItem(storageKey, JSON.stringify(newChat))
 
       await generateSynthesis(newChat)
