@@ -5,24 +5,32 @@ import TodoistTasks from './TodoistTasks'
 
 export default function TodoistTasksView({ token }: { token: string }) {
   const [filter, setFilter] = useState<'today' | 'tomorrow' | 'overdue' | '7 days'>(
-    () => (localStorage.getItem('todoist_filter') as any) || 'today'
+    () => (typeof window !== 'undefined'
+      ? (localStorage.getItem('todoist_filter') as any) || 'today'
+      : 'today')
   )
   const [tasks, setTasks] = useState<any[]>([])
   const [toast, setToast] = useState<string | null>(null)
-  const lastEvent = useRef<string>('')
+  const lastEvent = useRef<number>(0)
 
   const handleRefresh = (updated?: any[]) => updated && setTasks(updated)
 
-  // 💾 Zapamiętuj filtr lokalnie (żeby nie resetował się po re-renderze)
+  // 💾 Zapamiętuj filtr w localStorage
   useEffect(() => {
-    localStorage.setItem('todoist_filter', filter)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('todoist_filter', filter)
+    }
   }, [filter])
 
+  // 🔁 SSE + Polling + Webhook check
   useEffect(() => {
     if (!token) return
+    console.log('🚀 Uruchomiono Todoist listener...')
 
     let es: EventSource | null = null
+    let lastWebhookTime = 0
 
+    // ✅ Połączenie SSE (działa lokalnie)
     const connectSSE = () => {
       try {
         es = new EventSource('/api/todoist/stream')
@@ -32,11 +40,11 @@ export default function TodoistTasksView({ token }: { token: string }) {
           try {
             const data = JSON.parse(event.data)
             if (data.event?.startsWith('item:')) {
-              // 🧠 zapobieganie wielokrotnemu odświeżeniu przy tym samym evencie
-              if (lastEvent.current === data.event) return
-              lastEvent.current = data.event
+              const now = Date.now()
+              if (now - lastEvent.current < 2000) return // antyspam
+              lastEvent.current = now
 
-              console.log('🔁 Otrzymano event Todoist:', data)
+              console.log('🔁 Event Todoist:', data.event)
               window.dispatchEvent(new Event('taskUpdated'))
 
               const msg =
@@ -68,20 +76,39 @@ export default function TodoistTasksView({ token }: { token: string }) {
 
     connectSSE()
 
-    // 🫀 Ping (utrzymuje połączenie lokalnie)
+    // 🫀 Ping utrzymujący połączenie (lokalnie)
     const ping = setInterval(() => {
       fetch('/api/todoist/stream/ping').catch(() => {})
     }, 25000)
 
-    // 🧩 Polling awaryjny (na Vercel)
+    // 🧩 Sprawdzanie webhooka (działa na Vercel)
+    const checkWebhook = async () => {
+      try {
+        const res = await fetch('/api/todoist/webhook')
+        const data = await res.json()
+        if (data.lastEventTime && data.lastEventTime > lastWebhookTime) {
+          lastWebhookTime = data.lastEventTime
+          console.log('🔔 Nowy webhook Todoist – odświeżam')
+          window.dispatchEvent(new Event('taskUpdated'))
+          setToast('🔄 Lista zadań zaktualizowana')
+          setTimeout(() => setToast(null), 2000)
+        }
+      } catch (err) {
+        // ciche błędy
+      }
+    }
+    const webhookInterval = setInterval(checkWebhook, 5000)
+
+    // 🧩 Polling awaryjny co 45s (gdyby inne zawiodły)
     const poll = setInterval(() => {
-      console.log('🔁 Polling Todoist – ciche odświeżenie listy')
+      console.log('🪄 Polling Todoist – ciche odświeżenie')
       window.dispatchEvent(new Event('taskUpdated'))
-    }, 30000)
+    }, 45000)
 
     return () => {
       clearInterval(ping)
       clearInterval(poll)
+      clearInterval(webhookInterval)
       es?.close()
     }
   }, [token])
@@ -101,11 +128,19 @@ export default function TodoistTasksView({ token }: { token: string }) {
       </div>
 
       {/* 🔔 Toast powiadomień */}
-      {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white text-sm px-4 py-2 rounded-lg shadow-lg backdrop-blur-sm animate-[fadeInUp_0.3s_ease-out]">
-          {toast}
-        </div>
-      )}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ duration: 0.3 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] bg-gray-900 text-white text-sm px-4 py-2 rounded-lg shadow-lg backdrop-blur-sm"
+          >
+            {toast}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
