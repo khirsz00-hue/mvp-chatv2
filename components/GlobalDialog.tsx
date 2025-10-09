@@ -28,7 +28,6 @@ export default function GlobalDialog({ onClose }: Props) {
     if (typeof window === 'undefined') return
     const saved = localStorage.getItem(storageKey)
     if (saved) setChat(JSON.parse(saved))
-
     const savedSummary = localStorage.getItem(summaryKey)
     if (savedSummary) setSummary(savedSummary)
   }, [])
@@ -64,18 +63,19 @@ export default function GlobalDialog({ onClose }: Props) {
 
       if (!res.ok) throw new Error('Błąd odpowiedzi z API')
       const data = await res.json()
-      const reply = data.reply?.trim() || '⚠️ Brak odpowiedzi od modelu.'
+      const reply = (data.reply?.trim() || '⚠️ Brak odpowiedzi od modelu.') as string
 
       const newChat: ChatMessage[] = [
-  ...updated,
-  { role: 'assistant' as const, content: reply },
-]
-setChat(newChat)
-localStorage.setItem(storageKey, JSON.stringify(newChat))
-await generateSynthesis(newChat)
+        ...updated,
+        { role: 'assistant' as const, content: reply },
+      ]
+
+      setChat(newChat)
+      localStorage.setItem(storageKey, JSON.stringify(newChat))
+      await generateSynthesis(newChat)
     } catch (err) {
       console.error('❌ Błąd komunikacji z AI:', err)
-      setChat((prev) => [
+      setChat(prev => [
         ...prev,
         { role: 'assistant', content: '⚠️ Wystąpił błąd podczas komunikacji z AI.' },
       ])
@@ -87,7 +87,7 @@ await generateSynthesis(newChat)
   // 🧠 SYNTEZA – generuje skrót rozmowy (2–3 zdania)
   const generateSynthesis = async (fullChat: ChatMessage[]) => {
     try {
-      const context = fullChat.map((m) => `${m.role}: ${m.content}`).join('\n')
+      const context = fullChat.map(m => `${m.role}: ${m.content}`).join('\n')
       const prompt = `
 Podsumuj rozmowę globalną w 2–3 zdaniach.
 Uwzględnij kluczowe decyzje, plany lub wnioski użytkownika.
@@ -102,7 +102,7 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
 
       if (!res.ok) throw new Error('Błąd generowania syntezy')
       const data = await res.json()
-      const synthesis = data.reply?.trim() || 'Brak syntezy.'
+      const synthesis = (data.reply?.trim() || 'Brak syntezy.') as string
 
       localStorage.setItem(summaryKey, synthesis)
       setSummary(synthesis)
@@ -119,7 +119,7 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
     >
       <div
         className="bg-white w-full max-w-2xl rounded-2xl shadow-xl flex flex-col border border-gray-200 overflow-hidden animate-fadeIn max-h-[90vh]"
-        onClick={(e) => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
       >
         {/* HEADER */}
         <div className="flex justify-between items-center px-5 py-3 border-b bg-gray-50">
@@ -171,17 +171,19 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
           {loading && <div className="text-sm text-gray-500 animate-pulse">AI myśli...</div>}
 
           {summary && (
-            <div className="mt-3 text-xs text-gray-500 italic border-t pt-2">{summary}</div>
+            <div className="mt-3 text-xs text-gray-500 italic border-t pt-2">
+              {summary}
+            </div>
           )}
         </div>
 
         {/* INPUT */}
-        <div className="border-t bg-white flex p-3 space-x-2">
+        <div className="border-t bg-white flex p-3 space-x-2 sticky bottom-0">
           <input
             type="text"
             value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && sendMessage()}
             placeholder="Zadaj pytanie np. „Pomóż mi zaplanować dzień...”"
             className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
