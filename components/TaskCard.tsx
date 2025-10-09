@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import TaskDialog from './TaskDialog'
 import { motion, AnimatePresence } from 'framer-motion'
+import TaskDialog from './TaskDialog'
 
 interface Task {
   id: string
@@ -10,6 +10,8 @@ interface Task {
   due?: string
   priority?: number
   project_id?: string
+  project_name?: string
+  labels?: string[]
 }
 
 interface TaskCardProps {
@@ -20,30 +22,15 @@ interface TaskCardProps {
 
 export default function TaskCard({ task, token, onAction }: TaskCardProps) {
   const [showDialog, setShowDialog] = useState(false)
-  const [dialogMode, setDialogMode] = useState<'none' | 'help'>('none')
   const [summary, setSummary] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [isHidden, setIsHidden] = useState(false)
   const dateInputRef = useRef<HTMLInputElement>(null)
 
-  // 📦 zapisz nazwę taska (dla historii czatów)
+  // 🧠 Wczytaj lokalną syntezę (AI summary)
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(`task_title_${task.id}`, task.content)
-    }
-  }, [task.id, task.content])
-
-  // 🧠 wczytaj lokalną syntezę (AI summary)
-  useEffect(() => {
-    const loadSummary = () => {
-      const saved = localStorage.getItem(`summary_${task.id}`)
-      setSummary(saved || null)
-    }
-
-    loadSummary()
-    const handler = () => loadSummary()
-    window.addEventListener('taskUpdated', handler)
-    return () => window.removeEventListener('taskUpdated', handler)
+    const saved = localStorage.getItem(`summary_${task.id}`)
+    setSummary(saved || null)
   }, [task.id])
 
   const triggerUpdate = (msg: string) => {
@@ -70,7 +57,7 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
       body: JSON.stringify({ id: task.id, token }),
     })
     setIsHidden(true)
-    triggerUpdate('🗑️ Zadanie usunięte')
+    triggerUpdate('🗑 Zadanie usunięte')
     setTimeout(() => onAction('deleted'), 400)
   }
 
@@ -86,7 +73,6 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
     onAction('postponed')
   }
 
-  // 📆 Otwórz date pickera
   const openDatePicker = () => dateInputRef.current?.showPicker?.()
 
   return (
@@ -96,84 +82,93 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
           key={task.id}
           initial={{ opacity: 0, y: 10, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -20, scale: 0.95 }}
+          exit={{ opacity: 0, y: -15, scale: 0.96 }}
           transition={{ duration: 0.25 }}
-          className="relative border rounded-xl p-4 bg-white shadow-sm hover:shadow-md transition-all group"
+          className="relative border rounded-lg p-3 bg-white shadow-sm hover:shadow-md transition-all group"
         >
-          {/* 📋 Treść zadania */}
-          <div className="flex justify-between items-start mb-2">
+          <div className="flex justify-between items-start">
+            {/* 📝 Treść zadania */}
             <div className="flex-1 pr-2">
-              <p className="font-medium text-gray-800 leading-snug">{task.content}</p>
-              {task.due && (
-                <span className="text-xs text-gray-500">
-                  {new Date(task.due).toLocaleDateString('pl-PL')}
-                </span>
-              )}
+              <p className="font-medium text-gray-800 text-sm leading-snug">
+                {task.content}
+              </p>
+
+              {/* 📅 Szczegóły pod treścią */}
+              <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-gray-500">
+                {task.due && (
+                  <span>{new Date(task.due).toLocaleDateString('pl-PL')}</span>
+                )}
+                {task.project_name && <span>• {task.project_name}</span>}
+                {task.labels?.length ? (
+                  <span>• {task.labels.map((l) => `#${l}`).join(', ')}</span>
+                ) : null}
+              </div>
             </div>
 
             {/* 💡 Tooltip z AI Summary */}
             {summary && (
               <div className="ml-2 relative group/summary">
-                <span className="text-yellow-500 text-lg cursor-pointer select-none hover:scale-110 transition-transform">
+                <span className="text-yellow-500 text-base cursor-pointer select-none hover:scale-110 transition-transform">
                   💡
                 </span>
-                <div className="absolute right-0 top-6 z-20 hidden group-hover/summary:block bg-white border border-gray-200 text-gray-700 text-xs rounded-md p-3 w-64 shadow-xl animate-fadeIn">
+                <div className="absolute right-0 top-6 z-20 hidden group-hover/summary:block bg-white border border-gray-200 text-gray-700 text-xs rounded-md p-2.5 w-64 shadow-xl animate-fadeIn">
                   <p className="font-semibold text-gray-800">🧠 Wnioski AI:</p>
-                  <p className="mt-1 text-gray-600 whitespace-pre-line leading-snug">{summary}</p>
+                  <p className="mt-1 text-gray-600 whitespace-pre-line leading-snug">
+                    {summary}
+                  </p>
                 </div>
               </div>
             )}
           </div>
 
           {/* 🔘 Przyciski akcji */}
-          <div className="flex justify-end flex-wrap gap-2 mt-3">
-            {[
-              {
-                label: '✅ Ukończ',
-                color: 'green',
-                onClick: handleComplete,
-              },
-              {
-                label: '📅 Przełóż',
-                color: 'blue',
-                onClick: openDatePicker,
-              },
-              {
-                label: '🗑 Usuń',
-                color: 'red',
-                onClick: handleDelete,
-              },
-              {
-                label: '💬 Pomóż mi',
-                color: 'purple',
-                onClick: () => {
-                  setDialogMode('help')
-                  setShowDialog(true)
-                },
-              },
-            ].map((btn) => (
-              <motion.button
-                key={btn.label}
-                whileTap={{ scale: 0.95 }}
-                whileHover={{ scale: 1.05 }}
-                onClick={btn.onClick}
-                className={`px-3 py-1 text-xs rounded-lg bg-${btn.color}-100 hover:bg-${btn.color}-200 text-${btn.color}-700 font-medium transition-all`}
-              >
-                {btn.label}
-              </motion.button>
-            ))}
+          <div className="flex justify-end gap-1 mt-2">
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.05 }}
+              onClick={handleComplete}
+              className="px-2.5 py-0.5 text-xs rounded-md bg-green-100 hover:bg-green-200 text-green-700 font-medium"
+            >
+              ✅
+            </motion.button>
 
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.05 }}
+              onClick={openDatePicker}
+              className="px-2.5 py-0.5 text-xs rounded-md bg-blue-100 hover:bg-blue-200 text-blue-700 font-medium"
+            >
+              📅
+            </motion.button>
             <input
               ref={dateInputRef}
               type="date"
               className="fixed top-1/2 left-1/2 translate-x-[-50%] translate-y-[-50%] opacity-0 pointer-events-auto"
               onChange={(e) => handlePostpone(e.target.value)}
             />
+
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.05 }}
+              onClick={handleDelete}
+              className="px-2.5 py-0.5 text-xs rounded-md bg-red-100 hover:bg-red-200 text-red-700 font-medium"
+            >
+              🗑
+            </motion.button>
+
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.05 }}
+              onClick={() => setShowDialog(true)}
+              className="px-2.5 py-0.5 text-xs rounded-md bg-purple-100 hover:bg-purple-200 text-purple-700 font-medium"
+            >
+              💬
+            </motion.button>
           </div>
 
           {/* 💬 Modal czatu */}
           {showDialog && (
-            <TaskDialog task={task} mode={dialogMode} onClose={() => setShowDialog(false)} />
+            <TaskDialog task={task} mode="help" onClose={() => setShowDialog(false)} />
           )}
 
           {/* ✅ Toast */}
@@ -184,7 +179,7 @@ export default function TaskCard({ task, token, onAction }: TaskCardProps) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 20 }}
                 transition={{ duration: 0.3 }}
-                className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white text-sm px-4 py-2 rounded-lg shadow-lg backdrop-blur-sm"
+                className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white text-xs px-3 py-1.5 rounded-md shadow-lg backdrop-blur-sm"
               >
                 {toast}
               </motion.div>
