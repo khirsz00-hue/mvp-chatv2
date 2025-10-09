@@ -1,21 +1,11 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+// 👇 używamy dynamicznego importu tylko po stronie serwera
+export const runtime = 'nodejs'
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json()
-    const { message, context } = body
-
-    if (!message) {
-      return NextResponse.json(
-        { error: 'Brak wiadomości w żądaniu.' },
-        { status: 400 }
-      )
-    }
+    const { message, context } = await req.json()
 
     if (!process.env.OPENAI_API_KEY) {
       console.error('❌ Brak OPENAI_API_KEY w środowisku!')
@@ -25,9 +15,12 @@ export async function POST(req: Request) {
       )
     }
 
+    const OpenAI = (await import('openai')).default
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+
     const systemPrompt = `
-Jesteś asystentem produktywności, który pomaga w realizacji zadań.
-Zawsze pytaj o szczegóły i doradzaj rzeczowo, nie wymyślaj danych.
+Jesteś asystentem produktywności, który pomaga użytkownikowi zrozumieć i wykonać zadanie.
+Zawsze pytaj o szczegóły, jeśli coś nie jest jasne, i odpowiadaj praktycznie.
 ${context ? `Kontekst zadania: ${context}` : ''}
     `.trim()
 
