@@ -6,7 +6,7 @@ export async function POST(req: Request) {
   try {
     const { message, context, todoist_token } = await req.json()
 
-    // 🧩 Walidacja
+    // 🧩 Walidacja wiadomości
     if (typeof message !== 'string' || !message.trim()) {
       return NextResponse.json(
         { error: 'Nieprawidłowa wiadomość — oczekiwano tekstu.' },
@@ -14,7 +14,7 @@ export async function POST(req: Request) {
       )
     }
 
-    // 🧩 Obsługa komend z Todoista
+    // 🧩 Komendy związane z Todoist
     const taskKeywords = ['zadania', 'taski', 'lista', 'na dziś', 'na dzis', 'co mam dziś', 'co mam dzis']
 
     if (taskKeywords.some(k => message.toLowerCase().includes(k))) {
@@ -28,15 +28,22 @@ export async function POST(req: Request) {
 
       try {
         console.log('🔑 Używam tokena Todoist:', todoist_token.slice(0, 8) + '...')
+
         const res = await fetch('https://api.todoist.com/rest/v2/tasks', {
           headers: { Authorization: `Bearer ${todoist_token}` },
+          cache: 'no-store',
         })
+
+        // 🧾 Logujemy odpowiedź Todoista — kluczowy krok diagnostyczny
+        const rawText = await res.text()
+        console.log('🪪 Todoist fetch result:', res.status, rawText)
 
         if (!res.ok) {
           throw new Error(`Błąd Todoist API: ${res.status}`)
         }
 
-        const tasks = await res.json()
+        // 🔄 Spróbuj sparsować JSON dopiero po logowaniu
+        const tasks = JSON.parse(rawText)
         const today = new Date().toISOString().split('T')[0]
         const todaysTasks = tasks.filter((t: any) => t.due?.date === today)
 
@@ -67,7 +74,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // 🧩 Sprawdzenie OpenAI
+    // 🧩 Sprawdzenie API keya OpenAI
     if (!process.env.OPENAI_API_KEY) {
       console.error('❌ Brak OPENAI_API_KEY w środowisku!')
       return NextResponse.json(
@@ -76,7 +83,7 @@ export async function POST(req: Request) {
       )
     }
 
-    // 🧠 OpenAI client
+    // 🧠 Klient OpenAI
     const OpenAI = (await import('openai')).default
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
