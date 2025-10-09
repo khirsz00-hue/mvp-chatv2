@@ -16,8 +16,9 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const scrollRef = useRef<HTMLDivElement | null>(null)
+  const todoistToken = localStorage.getItem('todoist_token') || '' // jeśli przechowujesz token
 
-  // 🧩 Wczytaj historię rozmowy z localStorage tylko raz
+  // 🧩 Wczytaj historię rozmowy
   useEffect(() => {
     const saved = localStorage.getItem(storageKey)
     if (saved) setChat(JSON.parse(saved))
@@ -45,6 +46,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     setLoading(true)
 
     try {
+      // 🔹 Wyślij wiadomość do API
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -56,9 +58,13 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
 
       if (!res.ok) throw new Error('Błąd odpowiedzi z API')
       const data = await res.json()
-      const reply = typeof data.reply === 'string' ? data.reply.trim() : '⚠️ Brak odpowiedzi od modelu.'
+      const reply =
+        typeof data.reply === 'string' ? data.reply.trim() : '⚠️ Brak odpowiedzi od modelu.'
 
       setChat(prev => [...prev, { role: 'assistant', content: reply }])
+
+      // 🔹 Generuj syntezę po odpowiedzi asystenta
+      await generateSynthesis([...chat, newMessage, { role: 'assistant', content: reply }])
     } catch (err) {
       console.error('❌ Błąd komunikacji z AI:', err)
       setChat(prev => [
@@ -67,6 +73,50 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
       ])
     } finally {
       setLoading(false)
+    }
+  }
+
+  // 🧠 SYNTEZA: generuje skrót rozmowy i zapisuje w Todoist
+  const generateSynthesis = async (fullChat: { role: string; content: string }[]) => {
+    try {
+      const contextText = fullChat.map(m => `${m.role}: ${m.content}`).join('\n')
+      const synthesisPrompt = `
+Podsumuj rozmowę o zadaniu "${task.content}" w 2 zdaniach. 
+Uwzględnij konkretne ustalenia, pomysły lub plan działania.
+Napisz po polsku, zaczynając od "Wnioski AI:".
+      `.trim()
+
+      const synthesisRes = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: synthesisPrompt + '\n\n' + contextText }),
+      })
+
+      if (!synthesisRes.ok) throw new Error('Błąd generowania syntezy')
+      const synthesisData = await synthesisRes.json()
+      const synthesis = synthesisData.reply?.trim() || 'Brak syntezy.'
+
+      // 💾 zapisz lokalnie
+      localStorage.setItem(`summary_${task.id}`, synthesis)
+      // 🔁 powiadom TaskCard
+      window.dispatchEvent(new Event('taskUpdated'))
+
+      // 💬 wyślij jako komentarz do Todoist
+      if (todoistToken) {
+        await fetch('https://api.todoist.com/rest/v2/comments', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${todoistToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            task_id: task.id,
+            content: `[AI] ${synthesis}`,
+          }),
+        })
+      }
+    } catch (err) {
+      console.error('⚠️ Błąd zapisu syntezy:', err)
     }
   }
 
