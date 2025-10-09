@@ -7,15 +7,17 @@ import remarkGfm from 'remark-gfm'
 type ChatMessage = {
   role: 'user' | 'assistant'
   content: string
+  timestamp: number
 }
 
 interface Props {
   onClose: () => void
+  assistant?: 'global' | 'six_hats'
 }
 
-export default function GlobalDialog({ onClose }: Props) {
-  const storageKey = 'chat_global'
-  const summaryKey = 'summary_global'
+export default function GlobalDialog({ onClose, assistant = 'global' }: Props) {
+  const storageKey = assistant === 'six_hats' ? 'chat_six_hats' : 'chat_global'
+  const summaryKey = assistant === 'six_hats' ? 'summary_six_hats' : 'summary_global'
 
   const [chat, setChat] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -27,17 +29,24 @@ export default function GlobalDialog({ onClose }: Props) {
   useEffect(() => {
     if (typeof window === 'undefined') return
     const saved = localStorage.getItem(storageKey)
-    if (saved) setChat(JSON.parse(saved))
+    if (saved) {
+      const parsed = JSON.parse(saved).map((m: any) => ({
+        ...m,
+        timestamp: m.timestamp || Date.now(),
+      }))
+      setChat(parsed)
+    }
     const savedSummary = localStorage.getItem(summaryKey)
     if (savedSummary) setSummary(savedSummary)
-  }, [])
+  }, [storageKey, summaryKey])
 
   // 💾 Zapisz rozmowę po każdej zmianie
   useEffect(() => {
     if (chat.length > 0 && typeof window !== 'undefined') {
       localStorage.setItem(storageKey, JSON.stringify(chat))
+      window.dispatchEvent(new Event('chatUpdated'))
     }
-  }, [chat])
+  }, [chat, storageKey])
 
   // 🔽 Auto-scroll
   useEffect(() => {
@@ -48,7 +57,7 @@ export default function GlobalDialog({ onClose }: Props) {
     const text = input.trim()
     if (!text || loading) return
 
-    const userMsg: ChatMessage = { role: 'user', content: text }
+    const userMsg: ChatMessage = { role: 'user', content: text, timestamp: Date.now() }
     const updated = [...chat, userMsg]
     setChat(updated)
     setInput('')
@@ -58,18 +67,18 @@ export default function GlobalDialog({ onClose }: Props) {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({
+          message: text,
+          assistant, // 🧠 przekazujemy kontekst asystenta
+        }),
       })
 
       if (!res.ok) throw new Error('Błąd odpowiedzi z API')
       const data = await res.json()
       const reply = (data.reply?.trim() || '⚠️ Brak odpowiedzi od modelu.') as string
 
-      const newChat: ChatMessage[] = [
-        ...updated,
-        { role: 'assistant' as const, content: reply },
-      ]
-
+      const aiMsg: ChatMessage = { role: 'assistant', content: reply, timestamp: Date.now() }
+      const newChat = [...updated, aiMsg]
       setChat(newChat)
       localStorage.setItem(storageKey, JSON.stringify(newChat))
       await generateSynthesis(newChat)
@@ -77,7 +86,11 @@ export default function GlobalDialog({ onClose }: Props) {
       console.error('❌ Błąd komunikacji z AI:', err)
       setChat(prev => [
         ...prev,
-        { role: 'assistant', content: '⚠️ Wystąpił błąd podczas komunikacji z AI.' },
+        {
+          role: 'assistant',
+          content: '⚠️ Wystąpił błąd podczas komunikacji z AI.',
+          timestamp: Date.now(),
+        },
       ])
     } finally {
       setLoading(false)
@@ -88,11 +101,18 @@ export default function GlobalDialog({ onClose }: Props) {
   const generateSynthesis = async (fullChat: ChatMessage[]) => {
     try {
       const context = fullChat.map(m => `${m.role}: ${m.content}`).join('\n')
-      const prompt = `
+      const prompt =
+        assistant === 'six_hats'
+          ? `
+Podsumuj rozmowę w stylu 6 kapeluszy myślowych.
+Wymień główne wnioski z każdego kapelusza (biały, czerwony, czarny, żółty, zielony, niebieski).
+Napisz krótko po polsku, zaczynając od "Wnioski 6 Hats:".
+          `.trim()
+          : `
 Podsumuj rozmowę globalną w 2–3 zdaniach.
 Uwzględnij kluczowe decyzje, plany lub wnioski użytkownika.
 Napisz po polsku, zaczynając od "Wnioski AI:".
-      `.trim()
+          `.trim()
 
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -106,7 +126,7 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
 
       localStorage.setItem(summaryKey, synthesis)
       setSummary(synthesis)
-      window.dispatchEvent(new Event('globalChatUpdated'))
+      window.dispatchEvent(new Event('chatUpdated'))
     } catch (err) {
       console.error('⚠️ Błąd generowania syntezy globalnej:', err)
     }
@@ -123,7 +143,9 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
       >
         {/* HEADER */}
         <div className="flex justify-between items-center px-5 py-3 border-b bg-gray-50">
-          <h2 className="text-lg font-semibold text-gray-800">Asystent globalny 🤖</h2>
+          <h2 className="text-lg font-semibold text-gray-800">
+            {assistant === 'six_hats' ? '🎩 Six Hats Assistant' : '🤖 Asystent globalny'}
+          </h2>
           <button
             onClick={onClose}
             className="text-sm text-gray-500 hover:text-gray-700 transition"
@@ -136,13 +158,30 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-gray-50">
           {chat.length === 0 && (
             <div className="bg-white p-3 rounded-lg shadow-sm border text-sm text-gray-800 leading-relaxed">
-              👋 Cześć! Jestem Twoim asystentem produktywności.<br />
-              Możesz zapytać np.:
-              <ul className="list-disc ml-5 mt-2 text-gray-600">
-                <li>„Pomóż mi zaplanować dzień”</li>
-                <li>„Zaproponuj kolejność zadań”</li>
-                <li>„Jak się skupić przy pracy?”</li>
-              </ul>
+              {assistant === 'six_hats' ? (
+                <>
+                  🎩 <b>Six Hats Assistant</b><br />
+                  Podejdźmy do problemu z sześciu perspektyw:
+                  <ul className="list-disc ml-5 mt-2 text-gray-600">
+                    <li>🤍 Biały – fakty i dane</li>
+                    <li>❤️ Czerwony – emocje i intuicje</li>
+                    <li>🖤 Czarny – ryzyka i zagrożenia</li>
+                    <li>💛 Żółty – szanse i pozytywy</li>
+                    <li>💚 Zielony – pomysły i kreatywność</li>
+                    <li>💙 Niebieski – podsumowanie i decyzje</li>
+                  </ul>
+                </>
+              ) : (
+                <>
+                  👋 Cześć! Jestem Twoim asystentem produktywności.<br />
+                  Możesz zapytać np.:
+                  <ul className="list-disc ml-5 mt-2 text-gray-600">
+                    <li>„Pomóż mi zaplanować dzień”</li>
+                    <li>„Zaproponuj kolejność zadań”</li>
+                    <li>„Jak się skupić przy pracy?”</li>
+                  </ul>
+                </>
+              )}
             </div>
           )}
 
@@ -171,9 +210,7 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
           {loading && <div className="text-sm text-gray-500 animate-pulse">AI myśli...</div>}
 
           {summary && (
-            <div className="mt-3 text-xs text-gray-500 italic border-t pt-2">
-              {summary}
-            </div>
+            <div className="mt-3 text-xs text-gray-500 italic border-t pt-2">{summary}</div>
           )}
         </div>
 
@@ -184,7 +221,11 @@ Napisz po polsku, zaczynając od "Wnioski AI:".
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && sendMessage()}
-            placeholder="Zadaj pytanie np. „Pomóż mi zaplanować dzień...”"
+            placeholder={
+              assistant === 'six_hats'
+                ? 'Zadaj pytanie np. "Przeanalizuj problem metodą 6 kapeluszy..."'
+                : 'Zadaj pytanie np. "Pomóż mi zaplanować dzień..."'
+            }
             className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <button
