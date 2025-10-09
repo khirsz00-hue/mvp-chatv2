@@ -1,36 +1,60 @@
 'use client'
-import { Task } from '@/lib/types'
 import { useState } from 'react'
+import TaskDialog from './TaskDialog'
 
-interface TaskCardProps {
-  task: Task
-  onComplete: (id: string) => void
-  onReschedule: (id: string, date?: string) => void
-  onCoach: (task: Task) => void
-}
+export default function TaskCard({ task, token, onAction }) {
+  const [showDialog, setShowDialog] = useState(false)
+  const [dialogMode, setDialogMode] = useState<'none'|'help'>('none')
 
-export default function TaskCard({ task, onComplete, onReschedule, onCoach }: TaskCardProps) {
-  const [showPicker, setShowPicker] = useState(false)
+  const handleComplete = async () => {
+    await fetch('/api/todoist/complete', {
+      method: 'POST',
+      body: JSON.stringify({ id: task.id, token }),
+    })
+    onAction('completed')
+  }
+
+  const handleDelete = async () => {
+    await fetch('/api/todoist/delete', {
+      method: 'POST',
+      body: JSON.stringify({ id: task.id, token }),
+    })
+    onAction('deleted')
+  }
+
+  const handlePostpone = async (newDate) => {
+    await fetch('/api/todoist/postpone', {
+      method: 'POST',
+      body: JSON.stringify({ id: task.id, token, newDate }),
+    })
+    onAction('postponed')
+  }
 
   return (
-    <div className="card flex justify-between items-center mb-2">
-      <div>
-        <p className="font-medium">{task.content}</p>
-        {task.due && <p className="text-xs text-neutral-500">{task.due}</p>}
+    <div className="border rounded-xl p-3 bg-white shadow-sm hover:shadow-md transition">
+      <div className="flex justify-between items-center">
+        <div>
+          <p className="font-medium">{task.content}</p>
+          {task.due && <span className="text-xs text-neutral-500">{task.due}</span>}
+        </div>
+        <div className="space-x-1">
+          <button className="text-green-600 text-xs font-medium" onClick={handleComplete}>Ukończ</button>
+          <label className="text-blue-600 text-xs font-medium cursor-pointer">
+            Przełóż
+            <input type="date" className="hidden" onChange={e => handlePostpone(e.target.value)} />
+          </label>
+          <button className="text-red-500 text-xs font-medium" onClick={handleDelete}>Usuń</button>
+          <button className="text-purple-600 text-xs font-medium" onClick={() => { setDialogMode('help'); setShowDialog(true) }}>
+            Pomóż mi
+          </button>
+        </div>
       </div>
-      <div className="flex gap-2">
-        <button className="btn text-sm" onClick={() => onComplete(task.id)}>✅</button>
-        <button className="btn text-sm" onClick={() => setShowPicker(!showPicker)}>📅</button>
-        <button className="btn text-sm" onClick={() => onCoach(task)}>🧠</button>
-      </div>
-      {showPicker && (
-        <input
-          type="date"
-          className="input mt-2"
-          onChange={(e) => {
-            onReschedule(task.id, e.target.value)
-            setShowPicker(false)
-          }}
+
+      {showDialog && (
+        <TaskDialog
+          task={task}
+          mode={dialogMode}
+          onClose={() => setShowDialog(false)}
         />
       )}
     </div>
