@@ -16,12 +16,11 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
   >([])
   const [openChat, setOpenChat] = useState<{ mode: 'global' | 'task'; id?: string; title?: string } | null>(null)
 
-  // 🔄 Wczytaj dane po załadowaniu
   useEffect(() => {
     if (typeof window === 'undefined') return
 
     const loadChats = () => {
-      // 🧠 Globalne rozmowy
+      // 🔹 Globalne rozmowy
       const global = JSON.parse(localStorage.getItem('chat_global') || '[]')
         .filter((m: any) => m.role === 'user')
         .slice(-5)
@@ -37,7 +36,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
         }))
       setGlobalChats(global)
 
-      // 📋 Rozmowy z zadaniami
+      // 🔹 Czat z zadaniami
       const tasks = Object.keys(localStorage)
         .filter(k => k.startsWith('chat_task_'))
         .map(k => {
@@ -59,8 +58,6 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
     }
 
     loadChats()
-
-    // ⏱ automatyczne odświeżenie po zapisie nowego czatu
     window.addEventListener('storage', loadChats)
     window.addEventListener('chatUpdated', loadChats)
     return () => {
@@ -69,7 +66,6 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
     }
   }, [])
 
-  // 🧭 Po kliknięciu w czat – otwórz modal lub przekaż do zewnętrznego handlera
   const handleOpenChat = (mode: 'global' | 'task', task?: { id: string; content: string }) => {
     if (onSelectChat) onSelectChat(mode, task)
     else {
@@ -80,9 +76,8 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
 
   return (
     <>
-      {/* 🧩 Sidebar */}
+      {/* 🧭 Sidebar */}
       <div className="w-[260px] border-r border-gray-200 bg-gray-50 flex flex-col h-full">
-        {/* 🏷️ Nagłówek */}
         <div className="p-3 border-b bg-white flex justify-between items-center">
           <h2 className="font-semibold text-gray-700 text-sm">💬 Historia czatów</h2>
         </div>
@@ -107,7 +102,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
           </button>
         </div>
 
-        {/* 📜 Lista */}
+        {/* 📋 Lista rozmów */}
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
           {tab === 'global' ? (
             globalChats.length === 0 ? (
@@ -142,7 +137,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
         </div>
       </div>
 
-      {/* 💬 Modal czatu */}
+      {/* 💬 Modal z czatem */}
       {openChat && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-3"
@@ -150,7 +145,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
         >
           <div
             className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border border-gray-200 overflow-hidden animate-fadeIn max-h-[90vh]"
-            onClick={(e) => e.stopPropagation()}
+            onClick={e => e.stopPropagation()}
           >
             <div className="flex justify-between items-center px-5 py-3 border-b bg-gray-50">
               <h2 className="text-lg font-semibold text-gray-800">
