@@ -66,11 +66,13 @@ export default function GlobalDialog({ onClose }: Props) {
       const data = await res.json()
       const reply = data.reply?.trim() || '⚠️ Brak odpowiedzi od modelu.'
 
-      const newChat = [...updated, { role: 'assistant', content: reply }]
-      setChat(newChat)
-      localStorage.setItem(storageKey, JSON.stringify(newChat))
-
-      await generateSynthesis(newChat)
+      const newChat: ChatMessage[] = [
+  ...updated,
+  { role: 'assistant' as const, content: reply },
+]
+setChat(newChat)
+localStorage.setItem(storageKey, JSON.stringify(newChat))
+await generateSynthesis(newChat)
     } catch (err) {
       console.error('❌ Błąd komunikacji z AI:', err)
       setChat((prev) => [
