@@ -1,13 +1,16 @@
 import { NextResponse } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(req: Request) {
   const body = await req.json()
+
   console.log('📩 [TODOIST WEBHOOK]', body?.event_name, body?.event_data?.content)
 
-  // 🔊 Emitujemy event do "globalnego kanału" w pamięci serwera
+  // 🔊 Zapisz event do pamięci serwera (globalnej)
   ;(globalThis as any).lastTodoistEvent = {
     event: body.event_name,
-    id: body.event_data?.id,
+    data: body.event_data,
     ts: Date.now(),
   }
 
