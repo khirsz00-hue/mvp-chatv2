@@ -1,26 +1,52 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
-import fs from 'fs'
-import path from 'path'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+})
 
 export async function POST(req: Request) {
-  const { assistantId, messages } = await req.json()
+  try {
+    const body = await req.json()
+    const { message, context } = body
 
-  // Załaduj prompt z pliku
-  const promptPath = path.join(process.cwd(), 'src', 'assistants', assistantId, 'prompt.txt')
-  const prompt = fs.existsSync(promptPath) ? fs.readFileSync(promptPath, 'utf8') : ''
+    if (!message) {
+      return NextResponse.json(
+        { error: 'Brak wiadomości w żądaniu.' },
+        { status: 400 }
+      )
+    }
 
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages: [
-      { role: 'system', content: prompt },
-      ...messages
-    ],
-    temperature: 0.7
-  })
+    if (!process.env.OPENAI_API_KEY) {
+      console.error('❌ Brak OPENAI_API_KEY w środowisku!')
+      return NextResponse.json(
+        { error: 'Brak konfiguracji OpenAI API Key.' },
+        { status: 500 }
+      )
+    }
 
-  const answer = response.choices[0].message?.content || ''
-  return NextResponse.json({ answer })
+    const systemPrompt = `
+Jesteś asystentem produktywności, który pomaga w realizacji zadań.
+Zawsze pytaj o szczegóły i doradzaj rzeczowo, nie wymyślaj danych.
+${context ? `Kontekst zadania: ${context}` : ''}
+    `.trim()
+
+    const completion = await client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      temperature: 0.7,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: message },
+      ],
+    })
+
+    const reply = completion.choices[0]?.message?.content ?? 'Brak odpowiedzi.'
+    return NextResponse.json({ reply })
+  } catch (error: any) {
+    console.error('❌ Błąd w /api/chat:', error)
+    return NextResponse.json(
+      { error: error.message || 'Wewnętrzny błąd serwera' },
+      { status: 500 }
+    )
+  }
 }
