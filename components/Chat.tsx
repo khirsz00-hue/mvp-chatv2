@@ -20,8 +20,9 @@ export type ChatMessage = {
 interface ChatProps {
   onSend: (msg: string) => Promise<void>
   messages: ChatMessage[]
-  assistant?: 'global' | 'six_hats'
+  assistant?: 'global' | 'six_hats' | 'todoist'
   hideHistory?: boolean
+  sessionId?: string // 🔹 identyfikator sesji, żeby czaty się nie mieszały
 }
 
 export default function Chat({
@@ -29,11 +30,19 @@ export default function Chat({
   messages,
   assistant = 'six_hats',
   hideHistory = true,
+  sessionId,
 }: ChatProps) {
   const [input, setInput] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  const storageKey = assistant === 'six_hats' ? 'chat_six_hats' : 'chat_global'
+  // 💾 Klucz zależny od asystenta lub sesji
+  const storageKey = sessionId
+    ? `chat_session_${sessionId}`
+    : assistant === 'six_hats'
+    ? 'chat_six_hats'
+    : assistant === 'todoist'
+    ? 'chat_todoist'
+    : 'chat_global'
 
   // 💾 Zapisuj wiadomości do localStorage
   useEffect(() => {
@@ -55,11 +64,11 @@ export default function Chat({
     await onSend(msg)
   }
 
-  // 🔹 Jeśli `hideHistory` = true, pokazuj tylko ostatnie wiadomości (np. user + AI)
+  // 🔹 Jeśli `hideHistory` = true, pokazuj tylko ostatnie 8 wiadomości
   const visibleMessages = hideHistory ? messages.slice(-8) : messages
 
   return (
-    <div className="flex flex-col h-[70vh] rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+    <div className="flex flex-col h-full max-h-[75vh] rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
       {/* CZAT */}
       <div className="flex-1 overflow-y-auto space-y-3 p-4 bg-gray-50">
         <AnimatePresence>
@@ -80,7 +89,7 @@ export default function Chat({
 
               {/* ✅ Wiadomości z zadaniami */}
               {m.type === 'tasks' && (
-                <div className="space-y-2 mt-1">
+                <div className="space-y-2 mt-2">
                   {m.tasks && m.tasks.length > 0 ? (
                     m.tasks.map((t) => (
                       <div
@@ -124,7 +133,7 @@ export default function Chat({
       </div>
 
       {/* INPUT */}
-      <div className="p-3 border-t flex gap-2 bg-white">
+      <div className="p-3 border-t flex gap-2 bg-white sticky bottom-0">
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -132,7 +141,9 @@ export default function Chat({
           placeholder={
             assistant === 'six_hats'
               ? 'Zadaj pytanie np. "Przeanalizuj problem metodą 6 kapeluszy..."'
-              : 'Napisz wiadomość np. "Daj taski na dziś"'
+              : assistant === 'global'
+              ? 'Napisz wiadomość np. "Daj taski na dziś"'
+              : 'Zadaj pytanie o zadania Todoist...'
           }
           className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
