@@ -1,187 +1,139 @@
-'use client'
+import { NextResponse } from 'next/server'
+import OpenAI from 'openai'
 
-import { useState, useRef, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+export const runtime = 'nodejs'
 
-export type ChatMessage = {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  timestamp: number
-  type?: 'text' | 'tasks'
-  tasks?: {
-    id: string
-    content: string
-    due?: string
-    priority?: number
-  }[]
-}
-
-interface ChatProps {
-  onSend: (msg: string) => Promise<void>
-  messages: ChatMessage[]
-  assistant?: 'global' | 'six_hats' | 'todoist'
-  hideHistory?: boolean
-  sessionId?: string
-}
-
-export default function Chat({
-  onSend,
-  messages,
-  assistant = 'six_hats',
-  hideHistory = true,
-  sessionId,
-}: ChatProps) {
-  const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
-  const bottomRef = useRef<HTMLDivElement>(null)
-
-  const storageKey = sessionId
-    ? `chat_session_${sessionId}`
-    : assistant === 'six_hats'
-    ? 'chat_six_hats'
-    : assistant === 'todoist'
-    ? 'chat_todoist'
-    : 'chat_global'
-
-  // 💾 Zapisuj wiadomości do localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined' && messages.length > 0) {
-      localStorage.setItem(storageKey, JSON.stringify(messages))
-      window.dispatchEvent(new Event('chatUpdated'))
+export async function POST(req: Request) {
+  try {
+    const { message } = await req.json()
+    if (!message) {
+      return NextResponse.json({ error: 'Brak wiadomości' }, { status: 400 })
     }
-  }, [messages, storageKey])
 
-  // 🔽 Auto-scroll
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    const lower = message.toLowerCase()
+    const todoistToken = process.env.TODOIST_API_TOKEN
+    let tasks: any[] = []
 
-  const handleSend = async (text?: string) => {
-    const msg = (text || input).trim()
-    if (!msg) return
-    setInput('')
-    setLoading(true)
-    await onSend(msg)
-    setLoading(false)
+    if (!todoistToken) {
+      console.error('❌ Brak TODOIST_API_TOKEN w env')
+      return NextResponse.json({ error: 'Brak tokena Todoist' }, { status: 500 })
+    }
+
+    // 🧩 Określ zakres czasowy
+    let filter = ''
+    if (lower.includes('jutro')) filter = 'tomorrow'
+    else if (lower.includes('tydzień') || lower.includes('tydzien')) filter = '7 days'
+    else if (lower.includes('miesiąc') || lower.includes('miesiac')) filter = '30 days'
+    else if (lower.includes('przeterminowane')) filter = 'overdue'
+    else filter = 'today'
+
+    console.log('🕓 Zakres filtracji Todoist:', filter)
+
+    // 📦 Pobierz zadania z Todoista z poprawionymi headerami
+    const res = await fetch('https://api.todoist.com/rest/v2/tasks', {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${todoistToken}`,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'User-Agent': 'ZenonAI (vercel.app; chat-todoist-integration)',
+        'X-Request-Source': 'VercelServerlessRuntime',
+      },
+    })
+
+    console.log('🔐 Status odpowiedzi Todoist:', res.status)
+
+    const text = await res.text()
+    let all: any[] = []
+
+    if (res.status === 200) {
+      try {
+        all = JSON.parse(text)
+      } catch {
+        console.warn('⚠️ Nie udało się sparsować odpowiedzi Todoist jako JSON.')
+      }
+    } else {
+      console.error('⚠️ Błąd odpowiedzi Todoist:', text)
+    }
+
+    // 📅 Filtrowanie po terminie
+    const now = new Date()
+    const dateCheck = (taskDate: string) => {
+      if (!taskDate) return false
+      const d = new Date(taskDate)
+      const diffDays = (d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+      if (filter === 'today') return d.toDateString() === now.toDateString()
+      if (filter === 'tomorrow') return diffDays >= 0.5 && diffDays < 1.5
+      if (filter === '7 days') return diffDays >= 0 && diffDays < 7
+      if (filter === '30 days') return diffDays >= 0 && diffDays < 30
+      if (filter === 'overdue') return d < now
+      return false
+    }
+
+    tasks = all.filter((t: any) => t.due?.date && dateCheck(t.due.date))
+    console.log('✅ Znaleziono zadań:', tasks.length)
+
+    // ✅ Jeśli użytkownik prosi o taski → zwróć je bezpośrednio
+    const isTaskQuery =
+      lower.includes('taski') ||
+      lower.includes('zadań') ||
+      lower.includes('pokaż') ||
+      lower.includes('daj')
+
+    if (isTaskQuery && tasks.length > 0) {
+      return NextResponse.json({
+        role: 'assistant',
+        type: 'tasks',
+        timestamp: Date.now(),
+        tasks: tasks.map((t: any) => ({
+          id: t.id,
+          content: t.content,
+          due: t.due?.date || undefined,
+          priority: t.priority || 1,
+        })),
+      })
+    }
+
+    // 🧠 Analiza AI — jeśli nie chodzi o zwykłe taski
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
+
+    const taskContext =
+      tasks.length > 0
+        ? tasks.map((t) => `- ${t.content} (termin: ${t.due?.date || 'brak'})`).join('\n')
+        : '(Brak zadań do analizy)'
+
+    const systemPrompt = `
+Jesteś osobistym asystentem produktywności zintegrowanym z Todoist.
+Masz pomagać użytkownikowi w planowaniu, analizie i organizacji zadań.
+
+Zasady:
+- Odpowiadaj po polsku.
+- Jeśli użytkownik prosi o grupowanie, wykonaj logiczny podział zadań wg tematów lub kategorii.
+- Jeśli użytkownik prosi o plan, zaproponuj harmonogram działań.
+- Jeśli brak danych, zapytaj o kontekst.
+
+Dostępne zadania:
+${taskContext}
+    `.trim()
+
+    const completion = await client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      temperature: 0.7,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: message },
+      ],
+    })
+
+    const reply = completion.choices[0]?.message?.content || '🤖 Brak odpowiedzi od AI.'
+    return NextResponse.json({
+      role: 'assistant',
+      type: 'text',
+      timestamp: Date.now(),
+      content: reply,
+    })
+  } catch (err: any) {
+    console.error('❌ Błąd /api/chat:', err)
+    return NextResponse.json({ error: err.message }, { status: 500 })
   }
-
-  const visibleMessages = hideHistory ? messages.slice(-8) : messages
-
-  return (
-    <div className="flex flex-col h-full max-h-[75vh] rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-      {/* CZAT */}
-      <div className="flex-1 overflow-y-auto space-y-3 p-4 bg-gray-50">
-        <AnimatePresence>
-          {visibleMessages.map((m) => (
-            <motion.div
-              key={m.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className={`p-3 rounded-xl max-w-[85%] whitespace-pre-wrap text-sm leading-relaxed ${
-                m.role === 'user'
-                  ? 'ml-auto bg-blue-600 text-white'
-                  : 'bg-white border border-gray-200 text-gray-800'
-              }`}
-            >
-              {/* 🧠 Tekst */}
-              {m.type !== 'tasks' && <div>{m.content}</div>}
-
-              {/* ✅ Zadania */}
-              {m.type === 'tasks' && (
-                <div className="mt-2 space-y-3">
-                  {/* 🔘 Przyciski akcji nad listą */}
-                  <div className="flex justify-end mb-2">
-                    <button
-                      onClick={() => handleSend('Pogrupuj tematycznie te zadania')}
-                      className="text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-700 transition"
-                    >
-                      🧩 Pogrupuj tematycznie
-                    </button>
-                  </div>
-
-                  {m.tasks && m.tasks.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {m.tasks.map((t) => (
-                        <motion.div
-                          key={t.id}
-                          whileHover={{ scale: 1.02 }}
-                          className="p-3 rounded-lg border border-gray-200 bg-gray-50 shadow-sm hover:shadow-md transition cursor-pointer"
-                        >
-                          <p className="font-medium text-gray-800">{t.content}</p>
-                          <div className="text-xs text-gray-500 flex gap-2 mt-1">
-                            {t.due && (
-                              <span>📅 {new Date(t.due).toLocaleDateString('pl-PL')}</span>
-                            )}
-                            {t.priority && t.priority > 1 && (
-                              <span>⭐ Priorytet {t.priority}</span>
-                            )}
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="italic text-gray-500 text-sm">Brak zadań do wyświetlenia.</p>
-                  )}
-                </div>
-              )}
-
-              {/* ⏱ Timestamp */}
-              <div
-                className={`text-[10px] mt-1 opacity-60 text-right ${
-                  m.role === 'user' ? 'text-white' : 'text-gray-500'
-                }`}
-              >
-                {new Date(m.timestamp).toLocaleTimeString('pl-PL', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-
-        {loading && (
-          <div className="flex justify-center items-center mt-4">
-            <motion.div
-              className="flex space-x-2"
-              animate={{ opacity: [0.4, 1, 0.4] }}
-              transition={{ duration: 1.5, repeat: Infinity }}
-            >
-              <div className="w-2 h-2 bg-gray-400 rounded-full" />
-              <div className="w-2 h-2 bg-gray-400 rounded-full" />
-              <div className="w-2 h-2 bg-gray-400 rounded-full" />
-            </motion.div>
-          </div>
-        )}
-
-        <div ref={bottomRef} />
-      </div>
-
-      {/* INPUT */}
-      <div className="p-3 border-t flex gap-2 bg-white sticky bottom-0">
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-          placeholder={
-            assistant === 'six_hats'
-              ? 'Zadaj pytanie np. "Przeanalizuj problem metodą 6 kapeluszy..."'
-              : assistant === 'global'
-              ? 'Napisz wiadomość np. "Daj taski na dziś"'
-              : 'Zadaj pytanie o zadania Todoist...'
-          }
-          className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <button
-          disabled={loading}
-          onClick={() => handleSend()}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition disabled:opacity-50"
-        >
-          Wyślij
-        </button>
-      </div>
-    </div>
-  )
 }
