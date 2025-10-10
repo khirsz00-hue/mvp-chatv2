@@ -3,10 +3,18 @@
 import { useState, useEffect } from 'react'
 import Chat, { ChatMessage } from './Chat'
 
+type TodoistTask = {
+  id: string
+  content: string
+  due?: { date: string } | null
+  priority?: number
+  completed?: boolean
+}
+
 export default function TodoistAIView() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [token, setToken] = useState<string | null>(null)
-  const [tasks, setTasks] = useState<any[]>([])
+  const [tasks, setTasks] = useState<TodoistTask[]>([])
   const [loading, setLoading] = useState(false)
 
   // 🔹 Pobierz token z localStorage
@@ -34,6 +42,24 @@ export default function TodoistAIView() {
     fetchTasks()
   }, [token])
 
+  // ✅ Zmiana statusu zadania (toggle complete)
+  const toggleTask = async (taskId: string) => {
+    if (!token) return
+    try {
+      await fetch(`https://api.todoist.com/rest/v2/tasks/${taskId}/close`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === taskId ? { ...t, completed: !t.completed } : t
+        )
+      )
+    } catch (err) {
+      console.error('❌ Nie udało się oznaczyć zadania jako ukończone:', err)
+    }
+  }
+
   // 💬 Wyślij wiadomość do AI z kontekstem Todoista
   const handleSend = async (message: string) => {
     const userMsg: ChatMessage = {
@@ -48,7 +74,12 @@ export default function TodoistAIView() {
 
     try {
       const contextTasks = tasks
-        .map((t) => `- ${t.content}${t.due?.date ? ` (termin: ${t.due.date})` : ''}`)
+        .map(
+          (t) =>
+            `- ${t.content}${
+              t.due?.date ? ` (termin: ${t.due.date})` : ''
+            }${t.completed ? ' ✅' : ''}`
+        )
         .join('\n')
 
       const contextPrompt = `
@@ -73,14 +104,28 @@ Nie powtarzaj listy zadań dosłownie, przedstaw przetworzoną analizę.
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Błąd API')
 
-      const aiMsg: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: data.content || data.reply || '🤖 Brak odpowiedzi od AI.',
-        timestamp: Date.now(),
+      // jeśli zwraca listę zadań
+      if (data.type === 'tasks' && data.tasks?.length) {
+        setMessages([
+          ...updated,
+          {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            type: 'tasks',
+            tasks: data.tasks,
+            content: '📋 Twoje zadania:',
+            timestamp: Date.now(),
+          },
+        ])
+      } else {
+        const aiMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: data.content || data.reply || '🤖 Brak odpowiedzi od AI.',
+          timestamp: Date.now(),
+        }
+        setMessages([...updated, aiMsg])
       }
-
-      setMessages([...updated, aiMsg])
     } catch (err) {
       console.error('❌ Błąd komunikacji z AI:', err)
       setMessages((prev) => [
@@ -88,7 +133,7 @@ Nie powtarzaj listy zadań dosłownie, przedstaw przetworzoną analizę.
         {
           id: crypto.randomUUID(),
           role: 'assistant',
-          content: '⚠️ Wystąpił problem z połączeniem z AI.',
+          content: '⚠️ Błąd komunikacji z AI.',
           timestamp: Date.now(),
         },
       ])
@@ -97,7 +142,7 @@ Nie powtarzaj listy zadań dosłownie, przedstaw przetworzoną analizę.
     }
   }
 
-  // 🔄 Pogrupuj tematycznie (AI przetwarza istniejące zadania)
+  // 🧠 Pogrupuj tematycznie
   const handleGroupTasks = async () => {
     if (tasks.length === 0) {
       setMessages((prev) => [
@@ -124,12 +169,61 @@ Nie powtarzaj dokładnych treści zadań — grupuj logicznie.
     await handleSend(groupPrompt)
   }
 
-  // 🧹 Wyczyść historię czatu
+  // 🧹 Wyczyść historię
   const handleClearHistory = () => {
     if (confirm('Na pewno chcesz usunąć historię rozmowy?')) {
       setMessages([])
       localStorage.removeItem('chat_todoist')
     }
+  }
+
+  // 🧩 Renderowanie Task Cards
+  const renderTasks = () => {
+    if (tasks.length === 0)
+      return (
+        <div className="text-gray-500 text-sm italic text-center py-4">
+          Brak zadań do wyświetlenia
+        </div>
+      )
+
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+        {tasks.map((t) => (
+          <div
+            key={t.id}
+            className={`p-3 rounded-xl border ${
+              t.completed ? 'bg-green-50 border-green-300' : 'bg-white border-gray-200'
+            } shadow-sm hover:shadow-md transition relative`}
+          >
+            <div className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                checked={!!t.completed}
+                onChange={() => toggleTask(t.id)}
+                className="mt-1 accent-green-600 cursor-pointer"
+              />
+              <div>
+                <p
+                  className={`text-sm font-medium ${
+                    t.completed ? 'line-through text-gray-400' : 'text-gray-800'
+                  }`}
+                >
+                  {t.content}
+                </p>
+                <div className="text-xs text-gray-500 mt-1 flex gap-2">
+                  {t.due?.date && (
+                    <span>📅 {new Date(t.due.date).toLocaleDateString('pl-PL')}</span>
+                  )}
+                  {t.priority && t.priority > 1 && (
+                    <span>⭐ Priorytet: {t.priority}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    )
   }
 
   return (
@@ -163,7 +257,6 @@ Nie powtarzaj dokładnych treści zadań — grupuj logicznie.
           </button>
         </div>
 
-        {/* 🧹 Wyczyść historię */}
         <button
           onClick={handleClearHistory}
           className="text-sm text-red-600 hover:text-red-800 transition"
@@ -171,6 +264,9 @@ Nie powtarzaj dokładnych treści zadań — grupuj logicznie.
           🗑️ Wyczyść historię
         </button>
       </div>
+
+      {/* 🧩 Task Cards */}
+      <div className="max-h-[40vh] overflow-y-auto">{renderTasks()}</div>
 
       {/* 💬 Chat */}
       <div className="flex-1">
