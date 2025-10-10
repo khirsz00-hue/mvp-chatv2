@@ -12,12 +12,12 @@ interface TodoistConnectionProps {
 export default function TodoistConnection({ token, onDisconnect }: TodoistConnectionProps) {
   const [mode, setMode] = useState<'tasks' | 'ai'>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('todoist_mode') as 'tasks' | 'ai') || 'tasks'
+      const saved = localStorage.getItem('todoist_mode')
+      if (saved === 'ai' || saved === 'tasks') return saved
     }
     return 'tasks'
   })
 
-  // 💾 Zapamiętuj wybrany tryb (tasks / ai)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('todoist_mode', mode)
@@ -26,10 +26,8 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
 
   return (
     <div className="relative flex flex-col h-[calc(100vh-100px)] bg-gray-50 border border-green-200 rounded-xl overflow-hidden">
-      {/* 🔘 Pasek górny */}
       <div className="flex justify-between items-center p-2 px-4 bg-white border-b shadow-sm">
         <div className="flex items-center gap-3">
-          {/* 🧭 Przełącznik widoków */}
           <div className="flex bg-gray-100 rounded-lg overflow-hidden">
             <button
               onClick={() => setMode('tasks')}
@@ -39,7 +37,7 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
                   : 'text-gray-700 hover:bg-gray-200'
               }`}
             >
-              📋 Lista zadań
+              Lista zadań
             </button>
             <button
               onClick={() => setMode('ai')}
@@ -49,15 +47,14 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
                   : 'text-gray-700 hover:bg-gray-200'
               }`}
             >
-              🤖 Asystent AI
+              Asystent AI
             </button>
           </div>
         </div>
 
-        {/* 🔌 Status połączenia */}
         <div className="flex items-center gap-3">
           <span className="text-sm font-semibold text-green-700 whitespace-nowrap">
-            ✅ Połączono z Todoist
+            Połączono z Todoist
           </span>
           <button
             onClick={onDisconnect}
@@ -68,12 +65,11 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
         </div>
       </div>
 
-      {/* 🔄 Dynamiczna zawartość */}
       <div className="flex-1 relative">
         {mode === 'tasks' ? (
           <TodoistTasksView token={token} />
         ) : (
-          <TodoistAIView /> {/* ✅ bez przekazywania tokena */}
+          <TodoistAIView />
         )}
       </div>
     </div>
