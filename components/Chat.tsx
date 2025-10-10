@@ -2,6 +2,9 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import TaskCard from './TaskCard'
 
 export type ChatMessage = {
   id: string
@@ -22,7 +25,7 @@ interface ChatProps {
   messages: ChatMessage[]
   assistant?: 'global' | 'six_hats' | 'todoist'
   hideHistory?: boolean
-  sessionId?: string // 🔹 identyfikator sesji, żeby czaty się nie mieszały
+  sessionId?: string
 }
 
 export default function Chat({
@@ -33,6 +36,7 @@ export default function Chat({
   sessionId,
 }: ChatProps) {
   const [input, setInput] = useState('')
+  const [isThinking, setIsThinking] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   // 💾 Klucz zależny od asystenta lub sesji
@@ -61,7 +65,9 @@ export default function Chat({
     if (!input.trim()) return
     const msg = input.trim()
     setInput('')
+    setIsThinking(true)
     await onSend(msg)
+    setIsThinking(false)
   }
 
   // 🔹 Jeśli `hideHistory` = true, pokazuj tylko ostatnie 8 wiadomości
@@ -84,28 +90,44 @@ export default function Chat({
                   : 'bg-white border border-gray-200 text-gray-800'
               }`}
             >
-              {/* 🧠 Wiadomości tekstowe */}
-              {m.type !== 'tasks' && <div>{m.content}</div>}
+              {/* 🧠 Wiadomości tekstowe z Markdown */}
+              {m.type !== 'tasks' && (
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  className={`prose prose-sm max-w-none ${
+                    m.role === 'user'
+                      ? 'text-white prose-strong:text-white prose-headings:text-white'
+                      : 'text-gray-800 prose-a:text-blue-600'
+                  }`}
+                >
+                  {m.content}
+                </ReactMarkdown>
+              )}
 
               {/* ✅ Wiadomości z zadaniami */}
               {m.type === 'tasks' && (
                 <div className="space-y-2 mt-2">
                   {m.tasks && m.tasks.length > 0 ? (
                     m.tasks.map((t) => (
-                      <div
+                      <motion.div
                         key={t.id}
-                        className="p-3 rounded-lg bg-gray-50 border border-gray-200 shadow-sm hover:bg-gray-100 transition"
+                        whileHover={{ scale: 1.01 }}
+                        className="cursor-pointer transition rounded-lg hover:bg-gray-50 overflow-visible"
                       >
-                        <p className="font-medium text-gray-800">{t.content}</p>
-                        <div className="text-xs text-gray-500 flex gap-2 mt-1">
-                          {t.due && (
-                            <span>📅 {new Date(t.due).toLocaleDateString('pl-PL')}</span>
-                          )}
-                          {t.priority && t.priority > 1 && (
-                            <span>⭐ Priorytet: {t.priority}</span>
-                          )}
-                        </div>
-                      </div>
+                        <TaskCard
+                          task={{
+                            id: t.id,
+                            content: t.content,
+                            due: t.due,
+                            priority: t.priority,
+                          }}
+                          token={''}
+                          onAction={() => {}}
+                          selectable={false}
+                          selected={false}
+                          onSelectChange={() => {}}
+                        />
+                      </motion.div>
                     ))
                   ) : (
                     <p className="italic text-gray-500 text-sm">
@@ -129,6 +151,34 @@ export default function Chat({
             </motion.div>
           ))}
         </AnimatePresence>
+
+        {/* 🔄 Loader */}
+        {isThinking && (
+          <div className="flex items-center justify-center gap-2 text-gray-500 text-sm mt-3 animate-pulse">
+            <svg
+              className="animate-spin h-4 w-4 text-gray-400"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+              ></path>
+            </svg>
+            <span>AI myśli...</span>
+          </div>
+        )}
+
         <div ref={bottomRef} />
       </div>
 
@@ -150,6 +200,7 @@ export default function Chat({
         <button
           className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition disabled:opacity-50"
           onClick={handleSend}
+          disabled={isThinking}
         >
           Wyślij
         </button>
