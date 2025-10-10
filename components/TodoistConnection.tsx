@@ -73,7 +73,7 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
         {mode === 'tasks' ? (
           <TodoistTasksView token={token} />
         ) : (
-          <TodoistAIView /> {/* ✅ Bez przekazywania tokena */}
+          <TodoistAIView /> {/* ✅ bez przekazywania tokena */}
         )}
       </div>
     </div>
