@@ -6,14 +6,15 @@ import Chat, { ChatMessage } from './Chat'
 export default function TodoistAIView() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [token, setToken] = useState<string | null>(null)
+  const [lastFetchedTasks, setLastFetchedTasks] = useState<any[]>([])
 
-  // 🔹 Pobierz token z localStorage po załadowaniu komponentu
+  // 🔹 Pobierz token z localStorage
   useEffect(() => {
     const saved = localStorage.getItem('todoist_token')
     if (saved) setToken(saved)
   }, [])
 
-  // 💬 Pobieranie tasków bez backendu
+  // 💬 Pobierz zadania z Todoista
   const fetchTasks = async (period: 'today' | 'tomorrow') => {
     if (!token) {
       return {
@@ -37,6 +38,8 @@ export default function TodoistAIView() {
 
       const dateString = targetDate.toISOString().split('T')[0]
       const filtered = tasks.filter((t: any) => t.due?.date === dateString)
+
+      setLastFetchedTasks(filtered) // 🧠 zapisz do pamięci dla kontekstu AI
 
       if (filtered.length === 0) {
         return {
@@ -72,7 +75,7 @@ export default function TodoistAIView() {
     }
   }
 
-  // 🧠 Obsługa wysyłania wiadomości
+  // 🧠 Obsługa wiadomości i kontekstu
   const handleSend = async (message: string) => {
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
@@ -80,13 +83,12 @@ export default function TodoistAIView() {
       content: message,
       timestamp: Date.now(),
     }
-
     const updated = [...messages, userMsg]
     setMessages(updated)
 
     const lower = message.toLowerCase()
 
-    // 🔍 Komendy: "dzisiaj" lub "jutro"
+    // 🔍 Komendy: "dzisiaj" / "jutro"
     if (lower.includes('dzis') || lower.includes('dziś')) {
       const data = await fetchTasks('today')
       setMessages([
@@ -119,13 +121,17 @@ export default function TodoistAIView() {
       return
     }
 
-    // 💬 Standardowa rozmowa z AI
+    // 🧩 Rozmowa z AI — z kontekstem tasków
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({
+          message,
+          context: lastFetchedTasks.map((t) => t.content).join('\n'),
+        }),
       })
+
       const data = await res.json()
       const reply =
         data.reply || '🤖 Nie mam pewności, jak odpowiedzieć na to pytanie.'
