@@ -199,10 +199,10 @@ export default function Chat({
               {/* ✅ Wiadomości z zadaniami */}
               {m.type === 'tasks' && (
                 <div className="mt-2 space-y-2">
-                  {m.tasks.length > 0 ? (
+                  {(m.tasks?.length || 0) > 0 ? (
                     <>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {m.tasks.map((t) => (
+                        {(m.tasks || []).map((t) => (
                           <TaskCard
                             key={t.id}
                             task={{
@@ -248,11 +248,15 @@ export default function Chat({
           ))}
         </AnimatePresence>
 
+        {/* Loader */}
         {isLoading && (
-          <div className="text-center text-gray-500 text-sm animate-pulse">
-            AI analizuje...
+          <div className="flex justify-center items-center mt-2 text-gray-500 text-sm gap-1 animate-pulse">
+            <span className="animate-bounce">●</span>
+            <span className="animate-bounce delay-100">●</span>
+            <span className="animate-bounce delay-200">●</span>
           </div>
         )}
+
         <div ref={bottomRef} />
       </div>
 
