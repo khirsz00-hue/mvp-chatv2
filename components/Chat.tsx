@@ -118,7 +118,7 @@ export default function Chat({
                           task={{
                             id: t.id,
                             content: t.content,
-                            due: t.due,
+                            due: t.due || undefined,
                             priority: t.priority,
                           }}
                           token={''}
