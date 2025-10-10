@@ -4,18 +4,23 @@ export const runtime = 'nodejs'
 
 export async function POST(req: Request) {
   try {
-    const customToken = req.headers.get('x-todoist-token') // ✅ bezpieczny nagłówek
-    const { message, context } = await req.json().catch(() => ({}))
+    const { message, context, todoist_token } = await req.json()
 
-    if (!message || typeof message !== 'string')
+    if (!message || typeof message !== 'string') {
       return NextResponse.json({ error: 'Brak wiadomości' }, { status: 400 })
+    }
 
+    // 🔑 1. TOKEN
+    const token = todoist_token || process.env.TODOIST_API_TOKEN
+    console.log('🔑 Odebrany token Todoist:', token ? token.slice(0, 10) + '...' : '❌ brak')
+
+    // 🔍 2. Wykrywanie zapytań o zadania
     const taskKeywords = ['zadania', 'taski', 'lista', 'na dziś', 'na dzis', 'co mam dziś', 'co mam dzis']
+    const lower = message.toLowerCase()
+    const isTaskQuery = taskKeywords.some(k => lower.includes(k))
 
-    // === TODOIST ===
-    if (taskKeywords.some(k => message.toLowerCase().includes(k))) {
-      if (!customToken) {
-        console.error('❌ Brak tokena Todoist (x-todoist-token)')
+    if (isTaskQuery) {
+      if (!token) {
         return NextResponse.json({
           reply: 'Brak tokena Todoist — zaloguj się w Todoist Helper 🔒',
           type: 'error',
@@ -23,30 +28,31 @@ export async function POST(req: Request) {
       }
 
       try {
-        console.log('🔑 Token Todoist otrzymany:', customToken.slice(0, 8) + '...')
         const res = await fetch('https://api.todoist.com/rest/v2/tasks', {
-          headers: { Authorization: `Bearer ${customToken}` },
+          headers: { Authorization: `Bearer ${token}` },
           cache: 'no-store',
         })
 
         const text = await res.text()
-        console.log('🪪 Odpowiedź Todoist:', res.status, text.slice(0, 120))
+        console.log('🪪 Odpowiedź Todoist API:', res.status, text.slice(0, 120))
 
         if (!res.ok) throw new Error(`Błąd Todoist API: ${res.status}`)
+
         const tasks = JSON.parse(text)
         const today = new Date().toISOString().split('T')[0]
         const todays = tasks.filter((t: any) => t.due?.date === today)
 
-        if (todays.length === 0)
+        if (!todays.length) {
           return NextResponse.json({
             type: 'tasks',
             tasks: [],
             reply: 'Nie masz dziś żadnych zaplanowanych zadań ✅',
           })
+        }
 
         return NextResponse.json({
           type: 'tasks',
-          reply: 'Oto Twoje zadania na dziś:',
+          reply: '🗓️ Twoje zadania na dziś:',
           tasks: todays.map((t: any) => ({
             id: t.id,
             content: t.content,
@@ -57,22 +63,23 @@ export async function POST(req: Request) {
       } catch (err) {
         console.error('❌ Błąd Todoist:', err)
         return NextResponse.json({
-          reply: 'Nie udało się pobrać zadań z Todoista 😞',
           type: 'error',
+          reply: 'Nie udało się pobrać zadań z Todoista 😞',
         })
       }
     }
 
-    // === OPENAI ===
+    // 🧠 3. Fallback – OpenAI
     if (!process.env.OPENAI_API_KEY)
-      return NextResponse.json({ error: 'Brak OpenAI API key' }, { status: 500 })
+      throw new Error('Brak OPENAI_API_KEY w środowisku.')
 
     const OpenAI = (await import('openai')).default
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
     const systemPrompt = [
-      'Jesteś asystentem produktywności.',
-      'Zawsze odpowiadaj po polsku, jasno i konkretnie.',
+      'Jesteś asystentem produktywności połączonym z Todoist.',
+      'Pomagasz w organizacji dnia, zadaniach i planowaniu.',
+      'Zawsze odpowiadaj po polsku, krótko i jasno.',
       context ? `Kontekst: ${context}` : '',
     ]
       .filter(Boolean)
@@ -87,9 +94,7 @@ export async function POST(req: Request) {
       ],
     })
 
-    const reply =
-      completion.choices?.[0]?.message?.content?.trim() || '⚠️ Brak odpowiedzi od modelu.'
-
+    const reply = completion.choices[0]?.message?.content?.trim() || '⚠️ Brak odpowiedzi.'
     return NextResponse.json({ reply, type: 'text' })
   } catch (err: any) {
     console.error('❌ Błąd /api/chat:', err)
