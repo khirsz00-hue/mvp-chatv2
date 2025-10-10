@@ -58,11 +58,11 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
 
       {/* 🔄 Dynamiczna zawartość */}
       <div className="flex-1 relative">
-        {mode === 'tasks' ? (
-          <TodoistTasksView token={token} />
-        ) : (
-          <TodoistAIView token={token} />
-        )}
+       {mode === 'tasks' ? (
+  <TodoistTasksView token={token} />
+) : (
+  <TodoistAIView />   {/* 👈 usuń przekazywanie tokena */}
+)}
       </div>
     </div>
   )
