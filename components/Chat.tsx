@@ -37,9 +37,10 @@ export default function Chat({
 }: ChatProps) {
   const [input, setInput] = useState('')
   const [isThinking, setIsThinking] = useState(false)
+  const [localMessages, setLocalMessages] = useState<ChatMessage[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  // 💾 Klucz historii czatu
+  // 💾 Klucz historii czatu (dla różnych asystentów)
   const storageKey = sessionId
     ? `chat_session_${sessionId}`
     : assistant === 'six_hats'
@@ -48,23 +49,26 @@ export default function Chat({
     ? 'chat_todoist'
     : 'chat_global'
 
-  // 📦 Wczytanie historii przy starcie
-  const [localMessages, setLocalMessages] = useState<ChatMessage[]>([])
+  // 📦 Wczytanie historii przy starcie lub zmianie asystenta
   useEffect(() => {
     const saved = localStorage.getItem(storageKey)
     if (saved) {
       try {
         setLocalMessages(JSON.parse(saved))
       } catch {
-        console.warn('Nie udało się wczytać historii czatu.')
+        console.warn('❌ Nie udało się wczytać historii czatu.')
       }
+    } else {
+      setLocalMessages([])
     }
   }, [storageKey])
 
   // 💾 Zapisuj wiadomości do localStorage
   useEffect(() => {
-    if (messages.length > 0)
+    if (messages.length > 0) {
       localStorage.setItem(storageKey, JSON.stringify(messages))
+      setLocalMessages(messages)
+    }
   }, [messages, storageKey])
 
   // 🔽 Auto-scroll do dołu
@@ -80,6 +84,12 @@ export default function Chat({
     setIsThinking(false)
   }
 
+  const handleClearHistory = () => {
+    localStorage.removeItem(storageKey)
+    setLocalMessages([])
+    window.dispatchEvent(new Event('chatUpdated'))
+  }
+
   const quickCommands = [
     'Daj taski na dziś',
     'Daj taski na ten tydzień',
@@ -93,23 +103,34 @@ export default function Chat({
 
   return (
     <div className="flex flex-col h-full max-h-[80vh] rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-      {/* 🔘 Przyciski szybkich komend */}
-      <div className="flex flex-wrap gap-2 p-3 bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
-        {quickCommands.map((label) => (
-          <button
-            key={label}
-            onClick={() => handleSend(label)}
-            className="px-3 py-1 text-xs font-medium rounded-full bg-white hover:bg-gray-200 border border-gray-300 transition"
-          >
-            {label}
-          </button>
-        ))}
+      {/* 🔘 Pasek komend + czyszczenie */}
+      <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
+        <div className="flex flex-wrap gap-2">
+          {quickCommands.map((label) => (
+            <button
+              key={label}
+              onClick={() => handleSend(label)}
+              className="px-3 py-1 text-xs font-medium rounded-full bg-white hover:bg-gray-200 border border-gray-300 transition"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* 🧹 Wyczyść czat */}
+        <button
+          onClick={handleClearHistory}
+          className="text-xs text-gray-600 hover:text-red-600 transition"
+          title="Usuń historię czatu"
+        >
+          🧹 Wyczyść
+        </button>
       </div>
 
       {/* CZAT */}
       <div className="flex-1 overflow-y-auto space-y-3 p-4 bg-gray-50">
         <AnimatePresence>
-          {visibleMessages.map((m) => (
+          {(visibleMessages.length > 0 ? visibleMessages : localMessages).map((m) => (
             <motion.div
               key={m.id}
               initial={{ opacity: 0, y: 10 }}
@@ -121,7 +142,7 @@ export default function Chat({
                   : 'bg-white border border-gray-200 text-gray-800'
               }`}
             >
-              {/* 🧠 Wiadomości tekstowe z Markdown */}
+              {/* 🧠 Tekst z markdown */}
               {m.type !== 'tasks' && (
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
@@ -135,7 +156,7 @@ export default function Chat({
                 </ReactMarkdown>
               )}
 
-              {/* ✅ Wiadomości z zadaniami jako TaskCard */}
+              {/* ✅ Zadania jako karty */}
               {m.type === 'tasks' && (
                 <div className="space-y-2 mt-2">
                   {m.tasks && m.tasks.length > 0 ? (
