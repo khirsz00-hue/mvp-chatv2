@@ -5,21 +5,20 @@ export const runtime = 'nodejs'
 
 export async function POST(req: Request) {
   try {
-    const { message } = await req.json()
+    const { message, token } = await req.json()
     if (!message) {
       return NextResponse.json({ error: 'Brak wiadomości' }, { status: 400 })
     }
 
-    const lower = message.toLowerCase()
-    const todoistToken = process.env.TODOIST_API_TOKEN
-    let tasks: any[] = []
-
-    if (!todoistToken) {
-      console.error('❌ Brak TODOIST_API_TOKEN w env')
-      return NextResponse.json({ error: 'Brak tokena Todoist' }, { status: 500 })
+    if (!token) {
+      console.error('❌ Brak tokena Todoist w żądaniu!')
+      return NextResponse.json({ error: 'Brak tokena Todoist' }, { status: 400 })
     }
 
-    // 🧩 Określ zakres czasowy
+    const lower = message.toLowerCase()
+    let tasks: any[] = []
+
+    // 🧩 Zakres czasowy
     let filter = ''
     if (lower.includes('jutro')) filter = 'tomorrow'
     else if (lower.includes('tydzień') || lower.includes('tydzien')) filter = '7 days'
@@ -29,35 +28,25 @@ export async function POST(req: Request) {
 
     console.log('🕓 Zakres filtracji Todoist:', filter)
 
-    // 📦 Pobierz zadania z Todoista z poprawionymi headerami
+    // 📦 Pobierz zadania z Todoista używając tokena użytkownika
     const res = await fetch('https://api.todoist.com/rest/v2/tasks', {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${todoistToken}`,
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        'User-Agent': 'ZenonAI (vercel.app; chat-todoist-integration)',
-        'X-Request-Source': 'VercelServerlessRuntime',
-      },
+      headers: { Authorization: `Bearer ${token}` },
     })
 
     console.log('🔐 Status odpowiedzi Todoist:', res.status)
 
-    const text = await res.text()
-    let all: any[] = []
-
-    if (res.status === 200) {
-      try {
-        all = JSON.parse(text)
-      } catch {
-        console.warn('⚠️ Nie udało się sparsować odpowiedzi Todoist jako JSON.')
-      }
-    } else {
+    if (!res.ok) {
+      const text = await res.text()
       console.error('⚠️ Błąd odpowiedzi Todoist:', text)
+      return NextResponse.json(
+        { error: `Błąd Todoist: ${res.status} ${text}` },
+        { status: 500 }
+      )
     }
 
-    // 📅 Filtrowanie po terminie
+    const all = await res.json()
     const now = new Date()
+
     const dateCheck = (taskDate: string) => {
       if (!taskDate) return false
       const d = new Date(taskDate)
@@ -73,7 +62,7 @@ export async function POST(req: Request) {
     tasks = all.filter((t: any) => t.due?.date && dateCheck(t.due.date))
     console.log('✅ Znaleziono zadań:', tasks.length)
 
-    // ✅ Jeśli użytkownik prosi o taski → zwróć je bezpośrednio
+    // ✅ Jeśli użytkownik prosi o taski → zwróć karty bez OpenAI
     const isTaskQuery =
       lower.includes('taski') ||
       lower.includes('zadań') ||
@@ -88,13 +77,13 @@ export async function POST(req: Request) {
         tasks: tasks.map((t: any) => ({
           id: t.id,
           content: t.content,
-          due: t.due?.date || undefined,
+          due: t.due?.date,
           priority: t.priority || 1,
         })),
       })
     }
 
-    // 🧠 Analiza AI — jeśli nie chodzi o zwykłe taski
+    // 🧠 Analiza AI (gdy nie chodzi o listę tasków)
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
 
     const taskContext =
