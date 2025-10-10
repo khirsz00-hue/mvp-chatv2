@@ -7,17 +7,19 @@ export default function TodoistAIView() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [token, setToken] = useState<string | null>(null)
 
-  // 🔹 Pobierz token z localStorage
+  // 🔹 Pobierz token z localStorage po załadowaniu komponentu
   useEffect(() => {
     const saved = localStorage.getItem('todoist_token')
     if (saved) setToken(saved)
   }, [])
 
-  // 💬 Funkcja do pobierania tasków bez backendu
+  // 💬 Pobieranie tasków bez backendu
   const fetchTasks = async (period: 'today' | 'tomorrow') => {
     if (!token) {
       return {
         reply: '❌ Brak tokena Todoist — zaloguj się w zakładce Todoist Helper 🔒',
+        type: 'text' as const,
+        tasks: [],
       }
     }
 
@@ -42,7 +44,7 @@ export default function TodoistAIView() {
             period === 'tomorrow'
               ? 'Nie masz jeszcze zaplanowanych zadań na jutro ✅'
               : 'Nie masz dziś żadnych zadań ✅',
-          type: 'tasks',
+          type: 'tasks' as const,
           tasks: [],
         }
       }
@@ -52,7 +54,7 @@ export default function TodoistAIView() {
           period === 'tomorrow'
             ? '📅 Twoje zadania na jutro:'
             : '📋 Twoje zadania na dziś:',
-        type: 'tasks',
+        type: 'tasks' as const,
         tasks: filtered.map((t: any) => ({
           id: t.id,
           content: t.content,
@@ -62,11 +64,15 @@ export default function TodoistAIView() {
       }
     } catch (err) {
       console.error('❌ Błąd Todoist:', err)
-      return { reply: '⚠️ Nie udało się pobrać zadań z Todoista 😞' }
+      return {
+        reply: '⚠️ Nie udało się pobrać zadań z Todoista 😞',
+        type: 'text' as const,
+        tasks: [],
+      }
     }
   }
 
-  // 🧠 Główna funkcja obsługująca wiadomości
+  // 🧠 Obsługa wysyłania wiadomości
   const handleSend = async (message: string) => {
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
@@ -74,12 +80,13 @@ export default function TodoistAIView() {
       content: message,
       timestamp: Date.now(),
     }
+
     const updated = [...messages, userMsg]
     setMessages(updated)
 
     const lower = message.toLowerCase()
 
-    // 🔍 Jeśli użytkownik pyta o zadania z Todoista
+    // 🔍 Komendy: "dzisiaj" lub "jutro"
     if (lower.includes('dzis') || lower.includes('dziś')) {
       const data = await fetchTasks('today')
       setMessages([
@@ -89,7 +96,7 @@ export default function TodoistAIView() {
           role: 'assistant',
           content: data.reply,
           timestamp: Date.now(),
-          type: data.type,
+          type: 'tasks',
           tasks: data.tasks,
         },
       ])
@@ -105,14 +112,14 @@ export default function TodoistAIView() {
           role: 'assistant',
           content: data.reply,
           timestamp: Date.now(),
-          type: data.type,
+          type: 'tasks',
           tasks: data.tasks,
         },
       ])
       return
     }
 
-    // 🧩 W przeciwnym razie — rozmowa z AI
+    // 💬 Standardowa rozmowa z AI
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -130,6 +137,7 @@ export default function TodoistAIView() {
           role: 'assistant',
           content: reply,
           timestamp: Date.now(),
+          type: 'text',
         },
       ])
     } catch (err) {
@@ -141,6 +149,7 @@ export default function TodoistAIView() {
           role: 'assistant',
           content: '⚠️ Wystąpił błąd komunikacji z AI.',
           timestamp: Date.now(),
+          type: 'text',
         },
       ])
     }
