@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import TodoistTasksView from './TodoistTasksView'
 import TodoistAIView from './TodoistAIView'
 
@@ -10,7 +10,19 @@ interface TodoistConnectionProps {
 }
 
 export default function TodoistConnection({ token, onDisconnect }: TodoistConnectionProps) {
-  const [mode, setMode] = useState<'tasks' | 'ai'>('tasks')
+  const [mode, setMode] = useState<'tasks' | 'ai'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('todoist_mode') as 'tasks' | 'ai') || 'tasks'
+    }
+    return 'tasks'
+  })
+
+  // 💾 Zapamiętuj wybrany tryb (tasks / ai)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('todoist_mode', mode)
+    }
+  }, [mode])
 
   return (
     <div className="relative flex flex-col h-[calc(100vh-100px)] bg-gray-50 border border-green-200 rounded-xl overflow-hidden">
@@ -58,11 +70,11 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
 
       {/* 🔄 Dynamiczna zawartość */}
       <div className="flex-1 relative">
-       {mode === 'tasks' ? (
-  <TodoistTasksView token={token} />
-) : (
-  <TodoistAIView />   {/* 👈 usuń przekazywanie tokena */}
-)}
+        {mode === 'tasks' ? (
+          <TodoistTasksView token={token} />
+        ) : (
+          <TodoistAIView /> {/* ✅ Bez przekazywania tokena */}
+        )}
       </div>
     </div>
   )
