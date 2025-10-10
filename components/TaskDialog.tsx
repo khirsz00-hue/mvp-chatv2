@@ -102,7 +102,7 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     return () => es.close()
   }, [task.id])
 
-  // ✉️ Wysyłanie wiadomości
+  // ✉️ Wysyłanie wiadomości — poprawione
   const sendMessage = async () => {
     const text = input.trim()
     if (!text || loading) return
@@ -115,10 +115,14 @@ export default function TaskDialog({ task, mode, onClose }: Props) {
     recentMessages.current.add(`user:${text}`)
 
     try {
-      const res = await fetch('/api/chat', {
+      // 👇 Kluczowa zmiana: nowy endpoint i kontekst zadania
+      const res = await fetch('/api/chat/task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, context: task?.content || '' }),
+        body: JSON.stringify({
+          message: text,
+          task: task.content, // przekazujemy treść klikniętego zadania
+        }),
       })
 
       if (!res.ok) throw new Error('Błąd odpowiedzi z API')
