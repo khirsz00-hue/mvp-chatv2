@@ -39,7 +39,7 @@ export default function Chat({
   const [isThinking, setIsThinking] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  // 💾 Klucz zależny od asystenta lub sesji
+  // 💾 Klucz historii czatu
   const storageKey = sessionId
     ? `chat_session_${sessionId}`
     : assistant === 'six_hats'
@@ -48,12 +48,23 @@ export default function Chat({
     ? 'chat_todoist'
     : 'chat_global'
 
+  // 📦 Wczytanie historii przy starcie
+  const [localMessages, setLocalMessages] = useState<ChatMessage[]>([])
+  useEffect(() => {
+    const saved = localStorage.getItem(storageKey)
+    if (saved) {
+      try {
+        setLocalMessages(JSON.parse(saved))
+      } catch {
+        console.warn('Nie udało się wczytać historii czatu.')
+      }
+    }
+  }, [storageKey])
+
   // 💾 Zapisuj wiadomości do localStorage
   useEffect(() => {
-    if (typeof window !== 'undefined' && messages.length > 0) {
+    if (messages.length > 0)
       localStorage.setItem(storageKey, JSON.stringify(messages))
-      window.dispatchEvent(new Event('chatUpdated'))
-    }
   }, [messages, storageKey])
 
   // 🔽 Auto-scroll do dołu
@@ -61,20 +72,40 @@ export default function Chat({
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const handleSend = async () => {
-    if (!input.trim()) return
-    const msg = input.trim()
+  const handleSend = async (msg: string) => {
+    if (!msg.trim()) return
     setInput('')
     setIsThinking(true)
     await onSend(msg)
     setIsThinking(false)
   }
 
-  // 🔹 Jeśli `hideHistory` = true, pokazuj tylko ostatnie 8 wiadomości
+  const quickCommands = [
+    'Daj taski na dziś',
+    'Daj taski na ten tydzień',
+    'Daj taski na ten miesiąc',
+    'Pokaż taski przeterminowane',
+    'Pogrupuj tematycznie',
+    'Pogrupuj wg projektów',
+  ]
+
   const visibleMessages = hideHistory ? messages.slice(-8) : messages
 
   return (
-    <div className="flex flex-col h-full max-h-[75vh] rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+    <div className="flex flex-col h-full max-h-[80vh] rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+      {/* 🔘 Przyciski szybkich komend */}
+      <div className="flex flex-wrap gap-2 p-3 bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
+        {quickCommands.map((label) => (
+          <button
+            key={label}
+            onClick={() => handleSend(label)}
+            className="px-3 py-1 text-xs font-medium rounded-full bg-white hover:bg-gray-200 border border-gray-300 transition"
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {/* CZAT */}
       <div className="flex-1 overflow-y-auto space-y-3 p-4 bg-gray-50">
         <AnimatePresence>
@@ -104,7 +135,7 @@ export default function Chat({
                 </ReactMarkdown>
               )}
 
-              {/* ✅ Wiadomości z zadaniami */}
+              {/* ✅ Wiadomości z zadaniami jako TaskCard */}
               {m.type === 'tasks' && (
                 <div className="space-y-2 mt-2">
                   {m.tasks && m.tasks.length > 0 ? (
@@ -112,7 +143,7 @@ export default function Chat({
                       <motion.div
                         key={t.id}
                         whileHover={{ scale: 1.01 }}
-                        className="cursor-pointer transition rounded-lg hover:bg-gray-50 overflow-visible"
+                        className="cursor-pointer transition rounded-lg overflow-visible"
                       >
                         <TaskCard
                           task={{
@@ -187,7 +218,7 @@ export default function Chat({
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+          onKeyDown={(e) => e.key === 'Enter' && handleSend(input)}
           placeholder={
             assistant === 'six_hats'
               ? 'Zadaj pytanie np. "Przeanalizuj problem metodą 6 kapeluszy..."'
@@ -199,7 +230,7 @@ export default function Chat({
         />
         <button
           className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition disabled:opacity-50"
-          onClick={handleSend}
+          onClick={() => handleSend(input)}
           disabled={isThinking}
         >
           Wyślij
