@@ -128,7 +128,7 @@ Odpowiedz po polsku, praktycznie i zwięźle.
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: prompt }),
+        body: JSON.stringify({ message: prompt, token }), // ✅ przekazujemy token do backendu
       })
 
       const data = await res.json()
@@ -214,6 +214,15 @@ ${tasks.map((t) => `- ${t.content}`).join('\n')}
 
   return (
     <div className="flex flex-col h-full p-3 space-y-3">
+      {/* 🔘 Status połączenia */}
+      <div
+        className={`text-sm font-medium mb-2 ${
+          token ? 'text-green-600' : 'text-red-500'
+        }`}
+      >
+        {token ? '🟢 Połączono z Todoist' : '🔴 Brak połączenia z Todoist'}
+      </div>
+
       {/* 🔘 Górne przyciski */}
       <div className="flex flex-wrap justify-between items-center gap-2 mb-2">
         <div className="flex flex-wrap gap-2">
