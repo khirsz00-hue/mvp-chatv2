@@ -19,6 +19,7 @@ export async function POST(req: Request) {
     if (lower.includes('jutro')) filter = 'tomorrow'
     else if (lower.includes('tydzień') || lower.includes('tydzien')) filter = '7 days'
     else if (lower.includes('miesiąc') || lower.includes('miesiac')) filter = '30 days'
+    else if (lower.includes('przeterminowane')) filter = 'overdue'
     else filter = 'today'
 
     // 📦 Pobierz zadania z Todoista
@@ -37,6 +38,7 @@ export async function POST(req: Request) {
         if (filter === 'tomorrow') return diffDays >= 0.5 && diffDays < 1.5
         if (filter === '7 days') return diffDays >= 0 && diffDays < 7
         if (filter === '30 days') return diffDays >= 0 && diffDays < 30
+        if (filter === 'overdue') return d < now
         return false
       }
 
@@ -45,7 +47,29 @@ export async function POST(req: Request) {
       console.error('⚠️ Błąd Todoist API:', err)
     }
 
-    // 🧠 Przygotuj prompt dla OpenAI
+    // ✅ Jeśli użytkownik prosi o taski → zwróć je jako karty (bez udziału OpenAI)
+    const isTaskQuery =
+      lower.includes('taski') ||
+      lower.includes('zadań') ||
+      lower.includes('zadań') ||
+      lower.includes('pokaż') ||
+      lower.includes('daj')
+
+    if (isTaskQuery && tasks.length > 0) {
+      return NextResponse.json({
+        role: 'assistant',
+        type: 'tasks',
+        timestamp: Date.now(),
+        tasks: tasks.map((t: any) => ({
+          id: t.id,
+          content: t.content,
+          due: t.due?.date || null,
+          priority: t.priority || 1,
+        })),
+      })
+    }
+
+    // 🧠 Przygotuj prompt dla OpenAI (tylko gdy to pytanie analityczne)
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
 
     const taskContext =
@@ -59,9 +83,9 @@ Masz pomagać użytkownikowi w planowaniu, analizie i organizacji zadań.
 
 Zasady:
 - Odpowiadaj po polsku.
-- Jeśli użytkownik pyta o "taski", podsumuj i pogrupuj je logicznie (np. wg tematów, priorytetu, dnia tygodnia).
-- Jeśli użytkownik prosi o plan, zaproponuj konkretny harmonogram (godziny, priorytety).
-- Jeśli brak kontekstu, zapytaj o szczegóły.
+- Jeśli użytkownik prosi o grupowanie, wykonaj logiczny podział zadań wg tematów lub kategorii.
+- Jeśli użytkownik prosi o plan, zaproponuj harmonogram działań.
+- Jeśli brak danych, zapytaj o kontekst.
 
 Dostępne zadania:
 ${taskContext}
@@ -77,7 +101,13 @@ ${taskContext}
     })
 
     const reply = completion.choices[0]?.message?.content || '🤖 Brak odpowiedzi od AI.'
-    return NextResponse.json({ reply, type: 'text' })
+
+    return NextResponse.json({
+      role: 'assistant',
+      type: 'text',
+      timestamp: Date.now(),
+      content: reply,
+    })
   } catch (err: any) {
     console.error('❌ Błąd /api/chat:', err)
     return NextResponse.json({ error: err.message }, { status: 500 })
