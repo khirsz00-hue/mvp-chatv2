@@ -40,7 +40,7 @@ export default function Chat({
   const [localMessages, setLocalMessages] = useState<ChatMessage[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  // 💾 Klucz historii czatu (dla różnych asystentów)
+  // 💾 Klucz historii czatu
   const storageKey = sessionId
     ? `chat_session_${sessionId}`
     : assistant === 'six_hats'
@@ -95,8 +95,6 @@ export default function Chat({
     'Daj taski na ten tydzień',
     'Daj taski na ten miesiąc',
     'Pokaż taski przeterminowane',
-    'Pogrupuj tematycznie',
-    'Pogrupuj wg projektów',
   ]
 
   const visibleMessages = hideHistory ? messages.slice(-8) : messages
@@ -142,7 +140,7 @@ export default function Chat({
                   : 'bg-white border border-gray-200 text-gray-800'
               }`}
             >
-              {/* 🧠 Tekst z markdown */}
+              {/* 🧠 Tekst markdown */}
               {m.type !== 'tasks' && (
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
@@ -158,29 +156,39 @@ export default function Chat({
 
               {/* ✅ Zadania jako karty */}
               {m.type === 'tasks' && (
-                <div className="space-y-2 mt-2">
+                <div className="space-y-2 mt-2 relative border-t pt-2">
                   {m.tasks && m.tasks.length > 0 ? (
-                    m.tasks.map((t) => (
-                      <motion.div
-                        key={t.id}
-                        whileHover={{ scale: 1.01 }}
-                        className="cursor-pointer transition rounded-lg overflow-visible"
-                      >
-                        <TaskCard
-                          task={{
-                            id: t.id,
-                            content: t.content,
-                            due: t.due || undefined,
-                            priority: t.priority,
-                          }}
-                          token={''}
-                          onAction={() => {}}
-                          selectable={false}
-                          selected={false}
-                          onSelectChange={() => {}}
-                        />
-                      </motion.div>
-                    ))
+                    <>
+                      {/* Lista TaskCards */}
+                      <div className="grid gap-2">
+                        {m.tasks.map((t) => (
+                          <TaskCard
+                            key={t.id}
+                            task={{
+                              id: t.id,
+                              content: t.content,
+                              due: t.due || undefined,
+                              priority: t.priority,
+                            }}
+                            token={''}
+                            onAction={() => {}}
+                            selectable={false}
+                            selected={false}
+                            onSelectChange={() => {}}
+                          />
+                        ))}
+                      </div>
+
+                      {/* 🔘 Przycisk pogrupowania */}
+                      <div className="mt-3 text-center">
+                        <button
+                          onClick={() => handleSend('Pogrupuj te zadania w tematyczne bloki')}
+                          className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 transition"
+                        >
+                          📂 Pogrupuj w tematyczne bloki
+                        </button>
+                      </div>
+                    </>
                   ) : (
                     <p className="italic text-gray-500 text-sm">
                       Brak zadań do wyświetlenia.
