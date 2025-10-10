@@ -59,10 +59,10 @@ export default function HomePage() {
   }, [])
 
   useEffect(() => {
-    console.log('🔑 Aktualny token Todoist:', token)
+    console.log('🔑 Aktualny token Todoist w stanie:', token)
   }, [token])
 
-  // 💬 Helper do fetchowania z tokenem przez nagłówek Authorization
+  // 💬 Wysyłanie wiadomości z tokenem przez nagłówek x-todoist-token
   const sendMessage = async (message: string, assistant: 'global' | 'six_hats'): Promise<string> => {
     console.log(`🟢 Wysyłam wiadomość (${assistant}) z tokenem:`, token)
 
@@ -70,7 +70,7 @@ export default function HomePage() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(token ? { 'x-todoist-token': token } : {}), // ✅ ten nagłówek działa na Vercel
       },
       body: JSON.stringify({ message, assistant }),
     })
@@ -78,6 +78,7 @@ export default function HomePage() {
     if (!res.ok) throw new Error('Błąd odpowiedzi z AI')
     const data = await res.json()
 
+    // 🧩 Jeżeli model zwraca listę zadań
     if (data.type === 'tasks' && data.tasks?.length) {
       const taskList = data.tasks.map((t: any) => `• ${t.content}`).join('\n')
       return `${data.reply || 'Zadania na dziś:'}\n\n${taskList}`
