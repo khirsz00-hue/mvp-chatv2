@@ -6,7 +6,7 @@ import Chat, { ChatMessage } from './Chat'
 export default function TodoistAIView() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [token, setToken] = useState<string | null>(null)
-  const [lastFetchedTasks, setLastFetchedTasks] = useState<any[]>([])
+  const [tasks, setTasks] = useState<any[]>([]) // 👈 przechowujemy taski z Todoista
 
   // 🔹 Pobierz token z localStorage
   useEffect(() => {
@@ -14,68 +14,26 @@ export default function TodoistAIView() {
     if (saved) setToken(saved)
   }, [])
 
-  // 💬 Pobierz zadania z Todoista
-  const fetchTasks = async (period: 'today' | 'tomorrow') => {
-    if (!token) {
-      return {
-        reply: '❌ Brak tokena Todoist — zaloguj się w zakładce Todoist Helper 🔒',
-        type: 'text' as const,
-        tasks: [],
+  // 🔹 Pobierz aktualne zadania (np. na dziś)
+  useEffect(() => {
+    if (!token) return
+
+    const fetchTasks = async () => {
+      try {
+        const res = await fetch('https://api.todoist.com/rest/v2/tasks', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        const data = await res.json()
+        setTasks(data || [])
+      } catch (err) {
+        console.error('❌ Błąd Todoist:', err)
       }
     }
 
-    try {
-      const res = await fetch('https://api.todoist.com/rest/v2/tasks', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const tasks = await res.json()
+    fetchTasks()
+  }, [token])
 
-      const today = new Date()
-      const targetDate =
-        period === 'tomorrow'
-          ? new Date(today.setDate(today.getDate() + 1))
-          : today
-
-      const dateString = targetDate.toISOString().split('T')[0]
-      const filtered = tasks.filter((t: any) => t.due?.date === dateString)
-
-      setLastFetchedTasks(filtered) // 🧠 zapisz do pamięci dla kontekstu AI
-
-      if (filtered.length === 0) {
-        return {
-          reply:
-            period === 'tomorrow'
-              ? 'Nie masz jeszcze zaplanowanych zadań na jutro ✅'
-              : 'Nie masz dziś żadnych zadań ✅',
-          type: 'tasks' as const,
-          tasks: [],
-        }
-      }
-
-      return {
-        reply:
-          period === 'tomorrow'
-            ? '📅 Twoje zadania na jutro:'
-            : '📋 Twoje zadania na dziś:',
-        type: 'tasks' as const,
-        tasks: filtered.map((t: any) => ({
-          id: t.id,
-          content: t.content,
-          due: t.due?.date,
-          priority: t.priority,
-        })),
-      }
-    } catch (err) {
-      console.error('❌ Błąd Todoist:', err)
-      return {
-        reply: '⚠️ Nie udało się pobrać zadań z Todoista 😞',
-        type: 'text' as const,
-        tasks: [],
-      }
-    }
-  }
-
-  // 🧠 Obsługa wiadomości i kontekstu
+  // 💬 Funkcja do wysyłania wiadomości do AI
   const handleSend = async (message: string) => {
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
@@ -86,76 +44,50 @@ export default function TodoistAIView() {
     const updated = [...messages, userMsg]
     setMessages(updated)
 
-    const lower = message.toLowerCase()
-
-    // 🔍 Komendy: "dzisiaj" / "jutro"
-    if (lower.includes('dzis') || lower.includes('dziś')) {
-      const data = await fetchTasks('today')
-      setMessages([
-        ...updated,
-        {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: data.reply,
-          timestamp: Date.now(),
-          type: 'tasks',
-          tasks: data.tasks,
-        },
-      ])
-      return
-    }
-
-    if (lower.includes('jutro') || lower.includes('tomorrow')) {
-      const data = await fetchTasks('tomorrow')
-      setMessages([
-        ...updated,
-        {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: data.reply,
-          timestamp: Date.now(),
-          type: 'tasks',
-          tasks: data.tasks,
-        },
-      ])
-      return
-    }
-
-    // 🧩 Rozmowa z AI — z kontekstem tasków
     try {
+      // 🧩 Kontekst = lista zadań z Todoista
+      const contextTasks = tasks
+        .map((t) => `- ${t.content}${t.due?.date ? ` (termin: ${t.due.date})` : ''}`)
+        .join('\n')
+
+      const contextPrompt = `
+Użytkownik ma następujące zadania w Todoist:
+${contextTasks || '(Brak zadań na dziś)'}
+
+Jego wiadomość: "${message}"
+
+Odpowiedz w języku polskim, jasno i praktycznie.
+Jeśli użytkownik prosi o pogrupowanie, zaproponuj logiczne kategorie i ich nazwy.
+Jeśli pyta o priorytety lub plan dnia, zaproponuj kolejność wykonania.
+Nie powtarzaj listy zadań dosłownie, tylko przedstaw przetworzoną analizę.
+      `.trim()
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message,
-          context: lastFetchedTasks.map((t) => t.content).join('\n'),
-        }),
+        body: JSON.stringify({ message: contextPrompt }),
       })
 
+      if (!res.ok) throw new Error('Błąd odpowiedzi z AI')
       const data = await res.json()
-      const reply =
-        data.reply || '🤖 Nie mam pewności, jak odpowiedzieć na to pytanie.'
 
-      setMessages([
-        ...updated,
-        {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: reply,
-          timestamp: Date.now(),
-          type: 'text',
-        },
-      ])
+      const aiMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: data.reply || '⚠️ Brak odpowiedzi od AI.',
+        timestamp: Date.now(),
+      }
+
+      setMessages([...updated, aiMsg])
     } catch (err) {
       console.error('❌ Błąd komunikacji z AI:', err)
-      setMessages([
-        ...updated,
+      setMessages((prev) => [
+        ...prev,
         {
           id: crypto.randomUUID(),
           role: 'assistant',
-          content: '⚠️ Wystąpił błąd komunikacji z AI.',
+          content: '⚠️ Błąd komunikacji z AI.',
           timestamp: Date.now(),
-          type: 'text',
         },
       ])
     }
