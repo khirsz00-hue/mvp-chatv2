@@ -23,26 +23,61 @@ export default function TodoistAIView() {
     if (saved) setToken(saved)
   }, [])
 
-  // 🔹 Pobierz zadania z Todoista (np. na dziś)
-  useEffect(() => {
+  // 🔹 Pobierz zadania bezpośrednio z Todoista (z frontu)
+  const fetchTasks = async (filter: string = 'today') => {
     if (!token) return
+    setLoading(true)
+    try {
+      const res = await fetch('https://api.todoist.com/rest/v2/tasks', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error(`Todoist API error: ${res.status}`)
+      const all = await res.json()
 
-    const fetchTasks = async () => {
-      try {
-        const res = await fetch('https://api.todoist.com/rest/v2/tasks', {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        const data = await res.json()
-        setTasks(data || [])
-      } catch (err) {
-        console.error('❌ Błąd Todoist:', err)
+      const now = new Date()
+      const checkDate = (date?: string) => {
+        if (!date) return false
+        const d = new Date(date)
+        const diffDays = (d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+        if (filter === 'today') return d.toDateString() === now.toDateString()
+        if (filter === 'tomorrow') return diffDays >= 0.5 && diffDays < 1.5
+        if (filter === '7days') return diffDays >= 0 && diffDays < 7
+        if (filter === '30days') return diffDays >= 0 && diffDays < 30
+        if (filter === 'overdue') return d < now
+        return false
       }
+
+      const filtered = all.filter((t: TodoistTask) =>
+        t.due?.date ? checkDate(t.due.date) : false
+      )
+
+      setTasks(filtered)
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: `📋 Znaleziono ${filtered.length} zadań (${filter}).`,
+          timestamp: Date.now(),
+        },
+      ])
+    } catch (err) {
+      console.error('❌ Błąd Todoist:', err)
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: '⚠️ Nie udało się pobrać zadań z Todoista.',
+          timestamp: Date.now(),
+        },
+      ])
+    } finally {
+      setLoading(false)
     }
+  }
 
-    fetchTasks()
-  }, [token])
-
-  // ✅ Zmiana statusu zadania (toggle complete)
+  // ✅ Toggle complete
   const toggleTask = async (taskId: string) => {
     if (!token) return
     try {
@@ -60,7 +95,7 @@ export default function TodoistAIView() {
     }
   }
 
-  // 💬 Wyślij wiadomość do AI z kontekstem Todoista
+  // 💬 Wyślij prompt do AI
   const handleSend = async (message: string) => {
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
@@ -82,91 +117,33 @@ export default function TodoistAIView() {
         )
         .join('\n')
 
-      const contextPrompt = `
-Użytkownik ma następujące zadania w Todoist:
+      const prompt = `
+Użytkownik ma następujące zadania:
 ${contextTasks || '(Brak zadań)'}
 
-Jego wiadomość: "${message}"
-
-Zasady:
-- Odpowiedz po polsku, jasno i praktycznie.
-- Jeśli użytkownik prosi o pogrupowanie, zaproponuj logiczne kategorie i ich nazwy.
-- Jeśli pyta o priorytety lub plan dnia, zaproponuj kolejność wykonania.
-Nie powtarzaj listy zadań dosłownie, przedstaw przetworzoną analizę.
+Wiadomość użytkownika: "${message}"
+Odpowiedz po polsku, praktycznie i zwięźle.
       `.trim()
 
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: contextPrompt, token }),
+        body: JSON.stringify({ message: prompt }),
       })
 
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Błąd API')
-
-      // jeśli zwraca listę zadań
-      if (data.type === 'tasks' && data.tasks?.length) {
-        setMessages([
-          ...updated,
-          {
-            id: crypto.randomUUID(),
-            role: 'assistant',
-            type: 'tasks',
-            tasks: data.tasks,
-            content: '📋 Twoje zadania:',
-            timestamp: Date.now(),
-          },
-        ])
-      } else {
-        const aiMsg: ChatMessage = {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: data.content || data.reply || '🤖 Brak odpowiedzi od AI.',
-          timestamp: Date.now(),
-        }
-        setMessages([...updated, aiMsg])
+      const aiMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: data.reply || data.content || '🤖 Brak odpowiedzi od AI.',
+        timestamp: Date.now(),
       }
+      setMessages([...updated, aiMsg])
     } catch (err) {
       console.error('❌ Błąd komunikacji z AI:', err)
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: '⚠️ Błąd komunikacji z AI.',
-          timestamp: Date.now(),
-        },
-      ])
     } finally {
       setLoading(false)
     }
-  }
-
-  // 🧠 Pogrupuj tematycznie
-  const handleGroupTasks = async () => {
-    if (tasks.length === 0) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: '📭 Brak zadań do pogrupowania.',
-          timestamp: Date.now(),
-        },
-      ])
-      return
-    }
-
-    const groupPrompt = `
-Oto lista zadań użytkownika:
-${tasks.map((t) => `- ${t.content}`).join('\n')}
-
-Pogrupuj je w sensowne tematy lub obszary życia.
-Nadaj każdej grupie nazwę i krótki opis.
-Nie powtarzaj dokładnych treści zadań — grupuj logicznie.
-    `.trim()
-
-    await handleSend(groupPrompt)
   }
 
   // 🧹 Wyczyść historię
@@ -177,16 +154,28 @@ Nie powtarzaj dokładnych treści zadań — grupuj logicznie.
     }
   }
 
-  // 🧩 Renderowanie Task Cards
-  const renderTasks = () => {
-    if (tasks.length === 0)
-      return (
-        <div className="text-gray-500 text-sm italic text-center py-4">
-          Brak zadań do wyświetlenia
-        </div>
-      )
+  // 🧠 Pogrupuj tematycznie
+  const handleGroupTasks = async () => {
+    if (!tasks.length) {
+      handleSend('Nie mam żadnych zadań, które można pogrupować.')
+      return
+    }
 
-    return (
+    const groupPrompt = `
+Pogrupuj te zadania tematycznie:
+${tasks.map((t) => `- ${t.content}`).join('\n')}
+    `.trim()
+
+    await handleSend(groupPrompt)
+  }
+
+  // 🧩 Render task cards
+  const renderTasks = () =>
+    tasks.length === 0 ? (
+      <div className="text-gray-500 text-sm italic text-center py-4">
+        Brak zadań do wyświetlenia
+      </div>
+    ) : (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
         {tasks.map((t) => (
           <div
@@ -214,9 +203,7 @@ Nie powtarzaj dokładnych treści zadań — grupuj logicznie.
                   {t.due?.date && (
                     <span>📅 {new Date(t.due.date).toLocaleDateString('pl-PL')}</span>
                   )}
-                  {t.priority && t.priority > 1 && (
-                    <span>⭐ Priorytet: {t.priority}</span>
-                  )}
+                  {t.priority && <span>⭐ P{t.priority}</span>}
                 </div>
               </div>
             </div>
@@ -224,39 +211,37 @@ Nie powtarzaj dokładnych treści zadań — grupuj logicznie.
         ))}
       </div>
     )
-  }
 
   return (
     <div className="flex flex-col h-full p-3 space-y-3">
-      {/* 🔘 Przyciski akcji */}
+      {/* 🔘 Górne przyciski */}
       <div className="flex flex-wrap justify-between items-center gap-2 mb-2">
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={() => handleSend('Daj taski na dziś')}
+            onClick={() => fetchTasks('today')}
             className="px-3 py-1.5 text-sm bg-gray-100 border rounded-lg hover:bg-gray-200 transition"
           >
-            📅 Taski na dziś
+            📅 Dziś
           </button>
           <button
-            onClick={() => handleSend('Daj taski na ten tydzień')}
+            onClick={() => fetchTasks('7days')}
             className="px-3 py-1.5 text-sm bg-gray-100 border rounded-lg hover:bg-gray-200 transition"
           >
-            🗓️ Taski na tydzień
+            🗓️ Ten tydzień
           </button>
           <button
-            onClick={() => handleSend('Daj taski na ten miesiąc')}
+            onClick={() => fetchTasks('30days')}
             className="px-3 py-1.5 text-sm bg-gray-100 border rounded-lg hover:bg-gray-200 transition"
           >
-            📆 Taski na miesiąc
+            📆 Ten miesiąc
           </button>
           <button
-            onClick={() => handleSend('Daj przeterminowane taski')}
+            onClick={() => fetchTasks('overdue')}
             className="px-3 py-1.5 text-sm bg-gray-100 border rounded-lg hover:bg-gray-200 transition"
           >
             ⏰ Przeterminowane
           </button>
         </div>
-
         <button
           onClick={handleClearHistory}
           className="text-sm text-red-600 hover:text-red-800 transition"
@@ -290,7 +275,7 @@ Nie powtarzaj dokładnych treści zadań — grupuj logicznie.
         />
       </div>
 
-      {/* 🔘 Dół — Pogrupuj tematycznie */}
+      {/* 🔘 Dół – Pogrupuj */}
       {tasks.length > 0 && (
         <div className="flex justify-center pt-2">
           <button
