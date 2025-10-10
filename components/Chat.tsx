@@ -2,8 +2,6 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import TaskCard from './TaskCard'
 
 export type ChatMessage = {
@@ -21,8 +19,8 @@ export type ChatMessage = {
 }
 
 interface ChatProps {
-  onSend: (msg: string) => Promise<void>
-  messages: ChatMessage[]
+  onSend?: (msg: string) => Promise<void>
+  messages?: ChatMessage[]
   assistant?: 'global' | 'six_hats' | 'todoist'
   hideHistory?: boolean
   sessionId?: string
@@ -30,17 +28,18 @@ interface ChatProps {
 
 export default function Chat({
   onSend,
-  messages,
-  assistant = 'six_hats',
+  messages: externalMessages = [],
+  assistant = 'todoist',
   hideHistory = true,
   sessionId,
 }: ChatProps) {
+  const [messages, setMessages] = useState<ChatMessage[]>(externalMessages)
   const [input, setInput] = useState('')
-  const [isThinking, setIsThinking] = useState(false)
-  const [localMessages, setLocalMessages] = useState<ChatMessage[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [lastTasks, setLastTasks] = useState<any[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  // 💾 Klucz historii czatu
+  // 💾 Klucz historii zależny od asystenta
   const storageKey = sessionId
     ? `chat_session_${sessionId}`
     : assistant === 'six_hats'
@@ -49,77 +48,131 @@ export default function Chat({
     ? 'chat_todoist'
     : 'chat_global'
 
-  // 📦 Wczytanie historii przy starcie lub zmianie asystenta
+  // 💾 Ładowanie historii po wejściu
   useEffect(() => {
     const saved = localStorage.getItem(storageKey)
     if (saved) {
-      try {
-        setLocalMessages(JSON.parse(saved))
-      } catch {
-        console.warn('❌ Nie udało się wczytać historii czatu.')
+      const parsed = JSON.parse(saved)
+      setMessages(parsed)
+      if (parsed.length > 0) {
+        const last = parsed.findLast((m: any) => m.type === 'tasks')
+        if (last?.tasks) setLastTasks(last.tasks)
       }
-    } else {
-      setLocalMessages([])
     }
   }, [storageKey])
 
-  // 💾 Zapisuj wiadomości do localStorage
+  // 💾 Zapis historii
   useEffect(() => {
-    if (messages.length > 0) {
+    if (messages.length > 0)
       localStorage.setItem(storageKey, JSON.stringify(messages))
-      setLocalMessages(messages)
-    }
   }, [messages, storageKey])
 
-  // 🔽 Auto-scroll do dołu
+  // 🔽 Auto-scroll
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const handleSend = async (msg: string) => {
-    if (!msg.trim()) return
+  // ✉️ Wysyłanie wiadomości
+  const sendMessage = async (msg?: string) => {
+    const content = msg || input.trim()
+    if (!content) return
     setInput('')
-    setIsThinking(true)
-    await onSend(msg)
-    setIsThinking(false)
+    setIsLoading(true)
+
+    const userMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content,
+      timestamp: Date.now(),
+    }
+    setMessages((prev) => [...prev, userMsg])
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: content,
+          tasks:
+            content.toLowerCase().includes('pogrupuj') ||
+            content.toLowerCase().includes('uporządkuj')
+              ? lastTasks
+              : undefined,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (data.type === 'tasks') {
+        setLastTasks(data.tasks)
+      }
+
+      const assistantMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: data.content || data.reply || '',
+        timestamp: Date.now(),
+        type: data.type || 'text',
+        tasks: data.tasks || [],
+      }
+      setMessages((prev) => [...prev, assistantMsg])
+    } catch (err) {
+      console.error('❌ Błąd komunikacji:', err)
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: '⚠️ Wystąpił błąd podczas komunikacji z AI.',
+          timestamp: Date.now(),
+        },
+      ])
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  const handleClearHistory = () => {
+  // 🧹 Wyczyść historię
+  const clearHistory = () => {
     localStorage.removeItem(storageKey)
-    setLocalMessages([])
-    window.dispatchEvent(new Event('chatUpdated'))
+    setMessages([])
+    setLastTasks([])
   }
 
-  const quickCommands = [
-    'Daj taski na dziś',
-    'Daj taski na ten tydzień',
-    'Daj taski na ten miesiąc',
-    'Pokaż taski przeterminowane',
-  ]
-
-  const visibleMessages = hideHistory ? messages.slice(-8) : messages
+  // 🔹 Widoczne wiadomości
+  const visibleMessages = hideHistory ? messages.slice(-12) : messages
 
   return (
-    <div className="flex flex-col h-full max-h-[80vh] rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-      {/* 🔘 Pasek komend + czyszczenie */}
-      <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
-        <div className="flex flex-wrap gap-2">
-          {quickCommands.map((label) => (
-            <button
-              key={label}
-              onClick={() => handleSend(label)}
-              className="px-3 py-1 text-xs font-medium rounded-full bg-white hover:bg-gray-200 border border-gray-300 transition"
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* 🧹 Wyczyść czat */}
+    <div className="flex flex-col h-full max-h-[75vh] rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+      {/* 🔘 Przyciski akcji */}
+      <div className="flex flex-wrap items-center gap-2 p-3 border-b bg-white sticky top-0 z-10">
         <button
-          onClick={handleClearHistory}
-          className="text-xs text-gray-600 hover:text-red-600 transition"
-          title="Usuń historię czatu"
+          onClick={() => sendMessage('Daj taski na dziś')}
+          className="px-3 py-1.5 text-sm rounded-md bg-gray-100 hover:bg-gray-200"
+        >
+          Daj taski na dziś
+        </button>
+        <button
+          onClick={() => sendMessage('Daj taski na ten tydzień')}
+          className="px-3 py-1.5 text-sm rounded-md bg-gray-100 hover:bg-gray-200"
+        >
+          Daj taski na ten tydzień
+        </button>
+        <button
+          onClick={() => sendMessage('Daj taski na ten miesiąc')}
+          className="px-3 py-1.5 text-sm rounded-md bg-gray-100 hover:bg-gray-200"
+        >
+          Daj taski na ten miesiąc
+        </button>
+        <button
+          onClick={() => sendMessage('Pokaż taski przeterminowane')}
+          className="px-3 py-1.5 text-sm rounded-md bg-gray-100 hover:bg-gray-200"
+        >
+          Pokaż taski przeterminowane
+        </button>
+        <button
+          onClick={clearHistory}
+          className="ml-auto px-3 py-1.5 text-sm rounded-md bg-red-100 text-red-700 hover:bg-red-200"
         >
           🧹 Wyczyść
         </button>
@@ -128,7 +181,7 @@ export default function Chat({
       {/* CZAT */}
       <div className="flex-1 overflow-y-auto space-y-3 p-4 bg-gray-50">
         <AnimatePresence>
-          {(visibleMessages.length > 0 ? visibleMessages : localMessages).map((m) => (
+          {visibleMessages.map((m) => (
             <motion.div
               key={m.id}
               initial={{ opacity: 0, y: 10 }}
@@ -140,27 +193,15 @@ export default function Chat({
                   : 'bg-white border border-gray-200 text-gray-800'
               }`}
             >
-              {/* 🧠 Tekst markdown */}
-              {m.type !== 'tasks' && (
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  className={`prose prose-sm max-w-none ${
-                    m.role === 'user'
-                      ? 'text-white prose-strong:text-white prose-headings:text-white'
-                      : 'text-gray-800 prose-a:text-blue-600'
-                  }`}
-                >
-                  {m.content}
-                </ReactMarkdown>
-              )}
+              {/* 🧠 Wiadomości tekstowe */}
+              {m.type !== 'tasks' && <div>{m.content}</div>}
 
-              {/* ✅ Zadania jako karty */}
+              {/* ✅ Wiadomości z zadaniami */}
               {m.type === 'tasks' && (
-                <div className="space-y-2 mt-2 relative border-t pt-2">
-                  {m.tasks && m.tasks.length > 0 ? (
+                <div className="mt-2 space-y-2">
+                  {m.tasks.length > 0 ? (
                     <>
-                      {/* Lista TaskCards */}
-                      <div className="grid gap-2">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                         {m.tasks.map((t) => (
                           <TaskCard
                             key={t.id}
@@ -170,20 +211,15 @@ export default function Chat({
                               due: t.due || undefined,
                               priority: t.priority,
                             }}
-                            token={''}
+                            token=""
                             onAction={() => {}}
-                            selectable={false}
-                            selected={false}
-                            onSelectChange={() => {}}
                           />
                         ))}
                       </div>
-
-                      {/* 🔘 Przycisk pogrupowania */}
-                      <div className="mt-3 text-center">
+                      <div className="text-right mt-3">
                         <button
-                          onClick={() => handleSend('Pogrupuj te zadania w tematyczne bloki')}
-                          className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 transition"
+                          onClick={() => sendMessage('Pogrupuj te zadania')}
+                          className="px-3 py-1.5 text-xs rounded-md bg-blue-100 text-blue-700 hover:bg-blue-200"
                         >
                           📂 Pogrupuj w tematyczne bloki
                         </button>
@@ -212,33 +248,11 @@ export default function Chat({
           ))}
         </AnimatePresence>
 
-        {/* 🔄 Loader */}
-        {isThinking && (
-          <div className="flex items-center justify-center gap-2 text-gray-500 text-sm mt-3 animate-pulse">
-            <svg
-              className="animate-spin h-4 w-4 text-gray-400"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              ></circle>
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-              ></path>
-            </svg>
-            <span>AI myśli...</span>
+        {isLoading && (
+          <div className="text-center text-gray-500 text-sm animate-pulse">
+            AI analizuje...
           </div>
         )}
-
         <div ref={bottomRef} />
       </div>
 
@@ -247,20 +261,14 @@ export default function Chat({
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSend(input)}
-          placeholder={
-            assistant === 'six_hats'
-              ? 'Zadaj pytanie np. "Przeanalizuj problem metodą 6 kapeluszy..."'
-              : assistant === 'global'
-              ? 'Napisz wiadomość np. "Daj taski na dziś"'
-              : 'Zadaj pytanie o zadania Todoist...'
-          }
+          onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+          placeholder="Napisz np. 'Daj taski na dziś' lub 'Pogrupuj te zadania'"
           className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <button
+          disabled={isLoading}
+          onClick={() => sendMessage()}
           className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition disabled:opacity-50"
-          onClick={() => handleSend(input)}
-          disabled={isThinking}
         >
           Wyślij
         </button>
