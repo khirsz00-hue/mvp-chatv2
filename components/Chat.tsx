@@ -69,6 +69,7 @@ export default function Chat({
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // ✉️ Send message to API
   const sendMessage = async (msg?: string) => {
     const content = msg || input.trim()
     if (!content) return
@@ -84,11 +85,15 @@ export default function Chat({
     setMessages((prev) => [...prev, userMsg])
 
     try {
+      // 🔐 Pobierz token z localStorage
+      const todoistToken = localStorage.getItem('todoist_token')
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: content,
+          token: todoistToken, // ✅ token przekazany do backendu
           tasks:
             content.toLowerCase().includes('pogrupuj') ||
             content.toLowerCase().includes('uporządkuj')
@@ -146,8 +151,10 @@ export default function Chat({
                   : 'bg-white border border-gray-200 text-gray-800'
               }`}
             >
+              {/* 💬 Zwykłe wiadomości */}
               {m.type !== 'tasks' && <div>{m.content}</div>}
 
+              {/* 🧩 Wiadomości z zadaniami */}
               {m.type === 'tasks' && (
                 <div className="mt-2 space-y-2">
                   {m.tasks && m.tasks.length > 0 ? (
@@ -184,6 +191,7 @@ export default function Chat({
                 </div>
               )}
 
+              {/* ⏱ Czas wiadomości */}
               <div
                 className={`text-[10px] mt-1 opacity-60 text-right ${
                   m.role === 'user' ? 'text-white' : 'text-gray-500'
@@ -198,6 +206,7 @@ export default function Chat({
           ))}
         </AnimatePresence>
 
+        {/* Loader */}
         {isLoading && (
           <div className="flex justify-center items-center mt-2 text-gray-500 text-sm gap-1 animate-pulse">
             <span className="animate-bounce">●</span>
