@@ -1,20 +1,14 @@
 'use client'
 
 export default function TodoistAuthButton() {
-  const handleConnect = () => {
-    const clientId = process.env.NEXT_PUBLIC_TODOIST_CLIENT_ID || process.env.TODOIST_CLIENT_ID
-    const redirectUri = process.env.NEXT_PUBLIC_TODOIST_REDIRECT_URI || process.env.TODOIST_REDIRECT_URI
-
-    if (!clientId || !redirectUri) {
-      alert('Brakuje konfiguracji OAuth Todoist. Sprawdź zmienne środowiskowe.')
-      return
+  const handleConnect = async () => {
+    try {
+      // 🔄 backend (auth/route.ts) sam zbuduje poprawny URL z env
+      window.location.href = '/api/todoist/auth'
+    } catch (err) {
+      console.error('❌ Błąd podczas próby połączenia z Todoist:', err)
+      alert('Nie udało się rozpocząć autoryzacji z Todoist.')
     }
-
-    const authUrl = `https://todoist.com/oauth/authorize?client_id=${clientId}&scope=data:read_write&state=todoist_auth&redirect_uri=${encodeURIComponent(
-      redirectUri
-    )}`
-
-    window.location.href = authUrl
   }
 
   return (
