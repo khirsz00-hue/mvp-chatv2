@@ -69,16 +69,16 @@ ${taskList}
     })
 
     const reply = completion.choices[0]?.message?.content || '🤖 Brak odpowiedzi od AI.'
-    console.log('💬 Odpowiedź AI:', reply.slice(0, 200))
+    console.log('💬 Odpowiedź AI:', reply.slice(0, 300))
 
-    // ✅ ZAWSZE zwracamy reply (dla frontu)
+    // ✅ ZAWSZE zwracamy `content` (nie `reply`)
     return NextResponse.json({
       success: true,
-      reply,
+      content: reply,
       timestamp: Date.now(),
     })
   } catch (err: any) {
     console.error('❌ Błąd /api/chat:', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    return NextResponse.json({ error: err.message, type: 'error' }, { status: 500 })
   }
 }
