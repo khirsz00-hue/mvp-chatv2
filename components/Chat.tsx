@@ -39,6 +39,7 @@ export default function Chat({
   const [lastTasks, setLastTasks] = useState<any[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
 
+  // 🔹 Klucz historii
   const storageKey = sessionId
     ? `chat_session_${sessionId}`
     : assistant === 'six_hats'
@@ -47,7 +48,7 @@ export default function Chat({
     ? 'chat_todoist'
     : 'chat_global'
 
-  // 💾 Load history
+  // 💾 Załaduj historię
   useEffect(() => {
     const saved = localStorage.getItem(storageKey)
     if (saved) {
@@ -58,7 +59,7 @@ export default function Chat({
     }
   }, [storageKey])
 
-  // 💾 Save history
+  // 💾 Zapisz historię
   useEffect(() => {
     if (messages.length > 0)
       localStorage.setItem(storageKey, JSON.stringify(messages))
@@ -69,7 +70,7 @@ export default function Chat({
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // ✉️ Send message to API
+  // ✉️ Wysyłanie wiadomości
   const sendMessage = async (msg?: string) => {
     const content = msg || input.trim()
     if (!content) return
@@ -85,15 +86,14 @@ export default function Chat({
     setMessages((prev) => [...prev, userMsg])
 
     try {
-      // 🔐 Pobierz token z localStorage
-      const todoistToken = localStorage.getItem('todoist_token')
+      const todoistToken = localStorage.getItem('todoist_token') // 🔥 kluczowa poprawka!
 
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: content,
-          token: todoistToken, // ✅ token przekazany do backendu
+          token: todoistToken,
           tasks:
             content.toLowerCase().includes('pogrupuj') ||
             content.toLowerCase().includes('uporządkuj')
@@ -132,11 +132,12 @@ export default function Chat({
     }
   }
 
+  // 🔹 Widoczne wiadomości
   const visibleMessages = hideHistory ? messages.slice(-12) : messages
 
   return (
     <div className="flex flex-col h-full max-h-[75vh] rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-      {/* CHAT CONTENT */}
+      {/* CZAT */}
       <div className="flex-1 overflow-y-auto space-y-3 p-4 bg-gray-50">
         <AnimatePresence>
           {visibleMessages.map((m) => (
@@ -151,10 +152,10 @@ export default function Chat({
                   : 'bg-white border border-gray-200 text-gray-800'
               }`}
             >
-              {/* 💬 Zwykłe wiadomości */}
+              {/* 🧠 Tekst */}
               {m.type !== 'tasks' && <div>{m.content}</div>}
 
-              {/* 🧩 Wiadomości z zadaniami */}
+              {/* ✅ Task Cards */}
               {m.type === 'tasks' && (
                 <div className="mt-2 space-y-2">
                   {m.tasks && m.tasks.length > 0 ? (
@@ -191,7 +192,7 @@ export default function Chat({
                 </div>
               )}
 
-              {/* ⏱ Czas wiadomości */}
+              {/* ⏱ Czas */}
               <div
                 className={`text-[10px] mt-1 opacity-60 text-right ${
                   m.role === 'user' ? 'text-white' : 'text-gray-500'
