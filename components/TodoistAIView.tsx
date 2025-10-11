@@ -23,7 +23,7 @@ export default function TodoistAIView() {
     if (saved) setToken(saved)
   }, [])
 
-  // 🔹 Pobierz zadania bezpośrednio z Todoista (z frontu)
+  // 🔹 Pobierz zadania bezpośrednio z Todoista (frontend kontroluje stan)
   const fetchTasks = async (filter: string = 'today') => {
     if (!token) return
     setLoading(true)
@@ -38,11 +38,11 @@ export default function TodoistAIView() {
       const checkDate = (date?: string) => {
         if (!date) return false
         const d = new Date(date)
-        const diffDays = (d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-        if (filter === 'today') return d.toDateString() === now.toDateString()
-        if (filter === 'tomorrow') return diffDays >= 0.5 && diffDays < 1.5
-        if (filter === '7days') return diffDays >= 0 && diffDays < 7
-        if (filter === '30days') return diffDays >= 0 && diffDays < 30
+        const diffHours = Math.abs(d.getTime() - now.getTime()) / (1000 * 60 * 60)
+        if (filter === 'today') return diffHours < 24
+        if (filter === 'tomorrow') return diffHours >= 24 && diffHours < 48
+        if (filter === '7days') return diffHours >= 0 && diffHours < 7 * 24
+        if (filter === '30days') return diffHours >= 0 && diffHours < 30 * 24
         if (filter === 'overdue') return d < now
         return false
       }
@@ -77,7 +77,7 @@ export default function TodoistAIView() {
     }
   }
 
-  // ✅ Toggle complete
+  // ✅ Oznacz jako ukończone
   const toggleTask = async (taskId: string) => {
     if (!token) return
     try {
@@ -95,7 +95,7 @@ export default function TodoistAIView() {
     }
   }
 
-  // 💬 Wyślij prompt do AI
+  // 💬 Wyślij wiadomość do AI z aktualnymi taskami
   const handleSend = async (message: string) => {
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
@@ -108,27 +108,10 @@ export default function TodoistAIView() {
     setLoading(true)
 
     try {
-      const contextTasks = tasks
-        .map(
-          (t) =>
-            `- ${t.content}${
-              t.due?.date ? ` (termin: ${t.due.date})` : ''
-            }${t.completed ? ' ✅' : ''}`
-        )
-        .join('\n')
-
-      const prompt = `
-Użytkownik ma następujące zadania:
-${contextTasks || '(Brak zadań)'}
-
-Wiadomość użytkownika: "${message}"
-Odpowiedz po polsku, praktycznie i zwięźle.
-      `.trim()
-
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: prompt, token }), // ✅ przekazujemy token do backendu
+        body: JSON.stringify({ message, token, tasks }), // ✅ przekazujemy aktualne taski
       })
 
       const data = await res.json()
@@ -160,13 +143,7 @@ Odpowiedz po polsku, praktycznie i zwięźle.
       handleSend('Nie mam żadnych zadań, które można pogrupować.')
       return
     }
-
-    const groupPrompt = `
-Pogrupuj te zadania tematycznie:
-${tasks.map((t) => `- ${t.content}`).join('\n')}
-    `.trim()
-
-    await handleSend(groupPrompt)
+    await handleSend(`Pogrupuj te zadania tematycznie:`)
   }
 
   // 🧩 Render task cards
@@ -181,7 +158,9 @@ ${tasks.map((t) => `- ${t.content}`).join('\n')}
           <div
             key={t.id}
             className={`p-3 rounded-xl border ${
-              t.completed ? 'bg-green-50 border-green-300' : 'bg-white border-gray-200'
+              t.completed
+                ? 'bg-green-50 border-green-300'
+                : 'bg-white border-gray-200'
             } shadow-sm hover:shadow-md transition relative`}
           >
             <div className="flex items-start gap-2">
@@ -194,14 +173,19 @@ ${tasks.map((t) => `- ${t.content}`).join('\n')}
               <div>
                 <p
                   className={`text-sm font-medium ${
-                    t.completed ? 'line-through text-gray-400' : 'text-gray-800'
+                    t.completed
+                      ? 'line-through text-gray-400'
+                      : 'text-gray-800'
                   }`}
                 >
                   {t.content}
                 </p>
                 <div className="text-xs text-gray-500 mt-1 flex gap-2">
                   {t.due?.date && (
-                    <span>📅 {new Date(t.due.date).toLocaleDateString('pl-PL')}</span>
+                    <span>
+                      📅{' '}
+                      {new Date(t.due.date).toLocaleDateString('pl-PL')}
+                    </span>
                   )}
                   {t.priority && <span>⭐ P{t.priority}</span>}
                 </div>
