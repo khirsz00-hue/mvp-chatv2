@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 
-export const runtime = 'nodejs' // ✅ wymusza działanie w środowisku Node (nie Edge)
+export const runtime = 'nodejs' // ✅ wymusza działanie w środowisku Node, gdzie działa process.env
 
 export async function GET() {
   const clientId = process.env.TODOIST_CLIENT_ID
@@ -8,17 +8,18 @@ export async function GET() {
   const clientSecret = process.env.TODOIST_CLIENT_SECRET
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL
 
-  // 🧩 Debug – pokaż w logach czy zmienne istnieją
-  console.log('🌍 [OAuth Debug]', {
-    clientId: !!clientId,
-    redirectUri,
-    clientSecret: !!clientSecret,
-    baseUrl,
-    envKeys: Object.keys(process.env).filter((k) =>
+  // 🧩 Pełny debug środowiska — pojawi się w logach Vercel
+  console.log('🧩 [DEBUG OAuth ENV]', {
+    TODOIST_CLIENT_ID: clientId ? '✅ set' : '❌ missing',
+    TODOIST_CLIENT_SECRET: clientSecret ? '✅ set' : '❌ missing',
+    TODOIST_REDIRECT_URI: redirectUri,
+    NEXT_PUBLIC_APP_URL: baseUrl,
+    ENV_KEYS: Object.keys(process.env).filter(k =>
       k.startsWith('TODOIST') || k.startsWith('NEXT_PUBLIC_APP')
     ),
   })
 
+  // 🔴 Zabezpieczenie: jeśli coś brak
   if (!clientId || !redirectUri) {
     console.error('❌ Brak konfiguracji OAuth Todoist (clientId lub redirectUri)')
     return NextResponse.json(
@@ -27,6 +28,7 @@ export async function GET() {
     )
   }
 
+  // 🔗 Budujemy URL autoryzacji
   const url = new URL('https://todoist.com/oauth/authorize')
   url.searchParams.set('client_id', clientId)
   url.searchParams.set('scope', 'data:read_write')
