@@ -108,7 +108,7 @@ export default function TodoistAIView() {
     setLoading(true)
 
     try {
-      // 🔍 Zawsze użyj aktualnych zadań (jeśli lokalny state jest pusty, pobierz z Todoista)
+      // 🔍 Jeśli brak lokalnych zadań, pobierz z Todoista
       let currentTasks = tasks
       if (!currentTasks || currentTasks.length === 0) {
         console.log('⚙️ Brak zadań w stanie – dociągam z Todoista...')
@@ -127,19 +127,41 @@ export default function TodoistAIView() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, token, tasks: currentTasks }), // ✅ faktyczne zadania
+        body: JSON.stringify({ message, token, tasks: currentTasks }),
       })
 
       const data = await res.json()
-      const aiMsg: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: data.reply || data.content || '🤖 Brak odpowiedzi od AI.',
-        timestamp: Date.now(),
-      }
-      setMessages([...updated, aiMsg])
+
+      console.log('📩 Surowa odpowiedź backendu:', data)
+
+      const reply =
+        data.content ||
+        data.reply ||
+        (typeof data === 'string' ? data : null) ||
+        '🤖 Brak odpowiedzi od AI.'
+
+      console.log('💬 Odpowiedź AI (tekst do wyświetlenia):', reply)
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: reply,
+          timestamp: Date.now(),
+        },
+      ])
     } catch (err) {
       console.error('❌ Błąd komunikacji z AI:', err)
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: '⚠️ Wystąpił błąd podczas komunikacji z AI.',
+          timestamp: Date.now(),
+        },
+      ])
     } finally {
       setLoading(false)
     }
@@ -156,10 +178,10 @@ export default function TodoistAIView() {
   // 🧠 Pogrupuj tematycznie
   const handleGroupTasks = async () => {
     if (!tasks.length) {
-      handleSend('Nie mam żadnych zadań, które można pogrupować.')
+      await handleSend('Nie mam żadnych zadań, które można pogrupować.')
       return
     }
-    await handleSend('Pogrupuj te zadania tematycznie:')
+    await handleSend(`Pogrupuj te zadania tematycznie:`)
   }
 
   // 🧩 Render task cards
