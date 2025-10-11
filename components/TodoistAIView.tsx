@@ -23,7 +23,7 @@ export default function TodoistAIView() {
     if (saved) setToken(saved)
   }, [])
 
-  // 🔹 Pobierz zadania bezpośrednio z Todoista (frontend kontroluje stan)
+  // 🔹 Pobierz zadania z Todoista
   const fetchTasks = async (filter: string = 'today') => {
     if (!token) return
     setLoading(true)
@@ -108,10 +108,26 @@ export default function TodoistAIView() {
     setLoading(true)
 
     try {
+      // 🔍 Zawsze użyj aktualnych zadań (jeśli lokalny state jest pusty, pobierz z Todoista)
+      let currentTasks = tasks
+      if (!currentTasks || currentTasks.length === 0) {
+        console.log('⚙️ Brak zadań w stanie – dociągam z Todoista...')
+        const resTasks = await fetch('https://api.todoist.com/rest/v2/tasks', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        currentTasks = await resTasks.json()
+      }
+
+      console.log('📤 Wysyłam do backendu /api/chat:', {
+        message,
+        tasksCount: currentTasks.length,
+        firstTask: currentTasks[0],
+      })
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, token, tasks }), // ✅ przekazujemy aktualne taski
+        body: JSON.stringify({ message, token, tasks: currentTasks }), // ✅ faktyczne zadania
       })
 
       const data = await res.json()
@@ -143,7 +159,7 @@ export default function TodoistAIView() {
       handleSend('Nie mam żadnych zadań, które można pogrupować.')
       return
     }
-    await handleSend(`Pogrupuj te zadania tematycznie:`)
+    await handleSend('Pogrupuj te zadania tematycznie:')
   }
 
   // 🧩 Render task cards
@@ -183,8 +199,7 @@ export default function TodoistAIView() {
                 <div className="text-xs text-gray-500 mt-1 flex gap-2">
                   {t.due?.date && (
                     <span>
-                      📅{' '}
-                      {new Date(t.due.date).toLocaleDateString('pl-PL')}
+                      📅 {new Date(t.due.date).toLocaleDateString('pl-PL')}
                     </span>
                   )}
                   {t.priority && <span>⭐ P{t.priority}</span>}
