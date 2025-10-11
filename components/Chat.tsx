@@ -19,7 +19,7 @@ export type ChatMessage = {
 }
 
 interface ChatProps {
-  onSend?: (msg: string) => Promise<void>
+  onSend?: (msg: string) => Promise<void> | void
   messages?: ChatMessage[]
   assistant?: 'global' | 'six_hats' | 'todoist'
   hideHistory?: boolean
@@ -38,6 +38,11 @@ export default function Chat({
   const [isLoading, setIsLoading] = useState(false)
   const [lastTasks, setLastTasks] = useState<any[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
+
+  // ✅ Synchronizacja zewnętrznych wiadomości (fix)
+  useEffect(() => {
+    setMessages(externalMessages)
+  }, [externalMessages])
 
   // 🔹 Klucz historii
   const storageKey = sessionId
@@ -83,10 +88,11 @@ export default function Chat({
       content,
       timestamp: Date.now(),
     }
+
     setMessages((prev) => [...prev, userMsg])
 
     try {
-      const todoistToken = localStorage.getItem('todoist_token') // 🔥 kluczowa poprawka!
+      const todoistToken = localStorage.getItem('todoist_token')
 
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -103,13 +109,18 @@ export default function Chat({
       })
 
       const data = await res.json()
+      console.log('📩 Odpowiedź backendu (Chat):', data)
 
       if (data.type === 'tasks') setLastTasks(data.tasks)
 
       const assistantMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: data.content || data.reply || '',
+        content:
+          data.content ||
+          data.reply ||
+          data.message ||
+          '🤖 Brak odpowiedzi od AI.',
         timestamp: Date.now(),
         type: data.type || 'text',
         tasks: data.tasks || [],
@@ -117,7 +128,7 @@ export default function Chat({
 
       setMessages((prev) => [...prev, assistantMsg])
     } catch (err) {
-      console.error('❌ Błąd komunikacji:', err)
+      console.error('❌ Błąd komunikacji z AI:', err)
       setMessages((prev) => [
         ...prev,
         {
@@ -132,7 +143,6 @@ export default function Chat({
     }
   }
 
-  // 🔹 Widoczne wiadomości
   const visibleMessages = hideHistory ? messages.slice(-12) : messages
 
   return (
@@ -207,7 +217,6 @@ export default function Chat({
           ))}
         </AnimatePresence>
 
-        {/* Loader */}
         {isLoading && (
           <div className="flex justify-center items-center mt-2 text-gray-500 text-sm gap-1 animate-pulse">
             <span className="animate-bounce">●</span>
