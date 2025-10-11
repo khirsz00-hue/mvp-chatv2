@@ -4,23 +4,16 @@ import OpenAI from 'openai'
 export const runtime = 'nodejs'
 
 export async function POST(req: Request) {
-  console.group('🤖 [API CHAT]')
   try {
     const { message, token, tasks: providedTasks } = await req.json()
 
     if (!message) {
-      console.error('❌ Brak wiadomości w żądaniu!')
-      console.groupEnd()
       return NextResponse.json({ error: 'Brak wiadomości' }, { status: 400 })
     }
 
-    if (!token && (!providedTasks || providedTasks.length === 0)) {
-      console.error('❌ Brak tokena i brak zadań z frontu!')
-      console.groupEnd()
-      return NextResponse.json(
-        { error: 'Brak źródła zadań (token lub lista)' },
-        { status: 400 }
-      )
+    if (!token) {
+      console.error('❌ Brak tokena Todoist w żądaniu!')
+      return NextResponse.json({ error: 'Brak tokena Todoist' }, { status: 400 })
     }
 
     const lower = message.toLowerCase()
@@ -34,25 +27,29 @@ export async function POST(req: Request) {
     else if (lower.includes('przeterminowane')) filter = 'overdue'
     else filter = 'today'
 
-    console.log(`🕓 Zakres filtracji Todoist: ${filter}`)
+    console.log('🕓 Zakres filtracji Todoist:', filter)
 
-    // 🔹 Jeśli dostarczono zadania z frontu – użyj ich
+    // ✅ Jeśli frontend przekazał taski — używamy ich zamiast pobierać z Todoista
     if (providedTasks && providedTasks.length > 0) {
-      console.log(`📦 Używam ${providedTasks.length} zadań z frontu.`)
-      tasks = providedTasks
+      console.log(`📦 Otrzymano ${providedTasks.length} zadań z frontu.`)
+      tasks = providedTasks.map((t: any) => ({
+        id: t.id,
+        content: t.content,
+        due: t.due?.date || t.due || null, // obsługa różnych formatów
+        priority: t.priority || 1,
+      }))
+      console.log('🧩 Przykładowe zadanie z frontu:', tasks[0])
     } else {
-      // 🌐 W przeciwnym razie pobierz z Todoista
-      console.log('🌐 Pobieram zadania z Todoista...')
+      console.log('🌐 Brak zadań z frontu — pobieram z Todoista...')
       const res = await fetch('https://api.todoist.com/rest/v2/tasks', {
         headers: { Authorization: `Bearer ${token}` },
       })
 
-      console.log(`🔐 Status odpowiedzi Todoist: ${res.status}`)
+      console.log('🔐 Status odpowiedzi Todoist:', res.status)
 
       if (!res.ok) {
         const text = await res.text()
         console.error('⚠️ Błąd odpowiedzi Todoist:', text)
-        console.groupEnd()
         return NextResponse.json(
           { error: `Błąd Todoist: ${res.status} ${text}` },
           { status: 500 }
@@ -75,10 +72,10 @@ export async function POST(req: Request) {
       }
 
       tasks = all.filter((t: any) => t.due?.date && dateCheck(t.due.date))
-      console.log(`✅ Znaleziono ${tasks.length} zadań.`)
+      console.log('✅ Znaleziono zadań z Todoista:', tasks.length)
     }
 
-    // ✅ Jeśli użytkownik prosi o taski → zwróć je bez AI
+    // ✅ Jeśli użytkownik prosi o taski → zwróć karty bez AI
     const isTaskQuery =
       lower.includes('taski') ||
       lower.includes('zadań') ||
@@ -87,7 +84,6 @@ export async function POST(req: Request) {
 
     if (isTaskQuery && tasks.length > 0) {
       console.log('🧾 Zwracam karty zadań do frontu.')
-      console.groupEnd()
       return NextResponse.json({
         role: 'assistant',
         type: 'tasks',
@@ -95,7 +91,7 @@ export async function POST(req: Request) {
         tasks: tasks.map((t: any) => ({
           id: t.id,
           content: t.content,
-          due: t.due?.date,
+          due: t.due,
           priority: t.priority || 1,
         })),
       })
@@ -108,12 +104,7 @@ export async function POST(req: Request) {
     const taskContext =
       tasks.length > 0
         ? tasks
-            .map(
-              (t) =>
-                `- ${t.content}${
-                  t.due ? ` (termin: ${t.due})` : ''
-                }${t.priority ? ` [priorytet ${t.priority}]` : ''}`
-            )
+            .map((t) => `- ${t.content}${t.due ? ` (termin: ${t.due})` : ''}`)
             .join('\n')
         : '(Brak zadań do analizy)'
 
@@ -141,9 +132,8 @@ ${taskContext}
     })
 
     const reply = completion.choices[0]?.message?.content || '🤖 Brak odpowiedzi od AI.'
-    console.log(`💬 Odpowiedź AI: ${reply.slice(0, 150)}...`)
+    console.log('💬 Odpowiedź AI:', reply.slice(0, 120))
 
-    console.groupEnd()
     return NextResponse.json({
       role: 'assistant',
       type: 'text',
@@ -152,7 +142,6 @@ ${taskContext}
     })
   } catch (err: any) {
     console.error('❌ Błąd /api/chat:', err)
-    console.groupEnd()
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
