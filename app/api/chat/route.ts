@@ -5,8 +5,7 @@ export const runtime = 'nodejs'
 
 export async function POST(req: Request) {
   try {
-    // 📨 Odczytaj dane z żądania
-    const { message, token } = await req.json()
+    const { message, token, tasks: providedTasks } = await req.json()
 
     if (!message) {
       return NextResponse.json({ error: 'Brak wiadomości' }, { status: 400 })
@@ -20,7 +19,7 @@ export async function POST(req: Request) {
     const lower = message.toLowerCase()
     let tasks: any[] = []
 
-    // 🧭 Zakres czasowy
+    // 🧩 Zakres filtracji
     let filter = ''
     if (lower.includes('jutro')) filter = 'tomorrow'
     else if (lower.includes('tydzień') || lower.includes('tydzien')) filter = '7 days'
@@ -30,54 +29,55 @@ export async function POST(req: Request) {
 
     console.log('🕓 Zakres filtracji Todoist:', filter)
 
-    // 📥 Pobierz zadania z Todoista przy użyciu tokena użytkownika
-    const res = await fetch('https://api.todoist.com/rest/v2/tasks', {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
-      },
-      next: { revalidate: 0 }, // 🚀 wyłącza cache
-    })
+    // 🔹 Jeśli dostarczono zadania z frontu (np. przy "pogrupuj"), nie pobieraj ponownie
+    if (providedTasks && providedTasks.length > 0) {
+      console.log('📦 Używam zadań dostarczonych z frontu:', providedTasks.length)
+      tasks = providedTasks
+    } else {
+      console.log('🌐 Pobieram zadania z Todoista...')
+      const res = await fetch('https://api.todoist.com/rest/v2/tasks', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
 
-    console.log('🔐 Status odpowiedzi Todoist:', res.status)
+      console.log('🔐 Status odpowiedzi Todoist:', res.status)
 
-    if (!res.ok) {
-      const text = await res.text()
-      console.error('⚠️ Błąd odpowiedzi Todoist:', text)
-      return NextResponse.json(
-        { error: `Błąd Todoist: ${res.status} ${text}` },
-        { status: res.status }
-      )
+      if (!res.ok) {
+        const text = await res.text()
+        console.error('⚠️ Błąd odpowiedzi Todoist:', text)
+        return NextResponse.json(
+          { error: `Błąd Todoist: ${res.status} ${text}` },
+          { status: 500 }
+        )
+      }
+
+      const all = await res.json()
+      const now = new Date()
+
+      const dateCheck = (taskDate: string) => {
+        if (!taskDate) return false
+        const d = new Date(taskDate)
+        const diffDays = (d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+        if (filter === 'today') return d.toDateString() === now.toDateString()
+        if (filter === 'tomorrow') return diffDays >= 0.5 && diffDays < 1.5
+        if (filter === '7 days') return diffDays >= 0 && diffDays < 7
+        if (filter === '30 days') return diffDays >= 0 && diffDays < 30
+        if (filter === 'overdue') return d < now
+        return false
+      }
+
+      tasks = all.filter((t: any) => t.due?.date && dateCheck(t.due.date))
+      console.log('✅ Znaleziono zadań:', tasks.length)
     }
 
-    const all = await res.json()
-    const now = new Date()
-
-    // 📅 Filtrowanie zadań po terminie
-    const dateCheck = (taskDate: string) => {
-      if (!taskDate) return false
-      const d = new Date(taskDate)
-      const diffDays = (d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-      if (filter === 'today') return d.toDateString() === now.toDateString()
-      if (filter === 'tomorrow') return diffDays >= 0.5 && diffDays < 1.5
-      if (filter === '7 days') return diffDays >= 0 && diffDays < 7
-      if (filter === '30 days') return diffDays >= 0 && diffDays < 30
-      if (filter === 'overdue') return d < now
-      return false
-    }
-
-    tasks = all.filter((t: any) => t.due?.date && dateCheck(t.due.date))
-    console.log('✅ Znaleziono zadań:', tasks.length)
-
-    // 🧩 Jeśli użytkownik prosi o listę tasków → zwróć bez udziału OpenAI
+    // ✅ Jeśli użytkownik prosi o taski → zwróć karty (bez AI)
     const isTaskQuery =
-      lower.includes('task') ||
+      lower.includes('taski') ||
       lower.includes('zadań') ||
       lower.includes('pokaż') ||
       lower.includes('daj')
 
     if (isTaskQuery && tasks.length > 0) {
+      console.log('🧾 Zwracam karty zadań do frontu.')
       return NextResponse.json({
         role: 'assistant',
         type: 'tasks',
@@ -91,23 +91,24 @@ export async function POST(req: Request) {
       })
     }
 
-    // 🧠 Analiza AI (gdy nie chodzi o listę tasków)
+    // 🧠 Analiza AI (np. przy "pogrupuj te zadania")
+    console.log('🧠 Przekazuję zadania do OpenAI...')
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
 
     const taskContext =
       tasks.length > 0
-        ? tasks.map((t) => `- ${t.content} (termin: ${t.due?.date || 'brak'})`).join('\n')
+        ? tasks.map((t) => `- ${t.content}${t.due ? ` (termin: ${t.due})` : ''}`).join('\n')
         : '(Brak zadań do analizy)'
 
     const systemPrompt = `
-Jesteś osobistym asystentem produktywności zintegrowanym z Todoist.
-Masz pomagać użytkownikowi w planowaniu, analizie i organizacji zadań.
+Jesteś inteligentnym asystentem produktywności zintegrowanym z Todoist.
 
 Zasady:
-- Odpowiadaj po polsku.
-- Jeśli użytkownik prosi o grupowanie, wykonaj logiczny podział zadań wg tematów lub kategorii.
-- Jeśli użytkownik prosi o plan, zaproponuj harmonogram działań.
-- Jeśli brak danych, zapytaj o kontekst.
+- Odpowiadasz po polsku.
+- Jeśli użytkownik prosi o "pogrupowanie", utwórz logiczne kategorie (np. Finanse, IT, Sprawy osobiste) i przypisz zadania do nich.
+- Jeśli użytkownik pyta o plan lub priorytety, zaproponuj konkretną kolejność działań.
+- Nie wymyślaj zadań spoza listy.
+- Jeśli nie masz żadnych danych, poproś o kontekst.
 
 Dostępne zadania:
 ${taskContext}
@@ -123,6 +124,7 @@ ${taskContext}
     })
 
     const reply = completion.choices[0]?.message?.content || '🤖 Brak odpowiedzi od AI.'
+    console.log('💬 Odpowiedź AI:', reply.slice(0, 120))
 
     return NextResponse.json({
       role: 'assistant',
