@@ -5,7 +5,9 @@ export const runtime = 'nodejs'
 
 export async function POST(req: Request) {
   try {
+    // 📨 Odczytaj dane z żądania
     const { message, token } = await req.json()
+
     if (!message) {
       return NextResponse.json({ error: 'Brak wiadomości' }, { status: 400 })
     }
@@ -18,7 +20,7 @@ export async function POST(req: Request) {
     const lower = message.toLowerCase()
     let tasks: any[] = []
 
-    // 🧩 Zakres czasowy
+    // 🧭 Zakres czasowy
     let filter = ''
     if (lower.includes('jutro')) filter = 'tomorrow'
     else if (lower.includes('tydzień') || lower.includes('tydzien')) filter = '7 days'
@@ -28,9 +30,14 @@ export async function POST(req: Request) {
 
     console.log('🕓 Zakres filtracji Todoist:', filter)
 
-    // 📦 Pobierz zadania z Todoista używając tokena użytkownika
+    // 📥 Pobierz zadania z Todoista przy użyciu tokena użytkownika
     const res = await fetch('https://api.todoist.com/rest/v2/tasks', {
-      headers: { Authorization: `Bearer ${token}` },
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      },
+      next: { revalidate: 0 }, // 🚀 wyłącza cache
     })
 
     console.log('🔐 Status odpowiedzi Todoist:', res.status)
@@ -40,13 +47,14 @@ export async function POST(req: Request) {
       console.error('⚠️ Błąd odpowiedzi Todoist:', text)
       return NextResponse.json(
         { error: `Błąd Todoist: ${res.status} ${text}` },
-        { status: 500 }
+        { status: res.status }
       )
     }
 
     const all = await res.json()
     const now = new Date()
 
+    // 📅 Filtrowanie zadań po terminie
     const dateCheck = (taskDate: string) => {
       if (!taskDate) return false
       const d = new Date(taskDate)
@@ -62,9 +70,9 @@ export async function POST(req: Request) {
     tasks = all.filter((t: any) => t.due?.date && dateCheck(t.due.date))
     console.log('✅ Znaleziono zadań:', tasks.length)
 
-    // ✅ Jeśli użytkownik prosi o taski → zwróć karty bez OpenAI
+    // 🧩 Jeśli użytkownik prosi o listę tasków → zwróć bez udziału OpenAI
     const isTaskQuery =
-      lower.includes('taski') ||
+      lower.includes('task') ||
       lower.includes('zadań') ||
       lower.includes('pokaż') ||
       lower.includes('daj')
@@ -115,6 +123,7 @@ ${taskContext}
     })
 
     const reply = completion.choices[0]?.message?.content || '🤖 Brak odpowiedzi od AI.'
+
     return NextResponse.json({
       role: 'assistant',
       type: 'text',
