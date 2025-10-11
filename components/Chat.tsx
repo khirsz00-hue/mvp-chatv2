@@ -39,7 +39,6 @@ export default function Chat({
   const [lastTasks, setLastTasks] = useState<any[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  // 💾 Klucz historii zależny od asystenta
   const storageKey = sessionId
     ? `chat_session_${sessionId}`
     : assistant === 'six_hats'
@@ -48,20 +47,18 @@ export default function Chat({
     ? 'chat_todoist'
     : 'chat_global'
 
-  // 💾 Ładowanie historii po wejściu
+  // 💾 Load history
   useEffect(() => {
     const saved = localStorage.getItem(storageKey)
     if (saved) {
       const parsed = JSON.parse(saved)
       setMessages(parsed)
-      if (parsed.length > 0) {
-        const last = parsed.findLast((m: any) => m.type === 'tasks')
-        if (last?.tasks) setLastTasks(last.tasks)
-      }
+      const last = parsed.findLast((m: any) => m.type === 'tasks')
+      if (last?.tasks) setLastTasks(last.tasks)
     }
   }, [storageKey])
 
-  // 💾 Zapis historii
+  // 💾 Save history
   useEffect(() => {
     if (messages.length > 0)
       localStorage.setItem(storageKey, JSON.stringify(messages))
@@ -72,7 +69,6 @@ export default function Chat({
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // ✉️ Wysyłanie wiadomości
   const sendMessage = async (msg?: string) => {
     const content = msg || input.trim()
     if (!content) return
@@ -103,9 +99,7 @@ export default function Chat({
 
       const data = await res.json()
 
-      if (data.type === 'tasks') {
-        setLastTasks(data.tasks)
-      }
+      if (data.type === 'tasks') setLastTasks(data.tasks)
 
       const assistantMsg: ChatMessage = {
         id: crypto.randomUUID(),
@@ -115,6 +109,7 @@ export default function Chat({
         type: data.type || 'text',
         tasks: data.tasks || [],
       }
+
       setMessages((prev) => [...prev, assistantMsg])
     } catch (err) {
       console.error('❌ Błąd komunikacji:', err)
@@ -132,53 +127,11 @@ export default function Chat({
     }
   }
 
-  // 🧹 Wyczyść historię
-  const clearHistory = () => {
-    localStorage.removeItem(storageKey)
-    setMessages([])
-    setLastTasks([])
-  }
-
-  // 🔹 Widoczne wiadomości
   const visibleMessages = hideHistory ? messages.slice(-12) : messages
 
   return (
     <div className="flex flex-col h-full max-h-[75vh] rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-      {/* 🔘 Przyciski akcji */}
-      <div className="flex flex-wrap items-center gap-2 p-3 border-b bg-white sticky top-0 z-10">
-        <button
-          onClick={() => sendMessage('Daj taski na dziś')}
-          className="px-3 py-1.5 text-sm rounded-md bg-gray-100 hover:bg-gray-200"
-        >
-          Daj taski na dziś
-        </button>
-        <button
-          onClick={() => sendMessage('Daj taski na ten tydzień')}
-          className="px-3 py-1.5 text-sm rounded-md bg-gray-100 hover:bg-gray-200"
-        >
-          Daj taski na ten tydzień
-        </button>
-        <button
-          onClick={() => sendMessage('Daj taski na ten miesiąc')}
-          className="px-3 py-1.5 text-sm rounded-md bg-gray-100 hover:bg-gray-200"
-        >
-          Daj taski na ten miesiąc
-        </button>
-        <button
-          onClick={() => sendMessage('Pokaż taski przeterminowane')}
-          className="px-3 py-1.5 text-sm rounded-md bg-gray-100 hover:bg-gray-200"
-        >
-          Pokaż taski przeterminowane
-        </button>
-        <button
-          onClick={clearHistory}
-          className="ml-auto px-3 py-1.5 text-sm rounded-md bg-red-100 text-red-700 hover:bg-red-200"
-        >
-          🧹 Wyczyść
-        </button>
-      </div>
-
-      {/* CZAT */}
+      {/* CHAT CONTENT */}
       <div className="flex-1 overflow-y-auto space-y-3 p-4 bg-gray-50">
         <AnimatePresence>
           {visibleMessages.map((m) => (
@@ -193,16 +146,14 @@ export default function Chat({
                   : 'bg-white border border-gray-200 text-gray-800'
               }`}
             >
-              {/* 🧠 Wiadomości tekstowe */}
               {m.type !== 'tasks' && <div>{m.content}</div>}
 
-              {/* ✅ Wiadomości z zadaniami */}
               {m.type === 'tasks' && (
                 <div className="mt-2 space-y-2">
-                  {(m.tasks?.length || 0) > 0 ? (
+                  {m.tasks && m.tasks.length > 0 ? (
                     <>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {(m.tasks || []).map((t) => (
+                        {m.tasks.map((t) => (
                           <TaskCard
                             key={t.id}
                             task={{
@@ -233,7 +184,6 @@ export default function Chat({
                 </div>
               )}
 
-              {/* ⏱ Czas wiadomości */}
               <div
                 className={`text-[10px] mt-1 opacity-60 text-right ${
                   m.role === 'user' ? 'text-white' : 'text-gray-500'
@@ -248,7 +198,6 @@ export default function Chat({
           ))}
         </AnimatePresence>
 
-        {/* Loader */}
         {isLoading && (
           <div className="flex justify-center items-center mt-2 text-gray-500 text-sm gap-1 animate-pulse">
             <span className="animate-bounce">●</span>
