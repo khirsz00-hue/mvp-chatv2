@@ -34,30 +34,15 @@ export default function TodoistAIView() {
       if (!res.ok) throw new Error(`Todoist API error: ${res.status}`)
       const all = await res.json()
 
-      const now = new Date()
-      const checkDate = (date?: string) => {
-        if (!date) return false
-        const d = new Date(date)
-        const diffHours = Math.abs(d.getTime() - now.getTime()) / (1000 * 60 * 60)
-        if (filter === 'today') return diffHours < 24
-        if (filter === 'tomorrow') return diffHours >= 24 && diffHours < 48
-        if (filter === '7days') return diffHours >= 0 && diffHours < 7 * 24
-        if (filter === '30days') return diffHours >= 0 && diffHours < 30 * 24
-        if (filter === 'overdue') return d < now
-        return false
-      }
+      setTasks(all)
+      console.log(`✅ Załadowano ${all.length} zadań z Todoista`)
 
-      const filtered = all.filter((t: TodoistTask) =>
-        t.due?.date ? checkDate(t.due.date) : false
-      )
-
-      setTasks(filtered)
       setMessages((prev) => [
         ...prev,
         {
           id: crypto.randomUUID(),
           role: 'assistant',
-          content: `📋 Znaleziono ${filtered.length} zadań (${filter}).`,
+          content: `📋 Załadowano ${all.length} zadań (${filter}).`,
           timestamp: Date.now(),
         },
       ])
@@ -103,54 +88,42 @@ export default function TodoistAIView() {
       content: message,
       timestamp: Date.now(),
     }
-    const updated = [...messages, userMsg]
-    setMessages(updated)
+    setMessages((prev) => [...prev, userMsg])
     setLoading(true)
 
     try {
-      // 🔍 Jeśli brak lokalnych zadań, pobierz z Todoista
-      let currentTasks = tasks
-      if (!currentTasks || currentTasks.length === 0) {
-        console.log('⚙️ Brak zadań w stanie – dociągam z Todoista...')
-        const resTasks = await fetch('https://api.todoist.com/rest/v2/tasks', {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        currentTasks = await resTasks.json()
+      const payload = {
+        message,
+        token,
+        tasks,
       }
 
-      console.log('📤 Wysyłam do backendu /api/chat:', {
-        message,
-        tasksCount: currentTasks.length,
-        firstTask: currentTasks[0],
-      })
+      console.log('📤 Wysyłam do backendu /api/chat:', payload)
 
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, token, tasks: currentTasks }),
+        body: JSON.stringify(payload),
       })
 
       const data = await res.json()
-
-      console.log('📩 Surowa odpowiedź backendu:', data)
+      console.log('📩 Odpowiedź backendu:', data)
 
       const reply =
-        data.content ||
         data.reply ||
+        data.content ||
         (typeof data === 'string' ? data : null) ||
         '🤖 Brak odpowiedzi od AI.'
 
-      console.log('💬 Odpowiedź AI (tekst do wyświetlenia):', reply)
+      const aiMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: reply,
+        timestamp: Date.now(),
+      }
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: reply,
-          timestamp: Date.now(),
-        },
-      ])
+      setMessages((prev) => [...prev, aiMsg])
+      console.log('✅ Dodano wiadomość AI:', reply)
     } catch (err) {
       console.error('❌ Błąd komunikacji z AI:', err)
       setMessages((prev) => [
@@ -287,19 +260,7 @@ export default function TodoistAIView() {
       <div className="flex-1">
         <Chat
           onSend={handleSend}
-          messages={
-            loading
-              ? [
-                  ...messages,
-                  {
-                    id: 'loader',
-                    role: 'assistant',
-                    content: '💭 AI analizuje zadania...',
-                    timestamp: Date.now(),
-                  },
-                ]
-              : messages
-          }
+          messages={messages}
           assistant="todoist"
           hideHistory={false}
         />
