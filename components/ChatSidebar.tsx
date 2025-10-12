@@ -134,7 +134,20 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
 
   const handleSelect = (mode: any, session: any) => {
     setActiveSessionId(session.id)
-    onSelectChat?.(mode, { id: session.id, content: session.title })
+
+    if (mode === 'todoist') {
+      // 🔥 Emit event to open modal (TaskDialog)
+      window.dispatchEvent(
+        new CustomEvent('chatSelect', {
+          detail: {
+            mode: 'todoist',
+            task: { id: session.id, title: session.title },
+          },
+        })
+      )
+    } else {
+      onSelectChat?.(mode, { id: session.id, content: session.title })
+    }
   }
 
   return (
@@ -173,6 +186,35 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
 
       {/* LISTA */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2 text-sm">
+        {tab === 'todoist' &&
+          (todoistSessions.length === 0 ? (
+            <p className="text-gray-500 italic">Brak historii Todoist.</p>
+          ) : (
+            todoistSessions.map((s) => (
+              <div
+                key={s.id}
+                onClick={() => handleSelect('todoist', s)}
+                title={s.last}
+                className={`cursor-pointer border rounded-lg p-2 transition ${
+                  activeSessionId === s.id
+                    ? 'bg-green-100 border-green-300'
+                    : 'bg-white hover:bg-green-50'
+                }`}
+              >
+                <p className="font-medium text-gray-800 truncate">{s.title}</p>
+                <p className="text-xs text-gray-500">
+                  {new Date(s.timestamp).toLocaleString('pl-PL', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </p>
+                <p className="text-xs text-gray-600 italic truncate">{s.last}</p>
+              </div>
+            ))
+          ))}
+
         {tab === 'global' &&
           (globalChats.length === 0 ? (
             <p className="text-gray-500 italic">Brak rozmów globalnych.</p>
@@ -198,7 +240,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
           (taskChats.length === 0 ? (
             <p className="text-gray-500 italic">Brak rozmów z zadaniami.</p>
           ) : (
-            taskChats.map((t, i) => (
+            taskChats.map((t) => (
               <div
                 key={t.id}
                 onClick={() => handleSelect('task', { id: t.id, title: t.title })}
@@ -233,35 +275,6 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
               >
                 <p className="text-xs text-gray-500">{chat.date}</p>
                 <p className="truncate text-gray-800">{chat.content}</p>
-              </div>
-            ))
-          ))}
-
-        {tab === 'todoist' &&
-          (todoistSessions.length === 0 ? (
-            <p className="text-gray-500 italic">Brak historii Todoist.</p>
-          ) : (
-            todoistSessions.map((s) => (
-              <div
-                key={s.id}
-                onClick={() => handleSelect('todoist', s)}
-                title={s.last}
-                className={`cursor-pointer border rounded-lg p-2 transition ${
-                  activeSessionId === s.id
-                    ? 'bg-green-100 border-green-300'
-                    : 'bg-white hover:bg-green-50'
-                }`}
-              >
-                <p className="font-medium text-gray-800 truncate">{s.title}</p>
-                <p className="text-xs text-gray-500">
-                  {new Date(s.timestamp).toLocaleString('pl-PL', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </p>
-                <p className="text-xs text-gray-600 italic truncate">{s.last}</p>
               </div>
             ))
           ))}
