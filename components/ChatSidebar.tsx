@@ -56,7 +56,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
         }),
         timestamp: m.timestamp || 0,
       }))
-      .sort((a: ChatPreview, b: ChatPreview) => b.timestamp - a.timestamp)
+      .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, 15)
     setGlobalChats(global)
 
@@ -84,7 +84,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
           timestamp: lastMsg?.timestamp || 0,
         }
       })
-      .sort((a: TaskPreview, b: TaskPreview) => b.timestamp - a.timestamp)
+      .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, 15)
     setTaskChats(tasks)
 
@@ -101,7 +101,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
         }),
         timestamp: m.timestamp || 0,
       }))
-      .sort((a: ChatPreview, b: ChatPreview) => b.timestamp - a.timestamp)
+      .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, 15)
     setSixHatsChats(sixHats)
 
@@ -117,7 +117,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
           last: lastMsg?.content || '(brak wiadomości)',
         }
       })
-      .sort((a: TodoistSession, b: TodoistSession) => b.timestamp - a.timestamp)
+      .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, 25)
     setTodoistSessions(sessions)
   }
@@ -132,22 +132,21 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
     }
   }, [])
 
+  // 📬 Kliknięcie w czat — wyślij event do modala
   const handleSelect = (mode: any, session: any) => {
     setActiveSessionId(session.id)
+    console.log('📡 Wysyłam event chatSelect', { mode, session })
 
-    if (mode === 'todoist') {
-      // 🔥 Emit event to open modal (TaskDialog)
-      window.dispatchEvent(
-        new CustomEvent('chatSelect', {
-          detail: {
-            mode: 'todoist',
-            task: { id: session.id, title: session.title },
-          },
-        })
-      )
-    } else {
-      onSelectChat?.(mode, { id: session.id, content: session.title })
-    }
+    window.dispatchEvent(
+      new CustomEvent('chatSelect', {
+        detail: {
+          mode,
+          task: { id: session.id, title: session.title },
+        },
+      })
+    )
+
+    onSelectChat?.(mode, { id: session.id, content: session.title })
   }
 
   return (
