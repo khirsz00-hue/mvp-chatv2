@@ -163,4 +163,143 @@ export default function TodoistAIView() {
   }
 
   // 🧠 Pogrupuj tematycznie
-  const handleGroupTasks = async
+  const handleGroupTasks = async () => {
+    if (!tasks.length) {
+      await handleSend('Nie mam żadnych zadań, które można pogrupować.')
+      return
+    }
+    await handleSend(`Pogrupuj te zadania tematycznie:`)
+  }
+
+  // 🧩 Render task cards
+  const renderTasks = () =>
+    tasks.length === 0 ? (
+      <div className="text-gray-500 text-sm italic text-center py-4">
+        Brak zadań do wyświetlenia
+      </div>
+    ) : (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+        {tasks.map((t) => (
+          <div
+            key={t.id}
+            className={`p-3 rounded-xl border ${
+              t.completed
+                ? 'bg-green-50 border-green-300'
+                : 'bg-white border-gray-200'
+            } shadow-sm hover:shadow-md transition relative`}
+          >
+            <div className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                checked={!!t.completed}
+                onChange={() => toggleTask(t.id)}
+                className="mt-1 accent-green-600 cursor-pointer"
+              />
+              <div>
+                <p
+                  className={`text-sm font-medium ${
+                    t.completed ? 'line-through text-gray-400' : 'text-gray-800'
+                  }`}
+                >
+                  {t.content}
+                </p>
+                <div className="text-xs text-gray-500 mt-1 flex gap-2">
+                  {t.due?.date && (
+                    <span>
+                      📅 {new Date(t.due.date).toLocaleDateString('pl-PL')}
+                    </span>
+                  )}
+                  {t.priority && <span>⭐ P{t.priority}</span>}
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+
+  return (
+    <div className="flex flex-col h-[85vh] max-h-[85vh] p-3 space-y-3 overflow-hidden">
+      {/* 🔘 Status połączenia */}
+      <div
+        className={`text-sm font-medium mb-2 ${
+          token ? 'text-green-600' : 'text-red-500'
+        }`}
+      >
+        {token ? '🟢 Połączono z Todoist' : '🔴 Brak połączenia z Todoist'}
+      </div>
+
+      {/* 🔘 Górne przyciski */}
+      <div className="flex flex-wrap justify-between items-center gap-2 mb-2">
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => fetchTasks('today')}
+            className="px-3 py-1.5 text-sm bg-gray-100 border rounded-lg hover:bg-gray-200 transition"
+          >
+            📅 Dziś
+          </button>
+          <button
+            onClick={() => fetchTasks('7days')}
+            className="px-3 py-1.5 text-sm bg-gray-100 border rounded-lg hover:bg-gray-200 transition"
+          >
+            🗓️ Ten tydzień
+          </button>
+          <button
+            onClick={() => fetchTasks('30days')}
+            className="px-3 py-1.5 text-sm bg-gray-100 border rounded-lg hover:bg-gray-200 transition"
+          >
+            📆 Ten miesiąc
+          </button>
+          <button
+            onClick={() => fetchTasks('overdue')}
+            className="px-3 py-1.5 text-sm bg-gray-100 border rounded-lg hover:bg-gray-200 transition"
+          >
+            ⏰ Przeterminowane
+          </button>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={handleNewChat}
+            className="text-sm text-blue-600 hover:text-blue-800 transition"
+          >
+            ✨ Nowy czat
+          </button>
+          <button
+            onClick={handleClearHistory}
+            className="text-sm text-red-600 hover:text-red-800 transition"
+          >
+            🗑️ Wyczyść historię
+          </button>
+        </div>
+      </div>
+
+      {/* 🧩 Task Cards */}
+      <div className="max-h-[35vh] overflow-y-auto border rounded-lg p-2 bg-gray-50 shadow-inner">
+        {renderTasks()}
+      </div>
+
+      {/* 💬 Chat */}
+      <div className="flex-1 overflow-hidden">
+        <Chat
+          onSend={handleSend}
+          messages={messages}
+          assistant="todoist"
+          hideHistory={false}
+        />
+      </div>
+
+      {/* 🔘 Dół – Pogrupuj */}
+      {tasks.length > 0 && (
+        <div className="flex justify-center pt-2">
+          <button
+            onClick={handleGroupTasks}
+            disabled={loading}
+            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+          >
+            🧠 Pogrupuj tematycznie
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
