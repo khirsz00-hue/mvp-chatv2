@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import ReactDOM from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
@@ -14,111 +14,119 @@ type ChatMessage = {
 
 export default function TaskDialog() {
   const [isOpen, setIsOpen] = useState(false)
-  const [task, setTask] = useState<{ id: string; title: string }>({ id: '', title: '' })
+  const [task, setTask] = useState<{ id: string; title: string } | null>(null)
   const [chat, setChat] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const scrollRef = useRef<HTMLDivElement | null>(null)
-  const recentMessages = useRef<Set<string>>(new Set())
-  const [token, setToken] = useState<string>('')
+  const scrollRef = useRef<HTMLDivElement>(null)
 
-  const chatKey = task?.id ? `chat_todoist_${task.id}` : ''
+  const chatKey = task ? `chat_todoist_${task.id}` : null
 
-  // 🔹 Otwieranie dialogu przez event
+  // 📡 Otwieranie przez globalny event chatSelect
   useEffect(() => {
-    const openChat = (event: any) => {
-      if (event.detail?.mode === 'todoist' && event.detail?.task) {
-        const t = event.detail.task
-        setTask({ id: t.id, title: t.title || t.content })
-        const saved = localStorage.getItem(`chat_todoist_${t.id}`)
-        setChat(saved ? JSON.parse(saved) : [])
-        setIsOpen(true)
-        console.log(`🗨️ Otwieram czat dla ${t.title}`)
-      }
+    const handleSelect = (event: CustomEvent) => {
+      const detail = event.detail
+      if (!detail?.task?.id) return
+      setTask({ id: detail.task.id, title: detail.task.title })
+      setIsOpen(true)
     }
-    window.addEventListener('chatSelect', openChat)
-    return () => window.removeEventListener('chatSelect', openChat)
+
+    window.addEventListener('chatSelect', handleSelect as EventListener)
+    return () => {
+      window.removeEventListener('chatSelect', handleSelect as EventListener)
+    }
   }, [])
 
-  // 📦 Token
+  // 📦 Wczytaj historię rozmowy
   useEffect(() => {
-    const tk = localStorage.getItem('todoist_token') || ''
-    setToken(tk)
-  }, [])
+    if (!chatKey) return
+    const saved = localStorage.getItem(chatKey)
+    if (saved) {
+      setChat(JSON.parse(saved))
+    } else {
+      setChat([])
+    }
+  }, [chatKey])
 
-  // 💾 Autozapis
+  // 💾 Zapisuj czat
   useEffect(() => {
-    if (chatKey && chat.length > 0)
+    if (chatKey) {
       localStorage.setItem(chatKey, JSON.stringify(chat))
+    }
   }, [chat, chatKey])
 
-  // 🔽 Auto-scroll
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [chat])
-
-  // ✉️ Wysyłanie wiadomości
+  // 💬 Wysyłanie wiadomości
   const sendMessage = async () => {
-    if (!input.trim() || loading) return
     const text = input.trim()
-    setInput('')
-    setLoading(true)
+    if (!text || !task) return
 
     const userMsg: ChatMessage = { role: 'user', content: text, timestamp: Date.now() }
-    setChat((prev) => [userMsg, ...prev])
-    recentMessages.current.add(`user:${text}`)
+    const updated = [...chat, userMsg]
+    setChat(updated)
+    setInput('')
+    setLoading(true)
 
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, token }),
+        body: JSON.stringify({ message: text }),
       })
       const data = await res.json()
       const reply =
-        data.reply?.trim() ||
-        data.content?.trim() ||
-        data.message?.trim() ||
-        '🤖 Brak odpowiedzi od AI.'
+        data.reply || data.content || '🤖 Brak odpowiedzi od AI.'
 
       const aiMsg: ChatMessage = { role: 'assistant', content: reply, timestamp: Date.now() }
-      setChat((prev) => [aiMsg, userMsg, ...prev])
+      setChat((prev) => [...prev, aiMsg])
     } catch (err) {
-      console.error('❌ Błąd komunikacji z AI:', err)
+      console.error('Błąd AI:', err)
       setChat((prev) => [
-        { role: 'assistant', content: '⚠️ Błąd komunikacji z AI.', timestamp: Date.now() },
         ...prev,
+        { role: 'assistant', content: '⚠️ Błąd komunikacji z AI.', timestamp: Date.now() },
       ])
     } finally {
       setLoading(false)
     }
   }
 
-  if (!isOpen) return null
+  const handleClose = () => {
+    setIsOpen(false)
+    setTimeout(() => setTask(null), 300)
+  }
+
+  // 🔽 Auto-scroll
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+  }, [chat])
+
+  if (!isOpen || !task) return null
 
   // 🪄 Modal
   const modal = (
     <AnimatePresence>
       <motion.div
-        key="dialog"
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        transition={{ duration: 0.2, ease: 'easeOut' }}
+        key="modal"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
         className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-3"
-        onClick={() => setIsOpen(false)}
+        onClick={handleClose}
       >
-        <div
-          className="relative bg-white w-full max-w-3xl rounded-2xl shadow-2xl flex flex-col border border-gray-200 overflow-hidden max-h-[90vh]"
+        <motion.div
+          initial={{ scale: 0.95, y: 20 }}
+          animate={{ scale: 1, y: 0 }}
+          exit={{ scale: 0.95, y: 20 }}
+          transition={{ duration: 0.25 }}
+          className="relative bg-white w-full max-w-lg rounded-2xl shadow-2xl flex flex-col border border-gray-200 overflow-hidden max-h-[90vh]"
           onClick={(e) => e.stopPropagation()}
         >
           {/* HEADER */}
           <div className="sticky top-0 flex justify-between items-center px-5 py-3 border-b bg-gray-50 z-10">
             <h2 className="text-lg font-semibold text-gray-800 truncate pr-4">
-              {task.title || 'Rozmowa z AI'}
+              {task.title}
             </h2>
             <button
-              onClick={() => setIsOpen(false)}
+              onClick={handleClose}
               className="text-sm text-gray-500 hover:text-gray-700 transition"
             >
               ✕ Zamknij
@@ -128,45 +136,26 @@ export default function TaskDialog() {
           {/* CZAT */}
           <div
             ref={scrollRef}
-            className="flex-1 overflow-y-auto flex flex-col-reverse px-5 py-4 space-y-4 bg-gray-50 scroll-smooth"
+            className="flex-1 overflow-y-auto flex flex-col gap-3 px-5 py-4 bg-gray-50 scroll-smooth"
           >
             {chat.map((msg, i) => (
               <div
                 key={i}
-                className={`p-3 rounded-lg shadow-sm text-sm leading-relaxed transition-all duration-200 ${
+                className={`p-3 rounded-lg text-sm shadow-sm max-w-[85%] ${
                   msg.role === 'user'
-                    ? 'bg-blue-600 text-white self-end markdown-user'
-                    : 'bg-white border border-gray-200 text-gray-800'
+                    ? 'self-end bg-blue-600 text-white'
+                    : 'self-start bg-white border border-gray-200 text-gray-800'
                 }`}
               >
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
-                  className={`prose prose-sm max-w-none ${
-                    msg.role === 'user'
-                      ? 'text-white prose-headings:text-white prose-strong:text-white prose-a:text-white [&_*]:!text-white'
-                      : 'text-gray-800 prose-a:text-blue-600'
-                  }`}
+                  className="prose prose-sm max-w-none"
                 >
                   {msg.content}
                 </ReactMarkdown>
-                <div className="text-[10px] mt-1 opacity-70 text-right">
-                  {new Date(msg.timestamp).toLocaleString([], {
-                    day: '2-digit',
-                    month: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </div>
               </div>
             ))}
-
-            {chat.length === 0 && (
-              <div className="bg-white p-3 rounded-lg shadow-sm border text-sm text-gray-800 leading-relaxed">
-                🧠 Rozpocznij rozmowę z AI o zadaniu: <b>"{task.title}"</b>.
-              </div>
-            )}
-
-            {loading && <div className="text-sm text-gray-500 animate-pulse">AI myśli...</div>}
+            {loading && <p className="text-sm text-gray-500 italic">AI myśli...</p>}
           </div>
 
           {/* INPUT */}
@@ -187,12 +176,10 @@ export default function TaskDialog() {
               Wyślij
             </button>
           </div>
-        </div>
+        </motion.div>
       </motion.div>
     </AnimatePresence>
   )
 
-  return typeof window !== 'undefined'
-    ? ReactDOM.createPortal(modal, document.body)
-    : null
+  return typeof window !== 'undefined' ? ReactDOM.createPortal(modal, document.body) : null
 }
