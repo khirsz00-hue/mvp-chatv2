@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Chat, { ChatMessage } from './Chat'
 import ReactMarkdown from 'react-markdown'
 
@@ -17,6 +17,13 @@ export default function TodoistAIView() {
   const [token, setToken] = useState<string | null>(null)
   const [tasks, setTasks] = useState<TodoistTask[]>([])
   const [loading, setLoading] = useState(false)
+  const [sessionId, setSessionId] = useState<string>(() => crypto.randomUUID())
+  const bottomRef = useRef<HTMLDivElement>(null)
+
+  // 🔹 Auto-scroll do najnowszej wiadomości
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
 
   // 🔹 Pobierz token z localStorage
   useEffect(() => {
@@ -35,16 +42,16 @@ export default function TodoistAIView() {
       if (!res.ok) throw new Error(`Todoist API error: ${res.status}`)
       const all = await res.json()
 
-      // 🧠 Logika filtrowania
+      // 🧠 Filtrowanie zadań
       const now = new Date()
       const filtered = all.filter((t: any) => {
         if (!t.due?.date) return false
         const due = new Date(t.due.date)
         const diff = (due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-        if (filter === 'today') return diff >= 0 && diff < 1
-        if (filter === '7days') return diff >= 0 && diff < 7
-        if (filter === '30days') return diff >= 0 && diff < 30
-        if (filter === 'overdue') return diff < 0
+        if (filter === 'today') return diff >= -0.5 && diff < 1.5
+        if (filter === '7days') return diff >= -0.5 && diff < 7
+        if (filter === '30days') return diff >= -0.5 && diff < 30
+        if (filter === 'overdue') return diff < -0.5
         return true
       })
 
@@ -113,7 +120,7 @@ export default function TodoistAIView() {
       })
 
       const data = await res.json()
-      console.log('📩 Surowa odpowiedź backendu:', data)
+      console.log('📩 Odpowiedź backendu:', data)
 
       let reply =
         data.content ||
@@ -150,16 +157,30 @@ export default function TodoistAIView() {
   const handleClearHistory = () => {
     if (confirm('Na pewno chcesz usunąć historię rozmowy?')) {
       setMessages([])
-      localStorage.removeItem('chat_todoist')
       setTasks([])
+      localStorage.removeItem('chat_todoist')
     }
   }
 
-  // ✨ Nowy czat
+  // ✨ Nowy czat — zapisuje do historii
   const handleNewChat = () => {
+    const newId = crypto.randomUUID()
+    setSessionId(newId)
     setMessages([])
     setTasks([])
     localStorage.removeItem('chat_todoist')
+
+    const sessions = JSON.parse(localStorage.getItem('chat_sessions_todoist') || '[]')
+    const newEntry = {
+      id: newId,
+      title: `Czat ${new Date().toLocaleTimeString('pl-PL', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })}`,
+      timestamp: Date.now(),
+    }
+    localStorage.setItem('chat_sessions_todoist', JSON.stringify([newEntry, ...sessions]))
+    window.dispatchEvent(new Event('chatUpdated'))
   }
 
   // 🧠 Pogrupuj tematycznie
@@ -279,13 +300,52 @@ export default function TodoistAIView() {
       </div>
 
       {/* 💬 Chat */}
-      <div className="flex-1 overflow-hidden">
-        <Chat
-          onSend={handleSend}
-          messages={messages}
-          assistant="todoist"
-          hideHistory={false}
+      <div className="flex-1 overflow-y-auto bg-white border rounded-xl p-3 shadow-sm">
+        {messages.map((m) => (
+          <div
+            key={m.id}
+            className={`mb-3 ${
+              m.role === 'user' ? 'text-right' : 'text-left'
+            }`}
+          >
+            <div
+              className={`inline-block px-3 py-2 rounded-xl text-sm ${
+                m.role === 'user'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-800'
+              }`}
+            >
+              <ReactMarkdown className="prose prose-sm max-w-none">
+                {m.content}
+              </ReactMarkdown>
+            </div>
+          </div>
+        ))}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* INPUT */}
+      <div className="flex gap-2 mt-2">
+        <input
+          type="text"
+          onKeyDown={(e) => e.key === 'Enter' && !loading && handleSend(e.currentTarget.value)}
+          disabled={loading}
+          placeholder="Napisz np. 'Daj taski na dziś' lub 'Pogrupuj zadania'"
+          className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
+        <button
+          onClick={() => {
+            const input = document.querySelector('input')
+            if (input && input.value.trim()) {
+              handleSend(input.value)
+              input.value = ''
+            }
+          }}
+          disabled={loading}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition disabled:opacity-50"
+        >
+          Wyślij
+        </button>
       </div>
 
       {/* 🔘 Dół – Pogrupuj */}
