@@ -1,154 +1,314 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import TodoistTasks from './TodoistTasks'
+import { useState, useRef, useEffect } from 'react'
+import Chat, { ChatMessage } from './Chat'
+import ReactMarkdown from 'react-markdown'
 
-export default function TodoistTasksView({ token }: { token: string }) {
-  const [filter, setFilter] = useState<'today' | 'tomorrow' | 'overdue' | '7 days' | '30 days'>(
-    () =>
-      typeof window !== 'undefined'
-        ? ((localStorage.getItem('todoist_filter') as any) || 'today')
-        : 'today'
-  )
-  const [tasks, setTasks] = useState<any[]>([])
-  const [toast, setToast] = useState<string | null>(null)
-  const lastEvent = useRef<number>(0)
+type TodoistTask = {
+  id: string
+  content: string
+  due?: { date: string } | null
+  priority?: number
+  completed?: boolean
+}
 
-  const handleRefresh = (updated?: any[]) => updated && setTasks(updated)
+export default function TodoistAIView({ token }: { token: string }) {
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [tasks, setTasks] = useState<TodoistTask[]>([])
+  const [loading, setLoading] = useState(false)
+  const [sessionId, setSessionId] = useState<string>(() => crypto.randomUUID())
+  const bottomRef = useRef<HTMLDivElement>(null)
 
-  // 💾 Zapamiętuj filtr w localStorage
+  // 🔹 Auto-scroll
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('todoist_filter', filter)
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  // 🔹 Załaduj wcześniejszą historię po kliknięciu w sidebar
+  useEffect(() => {
+    const handleChatSelect = (event: any) => {
+      if (event.detail?.mode === 'todoist' && event.detail?.task?.id) {
+        const { id, content } = event.detail.task
+        const saved = localStorage.getItem(`chat_todoist_${id}`)
+        if (saved) {
+          const loadedMessages = JSON.parse(saved)
+          setMessages(loadedMessages)
+          setSessionId(id)
+          console.log(`📂 Wczytano historię czatu Todoist: ${content}`)
+        } else {
+          console.warn('⚠️ Brak zapisanej historii dla', id)
+        }
+      }
     }
-  }, [filter])
+    window.addEventListener('chatSelect', handleChatSelect)
+    return () => window.removeEventListener('chatSelect', handleChatSelect)
+  }, [])
 
-  // 🔁 SSE + Webhook + Polling
-  useEffect(() => {
+  // 🔹 Pobierz zadania z Todoista
+  const fetchTasks = async (filter: string = 'today') => {
     if (!token) return
-    console.log('🚀 Uruchomiono Todoist listener...')
+    setLoading(true)
+    try {
+      const res = await fetch('https://api.todoist.com/rest/v2/tasks', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error(`Todoist API error: ${res.status}`)
+      const all = await res.json()
 
-    let es: EventSource | null = null
-    let lastWebhookTime = 0
+      const now = new Date()
+      const filtered = all.filter((t: any) => {
+        if (!t.due?.date) return false
+        const due = new Date(t.due.date)
+        const diff = (due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+        if (filter === 'today') return diff >= -0.5 && diff < 1.5
+        if (filter === '7days') return diff >= -0.5 && diff < 7
+        if (filter === '30days') return diff >= -0.5 && diff < 30
+        if (filter === 'overdue') return diff < -0.5
+        return true
+      })
 
-    const connectSSE = () => {
-      try {
-        es = new EventSource('/api/todoist/stream')
-        console.log('📡 Połączono z Todoist streamem...')
-
-        es.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data)
-            if (data.event?.startsWith('item:')) {
-              const now = Date.now()
-              if (data.event === 'item:added') {
-                // ⏱ odświeżenie z opóźnieniem dla nowych zadań
-                setTimeout(() => {
-                  console.log('🕒 Odświeżenie po dodaniu nowego zadania')
-                  window.dispatchEvent(new Event('taskUpdated'))
-                }, 1500)
-              } else if (now - lastEvent.current > 1500) {
-                lastEvent.current = now
-                window.dispatchEvent(new Event('taskUpdated'))
-              }
-
-              const msg =
-                data.event === 'item:added'
-                  ? '🆕 Dodano nowe zadanie'
-                  : data.event === 'item:completed'
-                  ? '✅ Zadanie ukończone'
-                  : data.event === 'item:updated'
-                  ? '✏️ Zmieniono zadanie'
-                  : '🔄 Lista zadań zaktualizowana'
-
-              setToast(msg)
-              setTimeout(() => setToast(null), 2500)
-            }
-          } catch (err) {
-            console.error('❌ Błąd parsowania SSE:', err)
-          }
-        }
-
-        es.onerror = (err) => {
-          console.warn('⚠️ Błąd SSE, ponowne łączenie za 5s...', err)
-          es?.close()
-          setTimeout(connectSSE, 5000)
-        }
-      } catch (err) {
-        console.warn('❌ Nie udało się połączyć z SSE:', err)
+      setTasks(filtered)
+      const infoMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: `📋 Załadowano ${filtered.length} zadań (${filter}).`,
+        timestamp: Date.now(),
       }
+
+      setMessages((prev) => {
+        const updated = [...prev, infoMsg]
+        localStorage.setItem(`chat_todoist_${sessionId}`, JSON.stringify(updated))
+        return updated
+      })
+    } catch (err) {
+      console.error('❌ Błąd Todoist:', err)
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: '⚠️ Nie udało się pobrać zadań z Todoista.',
+          timestamp: Date.now(),
+        },
+      ])
+    } finally {
+      setLoading(false)
     }
+  }
 
-    connectSSE()
+  // ✅ Oznacz jako ukończone
+  const toggleTask = async (taskId: string) => {
+    if (!token) return
+    try {
+      await fetch(`https://api.todoist.com/rest/v2/tasks/${taskId}/close`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === taskId ? { ...t, completed: !t.completed } : t
+        )
+      )
+    } catch (err) {
+      console.error('❌ Nie udało się oznaczyć zadania jako ukończone:', err)
+    }
+  }
 
-    // 🫀 Ping utrzymujący połączenie
-    const ping = setInterval(() => {
-      fetch('/api/todoist/stream/ping').catch(() => {})
-    }, 25000)
+  // 💬 Wyślij wiadomość do AI
+  const handleSend = async (message: string) => {
+    const userMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: message,
+      timestamp: Date.now(),
+    }
+    setMessages((prev) => {
+      const updated = [...prev, userMsg]
+      localStorage.setItem(`chat_todoist_${sessionId}`, JSON.stringify(updated))
+      return updated
+    })
+    setLoading(true)
 
-    // 🧩 Webhook checker (Vercel)
-    const checkWebhook = async () => {
-      try {
-        const res = await fetch('/api/todoist/webhook')
-        const data = await res.json()
-        if (data.lastEventTime && data.lastEventTime > lastWebhookTime) {
-          lastWebhookTime = data.lastEventTime
-          console.log('🔔 Webhook Todoist – odświeżam')
-          window.dispatchEvent(new Event('taskUpdated'))
-          setToast('🔄 Lista zadań zaktualizowana')
-          setTimeout(() => setToast(null), 2000)
-        }
-      } catch {
-        // ciche błędy
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, token, tasks }),
+      })
+
+      const data = await res.json()
+      const reply =
+        data.content ||
+        data.reply ||
+        data.message ||
+        (typeof data === 'string' ? data : '') ||
+        '🤖 Brak odpowiedzi od AI.'
+
+      const aiMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: reply.trim(),
+        timestamp: Date.now(),
       }
+      setMessages((prev) => {
+        const updated = [...prev, aiMsg]
+        localStorage.setItem(`chat_todoist_${sessionId}`, JSON.stringify(updated))
+        return updated
+      })
+    } catch (err) {
+      console.error('❌ Błąd komunikacji z AI:', err)
+    } finally {
+      setLoading(false)
     }
-    const webhookInterval = setInterval(checkWebhook, 5000)
+  }
 
-    // 🧩 Polling awaryjny co 45 s
-    const poll = setInterval(() => {
-      console.log('🪄 Polling Todoist – ciche odświeżenie')
-      window.dispatchEvent(new Event('taskUpdated'))
-    }, 45000)
-
-    return () => {
-      clearInterval(ping)
-      clearInterval(poll)
-      clearInterval(webhookInterval)
-      es?.close()
+  const handleGroupTasks = async () => {
+    if (!tasks.length) {
+      await handleSend('Nie mam żadnych zadań, które można pogrupować.')
+      return
     }
-  }, [token])
+    await handleSend('Pogrupuj te zadania tematycznie.')
+  }
 
   return (
-    <div className="flex h-full bg-gray-50 rounded-b-xl overflow-hidden relative">
-      {/* 📋 Sekcja zadań */}
-      <div className="flex-1 flex flex-col">
-        <div className="flex-1 p-3 overflow-visible">
-          <div className="max-h-[calc(100vh-150px)] overflow-y-auto rounded-xl">
-            <TodoistTasks
-              token={token}
-              filter={filter}
-              onChangeFilter={setFilter}
-              onUpdate={handleRefresh}
-            />
-          </div>
+    <div className="flex flex-col h-[85vh] max-h-[85vh] p-3 space-y-3 overflow-hidden">
+      {/* 🔘 Status */}
+      <div className="text-sm font-medium mb-2 text-green-600">
+        🟢 Połączono z Todoist
+      </div>
+
+      {/* 🔘 Filtry */}
+      <div className="flex flex-wrap justify-between items-center gap-2 mb-2">
+        <div className="flex flex-wrap gap-2">
+          {[
+            { label: '📅 Dziś', key: 'today' },
+            { label: '🗓️ Ten tydzień', key: '7days' },
+            { label: '📆 Ten miesiąc', key: '30days' },
+            { label: '⏰ Przeterminowane', key: 'overdue' },
+          ].map((f) => (
+            <button
+              key={f.key}
+              onClick={() => fetchTasks(f.key)}
+              className="px-3 py-1.5 text-sm bg-gray-100 border rounded-lg hover:bg-gray-200 transition"
+            >
+              {f.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* 🔔 Toast powiadomień */}
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.3 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] bg-gray-900 text-white text-sm px-4 py-2 rounded-lg shadow-lg backdrop-blur-sm"
-          >
-            {toast}
-          </motion.div>
+      {/* 🧩 Lista zadań */}
+      <div className="max-h-[35vh] overflow-y-auto border rounded-lg p-2 bg-gray-50 shadow-inner">
+        {tasks.length === 0 ? (
+          <div className="text-gray-500 text-sm italic text-center py-4">
+            Brak zadań do wyświetlenia
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {tasks.map((t) => (
+              <div
+                key={t.id}
+                className={`p-3 rounded-xl border ${
+                  t.completed
+                    ? 'bg-green-50 border-green-300'
+                    : 'bg-white border-gray-200'
+                } shadow-sm hover:shadow-md transition relative`}
+              >
+                <div className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    checked={!!t.completed}
+                    onChange={() => toggleTask(t.id)}
+                    className="mt-1 accent-green-600 cursor-pointer"
+                  />
+                  <div>
+                    <p
+                      className={`text-sm font-medium ${
+                        t.completed
+                          ? 'line-through text-gray-400'
+                          : 'text-gray-800'
+                      }`}
+                    >
+                      {t.content}
+                    </p>
+                    <div className="text-xs text-gray-500 mt-1 flex gap-2">
+                      {t.due?.date && (
+                        <span>
+                          📅 {new Date(t.due.date).toLocaleDateString('pl-PL')}
+                        </span>
+                      )}
+                      {t.priority && <span>⭐ P{t.priority}</span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
-      </AnimatePresence>
+      </div>
+
+      {/* 💬 Chat */}
+      <div className="flex-1 overflow-y-auto bg-white border rounded-xl p-3 shadow-sm">
+        {messages.map((m) => (
+          <div
+            key={m.id}
+            className={`mb-3 ${
+              m.role === 'user' ? 'text-right' : 'text-left'
+            }`}
+          >
+            <div
+              className={`inline-block px-3 py-2 rounded-xl text-sm ${
+                m.role === 'user'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-800'
+              }`}
+            >
+              <ReactMarkdown className="prose prose-sm max-w-none">
+                {m.content}
+              </ReactMarkdown>
+            </div>
+          </div>
+        ))}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* INPUT */}
+      <div className="flex gap-2 mt-2">
+        <input
+          type="text"
+          onKeyDown={(e) =>
+            e.key === 'Enter' && !loading && handleSend(e.currentTarget.value)
+          }
+          disabled={loading}
+          placeholder="Napisz np. 'Daj taski na dziś' lub 'Pogrupuj zadania'"
+          className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <button
+          onClick={() => {
+            const input = document.querySelector('input')
+            if (input && input.value.trim()) {
+              handleSend(input.value)
+              input.value = ''
+            }
+          }}
+          disabled={loading}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition disabled:opacity-50"
+        >
+          Wyślij
+        </button>
+      </div>
+
+      {tasks.length > 0 && (
+        <div className="flex justify-center pt-2">
+          <button
+            onClick={handleGroupTasks}
+            disabled={loading}
+            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+          >
+            🧠 Pogrupuj tematycznie
+          </button>
+        </div>
+      )}
     </div>
   )
 }
