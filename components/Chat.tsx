@@ -44,7 +44,7 @@ export default function Chat({
     setMessages(externalMessages)
   }, [externalMessages])
 
-  // 🔹 Klucz historii
+  // 🔹 Klucz historii dla danej sesji lub asystenta
   const storageKey =
     sessionId
       ? `chat_todoist_${sessionId}`
@@ -54,25 +54,29 @@ export default function Chat({
       ? 'chat_todoist'
       : 'chat_global'
 
-  // 💾 Załaduj historię
+  // 💾 Załaduj historię przy pierwszym renderze
   useEffect(() => {
     const saved = localStorage.getItem(storageKey)
     if (saved) {
-      const parsed = JSON.parse(saved)
-      setMessages(parsed)
-      const last = parsed.findLast((m: any) => m.type === 'tasks')
-      if (last?.tasks) setLastTasks(last.tasks)
+      try {
+        const parsed = JSON.parse(saved)
+        setMessages(parsed)
+        const last = parsed.findLast((m: any) => m.type === 'tasks')
+        if (last?.tasks) setLastTasks(last.tasks)
+      } catch (err) {
+        console.error('❌ Błąd odczytu historii czatu:', err)
+      }
     }
   }, [storageKey])
 
-  // 💾 Zapisz historię
+  // 💾 Zapisz historię po każdej zmianie wiadomości
   useEffect(() => {
     if (messages.length > 0) {
       localStorage.setItem(storageKey, JSON.stringify(messages))
     }
   }, [messages, storageKey])
 
-  // 🔽 Auto-scroll
+  // 🔽 Auto-scroll do najnowszej wiadomości
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
@@ -155,7 +159,7 @@ export default function Chat({
 
   return (
     <div className="flex flex-col h-full rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-      {/* CZAT */}
+      {/* 🧠 CZAT */}
       <div className="flex-1 overflow-y-auto space-y-3 p-4 bg-gray-50 max-h-[calc(100vh-220px)]">
         <AnimatePresence>
           {visibleMessages.map((m) => (
@@ -165,16 +169,16 @@ export default function Chat({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.2 }}
-              className={`p-3 rounded-xl max-w-[85%] text-sm leading-relaxed ${
+              className={`p-3 rounded-xl max-w-[85%] text-sm leading-relaxed whitespace-pre-wrap ${
                 m.role === 'user'
-                  ? 'ml-auto bg-blue-600 text-white'
+                  ? 'ml-auto bg-blue-600 text-white shadow-sm'
                   : 'bg-white border border-gray-200 text-gray-800'
               }`}
             >
-              {/* 🧠 Tekst */}
-              {m.type !== 'tasks' && <div className="whitespace-pre-wrap">{m.content}</div>}
+              {/* 🧩 Treść wiadomości */}
+              {m.type !== 'tasks' && <div>{m.content}</div>}
 
-              {/* ✅ Task Cards */}
+              {/* ✅ Karty zadań */}
               {m.type === 'tasks' && (
                 <div className="mt-2 space-y-2">
                   {m.tasks && m.tasks.length > 0 ? (
@@ -197,7 +201,7 @@ export default function Chat({
                       <div className="text-right mt-3">
                         <button
                           onClick={() => sendMessage('Pogrupuj te zadania')}
-                          className="px-3 py-1.5 text-xs rounded-md bg-blue-100 text-blue-700 hover:bg-blue-200"
+                          className="px-3 py-1.5 text-xs rounded-md bg-blue-100 text-blue-700 hover:bg-blue-200 transition"
                         >
                           📂 Pogrupuj w bloki tematyczne
                         </button>
@@ -237,7 +241,7 @@ export default function Chat({
         <div ref={bottomRef} />
       </div>
 
-      {/* INPUT */}
+      {/* ✍️ INPUT */}
       <div className="p-3 border-t flex gap-2 bg-white">
         <input
           value={input}
