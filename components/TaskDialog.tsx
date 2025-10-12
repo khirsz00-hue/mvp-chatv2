@@ -24,38 +24,40 @@ export default function TaskDialog() {
 
   // 📡 Otwieranie przez globalny event chatSelect
   useEffect(() => {
-    const handleSelect = (event: CustomEvent) => {
-      const detail = event.detail
+    const handleSelect = (event: Event) => {
+      const customEvent = event as CustomEvent
+      const detail = customEvent.detail
       if (!detail?.task?.id) return
       setTask({ id: detail.task.id, title: detail.task.title })
       setIsOpen(true)
     }
 
-    window.addEventListener('chatSelect', handleSelect as EventListener)
-    return () => {
-      window.removeEventListener('chatSelect', handleSelect as EventListener)
-    }
+    window.addEventListener('chatSelect', handleSelect)
+    return () => window.removeEventListener('chatSelect', handleSelect)
   }, [])
 
   // 📦 Wczytaj historię rozmowy
   useEffect(() => {
     if (!chatKey) return
-    const saved = localStorage.getItem(chatKey)
-    if (saved) {
-      setChat(JSON.parse(saved))
-    } else {
+    try {
+      const saved = localStorage.getItem(chatKey)
+      if (saved) setChat(JSON.parse(saved))
+      else setChat([])
+    } catch (e) {
+      console.error('Błąd ładowania historii:', e)
       setChat([])
     }
   }, [chatKey])
 
-  // 💾 Zapisuj czat
+  // 💾 Zapisuj czat w localStorage
   useEffect(() => {
     if (chatKey) {
       localStorage.setItem(chatKey, JSON.stringify(chat))
+      window.dispatchEvent(new Event('chatUpdated'))
     }
   }, [chat, chatKey])
 
-  // 💬 Wysyłanie wiadomości
+  // 💬 Wysyłanie wiadomości do AI
   const sendMessage = async () => {
     const text = input.trim()
     if (!text || !task) return
@@ -70,11 +72,13 @@ export default function TaskDialog() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({
+          message: text,
+          context: `Rozmowa o zadaniu: ${task.title}`,
+        }),
       })
       const data = await res.json()
-      const reply =
-        data.reply || data.content || '🤖 Brak odpowiedzi od AI.'
+      const reply = data.reply || data.content || '🤖 Brak odpowiedzi od AI.'
 
       const aiMsg: ChatMessage = { role: 'assistant', content: reply, timestamp: Date.now() }
       setChat((prev) => [...prev, aiMsg])
@@ -91,17 +95,26 @@ export default function TaskDialog() {
 
   const handleClose = () => {
     setIsOpen(false)
-    setTimeout(() => setTask(null), 300)
+    setTimeout(() => {
+      setTask(null)
+      setChat([])
+      setInput('')
+    }, 250)
   }
 
-  // 🔽 Auto-scroll
+  // 🔽 Auto-scroll zawsze do najnowszej wiadomości
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: 'smooth',
+      })
+    }
   }, [chat])
 
   if (!isOpen || !task) return null
 
-  // 🪄 Modal
+  // 🪄 Modal czatu
   const modal = (
     <AnimatePresence>
       <motion.div
@@ -147,15 +160,17 @@ export default function TaskDialog() {
                     : 'self-start bg-white border border-gray-200 text-gray-800'
                 }`}
               >
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  className="prose prose-sm max-w-none"
-                >
+                <ReactMarkdown remarkPlugins={[remarkGfm]} className="prose prose-sm max-w-none">
                   {msg.content}
                 </ReactMarkdown>
               </div>
             ))}
-            {loading && <p className="text-sm text-gray-500 italic">AI myśli...</p>}
+
+            {loading && (
+              <p className="text-sm text-gray-500 italic animate-pulse">
+                🤖 AI myśli...
+              </p>
+            )}
           </div>
 
           {/* INPUT */}
