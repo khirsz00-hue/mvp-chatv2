@@ -39,19 +39,20 @@ export default function Chat({
   const [lastTasks, setLastTasks] = useState<any[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  // ✅ Synchronizacja zewnętrznych wiadomości (fix)
+  // ✅ Synchronizacja zewnętrznych wiadomości
   useEffect(() => {
     setMessages(externalMessages)
   }, [externalMessages])
 
   // 🔹 Klucz historii
-  const storageKey = sessionId
-    ? `chat_session_${sessionId}`
-    : assistant === 'six_hats'
-    ? 'chat_six_hats'
-    : assistant === 'todoist'
-    ? 'chat_todoist'
-    : 'chat_global'
+  const storageKey =
+    sessionId
+      ? `chat_todoist_${sessionId}`
+      : assistant === 'six_hats'
+      ? 'chat_six_hats'
+      : assistant === 'todoist'
+      ? 'chat_todoist'
+      : 'chat_global'
 
   // 💾 Załaduj historię
   useEffect(() => {
@@ -66,8 +67,9 @@ export default function Chat({
 
   // 💾 Zapisz historię
   useEffect(() => {
-    if (messages.length > 0)
+    if (messages.length > 0) {
       localStorage.setItem(storageKey, JSON.stringify(messages))
+    }
   }, [messages, storageKey])
 
   // 🔽 Auto-scroll
@@ -92,6 +94,12 @@ export default function Chat({
     setMessages((prev) => [...prev, userMsg])
 
     try {
+      if (onSend) {
+        await onSend(content)
+        setIsLoading(false)
+        return
+      }
+
       const todoistToken = localStorage.getItem('todoist_token')
 
       const res = await fetch('/api/chat', {
@@ -143,27 +151,28 @@ export default function Chat({
     }
   }
 
-  const visibleMessages = hideHistory ? messages.slice(-12) : messages
+  const visibleMessages = hideHistory ? messages.slice(-20) : messages
 
   return (
-    <div className="flex flex-col h-full max-h-[75vh] rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+    <div className="flex flex-col h-full rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
       {/* CZAT */}
-      <div className="flex-1 overflow-y-auto space-y-3 p-4 bg-gray-50">
+      <div className="flex-1 overflow-y-auto space-y-3 p-4 bg-gray-50 max-h-[calc(100vh-220px)]">
         <AnimatePresence>
           {visibleMessages.map((m) => (
             <motion.div
               key={m.id}
-              initial={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className={`p-3 rounded-xl max-w-[85%] whitespace-pre-wrap text-sm leading-relaxed ${
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}
+              className={`p-3 rounded-xl max-w-[85%] text-sm leading-relaxed ${
                 m.role === 'user'
                   ? 'ml-auto bg-blue-600 text-white'
                   : 'bg-white border border-gray-200 text-gray-800'
               }`}
             >
               {/* 🧠 Tekst */}
-              {m.type !== 'tasks' && <div>{m.content}</div>}
+              {m.type !== 'tasks' && <div className="whitespace-pre-wrap">{m.content}</div>}
 
               {/* ✅ Task Cards */}
               {m.type === 'tasks' && (
@@ -190,7 +199,7 @@ export default function Chat({
                           onClick={() => sendMessage('Pogrupuj te zadania')}
                           className="px-3 py-1.5 text-xs rounded-md bg-blue-100 text-blue-700 hover:bg-blue-200"
                         >
-                          📂 Pogrupuj w tematyczne bloki
+                          📂 Pogrupuj w bloki tematyczne
                         </button>
                       </div>
                     </>
@@ -218,7 +227,7 @@ export default function Chat({
         </AnimatePresence>
 
         {isLoading && (
-          <div className="flex justify-center items-center mt-2 text-gray-500 text-sm gap-1 animate-pulse">
+          <div className="flex justify-center items-center mt-3 text-gray-500 text-sm gap-1 animate-pulse">
             <span className="animate-bounce">●</span>
             <span className="animate-bounce delay-100">●</span>
             <span className="animate-bounce delay-200">●</span>
@@ -229,7 +238,7 @@ export default function Chat({
       </div>
 
       {/* INPUT */}
-      <div className="p-3 border-t flex gap-2 bg-white sticky bottom-0">
+      <div className="p-3 border-t flex gap-2 bg-white">
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
