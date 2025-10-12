@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import TaskDialog from './TaskDialog'
 import TooltipPortal from './TooltipPortal'
 
 interface Task {
@@ -32,7 +31,6 @@ export default function TaskCard({
   selected,
   onSelectChange,
 }: TaskCardProps) {
-  const [showDialog, setShowDialog] = useState(false)
   const [summary, setSummary] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [isHidden, setIsHidden] = useState(false)
@@ -82,6 +80,18 @@ export default function TaskCard({
   }
 
   const openDatePicker = () => dateInputRef.current?.showPicker?.()
+
+  const handleHelp = () => {
+    // 🔥 Otwórz modal globalny (TaskDialog) przez event
+    window.dispatchEvent(
+      new CustomEvent('chatSelect', {
+        detail: {
+          mode: 'todoist',
+          task: { id: task.id, title: task.content },
+        },
+      })
+    )
+  }
 
   return (
     <AnimatePresence mode="popLayout">
@@ -208,17 +218,12 @@ export default function TaskCard({
             <motion.button
               whileTap={{ scale: 0.96 }}
               whileHover={{ scale: 1.05 }}
-              onClick={() => setShowDialog(true)}
+              onClick={handleHelp}
               className="flex items-center gap-1 px-2 py-1 rounded-md bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200"
             >
               💬 <span>Pomóż mi</span>
             </motion.button>
           </div>
-
-          {/* 💬 Modal czatu */}
-          {showDialog && (
-            <TaskDialog task={task} mode="help" onClose={() => setShowDialog(false)} />
-          )}
 
           {/* ✅ Toast */}
           <AnimatePresence>
