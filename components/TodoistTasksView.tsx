@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import TodoistTasks from './TodoistTasks'
 
 export default function TodoistTasksView({ token }: { token: string }) {
-  const [filter, setFilter] = useState<'today' | 'tomorrow' | 'overdue' | '7 days'>(
+  const [filter, setFilter] = useState<'today' | 'tomorrow' | 'overdue' | '7days' | '30days'>(
     () =>
       typeof window !== 'undefined'
         ? ((localStorage.getItem('todoist_filter') as any) || 'today')
@@ -13,9 +13,12 @@ export default function TodoistTasksView({ token }: { token: string }) {
   )
   const [tasks, setTasks] = useState<any[]>([])
   const [toast, setToast] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
   const lastEvent = useRef<number>(0)
 
-  const handleRefresh = (updated?: any[]) => updated && setTasks(updated)
+  const handleRefresh = (updated?: any[]) => {
+    if (updated) setTasks(updated)
+  }
 
   // 💾 Zapamiętuj filtr w localStorage
   useEffect(() => {
@@ -37,18 +40,13 @@ export default function TodoistTasksView({ token }: { token: string }) {
         es = new EventSource('/api/todoist/stream')
         console.log('📡 Połączono z Todoist streamem...')
 
+        es.onopen = () => console.log('✅ SSE: Połączenie aktywne')
         es.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data)
             if (data.event?.startsWith('item:')) {
               const now = Date.now()
-              if (data.event === 'item:added') {
-                // ⏱ odświeżenie z opóźnieniem dla nowych zadań
-                setTimeout(() => {
-                  console.log('🕒 Odświeżenie po dodaniu nowego zadania')
-                  window.dispatchEvent(new Event('taskUpdated'))
-                }, 1500)
-              } else if (now - lastEvent.current > 1500) {
+              if (now - lastEvent.current > 1000) {
                 lastEvent.current = now
                 window.dispatchEvent(new Event('taskUpdated'))
               }
@@ -63,7 +61,7 @@ export default function TodoistTasksView({ token }: { token: string }) {
                   : '🔄 Lista zadań zaktualizowana'
 
               setToast(msg)
-              setTimeout(() => setToast(null), 2500)
+              setTimeout(() => setToast(null), 2000)
             }
           } catch (err) {
             console.error('❌ Błąd parsowania SSE:', err)
@@ -100,10 +98,10 @@ export default function TodoistTasksView({ token }: { token: string }) {
           setTimeout(() => setToast(null), 2000)
         }
       } catch {
-        // ciche błędy
+        // ignorujemy błędy po stronie Vercela
       }
     }
-    const webhookInterval = setInterval(checkWebhook, 5000)
+    const webhookInterval = setInterval(checkWebhook, 6000)
 
     // 🧩 Polling awaryjny co 45 s
     const poll = setInterval(() => {
@@ -119,20 +117,43 @@ export default function TodoistTasksView({ token }: { token: string }) {
     }
   }, [token])
 
+  // 📆 Naprawa filtra „today” – tylko dzisiejsze daty
+  useEffect(() => {
+    if (!tasks?.length) return
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const tomorrow = new Date(today)
+    tomorrow.setDate(today.getDate() + 1)
+
+    if (filter === 'today') {
+      const onlyToday = tasks.filter((t) => {
+        if (!t.due?.date) return false
+        const due = new Date(t.due.date)
+        return due >= today && due < tomorrow
+      })
+      setTasks(onlyToday)
+    }
+  }, [filter, tasks])
+
   return (
     <div className="flex h-full bg-gray-50 rounded-b-xl overflow-hidden relative">
       {/* 📋 Sekcja zadań */}
       <div className="flex-1 flex flex-col">
-       <div className="flex-1 p-3 overflow-visible">
-  <div className="max-h-[calc(100vh-150px)] overflow-y-auto rounded-xl">
-    <TodoistTasks
-      token={token}
-      filter={filter}
-      onChangeFilter={setFilter}
-      onUpdate={handleRefresh}
-    />
-  </div>
-</div>
+        <div className="flex-1 p-3 overflow-visible">
+          <div className="max-h-[calc(100vh-150px)] overflow-y-auto rounded-xl relative">
+            {loading && (
+              <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-10 backdrop-blur-sm">
+                <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-500 border-t-transparent"></div>
+              </div>
+            )}
+            <TodoistTasks
+              token={token}
+              filter={filter}
+              onChangeFilter={setFilter}
+              onUpdate={handleRefresh}
+            />
+          </div>
+        </div>
       </div>
 
       {/* 🔔 Toast powiadomień */}
