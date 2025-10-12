@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 
 interface ChatSidebarProps {
   onSelectChat?: (
-    mode: 'global' | 'task' | 'six_hats',
+    mode: 'global' | 'task' | 'six_hats' | 'todoist',
     task?: { id: string; content: string }
   ) => void
 }
@@ -23,11 +23,18 @@ type TaskPreview = {
   timestamp: number
 }
 
+type TodoistSession = {
+  id: string
+  title: string
+  timestamp: number
+}
+
 export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
-  const [tab, setTab] = useState<'global' | 'task' | 'six_hats'>('global')
+  const [tab, setTab] = useState<'global' | 'task' | 'six_hats' | 'todoist'>('global')
   const [globalChats, setGlobalChats] = useState<ChatPreview[]>([])
   const [taskChats, setTaskChats] = useState<TaskPreview[]>([])
   const [sixHatsChats, setSixHatsChats] = useState<ChatPreview[]>([])
+  const [todoistSessions, setTodoistSessions] = useState<TodoistSession[]>([])
 
   // 🔄 Wczytaj dane z localStorage
   useEffect(() => {
@@ -49,7 +56,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
             : 'brak daty',
           timestamp: m.timestamp || 0,
         }))
-        .sort((a: ChatPreview, b: ChatPreview) => b.timestamp - a.timestamp)
+        .sort((a, b) => b.timestamp - a.timestamp)
         .slice(0, 10)
       setGlobalChats(global)
 
@@ -77,7 +84,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
             timestamp: lastMsg?.timestamp || 0,
           }
         })
-        .sort((a: TaskPreview, b: TaskPreview) => b.timestamp - a.timestamp)
+        .sort((a, b) => b.timestamp - a.timestamp)
         .slice(0, 10)
       setTaskChats(tasks)
 
@@ -96,9 +103,14 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
             : 'brak daty',
           timestamp: m.timestamp || 0,
         }))
-        .sort((a: ChatPreview, b: ChatPreview) => b.timestamp - a.timestamp)
+        .sort((a, b) => b.timestamp - a.timestamp)
         .slice(0, 10)
       setSixHatsChats(sixHats)
+
+      // 🧠 Todoist Sessions
+      const sessions: TodoistSession[] = JSON.parse(localStorage.getItem('chat_sessions_todoist') || '[]')
+        .sort((a, b) => b.timestamp - a.timestamp)
+      setTodoistSessions(sessions)
     }
 
     loadChats()
@@ -142,6 +154,14 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
           onClick={() => setTab('six_hats')}
         >
           Six Hats
+        </button>
+        <button
+          className={`flex-1 py-2 text-sm ${
+            tab === 'todoist' ? 'bg-white font-semibold text-green-700' : 'text-gray-600'
+          }`}
+          onClick={() => setTab('todoist')}
+        >
+          Todoist
         </button>
       </div>
 
@@ -192,6 +212,29 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
               >
                 <p className="text-xs text-gray-500">{chat.date}</p>
                 <p className="text-sm text-gray-800 truncate">{chat.content}</p>
+              </div>
+            ))
+          ))}
+
+        {tab === 'todoist' &&
+          (todoistSessions.length === 0 ? (
+            <p className="text-sm text-gray-500 italic">Brak historii Todoist.</p>
+          ) : (
+            todoistSessions.map((session) => (
+              <div
+                key={session.id}
+                onClick={() => onSelectChat?.('task', { id: session.id, content: session.title })}
+                className="cursor-pointer border rounded-lg p-2 bg-white hover:bg-green-50 transition"
+              >
+                <p className="font-medium text-gray-800 text-sm truncate">{session.title}</p>
+                <p className="text-xs text-gray-500">
+                  {new Date(session.timestamp).toLocaleString('pl-PL', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </p>
               </div>
             ))
           ))}
