@@ -44,9 +44,10 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
     if (typeof window === 'undefined') return
 
     // 🌍 Globalne czaty
-    const global: ChatPreview[] = JSON.parse(localStorage.getItem('chat_global') || '[]')
+    const globalData = JSON.parse(localStorage.getItem('chat_global') || '[]') as any[]
+    const global: ChatPreview[] = globalData
       .filter((m: any) => m.role === 'user')
-      .map((m: any) => ({
+      .map((m: any): ChatPreview => ({
         content: m.content,
         date: new Date(m.timestamp).toLocaleString('pl-PL', {
           day: '2-digit',
@@ -56,15 +57,16 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
         }),
         timestamp: m.timestamp || 0,
       }))
-      .sort((a, b) => b.timestamp - a.timestamp)
+      .sort((a: ChatPreview, b: ChatPreview) => b.timestamp - a.timestamp)
       .slice(0, 15)
     setGlobalChats(global)
 
     // ✅ Taski
-    const tasks: TaskPreview[] = Object.keys(localStorage)
-      .filter((k) => k.startsWith('chat_task_'))
-      .map((k) => {
-        const chat = JSON.parse(localStorage.getItem(k) || '[]')
+    const keys = Object.keys(localStorage)
+    const tasks: TaskPreview[] = keys
+      .filter((k: string) => k.startsWith('chat_task_'))
+      .map((k: string): TaskPreview => {
+        const chat = JSON.parse(localStorage.getItem(k) || '[]') as any[]
         const lastMsg = chat[chat.length - 1]
         const id = k.replace('chat_task_', '')
         const title = localStorage.getItem(`task_title_${id}`) || 'Zadanie bez nazwy'
@@ -84,14 +86,15 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
           timestamp: lastMsg?.timestamp || 0,
         }
       })
-      .sort((a, b) => b.timestamp - a.timestamp)
+      .sort((a: TaskPreview, b: TaskPreview) => b.timestamp - a.timestamp)
       .slice(0, 15)
     setTaskChats(tasks)
 
     // 🎩 Six Hats
-    const sixHats: ChatPreview[] = JSON.parse(localStorage.getItem('chat_six_hats') || '[]')
+    const sixData = JSON.parse(localStorage.getItem('chat_six_hats') || '[]') as any[]
+    const sixHats: ChatPreview[] = sixData
       .filter((m: any) => m.role === 'user')
-      .map((m: any) => ({
+      .map((m: any): ChatPreview => ({
         content: m.content,
         date: new Date(m.timestamp).toLocaleString('pl-PL', {
           day: '2-digit',
@@ -101,23 +104,22 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
         }),
         timestamp: m.timestamp || 0,
       }))
-      .sort((a, b) => b.timestamp - a.timestamp)
+      .sort((a: ChatPreview, b: ChatPreview) => b.timestamp - a.timestamp)
       .slice(0, 15)
     setSixHatsChats(sixHats)
 
     // 🧠 Todoist Sessions
-    const sessions: TodoistSession[] = JSON.parse(
-      localStorage.getItem('chat_sessions_todoist') || '[]'
-    )
-      .map((s: any) => {
-        const messages = JSON.parse(localStorage.getItem(`chat_todoist_${s.id}`) || '[]')
+    const rawSessions = JSON.parse(localStorage.getItem('chat_sessions_todoist') || '[]') as any[]
+    const sessions: TodoistSession[] = rawSessions
+      .map((s: any): TodoistSession => {
+        const messages = JSON.parse(localStorage.getItem(`chat_todoist_${s.id}`) || '[]') as any[]
         const lastMsg = messages[messages.length - 1]
         return {
           ...s,
           last: lastMsg?.content || '(brak wiadomości)',
         }
       })
-      .sort((a, b) => b.timestamp - a.timestamp)
+      .sort((a: TodoistSession, b: TodoistSession) => b.timestamp - a.timestamp)
       .slice(0, 25)
     setTodoistSessions(sessions)
   }
@@ -132,21 +134,22 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
     }
   }, [])
 
-  // 📬 Kliknięcie w czat — wyślij event do modala
   const handleSelect = (mode: any, session: any) => {
     setActiveSessionId(session.id)
-    console.log('📡 Wysyłam event chatSelect', { mode, session })
 
-    window.dispatchEvent(
-      new CustomEvent('chatSelect', {
-        detail: {
-          mode,
-          task: { id: session.id, title: session.title },
-        },
-      })
-    )
-
-    onSelectChat?.(mode, { id: session.id, content: session.title })
+    if (mode === 'todoist') {
+      // 🔥 Emit event to open modal (TaskDialog)
+      window.dispatchEvent(
+        new CustomEvent('chatSelect', {
+          detail: {
+            mode: 'todoist',
+            task: { id: session.id, title: session.title },
+          },
+        })
+      )
+    } else {
+      onSelectChat?.(mode, { id: session.id, content: session.title })
+    }
   }
 
   return (
