@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import TaskCard from './TaskCard'
 
 export type ChatMessage = {
@@ -24,6 +26,7 @@ interface ChatProps {
   assistant?: 'global' | 'six_hats' | 'todoist'
   hideHistory?: boolean
   sessionId?: string
+  contextTitle?: string
 }
 
 export default function Chat({
@@ -32,6 +35,7 @@ export default function Chat({
   assistant = 'todoist',
   hideHistory = true,
   sessionId,
+  contextTitle,
 }: ChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(externalMessages)
   const [input, setInput] = useState('')
@@ -39,12 +43,10 @@ export default function Chat({
   const [lastTasks, setLastTasks] = useState<any[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  // ✅ Synchronizacja zewnętrznych wiadomości
-  useEffect(() => {
-    setMessages(externalMessages)
-  }, [externalMessages])
+  // ✅ Sync z zewnętrznymi wiadomościami
+  useEffect(() => setMessages(externalMessages), [externalMessages])
 
-  // 🔹 Klucz historii dla danej sesji lub asystenta
+  // 🔹 Klucz historii
   const storageKey =
     sessionId
       ? `chat_todoist_${sessionId}`
@@ -54,7 +56,7 @@ export default function Chat({
       ? 'chat_todoist'
       : 'chat_global'
 
-  // 💾 Załaduj historię przy pierwszym renderze
+  // 💾 Wczytaj historię
   useEffect(() => {
     const saved = localStorage.getItem(storageKey)
     if (saved) {
@@ -69,14 +71,12 @@ export default function Chat({
     }
   }, [storageKey])
 
-  // 💾 Zapisz historię po każdej zmianie wiadomości
+  // 💾 Zapisuj historię
   useEffect(() => {
-    if (messages.length > 0) {
-      localStorage.setItem(storageKey, JSON.stringify(messages))
-    }
+    if (messages.length > 0) localStorage.setItem(storageKey, JSON.stringify(messages))
   }, [messages, storageKey])
 
-  // 🔽 Auto-scroll do najnowszej wiadomości
+  // 🔽 Scroll na dół
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
@@ -104,7 +104,7 @@ export default function Chat({
         return
       }
 
-      const todoistToken = localStorage.getItem('todoist_token')
+      const todoistToken = localStorage.getItem('todoist_token') || ''
 
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -129,10 +129,7 @@ export default function Chat({
         id: crypto.randomUUID(),
         role: 'assistant',
         content:
-          data.content ||
-          data.reply ||
-          data.message ||
-          '🤖 Brak odpowiedzi od AI.',
+          data.content || data.reply || data.message || '🤖 Brak odpowiedzi od AI.',
         timestamp: Date.now(),
         type: data.type || 'text',
         tasks: data.tasks || [],
@@ -157,8 +154,23 @@ export default function Chat({
 
   const visibleMessages = hideHistory ? messages.slice(-20) : messages
 
+  // 🧠 Kliknięcie w kartę zadań → otwiera modal
+  const handleOpenTask = (task: any) => {
+    const event = new CustomEvent('chatSelect', {
+      detail: { mode: 'todoist', task },
+    })
+    window.dispatchEvent(event)
+  }
+
   return (
     <div className="flex flex-col h-full rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+      {/* 🧩 KONTEKST */}
+      {contextTitle && (
+        <div className="px-4 py-2 bg-blue-50 border-b text-sm font-medium text-blue-700">
+          💬 {contextTitle}
+        </div>
+      )}
+
       {/* 🧠 CZAT */}
       <div className="flex-1 overflow-y-auto space-y-3 p-4 bg-gray-50 max-h-[calc(100vh-220px)]">
         <AnimatePresence>
@@ -175,8 +187,12 @@ export default function Chat({
                   : 'bg-white border border-gray-200 text-gray-800'
               }`}
             >
-              {/* 🧩 Treść wiadomości */}
-              {m.type !== 'tasks' && <div>{m.content}</div>}
+              {/* 🧩 Treść */}
+              {m.type !== 'tasks' && (
+                <ReactMarkdown remarkPlugins={[remarkGfm]} className="prose prose-sm max-w-none">
+                  {m.content}
+                </ReactMarkdown>
+              )}
 
               {/* ✅ Karty zadań */}
               {m.type === 'tasks' && (
@@ -185,17 +201,22 @@ export default function Chat({
                     <>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                         {m.tasks.map((t) => (
-                          <TaskCard
+                          <div
                             key={t.id}
-                            task={{
-                              id: t.id,
-                              content: t.content,
-                              due: t.due || undefined,
-                              priority: t.priority,
-                            }}
-                            token=""
-                            onAction={() => {}}
-                          />
+                            onClick={() => handleOpenTask(t)}
+                            className="cursor-pointer"
+                          >
+                            <TaskCard
+                              task={{
+                                id: t.id,
+                                content: t.content,
+                                due: t.due || undefined,
+                                priority: t.priority,
+                              }}
+                              token={localStorage.getItem('todoist_token') || ''}
+                              onAction={() => {}}
+                            />
+                          </div>
                         ))}
                       </div>
                       <div className="text-right mt-3">
@@ -247,7 +268,7 @@ export default function Chat({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-          placeholder="Napisz np. 'Daj taski na dziś' lub 'Pogrupuj te zadania'"
+          placeholder="Napisz np. 'Pogrupuj zadania'..."
           className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <button
