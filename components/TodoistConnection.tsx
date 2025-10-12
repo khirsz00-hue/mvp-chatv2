@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import TodoistTasksView from './TodoistTasksView'
 import TodoistAIView from './TodoistAIView'
 
@@ -26,6 +27,7 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
 
   return (
     <div className="relative flex flex-col h-[calc(100vh-100px)] bg-gray-50 border border-green-200 rounded-xl overflow-hidden">
+      {/* HEADER */}
       <div className="flex justify-between items-center p-2 px-4 bg-white border-b shadow-sm">
         <div className="flex items-center gap-3">
           <div className="flex bg-gray-100 rounded-lg overflow-hidden">
@@ -37,7 +39,7 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
                   : 'text-gray-700 hover:bg-gray-200'
               }`}
             >
-              Lista zadań
+              📋 Lista zadań
             </button>
             <button
               onClick={() => setMode('ai')}
@@ -47,14 +49,14 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
                   : 'text-gray-700 hover:bg-gray-200'
               }`}
             >
-              Asystent AI
+              🤖 Asystent AI
             </button>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
           <span className="text-sm font-semibold text-green-700 whitespace-nowrap">
-            Połączono z Todoist
+            🟢 Połączono z Todoist
           </span>
           <button
             onClick={onDisconnect}
@@ -65,12 +67,33 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
         </div>
       </div>
 
-      <div className="flex-1 relative">
-        {mode === 'tasks' ? (
-          <TodoistTasksView token={token} />
-        ) : (
-          <TodoistAIView />
-        )}
+      {/* MAIN CONTENT */}
+      <div className="flex-1 relative overflow-hidden">
+        <AnimatePresence mode="wait">
+          {mode === 'tasks' ? (
+            <motion.div
+              key="tasks"
+              initial={{ opacity: 0, x: -40 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 40 }}
+              transition={{ duration: 0.25 }}
+              className="absolute inset-0"
+            >
+              <TodoistTasksView token={token} />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="ai"
+              initial={{ opacity: 0, x: 40 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -40 }}
+              transition={{ duration: 0.25 }}
+              className="absolute inset-0"
+            >
+              <TodoistAIView token={token} />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   )
