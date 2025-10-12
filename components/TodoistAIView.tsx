@@ -31,6 +31,27 @@ export default function TodoistAIView() {
     if (saved) setToken(saved)
   }, [])
 
+  // 🔹 Wczytaj wcześniejszy czat po kliknięciu w sidebar
+  useEffect(() => {
+    const handleChatSelect = (event: any) => {
+      if (event.detail?.mode === 'todoist' && event.detail?.task?.id) {
+        const { id, content } = event.detail.task
+        const saved = localStorage.getItem(`chat_todoist_${id}`)
+        if (saved) {
+          const loadedMessages = JSON.parse(saved)
+          setMessages(loadedMessages)
+          setSessionId(id)
+          console.log(`📂 Wczytano historię czatu Todoist: ${content}`)
+        } else {
+          console.warn('⚠️ Brak zapisanej historii dla', id)
+        }
+      }
+    }
+
+    window.addEventListener('chatSelect', handleChatSelect)
+    return () => window.removeEventListener('chatSelect', handleChatSelect)
+  }, [])
+
   // 🔹 Pobierz zadania z Todoista z filtrami
   const fetchTasks = async (filter: string = 'today') => {
     if (!token) return
@@ -58,15 +79,18 @@ export default function TodoistAIView() {
       setTasks(filtered)
       console.log(`✅ Załadowano ${filtered.length} zadań (${filter})`)
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: `📋 Załadowano ${filtered.length} zadań (${filter}).`,
-          timestamp: Date.now(),
-        },
-      ])
+      const infoMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: `📋 Załadowano ${filtered.length} zadań (${filter}).`,
+        timestamp: Date.now(),
+      }
+
+      setMessages((prev) => {
+        const updated = [...prev, infoMsg]
+        localStorage.setItem(`chat_todoist_${sessionId}`, JSON.stringify(updated))
+        return updated
+      })
     } catch (err) {
       console.error('❌ Błąd Todoist:', err)
       setMessages((prev) => [
@@ -109,7 +133,13 @@ export default function TodoistAIView() {
       content: message,
       timestamp: Date.now(),
     }
-    setMessages((prev) => [...prev, userMsg])
+
+    setMessages((prev) => {
+      const updated = [...prev, userMsg]
+      localStorage.setItem(`chat_todoist_${sessionId}`, JSON.stringify(updated))
+      return updated
+    })
+
     setLoading(true)
 
     try {
@@ -136,7 +166,11 @@ export default function TodoistAIView() {
         timestamp: Date.now(),
       }
 
-      setMessages((prev) => [...prev, aiMsg])
+      setMessages((prev) => {
+        const updated = [...prev, aiMsg]
+        localStorage.setItem(`chat_todoist_${sessionId}`, JSON.stringify(updated))
+        return updated
+      })
     } catch (err) {
       console.error('❌ Błąd komunikacji z AI:', err)
       setMessages((prev) => [
@@ -158,7 +192,7 @@ export default function TodoistAIView() {
     if (confirm('Na pewno chcesz usunąć historię rozmowy?')) {
       setMessages([])
       setTasks([])
-      localStorage.removeItem('chat_todoist')
+      localStorage.removeItem(`chat_todoist_${sessionId}`)
     }
   }
 
@@ -168,7 +202,6 @@ export default function TodoistAIView() {
     setSessionId(newId)
     setMessages([])
     setTasks([])
-    localStorage.removeItem('chat_todoist')
 
     const sessions = JSON.parse(localStorage.getItem('chat_sessions_todoist') || '[]')
     const newEntry = {
@@ -253,30 +286,20 @@ export default function TodoistAIView() {
       {/* 🔘 Górne przyciski */}
       <div className="flex flex-wrap justify-between items-center gap-2 mb-2">
         <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => fetchTasks('today')}
-            className="px-3 py-1.5 text-sm bg-gray-100 border rounded-lg hover:bg-gray-200 transition"
-          >
-            📅 Dziś
-          </button>
-          <button
-            onClick={() => fetchTasks('7days')}
-            className="px-3 py-1.5 text-sm bg-gray-100 border rounded-lg hover:bg-gray-200 transition"
-          >
-            🗓️ Ten tydzień
-          </button>
-          <button
-            onClick={() => fetchTasks('30days')}
-            className="px-3 py-1.5 text-sm bg-gray-100 border rounded-lg hover:bg-gray-200 transition"
-          >
-            📆 Ten miesiąc
-          </button>
-          <button
-            onClick={() => fetchTasks('overdue')}
-            className="px-3 py-1.5 text-sm bg-gray-100 border rounded-lg hover:bg-gray-200 transition"
-          >
-            ⏰ Przeterminowane
-          </button>
+          {[
+            { label: '📅 Dziś', key: 'today' },
+            { label: '🗓️ Ten tydzień', key: '7days' },
+            { label: '📆 Ten miesiąc', key: '30days' },
+            { label: '⏰ Przeterminowane', key: 'overdue' },
+          ].map((f) => (
+            <button
+              key={f.key}
+              onClick={() => fetchTasks(f.key)}
+              className="px-3 py-1.5 text-sm bg-gray-100 border rounded-lg hover:bg-gray-200 transition"
+            >
+              {f.label}
+            </button>
+          ))}
         </div>
         <div className="flex gap-2">
           <button
@@ -328,7 +351,9 @@ export default function TodoistAIView() {
       <div className="flex gap-2 mt-2">
         <input
           type="text"
-          onKeyDown={(e) => e.key === 'Enter' && !loading && handleSend(e.currentTarget.value)}
+          onKeyDown={(e) =>
+            e.key === 'Enter' && !loading && handleSend(e.currentTarget.value)
+          }
           disabled={loading}
           placeholder="Napisz np. 'Daj taski na dziś' lub 'Pogrupuj zadania'"
           className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
