@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Chat, { ChatMessage } from './Chat'
 import ReactMarkdown from 'react-markdown'
 
@@ -44,6 +44,7 @@ export default function TodoistAIView() {
           console.log(`📂 Wczytano historię czatu Todoist: ${content}`)
         } else {
           console.warn('⚠️ Brak zapisanej historii dla', id)
+          setMessages([])
         }
       }
     }
@@ -52,7 +53,7 @@ export default function TodoistAIView() {
     return () => window.removeEventListener('chatSelect', handleChatSelect)
   }, [])
 
-  // 🔹 Pobierz zadania z Todoista z filtrami
+  // 🔹 Pobierz zadania z Todoista
   const fetchTasks = async (filter: string = 'today') => {
     if (!token) return
     setLoading(true)
@@ -63,16 +64,20 @@ export default function TodoistAIView() {
       if (!res.ok) throw new Error(`Todoist API error: ${res.status}`)
       const all = await res.json()
 
-      // 🧠 Filtrowanie zadań
-      const now = new Date()
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const tomorrow = new Date(today)
+      tomorrow.setDate(today.getDate() + 1)
+
       const filtered = all.filter((t: any) => {
         if (!t.due?.date) return false
         const due = new Date(t.due.date)
-        const diff = (due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-        if (filter === 'today') return diff >= -0.5 && diff < 1.5
-        if (filter === '7days') return diff >= -0.5 && diff < 7
-        if (filter === '30days') return diff >= -0.5 && diff < 30
-        if (filter === 'overdue') return diff < -0.5
+        const diff = (due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+
+        if (filter === 'today') return due >= today && due < tomorrow
+        if (filter === '7days') return diff >= 0 && diff < 7
+        if (filter === '30days') return diff >= 0 && diff < 30
+        if (filter === 'overdue') return due < today
         return true
       })
 
@@ -125,7 +130,7 @@ export default function TodoistAIView() {
     }
   }
 
-  // 💬 Wyślij wiadomość do AI
+  // 💬 Wysyłanie wiadomości do AI
   const handleSend = async (message: string) => {
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
@@ -152,7 +157,7 @@ export default function TodoistAIView() {
       const data = await res.json()
       console.log('📩 Odpowiedź backendu:', data)
 
-      let reply =
+      const reply =
         data.content ||
         data.reply ||
         data.message ||
@@ -196,7 +201,7 @@ export default function TodoistAIView() {
     }
   }
 
-  // ✨ Nowy czat — zapisuje do historii
+  // ✨ Nowy czat — dodaje sesję do historii
   const handleNewChat = () => {
     const newId = crypto.randomUUID()
     setSessionId(newId)
@@ -212,20 +217,21 @@ export default function TodoistAIView() {
       })}`,
       timestamp: Date.now(),
     }
+
     localStorage.setItem('chat_sessions_todoist', JSON.stringify([newEntry, ...sessions]))
     window.dispatchEvent(new Event('chatUpdated'))
   }
 
-  // 🧠 Pogrupuj tematycznie
+  // 🧠 Pogrupuj zadania
   const handleGroupTasks = async () => {
     if (!tasks.length) {
       await handleSend('Nie mam żadnych zadań, które można pogrupować.')
       return
     }
-    await handleSend(`Pogrupuj te zadania tematycznie:`)
+    await handleSend('Pogrupuj te zadania tematycznie.')
   }
 
-  // 🧩 Render task cards
+  // 🧩 Render listy zadań
   const renderTasks = () =>
     tasks.length === 0 ? (
       <div className="text-gray-500 text-sm italic text-center py-4">
@@ -240,7 +246,7 @@ export default function TodoistAIView() {
               t.completed
                 ? 'bg-green-50 border-green-300'
                 : 'bg-white border-gray-200'
-            } shadow-sm hover:shadow-md transition relative`}
+            } shadow-sm hover:shadow-md transition`}
           >
             <div className="flex items-start gap-2">
               <input
@@ -276,7 +282,7 @@ export default function TodoistAIView() {
     <div className="flex flex-col h-[85vh] max-h-[85vh] p-3 space-y-3 overflow-hidden">
       {/* 🔘 Status połączenia */}
       <div
-        className={`text-sm font-medium mb-2 ${
+        className={`text-sm font-medium ${
           token ? 'text-green-600' : 'text-red-500'
         }`}
       >
@@ -284,7 +290,7 @@ export default function TodoistAIView() {
       </div>
 
       {/* 🔘 Górne przyciski */}
-      <div className="flex flex-wrap justify-between items-center gap-2 mb-2">
+      <div className="flex flex-wrap justify-between items-center gap-2 mb-1">
         <div className="flex flex-wrap gap-2">
           {[
             { label: '📅 Dziś', key: 'today' },
@@ -295,7 +301,8 @@ export default function TodoistAIView() {
             <button
               key={f.key}
               onClick={() => fetchTasks(f.key)}
-              className="px-3 py-1.5 text-sm bg-gray-100 border rounded-lg hover:bg-gray-200 transition"
+              disabled={loading}
+              className="px-3 py-1.5 text-sm bg-gray-100 border rounded-lg hover:bg-gray-200 transition disabled:opacity-50"
             >
               {f.label}
             </button>
@@ -325,22 +332,15 @@ export default function TodoistAIView() {
       {/* 💬 Chat */}
       <div className="flex-1 overflow-y-auto bg-white border rounded-xl p-3 shadow-sm">
         {messages.map((m) => (
-          <div
-            key={m.id}
-            className={`mb-3 ${
-              m.role === 'user' ? 'text-right' : 'text-left'
-            }`}
-          >
+          <div key={m.id} className={`mb-3 ${m.role === 'user' ? 'text-right' : 'text-left'}`}>
             <div
-              className={`inline-block px-3 py-2 rounded-xl text-sm ${
+              className={`inline-block px-3 py-2 rounded-xl text-sm whitespace-pre-wrap ${
                 m.role === 'user'
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 text-gray-800'
               }`}
             >
-              <ReactMarkdown className="prose prose-sm max-w-none">
-                {m.content}
-              </ReactMarkdown>
+              <ReactMarkdown className="prose prose-sm max-w-none">{m.content}</ReactMarkdown>
             </div>
           </div>
         ))}
@@ -351,16 +351,14 @@ export default function TodoistAIView() {
       <div className="flex gap-2 mt-2">
         <input
           type="text"
-          onKeyDown={(e) =>
-            e.key === 'Enter' && !loading && handleSend(e.currentTarget.value)
-          }
+          onKeyDown={(e) => e.key === 'Enter' && !loading && handleSend(e.currentTarget.value)}
           disabled={loading}
           placeholder="Napisz np. 'Daj taski na dziś' lub 'Pogrupuj zadania'"
           className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <button
           onClick={() => {
-            const input = document.querySelector('input')
+            const input = document.querySelector<HTMLInputElement>('input')
             if (input && input.value.trim()) {
               handleSend(input.value)
               input.value = ''
