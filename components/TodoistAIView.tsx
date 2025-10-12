@@ -32,7 +32,7 @@ export default function TodoistAIView({ token }: { token: string }) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // 🔹 Ładowanie historii po kliknięciu w sidebar
+  // 🔹 Wczytanie historii po kliknięciu w sidebar
   useEffect(() => {
     const handleChatSelect = (event: any) => {
       if (event.detail?.mode === 'todoist' && event.detail?.task?.id) {
@@ -93,6 +93,11 @@ export default function TodoistAIView({ token }: { token: string }) {
       setLoading(false)
     }
   }
+
+  // ✅ Automatyczne pobranie zadań po starcie
+  useEffect(() => {
+    if (token) fetchTasks('today')
+  }, [token])
 
   // ✅ Oznacz jako ukończone
   const toggleTask = async (taskId: string) => {
@@ -246,6 +251,56 @@ export default function TodoistAIView({ token }: { token: string }) {
             🗑️ Wyczyść czat
           </button>
         </div>
+      </div>
+
+      {/* 🧩 Lista zadań */}
+      <div className="max-h-[35vh] overflow-y-auto border rounded-lg p-2 bg-gray-50 shadow-inner">
+        {tasks.length === 0 ? (
+          <div className="text-gray-500 text-sm italic text-center py-4">
+            Brak zadań do wyświetlenia
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {tasks.map((t) => (
+              <div
+                key={t.id}
+                className={`p-3 rounded-xl border ${
+                  t.completed
+                    ? 'bg-green-50 border-green-300'
+                    : 'bg-white border-gray-200'
+                } shadow-sm hover:shadow-md transition relative`}
+              >
+                <div className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    checked={!!t.completed}
+                    onChange={() => toggleTask(t.id)}
+                    className="mt-1 accent-green-600 cursor-pointer"
+                  />
+                  <div>
+                    <p
+                      className={`text-sm font-medium ${
+                        t.completed
+                          ? 'line-through text-gray-400'
+                          : 'text-gray-800'
+                      }`}
+                    >
+                      {t.content}
+                    </p>
+                    <div className="text-xs text-gray-500 mt-1 flex gap-2">
+                      {t.due?.date && (
+                        <span>
+                          📅 {new Date(t.due.date).toLocaleDateString('pl-PL')}
+                        </span>
+                      )}
+                      {t.priority && <span>⭐ P{t.priority}</span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 💬 Czat */}
