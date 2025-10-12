@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import TodoistTasksView from './TodoistTasksView'
 import TodoistAIView from './TodoistAIView'
+import TaskDialog from './TaskDialog' // 🧠 dodaj import modala
 
 interface TodoistConnectionProps {
   token: string
@@ -19,11 +20,29 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
     return 'tasks'
   })
 
+  // 🔁 zapisz ostatni tryb
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('todoist_mode', mode)
     }
   }, [mode])
+
+  // 💬 Stan modala TaskDialog
+  const [openTask, setOpenTask] = useState<{ id: string; title: string } | null>(null)
+
+  // 🧭 Nasłuch na event z ChatSidebar
+  useEffect(() => {
+    const handleChatSelect = (event: any) => {
+      const { mode, task } = event.detail || {}
+      if (mode === 'todoist' && task?.id) {
+        console.log('🪄 Otwieram TaskDialog dla', task)
+        setOpenTask(task)
+      }
+    }
+
+    window.addEventListener('chatSelect', handleChatSelect)
+    return () => window.removeEventListener('chatSelect', handleChatSelect)
+  }, [])
 
   return (
     <div className="relative flex flex-col h-[calc(100vh-100px)] bg-gray-50 border border-green-200 rounded-xl overflow-hidden">
@@ -95,6 +114,17 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
           )}
         </AnimatePresence>
       </div>
+
+      {/* 💬 GLOBALNY MODAL TASK DIALOG */}
+      <AnimatePresence>
+        {openTask && (
+          <TaskDialog
+            task={{ id: openTask.id, content: openTask.title }}
+            mode="help"
+            onClose={() => setOpenTask(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }
