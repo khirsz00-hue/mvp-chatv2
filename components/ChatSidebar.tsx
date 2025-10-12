@@ -56,7 +56,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
         }),
         timestamp: m.timestamp || 0,
       }))
-      .sort((a, b) => b.timestamp - a.timestamp)
+      .sort((a: ChatPreview, b: ChatPreview) => b.timestamp - a.timestamp)
       .slice(0, 15)
     setGlobalChats(global)
 
@@ -84,7 +84,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
           timestamp: lastMsg?.timestamp || 0,
         }
       })
-      .sort((a, b) => b.timestamp - a.timestamp)
+      .sort((a: TaskPreview, b: TaskPreview) => b.timestamp - a.timestamp)
       .slice(0, 15)
     setTaskChats(tasks)
 
@@ -101,7 +101,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
         }),
         timestamp: m.timestamp || 0,
       }))
-      .sort((a, b) => b.timestamp - a.timestamp)
+      .sort((a: ChatPreview, b: ChatPreview) => b.timestamp - a.timestamp)
       .slice(0, 15)
     setSixHatsChats(sixHats)
 
@@ -117,7 +117,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
           last: lastMsg?.content || '(brak wiadomości)',
         }
       })
-      .sort((a, b) => b.timestamp - a.timestamp)
+      .sort((a: TodoistSession, b: TodoistSession) => b.timestamp - a.timestamp)
       .slice(0, 25)
     setTodoistSessions(sessions)
   }
