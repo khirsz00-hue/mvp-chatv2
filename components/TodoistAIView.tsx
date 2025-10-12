@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { motion } from 'framer-motion'
+import remarkGfm from 'remark-gfm'
 
 type TodoistTask = {
   id: string
@@ -27,22 +28,21 @@ export default function TodoistAIView({ token }: { token: string }) {
   const [activeFilter, setActiveFilter] = useState<'today' | '7days' | '30days' | 'overdue'>('today')
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  // 🔹 Auto-scroll
+  // 🧭 Scroll do dołu po nowej wiadomości
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // 🔹 Wczytanie historii po kliknięciu w sidebar
+  // 📂 Wczytanie historii po kliknięciu w sidebar
   useEffect(() => {
     const handleChatSelect = (event: any) => {
       if (event.detail?.mode === 'todoist' && event.detail?.task?.id) {
-        const { id, content } = event.detail.task
+        const { id, title } = event.detail.task
         const saved = localStorage.getItem(`chat_todoist_${id}`)
         if (saved) {
-          const loadedMessages = JSON.parse(saved)
-          setMessages(loadedMessages)
+          setMessages(JSON.parse(saved))
           setSessionId(id)
-          console.log(`📂 Wczytano historię czatu Todoist: ${content}`)
+          console.log(`📂 Wczytano historię Todoist: ${title}`)
         }
       }
     }
@@ -50,7 +50,7 @@ export default function TodoistAIView({ token }: { token: string }) {
     return () => window.removeEventListener('chatSelect', handleChatSelect)
   }, [])
 
-  // 🔹 Nowy czat
+  // 🧾 Utwórz nową sesję
   const startNewChat = (title: string) => {
     const newId = crypto.randomUUID()
     setSessionId(newId)
@@ -58,37 +58,34 @@ export default function TodoistAIView({ token }: { token: string }) {
     setTasks([])
 
     const sessions = JSON.parse(localStorage.getItem('chat_sessions_todoist') || '[]')
-    const newEntry = {
-      id: newId,
-      title,
-      timestamp: Date.now(),
-    }
+    const newEntry = { id: newId, title, timestamp: Date.now() }
     localStorage.setItem('chat_sessions_todoist', JSON.stringify([newEntry, ...sessions]))
     window.dispatchEvent(new Event('chatUpdated'))
     return newId
   }
 
-  // 🔹 Pobierz zadania
+  // 📡 Pobierz zadania z Todoist
   const fetchTasks = async (filter: 'today' | '7days' | '30days' | 'overdue') => {
     if (!token) return
     setActiveFilter(filter)
-    const titleMap = {
+
+    const titles = {
       today: 'Zadania na dziś',
       '7days': 'Zadania na tydzień',
       '30days': 'Zadania na miesiąc',
       overdue: 'Zadania przeterminowane',
     }
-    const newId = startNewChat(titleMap[filter as keyof typeof titleMap])
 
+    const newId = startNewChat(titles[filter])
     setLoading(true)
+
     try {
       const res = await fetch('https://api.todoist.com/rest/v2/tasks', {
         headers: { Authorization: `Bearer ${token}` },
       })
-      if (!res.ok) throw new Error(`Todoist API error: ${res.status}`)
       const all = await res.json()
-
       const now = new Date()
+
       const filtered = all.filter((t: any) => {
         if (!t.due?.date) return false
         const due = new Date(t.due.date)
@@ -104,7 +101,7 @@ export default function TodoistAIView({ token }: { token: string }) {
       const infoMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: `📋 Załadowano ${filtered.length} zadań (${titleMap[filter as keyof typeof titleMap]}).`,
+        content: `📋 Załadowano ${filtered.length} zadań (${titles[filter]}).`,
         timestamp: Date.now(),
       }
       setMessages([infoMsg])
@@ -116,7 +113,6 @@ export default function TodoistAIView({ token }: { token: string }) {
     }
   }
 
-  // ✅ Automatyczne pobranie zadań po starcie
   useEffect(() => {
     if (token) fetchTasks('today')
   }, [token])
@@ -129,44 +125,39 @@ export default function TodoistAIView({ token }: { token: string }) {
       content: message,
       timestamp: Date.now(),
     }
-    setMessages((prev) => {
-      const updated = [...prev, userMsg]
-      localStorage.setItem(`chat_todoist_${sessionId}`, JSON.stringify(updated))
-      return updated
-    })
-
+    const updated = [...messages, userMsg]
+    setMessages(updated)
+    localStorage.setItem(`chat_todoist_${sessionId}`, JSON.stringify(updated))
     setLoading(true)
+
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, token, tasks }),
+        body: JSON.stringify({ message, tasks }),
       })
       const data = await res.json()
-      const reply =
-        data.content || data.reply || data.message || '🤖 Brak odpowiedzi od AI.'
+      const reply = data.reply || data.content || '🤖 Brak odpowiedzi od AI.'
       const aiMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
         content: reply.trim(),
         timestamp: Date.now(),
       }
-      setMessages((prev) => {
-        const updated = [...prev, aiMsg]
-        localStorage.setItem(`chat_todoist_${sessionId}`, JSON.stringify(updated))
-        return updated
-      })
+      const final = [...updated, aiMsg]
+      setMessages(final)
+      localStorage.setItem(`chat_todoist_${sessionId}`, JSON.stringify(final))
     } catch (err) {
-      console.error('❌ Błąd komunikacji z AI:', err)
+      console.error('❌ Błąd AI:', err)
     } finally {
       setLoading(false)
     }
   }
 
-  // 🧠 Pogrupuj z kontekstem dat
+  // 🧠 Grupowanie zadań
   const handleGroupTasks = async () => {
     if (!tasks.length) {
-      await handleSend('Nie mam żadnych zadań, które można pogrupować.')
+      await handleSend('Nie mam żadnych zadań do pogrupowania.')
       return
     }
 
@@ -191,7 +182,7 @@ export default function TodoistAIView({ token }: { token: string }) {
 
   // 🧹 Wyczyść czat
   const handleClear = () => {
-    if (confirm('Na pewno chcesz wyczyścić czat?')) {
+    if (confirm('Czy na pewno chcesz wyczyścić czat?')) {
       setMessages([])
       localStorage.removeItem(`chat_todoist_${sessionId}`)
     }
@@ -226,12 +217,20 @@ export default function TodoistAIView({ token }: { token: string }) {
             </button>
           ))}
         </div>
-        <button
-          onClick={handleClear}
-          className="text-sm text-red-600 hover:text-red-800"
-        >
-          🗑️ Wyczyść czat
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => startNewChat('Nowy czat')}
+            className="text-sm text-blue-600 hover:text-blue-800"
+          >
+            ➕ Nowy czat
+          </button>
+          <button
+            onClick={handleClear}
+            className="text-sm text-red-600 hover:text-red-800"
+          >
+            🗑️ Wyczyść
+          </button>
+        </div>
       </div>
 
       {/* 🧩 Lista zadań */}
@@ -253,18 +252,14 @@ export default function TodoistAIView({ token }: { token: string }) {
               >
                 <p
                   className={`text-sm font-medium ${
-                    t.completed
-                      ? 'line-through text-gray-400'
-                      : 'text-gray-800'
+                    t.completed ? 'line-through text-gray-400' : 'text-gray-800'
                   }`}
                 >
                   {t.content}
                 </p>
                 <div className="text-xs text-gray-500 mt-1 flex gap-2">
                   {t.due?.date && (
-                    <span>
-                      📅 {new Date(t.due.date).toLocaleDateString('pl-PL')}
-                    </span>
+                    <span>📅 {new Date(t.due.date).toLocaleDateString('pl-PL')}</span>
                   )}
                   {t.priority && <span>⭐ P{t.priority}</span>}
                 </div>
@@ -286,18 +281,20 @@ export default function TodoistAIView({ token }: { token: string }) {
             <div
               className={`inline-block px-3 py-2 rounded-xl text-sm whitespace-pre-wrap ${
                 m.role === 'user'
-                  ? 'bg-blue-600 text-white !text-white'
+                  ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 text-gray-800'
               }`}
-              style={{ color: m.role === 'user' ? 'white' : undefined }}
             >
-              <ReactMarkdown className="prose prose-sm max-w-none">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                className="prose prose-sm max-w-none"
+              >
                 {m.content}
               </ReactMarkdown>
             </div>
           </motion.div>
         ))}
-        {loading && <div className="text-center text-gray-500 text-sm">⏳...</div>}
+        {loading && <div className="text-center text-gray-500 text-sm">⏳ AI myśli...</div>}
         <div ref={bottomRef} />
       </div>
 
@@ -305,11 +302,11 @@ export default function TodoistAIView({ token }: { token: string }) {
       <div className="flex gap-2 mt-2">
         <input
           type="text"
+          placeholder="Napisz np. „Pogrupuj zadania”"
           onKeyDown={(e) =>
             e.key === 'Enter' && !loading && handleSend(e.currentTarget.value)
           }
           disabled={loading}
-          placeholder="Napisz np. 'Daj taski na dziś' lub 'Pogrupuj zadania'"
           className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <button
