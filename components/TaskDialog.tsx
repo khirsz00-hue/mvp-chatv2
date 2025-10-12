@@ -12,9 +12,15 @@ type ChatMessage = {
   timestamp: number
 }
 
-export default function TaskDialog() {
-  const [isOpen, setIsOpen] = useState(false)
-  const [task, setTask] = useState<{ id: string; title: string } | null>(null)
+interface TaskDialogProps {
+  task?: { id: string; title: string } // może być puste przy otwarciu z eventu
+  mode?: 'help'
+  onClose?: () => void
+}
+
+export default function TaskDialog({ task: initialTask, mode = 'help', onClose }: TaskDialogProps) {
+  const [isOpen, setIsOpen] = useState<boolean>(false)
+  const [task, setTask] = useState<{ id: string; title: string } | null>(initialTask || null)
   const [chat, setChat] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -22,71 +28,59 @@ export default function TaskDialog() {
 
   const chatKey = task ? `chat_todoist_${task.id}` : null
 
-  // 📡 Otwieranie przez globalny event chatSelect
+  // 📡 Obsługa otwarcia przez globalny event `chatSelect`
   useEffect(() => {
-    const handleSelect = (event: Event) => {
-      const customEvent = event as CustomEvent
-      const detail = customEvent.detail
-      if (!detail?.task?.id) return
-      setTask({ id: detail.task.id, title: detail.task.title })
-      setIsOpen(true)
+    const handleSelect = (event: CustomEvent) => {
+      const detail = event.detail
+      if (detail?.task?.id) {
+        setTask({ id: detail.task.id, title: detail.task.title })
+        setIsOpen(true)
+      }
     }
 
-    window.addEventListener('chatSelect', handleSelect)
-    return () => window.removeEventListener('chatSelect', handleSelect)
+    window.addEventListener('chatSelect', handleSelect as EventListener)
+    return () => {
+      window.removeEventListener('chatSelect', handleSelect as EventListener)
+    }
   }, [])
 
-  // 📦 Wczytaj historię rozmowy
+  // 📦 Wczytaj historię rozmowy po otwarciu
   useEffect(() => {
     if (!chatKey) return
-    try {
-      const saved = localStorage.getItem(chatKey)
-      if (saved) setChat(JSON.parse(saved))
-      else setChat([])
-    } catch (e) {
-      console.error('Błąd ładowania historii:', e)
-      setChat([])
-    }
+    const saved = localStorage.getItem(chatKey)
+    if (saved) setChat(JSON.parse(saved))
   }, [chatKey])
 
-  // 💾 Zapisuj czat w localStorage
+  // 💾 Zapisuj czat
   useEffect(() => {
-    if (chatKey) {
-      localStorage.setItem(chatKey, JSON.stringify(chat))
-      window.dispatchEvent(new Event('chatUpdated'))
-    }
+    if (chatKey) localStorage.setItem(chatKey, JSON.stringify(chat))
   }, [chat, chatKey])
 
-  // 💬 Wysyłanie wiadomości do AI
+  // ✉️ Wysyłanie wiadomości
   const sendMessage = async () => {
     const text = input.trim()
     if (!text || !task) return
-
-    const userMsg: ChatMessage = { role: 'user', content: text, timestamp: Date.now() }
-    const updated = [...chat, userMsg]
-    setChat(updated)
     setInput('')
     setLoading(true)
+
+    const userMsg: ChatMessage = { role: 'user', content: text, timestamp: Date.now() }
+    setChat((prev) => [...prev, userMsg])
 
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text,
-          context: `Rozmowa o zadaniu: ${task.title}`,
-        }),
+        body: JSON.stringify({ message: text }),
       })
       const data = await res.json()
       const reply = data.reply || data.content || '🤖 Brak odpowiedzi od AI.'
-
       const aiMsg: ChatMessage = { role: 'assistant', content: reply, timestamp: Date.now() }
       setChat((prev) => [...prev, aiMsg])
     } catch (err) {
-      console.error('Błąd AI:', err)
+      console.error('❌ Błąd komunikacji z AI:', err)
       setChat((prev) => [
         ...prev,
-        { role: 'assistant', content: '⚠️ Błąd komunikacji z AI.', timestamp: Date.now() },
+        { role: 'assistant', content: '⚠️ Wystąpił błąd komunikacji z AI.', timestamp: Date.now() },
       ])
     } finally {
       setLoading(false)
@@ -97,24 +91,18 @@ export default function TaskDialog() {
     setIsOpen(false)
     setTimeout(() => {
       setTask(null)
-      setChat([])
-      setInput('')
-    }, 250)
+      onClose?.()
+    }, 200)
   }
 
-  // 🔽 Auto-scroll zawsze do najnowszej wiadomości
+  // 🔽 Auto-scroll
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior: 'smooth',
-      })
-    }
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [chat])
 
   if (!isOpen || !task) return null
 
-  // 🪄 Modal czatu
+  // 🪄 Modal
   const modal = (
     <AnimatePresence>
       <motion.div
@@ -165,12 +153,7 @@ export default function TaskDialog() {
                 </ReactMarkdown>
               </div>
             ))}
-
-            {loading && (
-              <p className="text-sm text-gray-500 italic animate-pulse">
-                🤖 AI myśli...
-              </p>
-            )}
+            {loading && <p className="text-sm text-gray-500 italic">AI myśli...</p>}
           </div>
 
           {/* INPUT */}
