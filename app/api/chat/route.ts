@@ -10,7 +10,15 @@ type SimpleChatMessage = {
 
 export async function POST(req: Request) {
   try {
-    const { message, token, tasks: providedTasks, mode, taskId, taskTitle, history } = await req.json()
+    const {
+      message,
+      token,
+      tasks: providedTasks,
+      mode,
+      taskId,
+      taskTitle, // ✅ <- nowy klucz
+      history,
+    } = await req.json()
 
     if (!message) {
       return NextResponse.json({ error: 'Brak wiadomości' }, { status: 400 })
@@ -45,23 +53,28 @@ export async function POST(req: Request) {
       tasks = providedTasks
     }
 
-    // 🧠 Przygotowanie kontekstu
+    // 🧠 Przygotowanie kontekstu OpenAI
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
 
+    // 🔧 SYSTEM PROMPT
     let systemPrompt = ''
 
     if (mode === 'task' || mode === 'help') {
       systemPrompt = `
 Jesteś inteligentnym asystentem pomagającym użytkownikowi w realizacji konkretnego zadania.
-Zawsze odpowiadaj po polsku.
-Zachowuj się jak doradca, który zna temat zadania i pomaga krok po kroku.
-Nie pytaj, jakie to zadanie — już wiesz.
-Jeśli użytkownik prosi o pomoc, analizuj kontekst i doradzaj praktycznie.
+Odpowiadasz po polsku.
+Nie pytaj "o jakie zadanie chodzi" — już wiesz.
+Pomagaj krok po kroku, analizuj i doradzaj praktycznie.
 `.trim()
     } else if (token) {
       const taskList =
         tasks.length > 0
-          ? tasks.map((t) => `- ${t.content}${t.due?.date ? ` (termin: ${t.due.date})` : ''}`).join('\n')
+          ? tasks
+              .map(
+                (t) =>
+                  `- ${t.content}${t.due?.date ? ` (termin: ${t.due.date})` : ''}`
+              )
+              .join('\n')
           : '(Brak zadań w Todoist)'
 
       systemPrompt = `
@@ -80,7 +93,7 @@ Zawsze odpowiadaj po polsku.
 `.trim()
     }
 
-    // 📜 Historia rozmowy
+    // 📜 Historia rozmowy (ostatnie 10 wiadomości)
     const conversation: SimpleChatMessage[] = Array.isArray(history)
       ? history.slice(-10).map((msg: any) => ({
           role: msg.role === 'assistant' ? 'assistant' : 'user',
@@ -88,7 +101,7 @@ Zawsze odpowiadaj po polsku.
         }))
       : []
 
-    // 🧠 KONTEKST — tytuł zadania jako osobna wiadomość systemowa
+    // 🧠 KONTEKST – tytuł zadania (główna różnica)
     const contextIntro: SimpleChatMessage[] =
       mode === 'task' || mode === 'help'
         ? [
@@ -96,7 +109,7 @@ Zawsze odpowiadaj po polsku.
               role: 'system',
               content: `Kontekst rozmowy: Pomagasz użytkownikowi w zadaniu o nazwie "${taskTitle || taskId || 'Nieznane zadanie'}".
 Zawsze traktuj to jako główny temat rozmowy.
-Jeśli użytkownik prosi o pomoc, nawiązuj do tego zadania, jego postępu i możliwych kroków.`,
+Jeśli użytkownik pisze np. "Pomóż mi", wiesz, że chodzi o to właśnie zadanie.`,
             },
           ]
         : []
@@ -104,7 +117,7 @@ Jeśli użytkownik prosi o pomoc, nawiązuj do tego zadania, jego postępu i mo�
     // 🧩 Kompletna sekwencja wiadomości
     const messages: SimpleChatMessage[] = [
       { role: 'system', content: systemPrompt },
-      ...contextIntro,
+      ...contextIntro, // 👈 tu wstrzykujemy nazwę zadania
       ...conversation,
       {
         role: 'user',
@@ -115,16 +128,20 @@ Jeśli użytkownik prosi o pomoc, nawiązuj do tego zadania, jego postępu i mo�
       },
     ]
 
-    // 🧠 Zapytanie do OpenAI
+    // 🧠 Zapytanie do OpenAI z pełnym kontekstem
     const completion = await client.chat.completions.create({
       model: 'gpt-4o-mini',
       temperature: 0.7,
       messages,
     })
 
-    const reply = completion.choices[0]?.message?.content?.trim() || '🤖 Brak odpowiedzi od AI.'
-    console.log('💬 Odpowiedź AI:', reply.slice(0, 150))
+    const reply =
+      completion.choices[0]?.message?.content?.trim() ||
+      '🤖 Brak odpowiedzi od AI.'
 
+    console.log('💬 Odpowiedź AI:', reply.slice(0, 200))
+
+    // ✅ Odpowiedź API
     return NextResponse.json({
       success: true,
       content: reply,
@@ -132,6 +149,9 @@ Jeśli użytkownik prosi o pomoc, nawiązuj do tego zadania, jego postępu i mo�
     })
   } catch (err: any) {
     console.error('❌ Błąd /api/chat:', err)
-    return NextResponse.json({ error: err.message, type: 'error' }, { status: 500 })
+    return NextResponse.json(
+      { error: err.message, type: 'error' },
+      { status: 500 }
+    )
   }
 }
