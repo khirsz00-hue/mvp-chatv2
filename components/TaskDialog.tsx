@@ -68,7 +68,7 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose }
     if (chatKey) localStorage.setItem(chatKey, JSON.stringify(chat))
   }, [chat, chatKey])
 
-  // ✉️ Wysyłanie wiadomości
+  // ✉️ Wysyłanie wiadomości z historią (kontekst)
   const sendMessage = async () => {
     const text = input.trim()
     if (!text || !task) return
@@ -76,9 +76,13 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose }
     setLoading(true)
 
     const userMsg: ChatMessage = { role: 'user', content: text, timestamp: Date.now() }
-    setChat((prev) => [...prev, userMsg])
+    const updatedChat = [...chat, userMsg]
+    setChat(updatedChat)
 
     try {
+      // 📚 Pobierz całą historię rozmowy dla kontekstu
+      const history = JSON.parse(localStorage.getItem(chatKey || '') || '[]')
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -86,6 +90,7 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose }
           message: text,
           mode: modeState,
           taskId: task.id,
+          history, // 🧠 przekazujemy pełen kontekst rozmowy
         }),
       })
 
@@ -99,17 +104,15 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose }
       const aiMsg: ChatMessage = { role: 'assistant', content: reply, timestamp: Date.now() }
 
       // 💾 Zapisz odpowiedź i skrót
-      setChat((prev) => {
-        const updated = [...prev, aiMsg]
-        if (chatKey) localStorage.setItem(chatKey, JSON.stringify(updated))
-        localStorage.setItem(`summary_${task.id}`, aiMsg.content.slice(0, 300))
-        return updated
-      })
+      const newChat = [...updatedChat, aiMsg]
+      if (chatKey) localStorage.setItem(chatKey, JSON.stringify(newChat))
+      localStorage.setItem(`summary_${task.id}`, aiMsg.content.slice(0, 300))
+      setChat(newChat)
 
       // 🧠 Zapisz metadane do historii (dla ChatSidebar)
       localStorage.setItem(`task_title_${task.id}`, task.title)
 
-      // 💬 Dodaj wiadomość użytkownika do historii czatu
+      // 💬 Dodaj wiadomość użytkownika i AI do historii czatu
       const existingChat = JSON.parse(localStorage.getItem(`chat_task_${task.id}`) || '[]')
       existingChat.push(userMsg)
       existingChat.push(aiMsg)
