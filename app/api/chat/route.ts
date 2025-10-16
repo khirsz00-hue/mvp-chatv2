@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
-import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions'
 
 export const runtime = 'nodejs'
+
+type SimpleChatMessage = {
+  role: 'system' | 'user' | 'assistant'
+  content: string
+}
 
 export async function POST(req: Request) {
   try {
@@ -91,23 +95,25 @@ Jesteś przyjaznym asystentem AI pomagającym użytkownikowi w planowaniu i orga
 `.trim()
     }
 
-    // 🧩 Konwersja historii rozmowy (z typowaniem)
-    const conversation: ChatCompletionMessageParam[] = Array.isArray(history)
+    // 🧩 Konwersja historii rozmowy
+    const conversation: SimpleChatMessage[] = Array.isArray(history)
       ? history.slice(-10).map((msg: any) => ({
-          role: (msg.role === 'assistant' ? 'assistant' : 'user') as ChatCompletionMessageParam['role'],
-          content: msg.content,
+          role: msg.role === 'assistant' ? 'assistant' : 'user',
+          content: String(msg.content || ''),
         }))
       : []
 
     // 🧠 Zapytanie do OpenAI z pełnym kontekstem
+    const messages: SimpleChatMessage[] = [
+      { role: 'system', content: systemPrompt },
+      ...conversation,
+      { role: 'user', content: message },
+    ]
+
     const completion = await client.chat.completions.create({
       model: 'gpt-4o-mini',
       temperature: 0.7,
-      messages: [
-        { role: 'system' as const, content: systemPrompt },
-        ...conversation,
-        { role: 'user' as const, content: message },
-      ],
+      messages,
     })
 
     const reply = completion.choices[0]?.message?.content?.trim() || '🤖 Brak odpowiedzi od AI.'
