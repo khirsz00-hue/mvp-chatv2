@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions'
 
 export const runtime = 'nodejs'
 
@@ -90,10 +91,10 @@ Jesteś przyjaznym asystentem AI pomagającym użytkownikowi w planowaniu i orga
 `.trim()
     }
 
-    // 🧩 Konwersja historii rozmowy (jeśli dostępna)
-    const conversation = Array.isArray(history)
+    // 🧩 Konwersja historii rozmowy (z typowaniem)
+    const conversation: ChatCompletionMessageParam[] = Array.isArray(history)
       ? history.slice(-10).map((msg: any) => ({
-          role: msg.role === 'assistant' ? 'assistant' : 'user',
+          role: (msg.role === 'assistant' ? 'assistant' : 'user') as ChatCompletionMessageParam['role'],
           content: msg.content,
         }))
       : []
@@ -103,9 +104,9 @@ Jesteś przyjaznym asystentem AI pomagającym użytkownikowi w planowaniu i orga
       model: 'gpt-4o-mini',
       temperature: 0.7,
       messages: [
-        { role: 'system', content: systemPrompt },
-        ...conversation, // pełen kontekst
-        { role: 'user', content: message },
+        { role: 'system' as const, content: systemPrompt },
+        ...conversation,
+        { role: 'user' as const, content: message },
       ],
     })
 
