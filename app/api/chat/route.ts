@@ -1,3 +1,9 @@
+// 📜 Typ wiadomości – definiujemy lokalnie
+type SimpleChatMessage = {
+  role: 'system' | 'user' | 'assistant'
+  content: string
+}
+
 // 📜 Konwersacja – historia + wiadomość użytkownika
 const conversation: SimpleChatMessage[] = Array.isArray(history)
   ? history.slice(-10).map((msg: any) => ({
@@ -12,8 +18,9 @@ const contextIntro: SimpleChatMessage[] =
     ? [
         {
           role: 'system',
-          content: `Kontekst rozmowy: pomagaj użytkownikowi w zadaniu o nazwie "${taskTitle}". 
-Zawsze traktuj to jako temat całej rozmowy.`,
+          content: `Kontekst rozmowy: pomagaj użytkownikowi w zadaniu o nazwie "${taskId || 'Nieznane zadanie'}". 
+Zawsze traktuj to jako główny temat całej rozmowy. 
+Odpowiadaj konkretnie w kontekście tego zadania.`,
         },
       ]
     : []
@@ -27,7 +34,7 @@ const messages: SimpleChatMessage[] = [
     role: 'user',
     content:
       mode === 'task' || mode === 'help'
-        ? `Użytkownik pisze w kontekście zadania "${taskTitle}": ${message}`
+        ? `Użytkownik pisze w kontekście zadania "${taskId || 'Nieznane zadanie'}": ${message}`
         : message,
   },
 ]
