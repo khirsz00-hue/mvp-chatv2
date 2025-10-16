@@ -19,7 +19,7 @@ interface TaskDialogProps {
 }
 
 export default function TaskDialog({ task: initialTask, mode = 'help', onClose }: TaskDialogProps) {
-  const [isOpen, setIsOpen] = useState<boolean>(false)
+  const [isOpen, setIsOpen] = useState(false)
   const [modeState, setModeState] = useState<'help' | 'task' | 'todoist'>(mode)
   const [task, setTask] = useState<{ id: string; title: string } | null>(initialTask || null)
   const [chat, setChat] = useState<ChatMessage[]>([])
@@ -56,19 +56,21 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose }
       if (saved) {
         const parsed = JSON.parse(saved)
         setChat(Array.isArray(parsed) ? parsed : [])
-      } else setChat([])
+      } else {
+        setChat([])
+      }
     } catch (err) {
       console.error('Błąd odczytu historii:', err)
       setChat([])
     }
   }, [chatKey])
 
-  // 💾 Zapisuj czat
+  // 💾 Zapisuj czat po każdej zmianie
   useEffect(() => {
     if (chatKey) localStorage.setItem(chatKey, JSON.stringify(chat))
   }, [chat, chatKey])
 
-  // ✉️ Wysyłanie wiadomości z historią (kontekst)
+  // ✉️ Wysyłanie wiadomości z pełnym kontekstem
   const sendMessage = async () => {
     const text = input.trim()
     if (!text || !task) return
@@ -80,9 +82,19 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose }
     setChat(updatedChat)
 
     try {
-      // 📚 Pobierz całą historię rozmowy dla kontekstu
-      const history = JSON.parse(localStorage.getItem(chatKey || '') || '[]')
+      // 📚 Pobierz pełną historię rozmowy
+      let history: ChatMessage[] = []
+      try {
+        const saved = localStorage.getItem(chatKey || '')
+        history = saved ? JSON.parse(saved) : []
+      } catch {
+        history = []
+      }
 
+      // 🔗 Dodaj najnowszą wiadomość do historii przed wysyłką
+      const conversation = [...history, userMsg]
+
+      // 📤 Wyślij zapytanie do API z pełnym kontekstem
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -90,7 +102,8 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose }
           message: text,
           mode: modeState,
           taskId: task.id,
-          history, // 🧠 przekazujemy pełen kontekst rozmowy
+          taskTitle: task.title, // 👈 przekazujemy nazwę zadania
+          history: conversation, // 👈 cały kontekst rozmowy
         }),
       })
 
@@ -103,8 +116,8 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose }
 
       const aiMsg: ChatMessage = { role: 'assistant', content: reply, timestamp: Date.now() }
 
-      // 💾 Zapisz odpowiedź i skrót
-      const newChat = [...updatedChat, aiMsg]
+      // 💾 Zaktualizuj lokalny czat i tooltip
+      const newChat = [...conversation, aiMsg]
       if (chatKey) localStorage.setItem(chatKey, JSON.stringify(newChat))
       localStorage.setItem(`summary_${task.id}`, aiMsg.content.slice(0, 300))
       setChat(newChat)
@@ -112,13 +125,24 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose }
       // 🧠 Zapisz metadane do historii (dla ChatSidebar)
       localStorage.setItem(`task_title_${task.id}`, task.title)
 
-      // 💬 Dodaj wiadomość użytkownika i AI do historii czatu
-      const existingChat = JSON.parse(localStorage.getItem(`chat_task_${task.id}`) || '[]')
-      existingChat.push(userMsg)
-      existingChat.push(aiMsg)
-      localStorage.setItem(`chat_task_${task.id}`, JSON.stringify(existingChat))
+      // 💬 Zaktualizuj wpis w historii
+      const sessions = JSON.parse(localStorage.getItem('chat_sessions_task') || '[]')
+      const existing = sessions.find((s: any) => s.id === task.id)
+      const newEntry = {
+        id: task.id,
+        title: task.title,
+        timestamp: Date.now(),
+        last: reply.slice(0, 200),
+      }
 
-      // 🔄 Wyślij event do odświeżenia historii
+      if (existing) {
+        existing.last = newEntry.last
+        existing.timestamp = newEntry.timestamp
+      } else {
+        sessions.unshift(newEntry)
+      }
+
+      localStorage.setItem('chat_sessions_task', JSON.stringify(sessions))
       window.dispatchEvent(new Event('chatUpdated'))
     } catch (err) {
       console.error('❌ Błąd komunikacji z AI:', err)
@@ -143,7 +167,7 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose }
     }, 200)
   }
 
-  // 🔽 Auto-scroll
+  // 🔽 Auto-scroll po każdej zmianie
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [chat])
