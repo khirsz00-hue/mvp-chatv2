@@ -5,7 +5,15 @@ export const runtime = 'nodejs'
 
 export async function POST(req: Request) {
   try {
-    const { message, token, tasks: providedTasks, mode, taskId } = await req.json()
+    const {
+      message,
+      token,
+      tasks: providedTasks,
+      mode,
+      taskId,
+      taskTitle,
+      history = [],
+    } = await req.json()
 
     if (!message) {
       return NextResponse.json({ error: 'Brak wiadomości' }, { status: 400 })
@@ -42,14 +50,21 @@ export async function POST(req: Request) {
 
     // 🔧 Przygotowanie promptu kontekstowego
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
-
     let systemPrompt = ''
 
     if (mode === 'task') {
       systemPrompt = `
 Jesteś inteligentnym asystentem pomagającym użytkownikowi w realizacji konkretnego zadania.
 Nie masz dostępu do Todoist.
-Zachowuj się jak osobisty doradca – pomagaj rozwiązać problem krok po kroku, zadawaj pytania uściślające, podpowiadaj możliwe działania.
+Twoim celem jest pomóc użytkownikowi w zrozumieniu, zaplanowaniu i realizacji tego zadania krok po kroku.
+
+Zadanie: "${taskTitle || '(brak tytułu)'}"
+
+Zasady:
+- Odpowiadasz po polsku.
+- Nie pytaj ponownie o to samo, jeśli masz już kontekst z historii.
+- Jeśli użytkownik pisze "rozwiń to dalej", "kontynuuj" lub "doprecyzuj", kontynuuj wątek logicznie.
+- Możesz proponować działania, checklisty, analizować priorytety, sugerować dalsze kroki.
 `.trim()
     } else if (token) {
       const taskList =
@@ -75,12 +90,21 @@ Jesteś przyjaznym asystentem AI pomagającym użytkownikowi w planowaniu i orga
 `.trim()
     }
 
-    // 🧠 Zapytanie do OpenAI
+    // 🧩 Konwersja historii rozmowy (jeśli dostępna)
+    const conversation = Array.isArray(history)
+      ? history.slice(-10).map((msg: any) => ({
+          role: msg.role === 'assistant' ? 'assistant' : 'user',
+          content: msg.content,
+        }))
+      : []
+
+    // 🧠 Zapytanie do OpenAI z pełnym kontekstem
     const completion = await client.chat.completions.create({
       model: 'gpt-4o-mini',
       temperature: 0.7,
       messages: [
         { role: 'system', content: systemPrompt },
+        ...conversation, // pełen kontekst
         { role: 'user', content: message },
       ],
     })
