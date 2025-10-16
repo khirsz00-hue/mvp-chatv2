@@ -106,31 +106,26 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose }
         return updated
       })
 
-      // 🧠 Zapisz do historii
+      // 🧠 Zapisz metadane do historii (dla ChatSidebar)
       localStorage.setItem(`task_title_${task.id}`, task.title)
-      const sessions = JSON.parse(localStorage.getItem('chat_sessions_task') || '[]')
-      const existing = sessions.find((s: any) => s.id === task.id)
-      const newEntry = {
-        id: task.id,
-        title: task.title,
-        timestamp: Date.now(),
-        last: reply.slice(0, 200),
-      }
 
-      if (existing) {
-        existing.last = newEntry.last
-        existing.timestamp = newEntry.timestamp
-      } else {
-        sessions.unshift(newEntry)
-      }
+      // 💬 Dodaj wiadomość użytkownika do historii czatu
+      const existingChat = JSON.parse(localStorage.getItem(`chat_task_${task.id}`) || '[]')
+      existingChat.push(userMsg)
+      existingChat.push(aiMsg)
+      localStorage.setItem(`chat_task_${task.id}`, JSON.stringify(existingChat))
 
-      localStorage.setItem('chat_sessions_task', JSON.stringify(sessions))
+      // 🔄 Wyślij event do odświeżenia historii
       window.dispatchEvent(new Event('chatUpdated'))
     } catch (err) {
       console.error('❌ Błąd komunikacji z AI:', err)
       setChat((prev) => [
         ...prev,
-        { role: 'assistant', content: '⚠️ Wystąpił błąd komunikacji z AI.', timestamp: Date.now() },
+        {
+          role: 'assistant',
+          content: '⚠️ Wystąpił błąd komunikacji z AI.',
+          timestamp: Date.now(),
+        },
       ])
     } finally {
       setLoading(false)
