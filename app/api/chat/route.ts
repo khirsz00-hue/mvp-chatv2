@@ -5,20 +5,16 @@ export const runtime = 'nodejs'
 
 export async function POST(req: Request) {
   try {
-    const { message, token, tasks: providedTasks } = await req.json()
+    const { message, token, tasks: providedTasks, mode, taskId } = await req.json()
 
     if (!message) {
       return NextResponse.json({ error: 'Brak wiadomości' }, { status: 400 })
     }
 
-    if (!token) {
-      return NextResponse.json({ error: 'Brak tokena Todoist' }, { status: 400 })
-    }
-
     const lower = message.toLowerCase()
     let tasks: any[] = []
 
-    // 🔹 Zakres filtracji (opcjonalny)
+    // 🔹 Zakres filtracji (opcjonalny, tylko dla Todoist)
     let filter = ''
     if (lower.includes('jutro')) filter = 'tomorrow'
     else if (lower.includes('tydzień') || lower.includes('tydzien')) filter = '7 days'
@@ -26,29 +22,44 @@ export async function POST(req: Request) {
     else if (lower.includes('przeterminowane')) filter = 'overdue'
     else filter = 'today'
 
-    // 🧩 Pobranie lub użycie zadań z frontu
-    if (providedTasks && providedTasks.length > 0) {
-      console.log(`📦 Otrzymano ${providedTasks.length} zadań z frontu.`)
+    // 🧩 Pobranie lub użycie zadań (jeśli tryb Todoist)
+    if (token) {
+      if (providedTasks && providedTasks.length > 0) {
+        console.log(`📦 Otrzymano ${providedTasks.length} zadań z frontu.`)
+        tasks = providedTasks
+      } else {
+        console.log('🌐 Brak zadań z frontu — pobieram z Todoista...')
+        const res = await fetch('https://api.todoist.com/rest/v2/tasks', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!res.ok) throw new Error(`Todoist API error: ${res.status}`)
+        tasks = await res.json()
+        console.log(`✅ Znaleziono zadań w Todoist: ${tasks.length}`)
+      }
+    } else if (providedTasks?.length) {
       tasks = providedTasks
-    } else {
-      console.log('🌐 Brak zadań z frontu — pobieram z Todoista...')
-      const res = await fetch('https://api.todoist.com/rest/v2/tasks', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!res.ok) throw new Error(`Todoist API error: ${res.status}`)
-      tasks = await res.json()
-      console.log(`✅ Znaleziono zadań w Todoist: ${tasks.length}`)
     }
 
-    // 🧠 Analiza AI
+    // 🔧 Przygotowanie promptu kontekstowego
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
 
-    const taskList =
-      tasks.length > 0
-        ? tasks.map((t) => `- ${t.content}${t.due?.date ? ` (termin: ${t.due.date})` : ''}`).join('\n')
-        : '(Brak zadań)'
+    let systemPrompt = ''
 
-    const systemPrompt = `
+    if (mode === 'task') {
+      systemPrompt = `
+Jesteś inteligentnym asystentem pomagającym użytkownikowi w realizacji konkretnego zadania.
+Nie masz dostępu do Todoist.
+Zachowuj się jak osobisty doradca – pomagaj rozwiązać problem krok po kroku, zadawaj pytania uściślające, podpowiadaj możliwe działania.
+`.trim()
+    } else if (token) {
+      const taskList =
+        tasks.length > 0
+          ? tasks
+              .map((t) => `- ${t.content}${t.due?.date ? ` (termin: ${t.due.date})` : ''}`)
+              .join('\n')
+          : '(Brak zadań w Todoist)'
+
+      systemPrompt = `
 Jesteś inteligentnym asystentem produktywności zintegrowanym z Todoist.
 Zasady:
 - Odpowiadasz po polsku.
@@ -57,8 +68,14 @@ Zasady:
 - Jeśli nie masz danych, poproś użytkownika o kontekst.
 Dostępne zadania:
 ${taskList}
-    `.trim()
+`.trim()
+    } else {
+      systemPrompt = `
+Jesteś przyjaznym asystentem AI pomagającym użytkownikowi w planowaniu i organizacji pracy.
+`.trim()
+    }
 
+    // 🧠 Zapytanie do OpenAI
     const completion = await client.chat.completions.create({
       model: 'gpt-4o-mini',
       temperature: 0.7,
@@ -68,10 +85,9 @@ ${taskList}
       ],
     })
 
-    const reply = completion.choices[0]?.message?.content || '🤖 Brak odpowiedzi od AI.'
-    console.log('💬 Odpowiedź AI:', reply.slice(0, 300))
+    const reply = completion.choices[0]?.message?.content?.trim() || '🤖 Brak odpowiedzi od AI.'
+    console.log('💬 Odpowiedź AI:', reply.slice(0, 200))
 
-    // ✅ ZAWSZE zwracamy `content` (nie `reply`)
     return NextResponse.json({
       success: true,
       content: reply,
