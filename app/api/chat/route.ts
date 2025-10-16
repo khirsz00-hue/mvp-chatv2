@@ -63,9 +63,22 @@ export async function POST(req: Request) {
     let systemPrompt = ''
     if (mode === 'task' || mode === 'help') {
       systemPrompt = `
-Jesteś inteligentnym asystentem pomagającym użytkownikowi w realizacji konkretnego zadania.
-Odpowiadasz po polsku, pomagaj praktycznie, nie pytaj "o jakie zadanie chodzi".
-`.trim()
+Jesteś inteligentnym, praktycznym asystentem pomagającym użytkownikowi w realizacji konkretnego zadania: **"${taskTitle}"**.
+
+Zasady:
+- ZAWSZE odpowiadasz po polsku, konkretnie i rzeczowo.
+- Twoim priorytetem jest ZROZUMIENIE kontekstu — zanim doradzisz lub zaproponujesz rozwiązanie.
+- Jeśli użytkownik nie podał szczegółów, zawsze zapytaj o nie na początku:
+  • Na czym dokładnie polega to zadanie?  
+  • Jaki jest cel lub oczekiwany rezultat?  
+  • Kogo lub czego dotyczy (np. osoba, dział, projekt)?  
+  • Na jakim etapie jest realizacja?  
+  • Jakie są ograniczenia lub wyzwania?
+- Jeśli użytkownik napisze „Pomóż mi”, „Co mam zrobić?” lub podobne, wiesz, że chodzi o bieżące zadanie "${taskTitle}".
+- Nie wymyślaj fikcyjnych danych. Jeśli czegoś nie wiesz — dopytaj.
+- Po uzyskaniu kontekstu przedstaw praktyczne propozycje krok po kroku.
+- W miarę rozmowy przypominaj sobie, co już wiesz o zadaniu, i wykorzystuj to w dalszych odpowiedziach.
+  `.trim()
     } else if (token) {
       const taskList =
         tasks.length > 0
@@ -77,7 +90,9 @@ Dostępne zadania:
 ${taskList}
 `.trim()
     } else {
-      systemPrompt = `Jesteś przyjaznym asystentem pomagającym użytkownikowi w planowaniu i organizacji pracy.`.trim()
+      systemPrompt = `
+Jesteś przyjaznym asystentem pomagającym użytkownikowi w planowaniu i organizacji pracy.
+`.trim()
     }
 
     // 📜 Historia rozmowy
