@@ -61,9 +61,9 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
       .slice(0, 15)
     setGlobalChats(global)
 
-    // ✅ Taski
+    // ✅ Taski (łączone: chat_task_ + chat_sessions_task)
     const keys = Object.keys(localStorage)
-    const tasks: TaskPreview[] = keys
+    const tasksFromChats: TaskPreview[] = keys
       .filter((k: string) => k.startsWith('chat_task_'))
       .map((k: string): TaskPreview => {
         const chat = JSON.parse(localStorage.getItem(k) || '[]') as any[]
@@ -86,9 +86,33 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
           timestamp: lastMsg?.timestamp || 0,
         }
       })
-      .sort((a: TaskPreview, b: TaskPreview) => b.timestamp - a.timestamp)
-      .slice(0, 15)
-    setTaskChats(tasks)
+
+    // 🧠 Dodatkowo: czaty z chat_sessions_task (wpisy z TaskDialog)
+    const sessions = JSON.parse(localStorage.getItem('chat_sessions_task') || '[]') as any[]
+    const tasksFromSessions: TaskPreview[] = sessions.map((s: any) => ({
+      id: s.id,
+      title: s.title,
+      last: s.last || '(brak wiadomości)',
+      date: new Date(s.timestamp).toLocaleString('pl-PL', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      timestamp: s.timestamp,
+    }))
+
+    // 🔗 Połącz obie listy (unikalne ID, preferuj dane z sessions)
+    const mergedTasks: TaskPreview[] = [
+      ...tasksFromSessions,
+      ...tasksFromChats.filter(
+        (t) => !tasksFromSessions.some((s) => s.id === t.id)
+      ),
+    ]
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, 25)
+
+    setTaskChats(mergedTasks)
 
     // 🎩 Six Hats
     const sixData = JSON.parse(localStorage.getItem('chat_six_hats') || '[]') as any[]
@@ -110,7 +134,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
 
     // 🧠 Todoist Sessions
     const rawSessions = JSON.parse(localStorage.getItem('chat_sessions_todoist') || '[]') as any[]
-    const sessions: TodoistSession[] = rawSessions
+    const sessionsData: TodoistSession[] = rawSessions
       .map((s: any): TodoistSession => {
         const messages = JSON.parse(localStorage.getItem(`chat_todoist_${s.id}`) || '[]') as any[]
         const lastMsg = messages[messages.length - 1]
@@ -121,7 +145,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
       })
       .sort((a: TodoistSession, b: TodoistSession) => b.timestamp - a.timestamp)
       .slice(0, 25)
-    setTodoistSessions(sessions)
+    setTodoistSessions(sessionsData)
   }
 
   useEffect(() => {
