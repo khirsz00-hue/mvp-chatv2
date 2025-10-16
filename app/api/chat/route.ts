@@ -10,7 +10,7 @@ type SimpleChatMessage = {
 
 export async function POST(req: Request) {
   try {
-    const { message, token, tasks: providedTasks, mode, taskId, history } = await req.json()
+    const { message, token, tasks: providedTasks, mode, taskId, taskTitle, history } = await req.json()
 
     if (!message) {
       return NextResponse.json({ error: 'Brak wiadomości' }, { status: 400 })
@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     const lower = message.toLowerCase()
     let tasks: any[] = []
 
-    // 🔹 Zakres filtracji (opcjonalny, tylko dla Todoist)
+    // 🔹 Zakres filtracji (opcjonalny)
     let filter = ''
     if (lower.includes('jutro')) filter = 'tomorrow'
     else if (lower.includes('tydzień') || lower.includes('tydzien')) filter = '7 days'
@@ -45,24 +45,23 @@ export async function POST(req: Request) {
       tasks = providedTasks
     }
 
-    // 🔧 Przygotowanie promptu kontekstowego
+    // 🧠 Przygotowanie kontekstu
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
 
     let systemPrompt = ''
 
-    if (mode === 'task') {
+    if (mode === 'task' || mode === 'help') {
       systemPrompt = `
 Jesteś inteligentnym asystentem pomagającym użytkownikowi w realizacji konkretnego zadania.
-Nie masz dostępu do Todoist.
-Zachowuj się jak osobisty doradca – pomagaj rozwiązać problem krok po kroku, zadawaj pytania uściślające, podpowiadaj możliwe działania.
-Odpowiadaj po polsku.
+Zawsze odpowiadaj po polsku.
+Zachowuj się jak doradca, który zna temat zadania i pomaga krok po kroku.
+Nie pytaj, jakie to zadanie — już wiesz.
+Jeśli użytkownik prosi o pomoc, analizuj kontekst i doradzaj praktycznie.
 `.trim()
     } else if (token) {
       const taskList =
         tasks.length > 0
-          ? tasks
-              .map((t) => `- ${t.content}${t.due?.date ? ` (termin: ${t.due.date})` : ''}`)
-              .join('\n')
+          ? tasks.map((t) => `- ${t.content}${t.due?.date ? ` (termin: ${t.due.date})` : ''}`).join('\n')
           : '(Brak zadań w Todoist)'
 
       systemPrompt = `
@@ -71,18 +70,17 @@ Zasady:
 - Odpowiadasz po polsku.
 - Jeśli użytkownik prosi o "pogrupowanie", utwórz logiczne kategorie (np. Finanse, IT, Sprawy osobiste).
 - Nie wymyślaj nowych zadań spoza listy.
-- Jeśli nie masz danych, poproś użytkownika o kontekst.
 Dostępne zadania:
 ${taskList}
 `.trim()
     } else {
       systemPrompt = `
 Jesteś przyjaznym asystentem AI pomagającym użytkownikowi w planowaniu i organizacji pracy.
-Odpowiadasz po polsku.
+Zawsze odpowiadaj po polsku.
 `.trim()
     }
 
-    // 📜 Konwersacja – historia + wiadomość użytkownika
+    // 📜 Historia rozmowy
     const conversation: SimpleChatMessage[] = Array.isArray(history)
       ? history.slice(-10).map((msg: any) => ({
           role: msg.role === 'assistant' ? 'assistant' : 'user',
@@ -90,20 +88,20 @@ Odpowiadasz po polsku.
         }))
       : []
 
-    // 🧠 KONTEKST — wstrzyknięcie tytułu zadania jako osobnej wiadomości systemowej
+    // 🧠 KONTEKST — tytuł zadania jako osobna wiadomość systemowa
     const contextIntro: SimpleChatMessage[] =
       mode === 'task' || mode === 'help'
         ? [
             {
               role: 'system',
-              content: `Kontekst rozmowy: pomagaj użytkownikowi w zadaniu o nazwie "${taskId || 'Nieznane zadanie'}". 
-Zawsze traktuj to jako główny temat całej rozmowy. 
-Bądź konkretny i zadawaj pytania, które pomogą użytkownikowi ruszyć dalej z tym zadaniem.`,
+              content: `Kontekst rozmowy: Pomagasz użytkownikowi w zadaniu o nazwie "${taskTitle || taskId || 'Nieznane zadanie'}".
+Zawsze traktuj to jako główny temat rozmowy.
+Jeśli użytkownik prosi o pomoc, nawiązuj do tego zadania, jego postępu i możliwych kroków.`,
             },
           ]
         : []
 
-    // 🧩 Kompletna sekwencja wiadomości dla OpenAI
+    // 🧩 Kompletna sekwencja wiadomości
     const messages: SimpleChatMessage[] = [
       { role: 'system', content: systemPrompt },
       ...contextIntro,
@@ -112,7 +110,7 @@ Bądź konkretny i zadawaj pytania, które pomogą użytkownikowi ruszyć dalej 
         role: 'user',
         content:
           mode === 'task' || mode === 'help'
-            ? `Użytkownik pisze w kontekście zadania "${taskId || 'Nieznane zadanie'}": ${message}`
+            ? `Użytkownik pisze w kontekście zadania "${taskTitle || taskId}": ${message}`
             : message,
       },
     ]
@@ -125,7 +123,7 @@ Bądź konkretny i zadawaj pytania, które pomogą użytkownikowi ruszyć dalej 
     })
 
     const reply = completion.choices[0]?.message?.content?.trim() || '🤖 Brak odpowiedzi od AI.'
-    console.log('💬 Odpowiedź AI:', reply.slice(0, 200))
+    console.log('💬 Odpowiedź AI:', reply.slice(0, 150))
 
     return NextResponse.json({
       success: true,
