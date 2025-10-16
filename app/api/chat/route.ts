@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     const lower = message.toLowerCase()
     let tasks: any[] = []
 
-    // 🔹 Zakres filtracji (opcjonalny, tylko dla Todoist)
+    // 🔹 Filtrowanie (dla Todoist)
     let filter = ''
     if (lower.includes('jutro')) filter = 'tomorrow'
     else if (lower.includes('tydzień') || lower.includes('tydzien')) filter = '7 days'
@@ -35,41 +35,38 @@ export async function POST(req: Request) {
     else if (lower.includes('przeterminowane')) filter = 'overdue'
     else filter = 'today'
 
-    // 🧩 Pobranie lub użycie zadań (jeśli tryb Todoist)
+    // 🔹 Pobranie zadań z Todoist (opcjonalne)
     if (token) {
       if (providedTasks && providedTasks.length > 0) {
-        console.log(`📦 Otrzymano ${providedTasks.length} zadań z frontu.`)
         tasks = providedTasks
       } else {
-        console.log('🌐 Brak zadań z frontu — pobieram z Todoista...')
         const res = await fetch('https://api.todoist.com/rest/v2/tasks', {
           headers: { Authorization: `Bearer ${token}` },
         })
         if (!res.ok) throw new Error(`Todoist API error: ${res.status}`)
         tasks = await res.json()
-        console.log(`✅ Znaleziono zadań w Todoist: ${tasks.length}`)
       }
-    } else if (providedTasks?.length) {
-      tasks = providedTasks
     }
 
-    // 🔧 Przygotowanie promptu kontekstowego
+    // 🧠 Inicjalizacja OpenAI
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
+
     let systemPrompt = ''
 
-    if (mode === 'task') {
+    // 🧩 Tryb “pomocy w zadaniu”
+    if (mode === 'task' || mode === 'help') {
       systemPrompt = `
 Jesteś inteligentnym asystentem pomagającym użytkownikowi w realizacji konkretnego zadania.
-Nie masz dostępu do Todoist.
-Twoim celem jest pomóc użytkownikowi w zrozumieniu, zaplanowaniu i realizacji tego zadania krok po kroku.
 
-Zadanie: "${taskTitle || '(brak tytułu)'}"
+Zadanie użytkownika: "${taskTitle || '(brak tytułu)'}"
 
-Zasady:
-- Odpowiadasz po polsku.
-- Nie pytaj ponownie o to samo, jeśli masz już kontekst z historii.
-- Jeśli użytkownik pisze "rozwiń to dalej", "kontynuuj" lub "doprecyzuj", kontynuuj wątek logicznie.
-- Możesz proponować działania, checklisty, analizować priorytety, sugerować dalsze kroki.
+Twoje zasady:
+- Zawsze odnoś się do tego zadania.
+- Najpierw dopytaj użytkownika o szczegóły (np. cel, zakres, termin, przeszkody, oczekiwany efekt).
+- Potem pomagaj mu krok po kroku w realizacji.
+- Odpowiadaj po polsku.
+- Nie przechodź do nowych tematów — zawsze utrzymuj rozmowę w kontekście tego konkretnego zadania.
+- Jeśli użytkownik napisze coś ogólnego, potraktuj to w kontekście tego zadania.
 `.trim()
     } else if (token) {
       const taskList =
@@ -85,7 +82,6 @@ Zasady:
 - Odpowiadasz po polsku.
 - Jeśli użytkownik prosi o "pogrupowanie", utwórz logiczne kategorie (np. Finanse, IT, Sprawy osobiste).
 - Nie wymyślaj nowych zadań spoza listy.
-- Jeśli nie masz danych, poproś użytkownika o kontekst.
 Dostępne zadania:
 ${taskList}
 `.trim()
@@ -95,7 +91,7 @@ Jesteś przyjaznym asystentem AI pomagającym użytkownikowi w planowaniu i orga
 `.trim()
     }
 
-    // 🧩 Konwersja historii rozmowy
+    // 📜 Konwersja historii
     const conversation: SimpleChatMessage[] = Array.isArray(history)
       ? history.slice(-10).map((msg: any) => ({
           role: msg.role === 'assistant' ? 'assistant' : 'user',
@@ -103,20 +99,22 @@ Jesteś przyjaznym asystentem AI pomagającym użytkownikowi w planowaniu i orga
         }))
       : []
 
-    // 🧠 Zapytanie do OpenAI z pełnym kontekstem
+    // 🧩 Pełny kontekst rozmowy
     const messages: SimpleChatMessage[] = [
       { role: 'system', content: systemPrompt },
       ...conversation,
       { role: 'user', content: message },
     ]
 
+    // 🧠 Zapytanie do OpenAI
     const completion = await client.chat.completions.create({
       model: 'gpt-4o-mini',
       temperature: 0.7,
       messages,
     })
 
-    const reply = completion.choices[0]?.message?.content?.trim() || '🤖 Brak odpowiedzi od AI.'
+    const reply =
+      completion.choices[0]?.message?.content?.trim() || '🤖 Brak odpowiedzi od AI.'
     console.log('💬 Odpowiedź AI:', reply.slice(0, 200))
 
     return NextResponse.json({
@@ -126,6 +124,9 @@ Jesteś przyjaznym asystentem AI pomagającym użytkownikowi w planowaniu i orga
     })
   } catch (err: any) {
     console.error('❌ Błąd /api/chat:', err)
-    return NextResponse.json({ error: err.message, type: 'error' }, { status: 500 })
+    return NextResponse.json(
+      { error: err.message, type: 'error' },
+      { status: 500 }
+    )
   }
 }
