@@ -13,7 +13,7 @@ type ChatMessage = {
 }
 
 interface TaskDialogProps {
-  task?: { id: string; title: string } // może być puste przy otwarciu z eventu
+  task?: { id: string; title: string }
   mode?: 'help' | 'task' | 'todoist'
   onClose?: () => void
 }
@@ -27,14 +27,14 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose }
   const [loading, setLoading] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  // 🔑 wybierz poprawny klucz czatu
+  // 🔑 Klucz czatu
   const chatKey = task
     ? modeState === 'task'
       ? `chat_task_${task.id}`
       : `chat_todoist_${task.id}`
     : null
 
-  // 📡 Otwieranie przez globalny event `chatSelect`
+  // 📡 Otwieranie przez globalny event
   useEffect(() => {
     const handleSelect = (event: CustomEvent) => {
       const detail = event.detail
@@ -44,14 +44,11 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose }
         setIsOpen(true)
       }
     }
-
     window.addEventListener('chatSelect', handleSelect as EventListener)
-    return () => {
-      window.removeEventListener('chatSelect', handleSelect as EventListener)
-    }
+    return () => window.removeEventListener('chatSelect', handleSelect as EventListener)
   }, [])
 
-  // 📦 Wczytaj historię rozmowy po otwarciu
+  // 📦 Wczytaj historię rozmowy
   useEffect(() => {
     if (!chatKey) return
     try {
@@ -59,9 +56,7 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose }
       if (saved) {
         const parsed = JSON.parse(saved)
         setChat(Array.isArray(parsed) ? parsed : [])
-      } else {
-        setChat([])
-      }
+      } else setChat([])
     } catch (err) {
       console.error('Błąd odczytu historii:', err)
       setChat([])
@@ -70,9 +65,7 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose }
 
   // 💾 Zapisuj czat
   useEffect(() => {
-    if (chatKey) {
-      localStorage.setItem(chatKey, JSON.stringify(chat))
-    }
+    if (chatKey) localStorage.setItem(chatKey, JSON.stringify(chat))
   }, [chat, chatKey])
 
   // ✉️ Wysyłanie wiadomości
@@ -104,7 +97,35 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose }
         '🤖 Nie otrzymano odpowiedzi od AI. Spróbuj ponownie.'
 
       const aiMsg: ChatMessage = { role: 'assistant', content: reply, timestamp: Date.now() }
-      setChat((prev) => [...prev, aiMsg])
+
+      // 💾 Zapisz odpowiedź i skrót
+      setChat((prev) => {
+        const updated = [...prev, aiMsg]
+        if (chatKey) localStorage.setItem(chatKey, JSON.stringify(updated))
+        localStorage.setItem(`summary_${task.id}`, aiMsg.content.slice(0, 300))
+        return updated
+      })
+
+      // 🧠 Zapisz do historii
+      localStorage.setItem(`task_title_${task.id}`, task.title)
+      const sessions = JSON.parse(localStorage.getItem('chat_sessions_task') || '[]')
+      const existing = sessions.find((s: any) => s.id === task.id)
+      const newEntry = {
+        id: task.id,
+        title: task.title,
+        timestamp: Date.now(),
+        last: reply.slice(0, 200),
+      }
+
+      if (existing) {
+        existing.last = newEntry.last
+        existing.timestamp = newEntry.timestamp
+      } else {
+        sessions.unshift(newEntry)
+      }
+
+      localStorage.setItem('chat_sessions_task', JSON.stringify(sessions))
+      window.dispatchEvent(new Event('chatUpdated'))
     } catch (err) {
       console.error('❌ Błąd komunikacji z AI:', err)
       setChat((prev) => [
