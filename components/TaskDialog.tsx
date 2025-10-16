@@ -14,26 +14,33 @@ type ChatMessage = {
 
 interface TaskDialogProps {
   task?: { id: string; title: string } // może być puste przy otwarciu z eventu
-  mode?: 'help'
+  mode?: 'help' | 'task' | 'todoist'
   onClose?: () => void
 }
 
 export default function TaskDialog({ task: initialTask, mode = 'help', onClose }: TaskDialogProps) {
   const [isOpen, setIsOpen] = useState<boolean>(false)
+  const [modeState, setModeState] = useState<'help' | 'task' | 'todoist'>(mode)
   const [task, setTask] = useState<{ id: string; title: string } | null>(initialTask || null)
   const [chat, setChat] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  const chatKey = task ? `chat_todoist_${task.id}` : null
+  // 🔑 wybierz poprawny klucz czatu
+  const chatKey = task
+    ? modeState === 'task'
+      ? `chat_task_${task.id}`
+      : `chat_todoist_${task.id}`
+    : null
 
-  // 📡 Obsługa otwarcia przez globalny event `chatSelect`
+  // 📡 Otwieranie przez globalny event `chatSelect`
   useEffect(() => {
     const handleSelect = (event: CustomEvent) => {
       const detail = event.detail
       if (detail?.task?.id) {
         setTask({ id: detail.task.id, title: detail.task.title })
+        setModeState(detail.mode || 'todoist')
         setIsOpen(true)
       }
     }
@@ -47,13 +54,25 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose }
   // 📦 Wczytaj historię rozmowy po otwarciu
   useEffect(() => {
     if (!chatKey) return
-    const saved = localStorage.getItem(chatKey)
-    if (saved) setChat(JSON.parse(saved))
+    try {
+      const saved = localStorage.getItem(chatKey)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        setChat(Array.isArray(parsed) ? parsed : [])
+      } else {
+        setChat([])
+      }
+    } catch (err) {
+      console.error('Błąd odczytu historii:', err)
+      setChat([])
+    }
   }, [chatKey])
 
   // 💾 Zapisuj czat
   useEffect(() => {
-    if (chatKey) localStorage.setItem(chatKey, JSON.stringify(chat))
+    if (chatKey) {
+      localStorage.setItem(chatKey, JSON.stringify(chat))
+    }
   }, [chat, chatKey])
 
   // ✉️ Wysyłanie wiadomości
@@ -70,10 +89,20 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose }
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({
+          message: text,
+          mode: modeState,
+          taskId: task.id,
+        }),
       })
+
       const data = await res.json()
-      const reply = data.reply || data.content || '🤖 Brak odpowiedzi od AI.'
+      const reply =
+        data.reply ||
+        data.content ||
+        data.message ||
+        '🤖 Nie otrzymano odpowiedzi od AI. Spróbuj ponownie.'
+
       const aiMsg: ChatMessage = { role: 'assistant', content: reply, timestamp: Date.now() }
       setChat((prev) => [...prev, aiMsg])
     } catch (err) {
@@ -125,6 +154,9 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose }
           <div className="sticky top-0 flex justify-between items-center px-5 py-3 border-b bg-gray-50 z-10">
             <h2 className="text-lg font-semibold text-gray-800 truncate pr-4">
               {task.title}
+              <span className="ml-2 text-xs text-gray-500">
+                ({modeState === 'task' ? 'Zadanie' : 'Todoist'})
+              </span>
             </h2>
             <button
               onClick={handleClose}
