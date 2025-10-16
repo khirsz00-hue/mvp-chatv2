@@ -134,15 +134,15 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
     }
   }, [])
 
-  const handleSelect = (mode: any, session: any) => {
+  const handleSelect = (mode: 'global' | 'task' | 'six_hats' | 'todoist', session: any) => {
     setActiveSessionId(session.id)
 
-    if (mode === 'todoist') {
-      // 🔥 Emit event to open modal (TaskDialog)
+    // 🔥 Emit global event for modal (TaskDialog)
+    if (mode === 'todoist' || mode === 'task') {
       window.dispatchEvent(
         new CustomEvent('chatSelect', {
           detail: {
-            mode: 'todoist',
+            mode,
             task: { id: session.id, title: session.title },
           },
         })
@@ -188,6 +188,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
 
       {/* LISTA */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2 text-sm">
+        {/* 🧠 TODOIST */}
         {tab === 'todoist' &&
           (todoistSessions.length === 0 ? (
             <p className="text-gray-500 italic">Brak historii Todoist.</p>
@@ -217,27 +218,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
             ))
           ))}
 
-        {tab === 'global' &&
-          (globalChats.length === 0 ? (
-            <p className="text-gray-500 italic">Brak rozmów globalnych.</p>
-          ) : (
-            globalChats.map((chat, i) => (
-              <div
-                key={i}
-                onClick={() => handleSelect('global', { id: `global_${i}`, title: chat.content })}
-                title={chat.content}
-                className={`cursor-pointer border rounded-lg p-2 transition ${
-                  activeSessionId === `global_${i}`
-                    ? 'bg-green-100 border-green-300'
-                    : 'bg-white hover:bg-green-50'
-                }`}
-              >
-                <p className="text-xs text-gray-500">{chat.date}</p>
-                <p className="truncate text-gray-800">{chat.content}</p>
-              </div>
-            ))
-          ))}
-
+        {/* ✅ TASKI */}
         {tab === 'task' &&
           (taskChats.length === 0 ? (
             <p className="text-gray-500 italic">Brak rozmów z zadaniami.</p>
@@ -260,6 +241,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
             ))
           ))}
 
+        {/* 🎩 SIX HATS */}
         {tab === 'six_hats' &&
           (sixHatsChats.length === 0 ? (
             <p className="text-gray-500 italic">Brak rozmów Six Hats.</p>
@@ -271,6 +253,28 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
                 title={chat.content}
                 className={`cursor-pointer border rounded-lg p-2 transition ${
                   activeSessionId === `six_${i}`
+                    ? 'bg-green-100 border-green-300'
+                    : 'bg-white hover:bg-green-50'
+                }`}
+              >
+                <p className="text-xs text-gray-500">{chat.date}</p>
+                <p className="truncate text-gray-800">{chat.content}</p>
+              </div>
+            ))
+          ))}
+
+        {/* 🌍 GLOBALNE */}
+        {tab === 'global' &&
+          (globalChats.length === 0 ? (
+            <p className="text-gray-500 italic">Brak rozmów globalnych.</p>
+          ) : (
+            globalChats.map((chat, i) => (
+              <div
+                key={i}
+                onClick={() => handleSelect('global', { id: `global_${i}`, title: chat.content })}
+                title={chat.content}
+                className={`cursor-pointer border rounded-lg p-2 transition ${
+                  activeSessionId === `global_${i}`
                     ? 'bg-green-100 border-green-300'
                     : 'bg-white hover:bg-green-50'
                 }`}
