@@ -65,6 +65,20 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose }
     }
   }, [chatKey])
 
+  // 💬 Jeśli czat otwarty pierwszy raz — dodaj wiadomość startową z tytułem zadania
+  useEffect(() => {
+    if (isOpen && task && chat.length === 0) {
+      const introMsg: ChatMessage = {
+        role: 'assistant',
+        content: `Zaczynamy! Pomagam Ci w zadaniu **"${task.title}"**. 
+Powiedz, na jakim jesteś etapie albo z czym chcesz pomocy.`,
+        timestamp: Date.now(),
+      }
+      setChat([introMsg])
+      if (chatKey) localStorage.setItem(chatKey, JSON.stringify([introMsg]))
+    }
+  }, [isOpen, task])
+
   // 💾 Zapisuj czat po każdej zmianie
   useEffect(() => {
     if (chatKey) localStorage.setItem(chatKey, JSON.stringify(chat))
