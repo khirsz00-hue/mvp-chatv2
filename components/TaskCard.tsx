@@ -37,6 +37,7 @@ export default function TaskCard({
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null)
   const dateInputRef = useRef<HTMLInputElement>(null)
 
+  // 💡 Wczytaj AI-summary jeśli istnieje
   useEffect(() => {
     const saved = localStorage.getItem(`summary_${task.id}`)
     setSummary(saved || null)
@@ -48,6 +49,7 @@ export default function TaskCard({
     setTimeout(() => setToast(null), 2500)
   }
 
+  // ✅ Ukończenie zadania
   const handleComplete = async () => {
     await fetch('/api/todoist/complete', {
       method: 'POST',
@@ -58,6 +60,7 @@ export default function TaskCard({
     setTimeout(() => onAction('completed'), 400)
   }
 
+  // 🗑 Usunięcie zadania
   const handleDelete = async () => {
     await fetch('/api/todoist/delete', {
       method: 'POST',
@@ -68,6 +71,7 @@ export default function TaskCard({
     setTimeout(() => onAction('deleted'), 400)
   }
 
+  // 📅 Przeniesienie na nową datę
   const handlePostpone = async (newDate: string) => {
     if (!newDate) return
     await fetch('/api/todoist/postpone', {
@@ -81,8 +85,8 @@ export default function TaskCard({
 
   const openDatePicker = () => dateInputRef.current?.showPicker?.()
 
+  // 💬 Otwiera modal pomocy AI
   const handleHelp = () => {
-    // 🔥 Otwórz modal globalny (TaskDialog) przez event
     window.dispatchEvent(
       new CustomEvent('chatSelect', {
         detail: {
@@ -93,6 +97,20 @@ export default function TaskCard({
     )
   }
 
+  // 🎨 Kolor priorytetu
+  const priorityColor =
+    task.priority === 4
+      ? 'border-red-300'
+      : task.priority === 3
+      ? 'border-yellow-300'
+      : task.priority === 2
+      ? 'border-blue-300'
+      : 'border-gray-200'
+
+  // 🕐 Czy zadanie jest po terminie
+  const isOverdue =
+    task.due && new Date(task.due).getTime() < Date.now() - 24 * 60 * 60 * 1000
+
   return (
     <AnimatePresence mode="popLayout">
       {!isHidden && (
@@ -102,12 +120,12 @@ export default function TaskCard({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.25 }}
-          className={`relative border border-gray-200 rounded-lg p-3 bg-white shadow-sm hover:shadow-md transition-all overflow-visible ${
+          className={`relative border ${priorityColor} rounded-lg p-3 bg-white shadow-sm hover:shadow-md transition-all overflow-visible ${
             selected ? 'ring-2 ring-blue-300' : ''
           }`}
         >
+          {/* 📋 Treść zadania */}
           <div className="flex items-start justify-between gap-3">
-            {/* Checkbox + treść */}
             <div className="flex-1 min-w-0">
               <div className="flex items-start gap-2">
                 {selectable && (
@@ -118,47 +136,62 @@ export default function TaskCard({
                     className="mt-1 accent-blue-600 cursor-pointer"
                   />
                 )}
-                <p className="font-medium text-gray-800 text-[13px] leading-snug break-words">
-                  {task.content}
-                </p>
+
+                <div className="flex flex-col">
+                  <p
+                    className={`font-medium text-gray-800 text-[13px] leading-snug break-words ${
+                      isOverdue ? 'text-red-600 line-through' : ''
+                    }`}
+                  >
+                    {task.content}
+                  </p>
+
+                  <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-gray-500">
+                    {task.due && (
+                      <span
+                        className={`${
+                          isOverdue ? 'text-red-600 font-medium' : 'text-gray-600'
+                        }`}
+                      >
+                        {new Date(task.due).toLocaleDateString('pl-PL', {
+                          day: '2-digit',
+                          month: 'short',
+                        })}
+                      </span>
+                    )}
+
+                    {task.project_name && (
+                      <span className="bg-gray-100 px-1.5 py-[1px] rounded text-gray-600">
+                        📁 {task.project_name}
+                      </span>
+                    )}
+
+                    {task.labels?.map((label) => (
+                      <span
+                        key={label}
+                        className="bg-gray-100 px-1.5 py-[1px] rounded text-gray-600"
+                      >
+                        #{label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
                 {summary && (
                   <div
                     className="ml-1 text-yellow-500 cursor-pointer select-none hover:scale-110 transition-transform"
-                    onMouseEnter={(e) =>
-                      setTooltipPos({ x: e.clientX, y: e.clientY + 24 })
-                    }
-                    onMouseMove={(e) =>
-                      setTooltipPos({ x: e.clientX, y: e.clientY + 24 })
-                    }
+                    onMouseEnter={(e) => setTooltipPos({ x: e.clientX, y: e.clientY + 24 })}
+                    onMouseMove={(e) => setTooltipPos({ x: e.clientX, y: e.clientY + 24 })}
                     onMouseLeave={() => setTooltipPos(null)}
                   >
                     💡
                   </div>
                 )}
               </div>
-
-              <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-gray-500">
-                {task.due && (
-                  <span>{new Date(task.due).toLocaleDateString('pl-PL')}</span>
-                )}
-                {task.project_name && (
-                  <span className="bg-gray-100 px-1.5 py-[1px] rounded text-gray-600">
-                    {task.project_name}
-                  </span>
-                )}
-                {task.labels?.map((label) => (
-                  <span
-                    key={label}
-                    className="bg-gray-100 px-1.5 py-[1px] rounded text-gray-600"
-                  >
-                    #{label}
-                  </span>
-                ))}
-              </div>
             </div>
           </div>
 
-          {/* Tooltip 💡 */}
+          {/* 💬 Tooltip z podsumowaniem */}
           {tooltipPos && summary && (
             <TooltipPortal>
               <motion.div
@@ -173,9 +206,7 @@ export default function TaskCard({
                 }}
               >
                 <p className="font-semibold text-gray-800 mb-1">🧠 Wnioski AI:</p>
-                <p className="text-gray-600 whitespace-pre-line leading-snug">
-                  {summary}
-                </p>
+                <p className="text-gray-600 whitespace-pre-line leading-snug">{summary}</p>
               </motion.div>
             </TooltipPortal>
           )}
