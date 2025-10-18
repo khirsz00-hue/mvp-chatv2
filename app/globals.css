@@ -2,30 +2,43 @@
 @tailwind components;
 @tailwind utilities;
 
+/* === OGÓLNY STYL STRONY === */
 body {
-  @apply bg-gradient-to-b from-neutral-50 via-white to-neutral-50 text-neutral-900;
+  @apply bg-gradient-to-b from-neutral-50 via-white to-neutral-50 text-neutral-900 font-inter antialiased;
   background-attachment: fixed;
 }
 
 .card {
-  @apply bg-white/90 backdrop-blur rounded-2xl shadow-sm border border-neutral-200 p-4;
+  @apply bg-white/90 backdrop-blur rounded-2xl shadow-sm border border-neutral-200 p-4 transition-all hover:shadow-md;
 }
 
+/* === PRZYCISKI === */
 .btn {
-  @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-neutral-300 hover:bg-neutral-50 transition active:scale-[.98];
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-neutral-300 text-sm font-medium 
+         hover:bg-neutral-50 transition active:scale-[.98] select-none;
 }
 .btn-primary {
-  @apply bg-neutral-900 text-white border-neutral-900 hover:bg-neutral-800 shadow-glow;
+  @apply bg-neutral-900 text-white border-neutral-900 hover:bg-neutral-800 active:bg-neutral-950 shadow-glow;
 }
+.btn-outline {
+  @apply bg-transparent border-neutral-300 text-neutral-700 hover:bg-neutral-50 active:bg-neutral-100;
+}
+.btn-danger {
+  @apply bg-red-600 text-white border-red-600 hover:bg-red-700 active:bg-red-800;
+}
+
+/* === INPUTY === */
 .input {
-  @apply w-full rounded-xl border border-neutral-200 px-3 py-2 bg-white shadow-inner;
+  @apply w-full rounded-xl border border-neutral-200 px-3 py-2 bg-white shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
 }
+
+/* === TOAST === */
 .toast {
-  @apply fixed right-4 bottom-4 bg-neutral-900 text-white px-4 py-2 rounded-xl shadow-lg;
+  @apply fixed right-4 bottom-4 bg-neutral-900 text-white px-4 py-2 rounded-xl shadow-lg animate-fadeIn;
+  backdrop-filter: blur(6px);
 }
 
-/* === MARKDOWN STYLING === */
-
+/* === MARKDOWN === */
 .prose {
   @apply text-gray-800 leading-relaxed;
 }
@@ -62,7 +75,7 @@ body {
 
 .prose ul,
 .prose ol {
-  @apply pl-5 my-2;
+  @apply pl-5 my-2 list-disc;
 }
 
 .prose li {
@@ -98,8 +111,7 @@ body {
   @apply bg-gray-100 font-semibold;
 }
 
-/* === DODATKOWE POPRAWKI DO CHAT DIALOGU === */
-
+/* === MAŁY MARKDOWN (CHAT DIALOG) === */
 .prose-sm {
   @apply text-[0.92rem] leading-relaxed;
 }
@@ -113,6 +125,7 @@ body {
   @apply my-1.5;
 }
 
+/* === ANIMACJE === */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -128,21 +141,6 @@ body {
   animation: fadeIn 0.25s ease-out;
 }
 
-
-/* 🩵 Poprawka: tekst usera na niebieskim tle */
-.markdown-user p,
-.markdown-user ul,
-.markdown-user li,
-.markdown-user strong,
-.markdown-user em,
-.markdown-user a,
-.markdown-user h1,
-.markdown-user h2,
-.markdown-user h3 {
-  color: white !important;
-}
-
-
 @keyframes slideInRight {
   from {
     transform: translateX(100%);
@@ -156,4 +154,65 @@ body {
 
 .animate-slideInRight {
   animation: slideInRight 0.3s ease-out;
+}
+
+/* === CHAT === */
+.markdown-user p,
+.markdown-user ul,
+.markdown-user li,
+.markdown-user strong,
+.markdown-user em,
+.markdown-user a,
+.markdown-user h1,
+.markdown-user h2,
+.markdown-user h3 {
+  color: white !important;
+}
+
+/* === TOOLTIP === */
+.tooltip {
+  @apply absolute z-[99999] bg-neutral-800 text-white text-xs py-1 px-2 rounded-md shadow-md whitespace-nowrap;
+  animation: fadeIn 0.15s ease-out;
+}
+
+/* === SCROLLBAR === */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.35);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* === KARTY ZADAŃ (TaskCard) === */
+.task-card {
+  @apply relative border border-gray-200 rounded-xl p-3 bg-white shadow-sm hover:shadow-md transition-all;
+}
+
+.task-card:hover {
+  @apply border-gray-300;
+}
+
+.task-card-overdue {
+  @apply border-red-300 bg-red-50/30;
+}
+
+.task-card-priority-high {
+  @apply border-yellow-300;
+}
+
+/* === WEEK VIEW === */
+.week-column {
+  @apply flex flex-col gap-2 bg-white/80 backdrop-blur rounded-xl p-3 border border-gray-200 shadow-sm min-w-[220px];
+}
+
+.week-column-header {
+  @apply text-sm font-semibold text-gray-700 border-b border-gray-100 pb-1 mb-2 flex items-center justify-between;
 }
