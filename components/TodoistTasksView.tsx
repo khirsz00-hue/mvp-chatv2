@@ -3,17 +3,21 @@
 import { useEffect, useState, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import TodoistTasks from './TodoistTasks'
+import WeekView from './WeekView'
 
 export default function TodoistTasksView({ token }: { token: string }) {
-  const [filter, setFilter] = useState<'today' | 'tomorrow' | 'overdue' | '7 days' | '30 days'>(
-    () =>
-      typeof window !== 'undefined'
-        ? ((localStorage.getItem('todoist_filter') as any) || 'today')
-        : 'today'
+  const [filter, setFilter] = useState<
+    'today' | 'tomorrow' | 'overdue' | '7 days' | '30 days' | 'week-view'
+  >(() =>
+    typeof window !== 'undefined'
+      ? ((localStorage.getItem('todoist_filter') as any) || 'today')
+      : 'today'
   )
+
   const [tasks, setTasks] = useState<any[]>([])
   const [toast, setToast] = useState<string | null>(null)
   const lastEvent = useRef<number>(0)
+  const [viewMode, setViewMode] = useState<'list' | 'week'>('list')
 
   const handleRefresh = (updated?: any[]) => updated && setTasks(updated)
 
@@ -123,14 +127,46 @@ export default function TodoistTasksView({ token }: { token: string }) {
     <div className="flex h-full bg-gray-50 rounded-b-xl overflow-hidden relative">
       {/* 📋 Sekcja zadań */}
       <div className="flex-1 flex flex-col">
+        {/* 🔘 Górny pasek widoku */}
+        <div className="flex justify-between items-center px-3 py-2 border-b bg-white shadow-sm">
+          <div className="flex gap-2">
+            {[
+              { key: 'today', label: 'Dziś' },
+              { key: 'tomorrow', label: 'Jutro' },
+              { key: '7 days', label: 'Tydzień' },
+              { key: '30 days', label: 'Miesiąc' },
+              { key: 'overdue', label: 'Przeterminowane' },
+            ].map((f) => (
+              <button
+                key={f.key}
+                onClick={() => {
+                  setFilter(f.key as any)
+                  setViewMode(f.key === '7 days' ? 'week' : 'list')
+                }}
+                className={`px-3 py-1 rounded-md text-sm font-medium transition ${
+                  filter === f.key
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="flex-1 p-3 overflow-visible">
           <div className="max-h-[calc(100vh-150px)] overflow-y-auto rounded-xl">
-            <TodoistTasks
-              token={token}
-              filter={filter}
-              onChangeFilter={setFilter}
-              onUpdate={handleRefresh}
-            />
+            {viewMode === 'week' ? (
+              <WeekView tasks={tasks} />
+            ) : (
+              <TodoistTasks
+                token={token}
+                filter={filter}
+                onChangeFilter={setFilter}
+                onUpdate={handleRefresh}
+              />
+            )}
           </div>
         </div>
       </div>
