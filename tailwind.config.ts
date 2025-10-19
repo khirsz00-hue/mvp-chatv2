@@ -2,9 +2,9 @@ import type { Config } from 'tailwindcss'
 
 const config: Config = {
   content: [
-    "./app/**/*.{ts,tsx}",
-    "./components/**/*.{ts,tsx}",
-    "./src/**/*.{ts,tsx,md,mdx}"
+    "./app/**/*.{js,ts,jsx,tsx,md,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,md,mdx}",
+    "./src/**/*.{js,ts,jsx,tsx,md,mdx}",
   ],
   theme: {
     extend: {
@@ -20,14 +20,18 @@ const config: Config = {
           700: "#1d4ed8",
           800: "#1e40af",
           900: "#1e3a8a",
-          DEFAULT: "#2563eb"
-        }
+          DEFAULT: "#2563eb",
+        },
       },
       boxShadow: {
-        glow: "0 0 0 1px rgba(37,99,235,.25), 0 10px 30px -10px rgba(37,99,235,.45)"
-      }
+        glow: "0 0 0 1px rgba(37,99,235,.25), 0 10px 30px -10px rgba(37,99,235,.45)",
+      },
+      fontFamily: {
+        inter: ['Inter', 'system-ui', 'sans-serif'], // ✅ dodana definicja font-inter
+      },
     },
   },
   plugins: [],
 }
+
 export default config
