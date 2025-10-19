@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import TodoistConnection from '@/components/TodoistTaskView'
+import TodoistConnection from '@/components/TodoistConnection'
 import TodoistAuthButton from '@/components/TodoistAuthButton'
 import Chat, { ChatMessage } from '@/components/Chat'
 import ChatSidebar from '@/components/ChatSidebar'
