@@ -96,7 +96,11 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
               transition={{ duration: 0.25 }}
               className="absolute inset-0"
             >
-              <TodoistTasksView token={token} />
+              <TodoistTasksView
+                token={token}
+                // ✅ Dodane: globalny event do odświeżania danych, żeby WeekView działał w czasie rzeczywistym
+                onUpdate={() => window.dispatchEvent(new Event('taskUpdated'))}
+              />
             </motion.div>
           ) : (
             <motion.div
