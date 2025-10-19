@@ -162,7 +162,7 @@ export default function TodoistTasksView({ token }: { token: string }) {
             ) : (
               <TodoistTasks
                 token={token}
-                filter={filter}
+                filter={filter === 'week-view' ? '7 days' : filter} // ✅ fallback naprawiający typowanie
                 onChangeFilter={setFilter}
                 onUpdate={handleRefresh}
               />
