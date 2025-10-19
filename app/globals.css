@@ -8,6 +8,7 @@ body {
   background-attachment: fixed;
 }
 
+/* === KARTY === */
 .card {
   @apply bg-white/90 backdrop-blur rounded-2xl shadow-sm border border-neutral-200 p-4 transition-all hover:shadow-md;
 }
@@ -195,15 +196,12 @@ body {
 .task-card {
   @apply relative border border-gray-200 rounded-xl p-3 bg-white shadow-sm hover:shadow-md transition-all;
 }
-
 .task-card:hover {
   @apply border-gray-300;
 }
-
 .task-card-overdue {
   @apply border-red-300 bg-red-50/30;
 }
-
 .task-card-priority-high {
   @apply border-yellow-300;
 }
@@ -212,7 +210,15 @@ body {
 .week-column {
   @apply flex flex-col gap-2 bg-white/80 backdrop-blur rounded-xl p-3 border border-gray-200 shadow-sm min-w-[220px];
 }
-
 .week-column-header {
   @apply text-sm font-semibold text-gray-700 border-b border-gray-100 pb-1 mb-2 flex items-center justify-between;
+}
+.week-column-tasks {
+  @apply flex flex-col gap-2;
+}
+.week-day-today {
+  @apply text-blue-700 font-bold;
+}
+.week-day-empty {
+  @apply text-gray-400 italic text-xs text-center py-2;
 }
