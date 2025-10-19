@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import TodoistTasksView from './TodoistTasksView'
 import TodoistAIView from './TodoistAIView'
-import TaskDialog from './TaskDialog' // ✅ dodane (żeby modal działał globalnie)
+import TaskDialog from './TaskDialog' // ✅ modal globalny
 
 interface TodoistConnectionProps {
   token: string
@@ -96,10 +96,13 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
               transition={{ duration: 0.25 }}
               className="absolute inset-0"
             >
+              {/* ✅ Dodano onUpdate, typy zgodne w TodoistTasksView */}
               <TodoistTasksView
                 token={token}
-                // ✅ Dodane: globalny event do odświeżania danych, żeby WeekView działał w czasie rzeczywistym
-                onUpdate={() => window.dispatchEvent(new Event('taskUpdated'))}
+                onUpdate={() => {
+                  window.dispatchEvent(new Event('taskUpdated'))
+                  return true
+                }}
               />
             </motion.div>
           ) : (
@@ -120,7 +123,7 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
       {/* 💬 Globalny modal do rozmów z zadaniami */}
       {openTask && (
         <TaskDialog
-          task={{ id: openTask.id, title: openTask.title }} // ✅ poprawione (title zamiast content)
+          task={{ id: openTask.id, title: openTask.title }}
           mode="help"
           onClose={() => setOpenTask(null)}
         />
