@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { formatISO, addDays, isBefore, parseISO, isToday, isTomorrow } from 'date-fns'
 import TodoistTasks from './TodoistTasks'
 import WeekView from './WeekView'
 
@@ -21,22 +22,80 @@ export default function TodoistTasksView({
   )
 
   const [tasks, setTasks] = useState<any[]>([])
-  const [toast, setToast] = useState<string | null>(null)
-  const lastEvent = useRef<number>(0)
-  const [viewMode, setViewMode] = useState<'list' | 'week'>('list')
+  const [projects, setProjects] = useState<any[]>([])
   const [selectedProject, setSelectedProject] = useState<string>('all')
+  const [toast, setToast] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'list' | 'week'>('list')
+  const lastEvent = useRef<number>(0)
 
-  const handleRefresh = (updated?: any[]) => {
-    if (updated) setTasks(updated)
-    onUpdate?.()
-  }
-
-  // 💾 Zapamiętaj filtr
+  // === 🔁 Pobieranie projektów (dynamiczne z Todoist) ===
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('todoist_filter', filter)
+    if (!token) return
+    const fetchProjects = async () => {
+      try {
+        const res = await fetch('/api/todoist/projects', {
+          headers: { 'x-todoist-token': token },
+        })
+        const data = await res.json()
+        if (data.projects) setProjects(data.projects)
+      } catch (err) {
+        console.error('❌ Błąd pobierania projektów:', err)
+      }
     }
-  }, [filter])
+    fetchProjects()
+  }, [token])
+
+  // === 🔁 Pobieranie zadań z Todoista ===
+  const fetchTasks = async () => {
+    if (!token) return
+    try {
+      let filterQuery = ''
+      switch (filter) {
+        case 'today':
+          filterQuery = 'today | overdue'
+          break
+        case 'tomorrow':
+          filterQuery = 'tomorrow'
+          break
+        case '7 days':
+          filterQuery = '7 days'
+          break
+        case '30 days':
+          filterQuery = '30 days'
+          break
+        case 'overdue':
+          filterQuery = 'overdue'
+          break
+      }
+
+      const res = await fetch(`/api/todoist/tasks?filter=${encodeURIComponent(filterQuery)}`, {
+        headers: { 'x-todoist-token': token },
+      })
+      const data = await res.json()
+
+      let fetched = data.tasks || []
+
+      // 📁 Filtr po projekcie
+      if (selectedProject !== 'all') {
+        fetched = fetched.filter((t: any) => t.project_id === selectedProject)
+      }
+
+      // 🧩 W filtrze "Dziś" — osobno przeterminowane
+      if (filter === 'today') {
+        const overdue = fetched.filter(
+          (t: any) => t.due?.date && isBefore(parseISO(t.due.date), new Date())
+        )
+        const today = fetched.filter(
+          (t: any) => t.due?.date && isToday(parseISO(t.due.date))
+        )
+        setTasks([...overdue, ...today])
+      } else {
+        setTasks(fetched)
+      }
+    } catch (err) {
+      console.error('❌ Błąd pobierania zadań:', err)
+    }
+  }
 
   // 🔁 SSE + Webhook + Polling (bez zmian)
   useEffect(() => {
@@ -49,91 +108,57 @@ export default function TodoistTasksView({
     const connectSSE = () => {
       try {
         es = new EventSource('/api/todoist/stream')
-        console.log('📡 Połączono z Todoist streamem...')
-
         es.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data)
             if (data.event?.startsWith('item:')) {
               const now = Date.now()
               if (data.event === 'item:added') {
-                setTimeout(() => {
-                  console.log('🕒 Odświeżenie po dodaniu nowego zadania')
-                  window.dispatchEvent(new Event('taskUpdated'))
-                  onUpdate?.()
-                }, 1500)
+                setTimeout(fetchTasks, 1500)
               } else if (now - lastEvent.current > 1500) {
                 lastEvent.current = now
-                window.dispatchEvent(new Event('taskUpdated'))
-                onUpdate?.()
+                fetchTasks()
               }
 
               const msg =
                 data.event === 'item:added'
-                  ? '🆕 Dodano nowe zadanie'
+                  ? '🆕 Dodano zadanie'
                   : data.event === 'item:completed'
-                  ? '✅ Zadanie ukończone'
-                  : data.event === 'item:updated'
-                  ? '✏️ Zmieniono zadanie'
+                  ? '✅ Ukończono zadanie'
                   : '🔄 Lista zadań zaktualizowana'
 
               setToast(msg)
               setTimeout(() => setToast(null), 2500)
             }
-          } catch (err) {
-            console.error('❌ Błąd parsowania SSE:', err)
-          }
+          } catch {}
         }
 
-        es.onerror = (err) => {
-          console.warn('⚠️ Błąd SSE, ponowne łączenie za 5s...', err)
+        es.onerror = () => {
           es?.close()
           setTimeout(connectSSE, 5000)
         }
-      } catch (err) {
-        console.warn('❌ Nie udało się połączyć z SSE:', err)
-      }
+      } catch {}
     }
 
     connectSSE()
-
-    const ping = setInterval(() => {
-      fetch('/api/todoist/stream/ping').catch(() => {})
-    }, 25000)
-
-    const checkWebhook = async () => {
-      try {
-        const res = await fetch('/api/todoist/webhook')
-        const data = await res.json()
-        if (data.lastEventTime && data.lastEventTime > lastWebhookTime) {
-          lastWebhookTime = data.lastEventTime
-          console.log('🔔 Webhook Todoist – odświeżam')
-          window.dispatchEvent(new Event('taskUpdated'))
-          onUpdate?.()
-          setToast('🔄 Lista zadań zaktualizowana')
-          setTimeout(() => setToast(null), 2000)
-        }
-      } catch {}
-    }
-    const webhookInterval = setInterval(checkWebhook, 5000)
-
-    const poll = setInterval(() => {
-      console.log('🪄 Polling Todoist – ciche odświeżenie')
-      window.dispatchEvent(new Event('taskUpdated'))
-      onUpdate?.()
-    }, 45000)
-
+    const ping = setInterval(() => fetch('/api/todoist/stream/ping').catch(() => {}), 25000)
+    const poll = setInterval(fetchTasks, 45000)
     return () => {
       clearInterval(ping)
       clearInterval(poll)
-      clearInterval(webhookInterval)
       es?.close()
     }
   }, [token])
 
+  // 📦 Odświeżanie przy zmianie filtra lub projektu
+  useEffect(() => {
+    fetchTasks()
+  }, [filter, selectedProject])
+
+  // === ⚡ Główny widok ===
   return (
     <div className="flex flex-col h-full bg-gray-50 rounded-b-xl overflow-hidden relative">
-      {/* === 🔘 Górny pasek filtrów i projektów === */}
+      {/* === 🔘 Pasek filtrów i projektów === */}
       <div className="flex flex-wrap justify-between items-center px-4 py-3 border-b bg-neutral-900 text-white shadow-sm gap-2">
         {/* 🔹 Filtry czasowe */}
         <div className="flex gap-2 flex-wrap">
@@ -161,7 +186,7 @@ export default function TodoistTasksView({
           ))}
         </div>
 
-        {/* 🔸 Wybór projektu */}
+        {/* 🔸 Projekty + przełącznik widoku */}
         <div className="flex items-center gap-2">
           <select
             value={selectedProject}
@@ -169,10 +194,11 @@ export default function TodoistTasksView({
             className="bg-neutral-800 text-white text-sm px-3 py-1.5 rounded-md border border-neutral-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">📁 Wszystkie projekty</option>
-            <option value="zdrowie">💊 Zdrowie</option>
-            <option value="praca">💼 Praca</option>
-            <option value="dom">🏠 Dom</option>
-            <option value="inne">🗂️ Inne</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
           </select>
 
           <button
@@ -184,18 +210,22 @@ export default function TodoistTasksView({
         </div>
       </div>
 
-      {/* === 📋 Główna zawartość === */}
+      {/* === 📋 Zawartość główna === */}
       <div className="flex-1 overflow-y-auto p-3">
         {viewMode === 'week' ? (
-          <WeekView tasks={tasks.filter((t) =>
-            selectedProject === 'all' ? true : t.project_name?.toLowerCase().includes(selectedProject)
-          )} />
+          <WeekView
+            tasks={tasks}
+            onMove={(id, newDate) => {
+              console.log(`📆 Przenoszę zadanie ${id} → ${formatISO(newDate)}`)
+              // TODO: wywołaj endpoint Todoist do zmiany daty (PATCH /tasks/:id)
+            }}
+          />
         ) : (
           <TodoistTasks
             token={token}
             filter={filter}
             onChangeFilter={setFilter}
-            onUpdate={handleRefresh}
+            onUpdate={fetchTasks}
           />
         )}
       </div>
