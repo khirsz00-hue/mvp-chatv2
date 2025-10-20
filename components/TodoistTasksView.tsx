@@ -5,7 +5,13 @@ import { AnimatePresence, motion } from 'framer-motion'
 import TodoistTasks from './TodoistTasks'
 import WeekView from './WeekView'
 
-export default function TodoistTasksView({ token }: { token: string }) {
+export default function TodoistTasksView({
+  token,
+  onUpdate,
+}: {
+  token: string
+  onUpdate?: () => void
+}) {
   const [filter, setFilter] = useState<
     'today' | 'tomorrow' | 'overdue' | '7 days' | '30 days' | 'week-view'
   >(() =>
@@ -19,7 +25,10 @@ export default function TodoistTasksView({ token }: { token: string }) {
   const lastEvent = useRef<number>(0)
   const [viewMode, setViewMode] = useState<'list' | 'week'>('list')
 
-  const handleRefresh = (updated?: any[]) => updated && setTasks(updated)
+  const handleRefresh = (updated?: any[]) => {
+    if (updated) setTasks(updated)
+    onUpdate?.() // ✅ wywołanie callbacka z TodoistConnection
+  }
 
   // 💾 Zapamiętaj filtr
   useEffect(() => {
@@ -51,10 +60,12 @@ export default function TodoistTasksView({ token }: { token: string }) {
                 setTimeout(() => {
                   console.log('🕒 Odświeżenie po dodaniu nowego zadania')
                   window.dispatchEvent(new Event('taskUpdated'))
+                  onUpdate?.()
                 }, 1500)
               } else if (now - lastEvent.current > 1500) {
                 lastEvent.current = now
                 window.dispatchEvent(new Event('taskUpdated'))
+                onUpdate?.()
               }
 
               const msg =
@@ -100,6 +111,7 @@ export default function TodoistTasksView({ token }: { token: string }) {
           lastWebhookTime = data.lastEventTime
           console.log('🔔 Webhook Todoist – odświeżam')
           window.dispatchEvent(new Event('taskUpdated'))
+          onUpdate?.()
           setToast('🔄 Lista zadań zaktualizowana')
           setTimeout(() => setToast(null), 2000)
         }
@@ -113,6 +125,7 @@ export default function TodoistTasksView({ token }: { token: string }) {
     const poll = setInterval(() => {
       console.log('🪄 Polling Todoist – ciche odświeżenie')
       window.dispatchEvent(new Event('taskUpdated'))
+      onUpdate?.()
     }, 45000)
 
     return () => {
@@ -162,7 +175,7 @@ export default function TodoistTasksView({ token }: { token: string }) {
             ) : (
               <TodoistTasks
                 token={token}
-                filter={filter === 'week-view' ? '7 days' : filter} // ✅ fallback naprawiający typowanie
+                filter={filter === 'week-view' ? '7 days' : filter} // ✅ fallback
                 onChangeFilter={setFilter}
                 onUpdate={handleRefresh}
               />
