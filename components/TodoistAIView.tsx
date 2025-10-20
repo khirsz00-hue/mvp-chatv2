@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { motion } from 'framer-motion'
 import remarkGfm from 'remark-gfm'
+import TaskCard from './TaskCard'
 
 type TodoistTask = {
   id: string
@@ -16,24 +17,27 @@ type TodoistTask = {
 type ChatMessage = {
   id: string
   role: 'user' | 'assistant'
-  content: string
   timestamp: number
+  // rozszerzenie na wiadomości z listą zadań
+  type?: 'text' | 'tasks'
+  content?: string
+  tasks?: TodoistTask[]
 }
 
 export default function TodoistAIView({ token }: { token: string }) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [tasks, setTasks] = useState<TodoistTask[]>([])
+  const [tasks, setTasks] = useState<TodoistTask[]>([]) // ostatnio pobrane (do "Pogrupuj tematycznie")
   const [loading, setLoading] = useState(false)
   const [sessionId, setSessionId] = useState<string>(() => crypto.randomUUID())
-  const [activeFilter, setActiveFilter] = useState<'today' | '7days' | '30days' | 'overdue'>('today')
   const bottomRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
-  // 🧭 Scroll do dołu po nowej wiadomości
+  // 🧭 Autoscroll po nowej wiadomości
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // 📂 Wczytanie historii po kliknięciu w sidebar
+  // 📂 Wczytanie historii po kliknięciu w sidebar (chatSelect)
   useEffect(() => {
     const handleChatSelect = (event: any) => {
       if (event.detail?.mode === 'todoist' && event.detail?.task?.id) {
@@ -50,12 +54,11 @@ export default function TodoistAIView({ token }: { token: string }) {
     return () => window.removeEventListener('chatSelect', handleChatSelect)
   }, [])
 
-  // 🧾 Utwórz nową sesję
+  // 🧾 Nowa sesja
   const startNewChat = (title: string) => {
     const newId = crypto.randomUUID()
     setSessionId(newId)
     setMessages([])
-    setTasks([])
 
     const sessions = JSON.parse(localStorage.getItem('chat_sessions_todoist') || '[]')
     const newEntry = { id: newId, title, timestamp: Date.now() }
@@ -64,85 +67,125 @@ export default function TodoistAIView({ token }: { token: string }) {
     return newId
   }
 
-  // 📡 Pobierz zadania z Todoist
-  const fetchTasks = async (filter: 'today' | '7days' | '30days' | 'overdue') => {
-    if (!token) return
-    setActiveFilter(filter)
+  // 🔎 Rozpoznanie prośby o listę zadań w wiadomości użytkownika
+  const detectFilterFromMessage = (
+    text: string
+  ): null | { key: 'today' | '7days' | '30days' | 'overdue'; title: string } => {
+    const t = text.toLowerCase()
 
-    const titles = {
-      today: 'Zadania na dziś',
-      '7days': 'Zadania na tydzień',
-      '30days': 'Zadania na miesiąc',
-      overdue: 'Zadania przeterminowane',
+    // dziś
+    if (
+      t.includes('dziś') || t.includes('dzis') || t.includes('dzisiaj') || t.includes('na dziś') || t.includes('na dzis')
+    ) {
+      return { key: 'today', title: 'Zadania na dziś' }
     }
-
-    const newId = startNewChat(titles[filter])
-    setLoading(true)
-
-    try {
-      const res = await fetch('https://api.todoist.com/rest/v2/tasks', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const all = await res.json()
-      const now = new Date()
-
-      const filtered = all.filter((t: any) => {
-        if (!t.due?.date) return false
-        const due = new Date(t.due.date)
-        const diff = (due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-        if (filter === 'today') return diff >= -0.5 && diff < 1.5
-        if (filter === '7days') return diff >= -0.5 && diff < 7
-        if (filter === '30days') return diff >= -0.5 && diff < 30
-        if (filter === 'overdue') return diff < -0.5
-        return true
-      })
-
-      setTasks(filtered)
-      const infoMsg: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: `📋 Załadowano ${filtered.length} zadań (${titles[filter]}).`,
-        timestamp: Date.now(),
-      }
-      setMessages([infoMsg])
-      localStorage.setItem(`chat_todoist_${newId}`, JSON.stringify([infoMsg]))
-    } catch (err) {
-      console.error('❌ Błąd Todoist:', err)
-    } finally {
-      setLoading(false)
+    // tydzień
+    if (t.includes('tydzień') || t.includes('tydzien') || t.includes('7 dni') || t.includes('na tydzień')) {
+      return { key: '7days', title: 'Zadania na tydzień' }
     }
+    // miesiąc
+    if (t.includes('miesiąc') || t.includes('miesiac') || t.includes('30 dni') || t.includes('na miesiąc')) {
+      return { key: '30days', title: 'Zadania na miesiąc' }
+    }
+    // przeterminowane
+    if (t.includes('przetermin')) {
+      return { key: 'overdue', title: 'Zadania przeterminowane' }
+    }
+    return null
   }
 
-  useEffect(() => {
-    if (token) fetchTasks('today')
-  }, [token])
+  // 📡 Pobierz zadania z Todoist wg filtra
+  const fetchTasksByFilter = async (filter: 'today' | '7days' | '30days' | 'overdue') => {
+    const res = await fetch('https://api.todoist.com/rest/v2/tasks', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const all = await res.json()
+    const now = new Date()
+
+    const filtered: TodoistTask[] = all.filter((t: any) => {
+      if (!t.due?.date) return false
+      const due = new Date(t.due.date)
+      const diff = (due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+      if (filter === 'today') return diff >= -0.5 && diff < 1.5
+      if (filter === '7days') return diff >= -0.5 && diff < 7
+      if (filter === '30days') return diff >= -0.5 && diff < 30
+      if (filter === 'overdue') return diff < -0.5
+      return true
+    })
+
+    return filtered
+  }
+
+  // 🧠 Jeżeli użytkownik poprosił o listę zadań – dołącz je jako wiadomość AI typu "tasks"
+  const maybeHandleTaskQuery = async (userText: string): Promise<boolean> => {
+    const match = detectFilterFromMessage(userText)
+    if (!match || !token) return false
+
+    const newId = sessionId || startNewChat(match.title)
+    const list = await fetchTasksByFilter(match.key)
+    setTasks(list) // zapamiętaj ostatni zestaw, np. do "Pogrupuj tematycznie"
+
+    const infoMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'assistant',
+      type: 'text',
+      content: `📋 Załadowano ${list.length} zadań (${match.title}).`,
+      timestamp: Date.now(),
+    }
+    const tasksMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'assistant',
+      type: 'tasks',
+      tasks: list,
+      timestamp: Date.now(),
+    }
+
+    const final = [...messages, infoMsg, tasksMsg]
+    setMessages(final)
+    localStorage.setItem(`chat_todoist_${newId}`, JSON.stringify(final))
+    return true
+  }
 
   // 💬 Wysyłanie wiadomości
-  const handleSend = async (message: string) => {
+  const handleSend = async (raw: string) => {
+    const message = raw.trim()
+    if (!message) return
+
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
       content: message,
       timestamp: Date.now(),
+      type: 'text',
     }
     const updated = [...messages, userMsg]
     setMessages(updated)
     localStorage.setItem(`chat_todoist_${sessionId}`, JSON.stringify(updated))
-    setLoading(true)
 
+    setLoading(true)
     try {
+      // Najpierw sprawdź, czy to nie jest prośba o listę zadań
+      const handled = await maybeHandleTaskQuery(message)
+      if (handled) {
+        setLoading(false)
+        return
+      }
+
+      // Standardowa rozmowa z AI z kontekstem ostatnio pobranych zadań
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message, tasks }),
       })
       const data = await res.json()
-      const reply = data.reply || data.content || '🤖 Brak odpowiedzi od AI.'
+      const reply = (data.reply || data.content || '🤖 Brak odpowiedzi od AI.').trim()
+
       const aiMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: reply.trim(),
+        content: reply,
         timestamp: Date.now(),
+        type: 'text',
       }
       const final = [...updated, aiMsg]
       setMessages(final)
@@ -154,30 +197,16 @@ export default function TodoistAIView({ token }: { token: string }) {
     }
   }
 
-  // 🧠 Grupowanie zadań
+  // 🧠 Pogrupuj obecnie załadowane zadania (z ostatniego zapytania o listę)
   const handleGroupTasks = async () => {
     if (!tasks.length) {
       await handleSend('Nie mam żadnych zadań do pogrupowania.')
       return
     }
-
     const now = new Date()
-    let context = ''
-    if (activeFilter === 'today') {
-      context = `na dziś (${now.toLocaleDateString('pl-PL')})`
-    } else if (activeFilter === '7days') {
-      const end = new Date(now)
-      end.setDate(now.getDate() + 7)
-      context = `na okres od ${now.toLocaleDateString('pl-PL')} do ${end.toLocaleDateString('pl-PL')}`
-    } else if (activeFilter === '30days') {
-      const end = new Date(now)
-      end.setDate(now.getDate() + 30)
-      context = `na okres od ${now.toLocaleDateString('pl-PL')} do ${end.toLocaleDateString('pl-PL')}`
-    } else if (activeFilter === 'overdue') {
-      context = 'które są przeterminowane'
-    }
-
-    await handleSend(`Pogrupuj te zadania tematycznie ${context}.`)
+    await handleSend(
+      `Pogrupuj te zadania tematycznie na najbliższy okres (od ${now.toLocaleDateString('pl-PL')}).`
+    )
   }
 
   // 🧹 Wyczyść czat
@@ -190,131 +219,98 @@ export default function TodoistAIView({ token }: { token: string }) {
 
   return (
     <div className="flex flex-col h-[85vh] max-h-[85vh] p-3 space-y-3 overflow-hidden">
-      {/* 🔘 Status */}
+      {/* Status */}
       <div className="text-sm font-medium text-green-600 mb-1">
         🟢 Połączono z Todoist
       </div>
 
-      {/* 🔘 Górne przyciski */}
-      <div className="flex justify-between items-center mb-1">
-        <div className="flex flex-wrap gap-2">
-          {[
-            { key: 'today', label: '📅 Dziś' },
-            { key: '7days', label: '🗓️ Tydzień' },
-            { key: '30days', label: '📆 Miesiąc' },
-            { key: 'overdue', label: '⏰ Przetermin.' },
-          ].map((f) => (
-            <button
-              key={f.key}
-              onClick={() => fetchTasks(f.key as any)}
-              className={`px-3 py-1.5 text-sm rounded-lg border transition ${
-                activeFilter === f.key
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex gap-3">
-          <button
-            onClick={() => startNewChat('Nowy czat')}
-            className="text-sm text-blue-600 hover:text-blue-800"
-          >
-            ➕ Nowy czat
-          </button>
-          <button
-            onClick={handleClear}
-            className="text-sm text-red-600 hover:text-red-800"
-          >
-            🗑️ Wyczyść
-          </button>
-        </div>
+      {/* Panel akcji (bez filtrów i bez listy zadań) */}
+      <div className="flex justify-end gap-3">
+        <button
+          onClick={() => startNewChat('Nowy czat')}
+          className="text-sm text-blue-600 hover:text-blue-800"
+        >
+          ➕ Nowy czat
+        </button>
+        <button
+          onClick={handleClear}
+          className="text-sm text-red-600 hover:text-red-800"
+        >
+          🗑️ Wyczyść
+        </button>
       </div>
 
-      {/* 🧩 Lista zadań */}
-      <div className="max-h-[35vh] overflow-y-auto border rounded-lg p-2 bg-gray-50 shadow-inner">
-        {tasks.length === 0 ? (
-          <div className="text-gray-500 text-sm italic text-center py-4">
-            Brak zadań do wyświetlenia
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-            {tasks.map((t) => (
-              <div
-                key={t.id}
-                className={`p-3 rounded-xl border ${
-                  t.completed
-                    ? 'bg-green-50 border-green-300'
-                    : 'bg-white border-gray-200'
-                } shadow-sm hover:shadow-md transition relative`}
-              >
-                <p
-                  className={`text-sm font-medium ${
-                    t.completed ? 'line-through text-gray-400' : 'text-gray-800'
-                  }`}
-                >
-                  {t.content}
-                </p>
-                <div className="text-xs text-gray-500 mt-1 flex gap-2">
-                  {t.due?.date && (
-                    <span>📅 {new Date(t.due.date).toLocaleDateString('pl-PL')}</span>
-                  )}
-                  {t.priority && <span>⭐ P{t.priority}</span>}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* 💬 Czat */}
+      {/* Czat */}
       <div className="flex-1 overflow-y-auto bg-white border rounded-xl p-3 shadow-sm">
-        {messages.map((m) => (
-          <motion.div
-            key={m.id}
-            initial={{ opacity: 0, y: 5 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={`mb-3 ${m.role === 'user' ? 'text-right' : 'text-left'}`}
-          >
-            <div
-              className={`inline-block px-3 py-2 rounded-xl text-sm whitespace-pre-wrap ${
-                m.role === 'user'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-800'
-              }`}
-            >
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                className="prose prose-sm max-w-none"
+        {messages.map((m) => {
+          if (m.type === 'tasks' && m.tasks) {
+            // Wiadomość asystenta w formie kart zadań
+            return (
+              <motion.div
+                key={m.id}
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-4 text-left"
               >
-                {m.content}
-              </ReactMarkdown>
-            </div>
-          </motion.div>
-        ))}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {m.tasks.map((t) => (
+                    <div key={t.id} className="cursor-default">
+                      <TaskCard task={t as any} token={token} onAction={() => {}} />
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )
+          }
+
+          // zwykła bańka tekstowa
+          return (
+            <motion.div
+              key={m.id}
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`mb-3 ${m.role === 'user' ? 'text-right' : 'text-left'}`}
+            >
+              <div
+                className={`inline-block px-3 py-2 rounded-xl text-sm whitespace-pre-wrap ${
+                  m.role === 'user'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-800'
+                }`}
+              >
+                <ReactMarkdown remarkPlugins={[remarkGfm]} className="prose prose-sm max-w-none">
+                  {m.content || ''}
+                </ReactMarkdown>
+              </div>
+            </motion.div>
+          )
+        })}
         {loading && <div className="text-center text-gray-500 text-sm">⏳ AI myśli...</div>}
         <div ref={bottomRef} />
       </div>
 
-      {/* INPUT */}
+      {/* Input */}
       <div className="flex gap-2 mt-2">
         <input
+          ref={inputRef}
           type="text"
-          placeholder="Napisz np. „Pogrupuj zadania”"
-          onKeyDown={(e) =>
-            e.key === 'Enter' && !loading && handleSend(e.currentTarget.value)
-          }
+          placeholder='Napisz np. „Pokaż mi taski na dziś”'
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !loading) {
+              const value = (e.currentTarget as HTMLInputElement).value
+              handleSend(value)
+              ;(e.currentTarget as HTMLInputElement).value = ''
+            }
+          }}
           disabled={loading}
           className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <button
           onClick={() => {
-            const input = document.querySelector('input')
-            if (input && input.value.trim()) {
-              handleSend(input.value)
-              input.value = ''
+            const v = inputRef.current?.value?.trim()
+            if (!loading && v) {
+              handleSend(v)
+              if (inputRef.current) inputRef.current.value = ''
             }
           }}
           disabled={loading}
