@@ -22,13 +22,14 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
 
   const [openTask, setOpenTask] = useState<{ id: string; title: string } | null>(null)
 
+  // 💾 Zapamiętaj ostatni tryb (tasks / ai)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('todoist_mode', mode)
     }
   }, [mode])
 
-  // 📡 event „Pomóż mi”
+  // 📡 Globalny event „Pomóż mi” — otwiera TaskDialog
   useEffect(() => {
     const handleChatSelect = (event: CustomEvent) => {
       if (event.detail?.task) {
@@ -43,8 +44,9 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
 
   return (
     <div className="relative flex flex-col h-[calc(100vh-100px)] bg-gray-50 border border-green-200 rounded-xl overflow-hidden">
-      {/* HEADER */}
+      {/* === 🔹 Nagłówek === */}
       <div className="flex justify-between items-center p-2 px-4 bg-white border-b shadow-sm">
+        {/* Tryby */}
         <div className="flex items-center gap-3">
           <div className="flex bg-gray-100 rounded-lg overflow-hidden">
             <button
@@ -70,6 +72,7 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
           </div>
         </div>
 
+        {/* Status połączenia */}
         <div className="flex items-center gap-3">
           <span className="text-sm font-semibold text-green-700 whitespace-nowrap">
             🟢 Połączono z Todoist
@@ -83,7 +86,7 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
         </div>
       </div>
 
-      {/* MAIN */}
+      {/* === 🔸 Główna sekcja === */}
       <div className="flex-1 relative overflow-hidden">
         <AnimatePresence mode="wait">
           {mode === 'tasks' ? (
@@ -95,11 +98,8 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
               transition={{ duration: 0.25 }}
               className="absolute inset-0"
             >
-              {/* ✅ hideHeader zostaje (ukrywa niebieski), 
-                  ale TodoistTasks wewnątrz pokaże czarny pasek */}
               <TodoistTasksView
                 token={token}
-                hideHeader
                 onUpdate={() => window.dispatchEvent(new Event('taskUpdated'))}
               />
             </motion.div>
@@ -118,7 +118,7 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
         </AnimatePresence>
       </div>
 
-      {/* 💬 Modal */}
+      {/* === 💬 Modal pomocy === */}
       {openTask && (
         <TaskDialog
           task={{ id: openTask.id, title: openTask.title }}
