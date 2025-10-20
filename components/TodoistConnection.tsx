@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import TodoistTasksView from './TodoistTasksView'
 import TodoistAIView from './TodoistAIView'
-import TaskDialog from './TaskDialog' // ✅ modal globalny
+import TaskDialog from './TaskDialog'
 
 interface TodoistConnectionProps {
   token: string
@@ -22,20 +22,20 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
 
   const [openTask, setOpenTask] = useState<{ id: string; title: string } | null>(null)
 
+  // 💾 Zapamiętaj ostatni tryb
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('todoist_mode', mode)
     }
   }, [mode])
 
-  // 📡 Nasłuch globalnego eventu z sidebaru lub przycisku „Pomóż mi”
+  // 📡 Nasłuch globalnego eventu „Pomóż mi”
   useEffect(() => {
     const handleChatSelect = (event: CustomEvent) => {
       if (event.detail?.task) {
         setOpenTask({ id: event.detail.task.id, title: event.detail.task.title })
       }
     }
-
     window.addEventListener('chatSelect', handleChatSelect as EventListener)
     return () => {
       window.removeEventListener('chatSelect', handleChatSelect as EventListener)
@@ -44,7 +44,7 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
 
   return (
     <div className="relative flex flex-col h-[calc(100vh-100px)] bg-gray-50 border border-green-200 rounded-xl overflow-hidden">
-      {/* HEADER */}
+      {/* 🧭 Górny pasek */}
       <div className="flex justify-between items-center p-2 px-4 bg-white border-b shadow-sm">
         <div className="flex items-center gap-3">
           <div className="flex bg-gray-100 rounded-lg overflow-hidden">
@@ -84,7 +84,7 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
         </div>
       </div>
 
-      {/* MAIN CONTENT */}
+      {/* 📋 Główna zawartość */}
       <div className="flex-1 relative overflow-hidden">
         <AnimatePresence mode="wait">
           {mode === 'tasks' ? (
@@ -96,12 +96,12 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
               transition={{ duration: 0.25 }}
               className="absolute inset-0"
             >
-              {/* ✅ Dodano onUpdate, typy zgodne w TodoistTasksView */}
+              {/* ✅ hideHeader usuwa podwójny pasek, onUpdate integruje eventy */}
               <TodoistTasksView
                 token={token}
+                hideHeader
                 onUpdate={() => {
                   window.dispatchEvent(new Event('taskUpdated'))
-                  return true
                 }}
               />
             </motion.div>
@@ -120,7 +120,7 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
         </AnimatePresence>
       </div>
 
-      {/* 💬 Globalny modal do rozmów z zadaniami */}
+      {/* 💬 Modal konwersacji dla „Pomóż mi” */}
       {openTask && (
         <TaskDialog
           task={{ id: openTask.id, title: openTask.title }}
