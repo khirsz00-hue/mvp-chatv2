@@ -22,14 +22,13 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
 
   const [openTask, setOpenTask] = useState<{ id: string; title: string } | null>(null)
 
-  // 💾 Zapamiętaj ostatni tryb
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('todoist_mode', mode)
     }
   }, [mode])
 
-  // 📡 Nasłuch globalnego eventu „Pomóż mi”
+  // 📡 event „Pomóż mi”
   useEffect(() => {
     const handleChatSelect = (event: CustomEvent) => {
       if (event.detail?.task) {
@@ -44,7 +43,7 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
 
   return (
     <div className="relative flex flex-col h-[calc(100vh-100px)] bg-gray-50 border border-green-200 rounded-xl overflow-hidden">
-      {/* 🧭 Górny pasek */}
+      {/* HEADER */}
       <div className="flex justify-between items-center p-2 px-4 bg-white border-b shadow-sm">
         <div className="flex items-center gap-3">
           <div className="flex bg-gray-100 rounded-lg overflow-hidden">
@@ -84,7 +83,7 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
         </div>
       </div>
 
-      {/* 📋 Główna zawartość */}
+      {/* MAIN */}
       <div className="flex-1 relative overflow-hidden">
         <AnimatePresence mode="wait">
           {mode === 'tasks' ? (
@@ -96,13 +95,12 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
               transition={{ duration: 0.25 }}
               className="absolute inset-0"
             >
-              {/* ✅ hideHeader usuwa podwójny pasek, onUpdate integruje eventy */}
+              {/* ✅ hideHeader zostaje (ukrywa niebieski), 
+                  ale TodoistTasks wewnątrz pokaże czarny pasek */}
               <TodoistTasksView
                 token={token}
                 hideHeader
-                onUpdate={() => {
-                  window.dispatchEvent(new Event('taskUpdated'))
-                }}
+                onUpdate={() => window.dispatchEvent(new Event('taskUpdated'))}
               />
             </motion.div>
           ) : (
@@ -120,7 +118,7 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
         </AnimatePresence>
       </div>
 
-      {/* 💬 Modal konwersacji dla „Pomóż mi” */}
+      {/* 💬 Modal */}
       {openTask && (
         <TaskDialog
           task={{ id: openTask.id, title: openTask.title }}
