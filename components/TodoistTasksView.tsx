@@ -8,14 +8,12 @@ import WeekView from './WeekView'
 export default function TodoistTasksView({
   token,
   onUpdate,
-  hideHeader = true, // ✅ domyślnie ukryty pasek (bo filtr jest w TodoistTasks)
 }: {
   token: string
   onUpdate?: () => void
-  hideHeader?: boolean
 }) {
   const [filter, setFilter] = useState<
-    'today' | 'tomorrow' | 'overdue' | '7 days' | '30 days' | 'week-view'
+    'today' | 'tomorrow' | 'overdue' | '7 days' | '30 days'
   >(() =>
     typeof window !== 'undefined'
       ? ((localStorage.getItem('todoist_filter') as any) || 'today')
@@ -26,6 +24,7 @@ export default function TodoistTasksView({
   const [toast, setToast] = useState<string | null>(null)
   const lastEvent = useRef<number>(0)
   const [viewMode, setViewMode] = useState<'list' | 'week'>('list')
+  const [selectedProject, setSelectedProject] = useState<string>('all')
 
   const handleRefresh = (updated?: any[]) => {
     if (updated) setTasks(updated)
@@ -39,7 +38,7 @@ export default function TodoistTasksView({
     }
   }, [filter])
 
-  // 🔁 SSE + Webhook + Polling
+  // 🔁 SSE + Webhook + Polling (bez zmian)
   useEffect(() => {
     if (!token) return
     console.log('🚀 Uruchomiono Todoist listener...')
@@ -58,7 +57,6 @@ export default function TodoistTasksView({
             if (data.event?.startsWith('item:')) {
               const now = Date.now()
               if (data.event === 'item:added') {
-                // ⏱ lekkie opóźnienie po dodaniu zadania
                 setTimeout(() => {
                   console.log('🕒 Odświeżenie po dodaniu nowego zadania')
                   window.dispatchEvent(new Event('taskUpdated'))
@@ -134,53 +132,72 @@ export default function TodoistTasksView({
   }, [token])
 
   return (
-    <div className="flex h-full bg-gray-50 rounded-b-xl overflow-hidden relative">
-      <div className="flex-1 flex flex-col">
-        {/* 🔘 Górny pasek widoku — ukryty jeśli hideHeader = true */}
-        {!hideHeader && (
-          <div className="flex justify-between items-center px-3 py-2 border-b bg-white shadow-sm">
-            <div className="flex gap-2">
-              {[
-                { key: 'today', label: 'Dziś' },
-                { key: 'tomorrow', label: 'Jutro' },
-                { key: '7 days', label: 'Tydzień' },
-                { key: '30 days', label: 'Miesiąc' },
-                { key: 'overdue', label: 'Przeterminowane' },
-              ].map((f) => (
-                <button
-                  key={f.key}
-                  onClick={() => {
-                    setFilter(f.key as any)
-                    setViewMode(f.key === '7 days' ? 'week' : 'list')
-                  }}
-                  className={`px-3 py-1 rounded-md text-sm font-medium transition ${
-                    filter === f.key
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* 📋 Widok zadań */}
-        <div className="flex-1 p-3 overflow-visible">
-          <div className="max-h-[calc(100vh-150px)] overflow-y-auto rounded-xl">
-            {viewMode === 'week' ? (
-              <WeekView tasks={tasks} /> // 🧠 przekazuje aktualne taski
-            ) : (
-              <TodoistTasks
-                token={token}
-                filter={filter === 'week-view' ? '7 days' : filter}
-                onChangeFilter={setFilter}
-                onUpdate={handleRefresh}
-              />
-            )}
-          </div>
+    <div className="flex flex-col h-full bg-gray-50 rounded-b-xl overflow-hidden relative">
+      {/* === 🔘 Górny pasek filtrów i projektów === */}
+      <div className="flex flex-wrap justify-between items-center px-4 py-3 border-b bg-neutral-900 text-white shadow-sm gap-2">
+        {/* 🔹 Filtry czasowe */}
+        <div className="flex gap-2 flex-wrap">
+          {[
+            { key: 'today', label: 'Dziś' },
+            { key: 'tomorrow', label: 'Jutro' },
+            { key: '7 days', label: 'Tydzień' },
+            { key: '30 days', label: 'Miesiąc' },
+            { key: 'overdue', label: 'Przeterminowane' },
+          ].map((f) => (
+            <button
+              key={f.key}
+              onClick={() => {
+                setFilter(f.key as any)
+                setViewMode(f.key === '7 days' ? 'week' : 'list')
+              }}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${
+                filter === f.key
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-neutral-800 text-gray-200 hover:bg-neutral-700'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
         </div>
+
+        {/* 🔸 Wybór projektu */}
+        <div className="flex items-center gap-2">
+          <select
+            value={selectedProject}
+            onChange={(e) => setSelectedProject(e.target.value)}
+            className="bg-neutral-800 text-white text-sm px-3 py-1.5 rounded-md border border-neutral-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">📁 Wszystkie projekty</option>
+            <option value="zdrowie">💊 Zdrowie</option>
+            <option value="praca">💼 Praca</option>
+            <option value="dom">🏠 Dom</option>
+            <option value="inne">🗂️ Inne</option>
+          </select>
+
+          <button
+            onClick={() => setViewMode(viewMode === 'list' ? 'week' : 'list')}
+            className="text-sm bg-neutral-800 text-gray-200 px-3 py-1.5 rounded-md hover:bg-neutral-700"
+          >
+            {viewMode === 'list' ? '📅 Widok tygodnia' : '📋 Lista zadań'}
+          </button>
+        </div>
+      </div>
+
+      {/* === 📋 Główna zawartość === */}
+      <div className="flex-1 overflow-y-auto p-3">
+        {viewMode === 'week' ? (
+          <WeekView tasks={tasks.filter((t) =>
+            selectedProject === 'all' ? true : t.project_name?.toLowerCase().includes(selectedProject)
+          )} />
+        ) : (
+          <TodoistTasks
+            token={token}
+            filter={filter}
+            onChangeFilter={setFilter}
+            onUpdate={handleRefresh}
+          />
+        )}
       </div>
 
       {/* 🔔 Toast */}
