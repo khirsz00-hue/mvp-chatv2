@@ -8,9 +8,11 @@ import WeekView from './WeekView'
 export default function TodoistTasksView({
   token,
   onUpdate,
+  hideHeader = true, // ✅ domyślnie ukryty pasek (bo filtr jest w TodoistTasks)
 }: {
   token: string
   onUpdate?: () => void
+  hideHeader?: boolean
 }) {
   const [filter, setFilter] = useState<
     'today' | 'tomorrow' | 'overdue' | '7 days' | '30 days' | 'week-view'
@@ -27,7 +29,7 @@ export default function TodoistTasksView({
 
   const handleRefresh = (updated?: any[]) => {
     if (updated) setTasks(updated)
-    onUpdate?.() // ✅ wywołanie callbacka z TodoistConnection
+    onUpdate?.()
   }
 
   // 💾 Zapamiętaj filtr
@@ -97,12 +99,10 @@ export default function TodoistTasksView({
 
     connectSSE()
 
-    // 🫀 Ping utrzymujący połączenie
     const ping = setInterval(() => {
       fetch('/api/todoist/stream/ping').catch(() => {})
     }, 25000)
 
-    // 🧩 Webhook checker
     const checkWebhook = async () => {
       try {
         const res = await fetch('/api/todoist/webhook')
@@ -115,13 +115,10 @@ export default function TodoistTasksView({
           setToast('🔄 Lista zadań zaktualizowana')
           setTimeout(() => setToast(null), 2000)
         }
-      } catch {
-        // ciche błędy
-      }
+      } catch {}
     }
     const webhookInterval = setInterval(checkWebhook, 5000)
 
-    // 🧩 Polling awaryjny co 45 s
     const poll = setInterval(() => {
       console.log('🪄 Polling Todoist – ciche odświeżenie')
       window.dispatchEvent(new Event('taskUpdated'))
@@ -138,44 +135,46 @@ export default function TodoistTasksView({
 
   return (
     <div className="flex h-full bg-gray-50 rounded-b-xl overflow-hidden relative">
-      {/* 📋 Sekcja zadań */}
       <div className="flex-1 flex flex-col">
-        {/* 🔘 Górny pasek widoku */}
-        <div className="flex justify-between items-center px-3 py-2 border-b bg-white shadow-sm">
-          <div className="flex gap-2">
-            {[
-              { key: 'today', label: 'Dziś' },
-              { key: 'tomorrow', label: 'Jutro' },
-              { key: '7 days', label: 'Tydzień' },
-              { key: '30 days', label: 'Miesiąc' },
-              { key: 'overdue', label: 'Przeterminowane' },
-            ].map((f) => (
-              <button
-                key={f.key}
-                onClick={() => {
-                  setFilter(f.key as any)
-                  setViewMode(f.key === '7 days' ? 'week' : 'list')
-                }}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition ${
-                  filter === f.key
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
+        {/* 🔘 Górny pasek widoku — ukryty jeśli hideHeader = true */}
+        {!hideHeader && (
+          <div className="flex justify-between items-center px-3 py-2 border-b bg-white shadow-sm">
+            <div className="flex gap-2">
+              {[
+                { key: 'today', label: 'Dziś' },
+                { key: 'tomorrow', label: 'Jutro' },
+                { key: '7 days', label: 'Tydzień' },
+                { key: '30 days', label: 'Miesiąc' },
+                { key: 'overdue', label: 'Przeterminowane' },
+              ].map((f) => (
+                <button
+                  key={f.key}
+                  onClick={() => {
+                    setFilter(f.key as any)
+                    setViewMode(f.key === '7 days' ? 'week' : 'list')
+                  }}
+                  className={`px-3 py-1 rounded-md text-sm font-medium transition ${
+                    filter === f.key
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
+        {/* 📋 Widok zadań */}
         <div className="flex-1 p-3 overflow-visible">
           <div className="max-h-[calc(100vh-150px)] overflow-y-auto rounded-xl">
             {viewMode === 'week' ? (
-              <WeekView tasks={tasks} />
+              <WeekView tasks={tasks} /> // 🧠 przekazuje aktualne taski
             ) : (
               <TodoistTasks
                 token={token}
-                filter={filter === 'week-view' ? '7 days' : filter} // ✅ fallback
+                filter={filter === 'week-view' ? '7 days' : filter}
                 onChangeFilter={setFilter}
                 onUpdate={handleRefresh}
               />
@@ -184,7 +183,7 @@ export default function TodoistTasksView({
         </div>
       </div>
 
-      {/* 🔔 Toast powiadomień */}
+      {/* 🔔 Toast */}
       <AnimatePresence>
         {toast && (
           <motion.div
