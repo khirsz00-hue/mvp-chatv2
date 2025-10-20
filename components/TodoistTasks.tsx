@@ -25,6 +25,8 @@ interface TodoistTasksProps {
   onChangeFilter: (filter: 'today' | 'tomorrow' | 'overdue' | '7 days' | '30 days') => void
   onUpdate?: (tasks: Task[]) => void
   onOpenTaskChat?: (task: Task) => void
+  /** Ustaw true tylko jeśli chcesz pokazać wbudowany górny pasek filtrów. Domyślnie ukryty, by uniknąć duplikatu. */
+  showHeaderFilters?: boolean
 }
 
 export default function TodoistTasks({
@@ -33,6 +35,7 @@ export default function TodoistTasks({
   onChangeFilter,
   onUpdate,
   onOpenTaskChat,
+  showHeaderFilters = false,
 }: TodoistTasksProps) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [projects, setProjects] = useState<Project[]>([])
@@ -128,46 +131,48 @@ export default function TodoistTasks({
 
   return (
     <div className="space-y-4 relative overflow-visible">
-      {/* 🔹 Pasek filtrów + projekty */}
-      <div className="sticky top-0 z-30 flex flex-col md:flex-row items-center justify-between gap-2 px-3 py-3 bg-white/80 backdrop-blur-md border-b border-gray-200 shadow-sm rounded-b-xl">
-        <div className="flex flex-wrap justify-center gap-2">
-          {[
-            { key: 'today', label: 'Dziś' },
-            { key: 'tomorrow', label: 'Jutro' },
-            { key: '7 days', label: 'Tydzień' },
-            { key: '30 days', label: 'Miesiąc' },
-            { key: 'overdue', label: 'Przeterminowane' },
-          ].map((f) => (
-            <motion.button
-              key={f.key}
-              onClick={() => onChangeFilter(f.key as any)}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.97 }}
-              className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 ${
-                filter === f.key
-                  ? 'bg-gray-900 text-white shadow-sm'
-                  : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-              }`}
-            >
-              {f.label}
-            </motion.button>
-          ))}
-        </div>
+      {/* 🔹 Pasek filtrów (opcjonalny – ukryty domyślnie) + projekty */}
+      {showHeaderFilters && (
+        <div className="sticky top-0 z-30 flex flex-col md:flex-row items-center justify-between gap-2 px-3 py-3 bg-white/80 backdrop-blur-md border-b border-gray-200 shadow-sm rounded-b-xl">
+          <div className="flex flex-wrap justify-center gap-2">
+            {[
+              { key: 'today', label: 'Dziś' },
+              { key: 'tomorrow', label: 'Jutro' },
+              { key: '7 days', label: 'Tydzień' },
+              { key: '30 days', label: 'Miesiąc' },
+              { key: 'overdue', label: 'Przeterminowane' },
+            ].map((f) => (
+              <motion.button
+                key={f.key}
+                onClick={() => onChangeFilter(f.key as any)}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.97 }}
+                className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+                  filter === f.key
+                    ? 'bg-gray-900 text-white shadow-sm'
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                }`}
+              >
+                {f.label}
+              </motion.button>
+            ))}
+          </div>
 
-        {/* Projekty */}
-        <select
-          value={selectedProject}
-          onChange={(e) => setSelectedProject(e.target.value)}
-          className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
-        >
-          <option value="all">📁 Wszystkie projekty</option>
-          {projects.map((p: Project) => (
-            <option key={p.id} value={p.id}>
-              💼 {p.name}
-            </option>
-          ))}
-        </select>
-      </div>
+          {/* Projekty */}
+          <select
+            value={selectedProject}
+            onChange={(e) => setSelectedProject(e.target.value)}
+            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
+          >
+            <option value="all">📁 Wszystkie projekty</option>
+            {projects.map((p: Project) => (
+              <option key={p.id} value={p.id}>
+                💼 {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* 🔹 Lista zadań */}
       <div className="relative overflow-visible pb-16">
