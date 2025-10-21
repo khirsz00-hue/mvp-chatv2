@@ -8,7 +8,6 @@ import {
   isValid,
   startOfDay,
   startOfWeek,
-  endOfWeek,
 } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import {
@@ -36,19 +35,19 @@ export default function WeekView({
 }: WeekViewProps) {
   const today = startOfDay(new Date())
   const weekStart = startOfWeek(today, { weekStartsOn: 1 })
-  const weekEnd = endOfWeek(today, { weekStartsOn: 1 })
   const days = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i))
 
   const [columns, setColumns] = useState<Record<string, any[]>>({})
   const [draggingTask, setDraggingTask] = useState<any | null>(null)
 
-  // 🧩 Pomocnicza funkcja parsowania dat
+  // ✅ Bezpieczne parsowanie dat Todoista z kompensacją strefy
   const parseDateSafe = (value?: string) => {
     if (!value) return null
     try {
-      const clean = value.includes('T') ? value.split('T')[0] : value
-      const parsed = parseISO(clean)
-      return isValid(parsed) ? startOfDay(parsed) : null
+      const parsed = parseISO(value)
+      // kompensacja UTC → lokalna
+      const local = new Date(parsed.getTime() + parsed.getTimezoneOffset() * 60000)
+      return isValid(local) ? startOfDay(local) : null
     } catch {
       return null
     }
@@ -56,19 +55,13 @@ export default function WeekView({
 
   // 🗂️ Grupowanie zadań po dniu
   useEffect(() => {
-    if (!tasks || tasks.length === 0) {
-      console.log('⚠️ Brak zadań w WeekView')
+    if (!tasks?.length) {
       setColumns({})
       return
     }
 
-    console.log('✅ WeekView otrzymał taski:', tasks)
-
     const grouped: Record<string, any[]> = {}
-    for (const day of days) {
-      const key = format(day, 'yyyy-MM-dd')
-      grouped[key] = []
-    }
+    for (const day of days) grouped[format(day, 'yyyy-MM-dd')] = []
 
     for (const t of tasks) {
       const parsed = parseDateSafe(t?.due?.date)
@@ -76,11 +69,10 @@ export default function WeekView({
       if (key && grouped[key]) grouped[key].push(t)
     }
 
-    console.log('📅 Zgrupowane kolumny:', grouped)
     setColumns(grouped)
-  }, [tasks.length])
+  }, [tasks])
 
-  // 🎯 Obsługa drag & drop
+  // 🎯 Drag & Drop logika
   const handleDragEnd = (result: any) => {
     const { destination, source, draggableId } = result
     setDraggingTask(null)
@@ -109,8 +101,8 @@ export default function WeekView({
     }
   }
 
-  // 🔄 Render fallback, jeśli brak danych
-  if (!tasks || tasks.length === 0) {
+  // 🚫 Gdy brak zadań
+  if (!tasks?.length) {
     return (
       <div className="flex items-center justify-center h-full text-sm text-gray-500 italic">
         ⏳ Brak zadań do wyświetlenia w tym tygodniu.
@@ -118,18 +110,18 @@ export default function WeekView({
     )
   }
 
-  // ✅ Widok główny
+  // 🎨 Animacje i wygląd
   return (
-    <div className="flex flex-col h-full select-none">
-      {/* 📆 Nagłówek tygodnia */}
+    <div className="flex flex-col h-full select-none bg-gradient-to-b from-gray-50 to-white">
+      {/* 📆 Pasek nagłówka */}
       <motion.div
         className="text-center py-4 border-b border-gray-200 bg-white shadow-sm mb-3 sticky top-0 z-20"
-        initial={{ opacity: 0, y: -20 }}
+        initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
       >
         <h2 className="text-lg font-semibold text-gray-800 tracking-tight">
           {format(weekStart, 'd MMM', { locale: pl })} –{' '}
-          {format(weekEnd, 'd MMM yyyy', { locale: pl })}
+          {format(addDays(weekStart, 6), 'd MMM yyyy', { locale: pl })}
         </h2>
       </motion.div>
 
@@ -145,8 +137,7 @@ export default function WeekView({
           {days.map((date) => {
             const key = format(date, 'yyyy-MM-dd')
             const dayTasks = columns[key] || []
-            const isToday =
-              format(date, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')
+            const isToday = format(date, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')
 
             return (
               <Droppable key={key} droppableId={key}>
@@ -158,16 +149,16 @@ export default function WeekView({
                       snapshot.isDraggingOver
                         ? 'bg-blue-50 border-blue-300 shadow-lg'
                         : 'hover:border-gray-300'
-                    } ${isToday ? 'ring-1 ring-blue-400' : ''}`}
+                    } ${isToday ? 'ring-2 ring-blue-500 ring-offset-1' : ''}`}
                     animate={{ scale: snapshot.isDraggingOver ? 1.02 : 1 }}
-                    transition={{ duration: 0.2 }}
+                    transition={{ duration: 0.15 }}
                   >
                     {/* 🗓️ Nagłówek dnia */}
                     <div className="text-center font-semibold text-gray-700 mb-2 text-sm border-b pb-1">
                       <span
-                        className={`${
-                          isToday ? 'text-blue-600' : ''
-                        } capitalize`}
+                        className={`capitalize ${
+                          isToday ? 'text-blue-600 font-bold' : ''
+                        }`}
                       >
                         {format(date, 'EEE', { locale: pl })}
                       </span>
@@ -179,7 +170,7 @@ export default function WeekView({
                       </span>
                     </div>
 
-                    {/* 🧾 Zadania */}
+                    {/* 🧾 Lista zadań */}
                     <div className="flex-1 overflow-y-auto space-y-2 relative">
                       <AnimatePresence>
                         {dayTasks.length === 0 ? (
@@ -200,90 +191,73 @@ export default function WeekView({
                               index={index}
                             >
                               {(provided: any, snapshot: any) => (
-                                <>
-                                  <motion.div
-                                    ref={provided.innerRef}
-                                    {...provided.draggableProps}
-                                    {...provided.dragHandleProps}
-                                    layout
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -10 }}
-                                    transition={{ duration: 0.25 }}
-                                    className={`relative group bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-lg p-2 flex items-center justify-between shadow-sm hover:shadow-md cursor-grab ${
-                                      snapshot.isDragging
-                                        ? 'opacity-50 border-blue-300 scale-[1.03]'
-                                        : ''
-                                    }`}
+                                <motion.div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                  layout
+                                  initial={{ opacity: 0, y: 10 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  exit={{ opacity: 0, y: -10 }}
+                                  transition={{ duration: 0.25 }}
+                                  className={`relative group bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-lg p-2 flex items-center justify-between shadow-sm hover:shadow-md cursor-grab ${
+                                    snapshot.isDragging
+                                      ? 'opacity-50 border-blue-300 scale-[1.03]'
+                                      : ''
+                                  }`}
+                                >
+                                  {/* ✅ Checkbox */}
+                                  <button
+                                    onClick={() => onComplete?.(task.id)}
+                                    className="w-4 h-4 rounded-full border-2 border-gray-400 hover:border-green-500 hover:bg-green-500 transition flex items-center justify-center"
+                                    title="Ukończ"
                                   >
-                                    <button
-                                      onClick={() => onComplete?.(task.id)}
-                                      className="w-4 h-4 rounded-full border-2 border-gray-400 hover:border-green-500 hover:bg-green-500 transition flex items-center justify-center"
-                                      title="Ukończ"
-                                    >
-                                      <CheckCircle2
-                                        size={12}
-                                        className="text-white opacity-0 group-hover:opacity-100 transition"
-                                      />
+                                    <CheckCircle2
+                                      size={12}
+                                      className="text-white opacity-0 group-hover:opacity-100 transition"
+                                    />
+                                  </button>
+
+                                  {/* 📋 Treść */}
+                                  <div className="flex-1 mx-2 min-w-0">
+                                    <p className="text-[13px] font-medium text-gray-800 truncate">
+                                      {task.content}
+                                    </p>
+                                    {task.project_name && (
+                                      <p className="text-[10px] text-gray-500 truncate">
+                                        📁 {task.project_name}
+                                      </p>
+                                    )}
+                                  </div>
+
+                                  {/* ⋮ Menu */}
+                                  <div className="relative group/menu">
+                                    <button className="p-1 text-gray-400 hover:text-gray-700 transition">
+                                      <MoreVertical size={14} />
                                     </button>
 
-                                    <div className="flex-1 mx-2 min-w-0">
-                                      <p className="text-[13px] font-medium text-gray-800 truncate">
-                                        {task.content}
-                                      </p>
-                                      {task.project_name && (
-                                        <p className="text-[10px] text-gray-500 truncate">
-                                          📁 {task.project_name}
-                                        </p>
-                                      )}
-                                    </div>
-
-                                    <div className="relative group/menu">
-                                      <button className="p-1 text-gray-400 hover:text-gray-700 transition">
-                                        <MoreVertical size={14} />
-                                      </button>
-
-                                      <motion.div
-                                        initial={{ opacity: 0, y: -4 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: -4 }}
-                                        transition={{ duration: 0.15 }}
-                                        className="absolute right-0 top-5 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-50 opacity-0 group-hover/menu:opacity-100 pointer-events-none group-hover/menu:pointer-events-auto"
-                                      >
-                                        <button
-                                          onClick={() => onHelp?.(task)}
-                                          className="block w-full text-left px-3 py-1 text-xs hover:bg-gray-100"
-                                        >
-                                          💬 Pomóż mi
-                                        </button>
-                                        <button
-                                          onClick={() => onDelete?.(task.id)}
-                                          className="block w-full text-left px-3 py-1 text-xs hover:bg-gray-100"
-                                        >
-                                          🗑 Usuń
-                                        </button>
-                                      </motion.div>
-                                    </div>
-                                  </motion.div>
-
-                                  {/* 👻 Ghost */}
-                                  {snapshot.isDragging && draggingTask?.id === task.id && (
                                     <motion.div
-                                      className="absolute left-0 right-0 bg-white border border-blue-300 rounded-lg shadow-xl z-50 pointer-events-none"
-                                      style={{
-                                        opacity: 0.6,
-                                        transform: 'rotate(1deg)',
-                                      }}
-                                      initial={{ scale: 0.95 }}
-                                      animate={{ scale: 1.02 }}
-                                      transition={{ duration: 0.2 }}
+                                      initial={{ opacity: 0, y: -4 }}
+                                      animate={{ opacity: 1, y: 0 }}
+                                      exit={{ opacity: 0, y: -4 }}
+                                      transition={{ duration: 0.15 }}
+                                      className="absolute right-0 top-5 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-50 opacity-0 group-hover/menu:opacity-100 pointer-events-none group-hover/menu:pointer-events-auto"
                                     >
-                                      <div className="p-2 text-[13px] text-gray-700 font-medium">
-                                        {draggingTask.content}
-                                      </div>
+                                      <button
+                                        onClick={() => onHelp?.(task)}
+                                        className="block w-full text-left px-3 py-1 text-xs hover:bg-gray-100"
+                                      >
+                                        💬 Pomóż mi
+                                      </button>
+                                      <button
+                                        onClick={() => onDelete?.(task.id)}
+                                        className="block w-full text-left px-3 py-1 text-xs hover:bg-gray-100 text-red-600"
+                                      >
+                                        🗑 Usuń
+                                      </button>
                                     </motion.div>
-                                  )}
-                                </>
+                                  </div>
+                                </motion.div>
                               )}
                             </Draggable>
                           ))
