@@ -5,8 +5,9 @@ import {
   format,
   addDays,
   parseISO,
-  differenceInCalendarDays,
   isValid,
+  startOfDay,
+  differenceInCalendarDays,
 } from 'date-fns'
 import { pl } from 'date-fns/locale'
 
@@ -25,45 +26,44 @@ export default function WeekView({
   onDelete,
   onHelp,
 }: WeekViewProps) {
-  // 📅 Faktyczny zakres 7 dni od dziś
-  const today = new Date()
+  const today = startOfDay(new Date())
   const days = Array.from({ length: 7 }).map((_, i) => addDays(today, i))
 
-  // 🧩 Normalizacja dat Todoista (usuwa czas i strefę)
-  const normalizeDate = (dateStr: string) => {
-    if (!dateStr) return null
+  const parseDateSafe = (value?: string) => {
+    if (!value) return null
     try {
-      const iso = dateStr.split('T')[0] // tylko część YYYY-MM-DD
-      const parsed = parseISO(iso)
-      return isValid(parsed) ? parsed : null
+      const base = value.includes('T') ? value.split('T')[0] : value
+      const parsed = parseISO(base)
+      return isValid(parsed) ? startOfDay(parsed) : null
     } catch {
       return null
     }
   }
 
-  // 🗂️ Grupowanie z tolerancją ±1 dzień (UTC fix)
+  // 🔍 grupowanie zadań wg dnia (bez różnicy stref)
   const tasksByDay = days.map((day) => {
     const dayTasks = tasks.filter((t) => {
-      const taskDate = normalizeDate(t.due?.date)
-      if (!taskDate) return false
-      const diff = differenceInCalendarDays(taskDate, day)
-      return Math.abs(diff) <= 1 // tolerancja – łapie UTC różnice
+      const raw = t?.due?.date || t?.due
+      const parsed = parseDateSafe(raw)
+      if (!parsed) return false
+      return differenceInCalendarDays(parsed, day) === 0
     })
     return { date: day, tasks: dayTasks }
   })
 
-  // 🔍 Logi diagnostyczne — pomogą potwierdzić przyczynę
+  // 🧠 debug – pokaż, czy dane w ogóle przyszły
   useEffect(() => {
-    console.groupCollapsed('🧠 Debug WeekView')
-    console.log('📋 Liczba zadań przekazanych z TodoistTasksView:', tasks.length)
-    if (tasks.length > 0) {
-      console.log(
-        '🗓️ Przykładowe daty (pierwsze 5):',
-        tasks.slice(0, 5).map((t) => t.due?.date)
+    console.groupCollapsed('🧠 WeekView debug')
+    console.log('📋 Liczba zadań:', tasks.length)
+    if (tasks.length) {
+      console.table(
+        tasks.map((t) => ({
+          id: t.id,
+          content: t.content,
+          rawDue: t?.due?.date || t?.due,
+          parsed: parseDateSafe(t?.due?.date || t?.due)?.toISOString() || '❌',
+        }))
       )
-      const withoutDue = tasks.filter((t) => !t.due?.date)
-      if (withoutDue.length > 0)
-        console.warn('⚠️ Zadania bez daty due:', withoutDue.length)
     }
     console.groupEnd()
   }, [tasks])
@@ -75,7 +75,6 @@ export default function WeekView({
           key={date.toISOString()}
           className="flex flex-col bg-white border border-gray-200 rounded-xl p-3 shadow-sm min-h-[70vh]"
         >
-          {/* 📅 Nagłówek dnia */}
           <div className="text-center font-semibold text-gray-700 mb-2">
             {format(date, 'EEE', { locale: pl })} <br />
             <span className="text-xs text-gray-500">
@@ -83,7 +82,6 @@ export default function WeekView({
             </span>
           </div>
 
-          {/* 🧾 Lista zadań */}
           <div className="flex-1 overflow-y-auto flex flex-col gap-2">
             {dayTasks.length === 0 ? (
               <p className="text-xs text-gray-400 italic text-center mt-4">
@@ -93,15 +91,15 @@ export default function WeekView({
               dayTasks.map((task) => (
                 <div
                   key={task.id}
-                  className="bg-gray-50 rounded-lg border border-gray-200 shadow-sm p-2 hover:shadow-md transition cursor-default flex flex-col justify-between"
+                  className="bg-gray-50 rounded-lg border border-gray-200 shadow-sm p-2 hover:shadow-md transition flex flex-col justify-between"
                 >
                   <div>
                     <p className="font-medium text-gray-800 text-sm truncate">
                       {task.content}
                     </p>
-                    {task.project_id && (
+                    {task.project_name && (
                       <p className="text-[11px] text-gray-500 mt-1">
-                        📁 {task.project_name || task.project_id}
+                        📁 {task.project_name}
                       </p>
                     )}
                     {task.due?.date && (
@@ -124,9 +122,7 @@ export default function WeekView({
                           'Podaj nową datę (rrrr-mm-dd)',
                           format(date, 'yyyy-MM-dd')
                         )
-                        if (newDate) {
-                          onMove?.(task.id, new Date(newDate))
-                        }
+                        if (newDate) onMove?.(task.id, new Date(newDate))
                       }}
                       className="text-[11px] bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200"
                     >
