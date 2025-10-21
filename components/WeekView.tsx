@@ -7,7 +7,6 @@ import {
   parseISO,
   isValid,
   startOfDay,
-  differenceInCalendarDays,
   startOfWeek,
   endOfWeek,
 } from 'date-fns'
@@ -16,7 +15,6 @@ import {
   DragDropContext,
   Droppable,
   Draggable,
-  DropResult,
 } from 'react-beautiful-dnd'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MoreVertical, CheckCircle2 } from 'lucide-react'
@@ -55,7 +53,7 @@ export default function WeekView({
     }
   }
 
-  // 📅 grupowanie
+  // 📅 grupowanie zadań po dniu
   useEffect(() => {
     const grouped: Record<string, any[]> = {}
     for (const day of days) {
@@ -70,8 +68,8 @@ export default function WeekView({
     setColumns(grouped)
   }, [tasks])
 
-  // 🎯 obsługa drag & drop
-  const handleDragEnd = (result: DropResult) => {
+  // 🎯 obsługa drag & drop (bez typów TS)
+  const handleDragEnd = (result: any) => {
     const { destination, source, draggableId } = result
     setActiveDay(null)
     if (!destination) return
@@ -114,7 +112,10 @@ export default function WeekView({
       </motion.div>
 
       {/* 🧱 Siatka dni */}
-      <DragDropContext onDragEnd={handleDragEnd} onDragStart={(e) => setActiveDay(e.source.droppableId)}>
+      <DragDropContext
+        onDragEnd={handleDragEnd}
+        onDragStart={(e: any) => setActiveDay(e.source.droppableId)}
+      >
         <div className="grid grid-cols-7 gap-3 px-3 pb-6 flex-1 overflow-x-auto">
           {days.map((date) => {
             const key = format(date, 'yyyy-MM-dd')
