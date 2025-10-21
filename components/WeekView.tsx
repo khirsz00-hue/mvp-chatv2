@@ -41,6 +41,7 @@ export default function WeekView({
 
   const [columns, setColumns] = useState<Record<string, any[]>>({})
   const [activeDay, setActiveDay] = useState<string | null>(null)
+  const [draggingTask, setDraggingTask] = useState<any | null>(null)
 
   const parseDateSafe = (value?: string) => {
     if (!value) return null
@@ -53,7 +54,7 @@ export default function WeekView({
     }
   }
 
-  // 📅 grupowanie zadań po dniu
+  // 📅 Grupowanie zadań po dniu
   useEffect(() => {
     const grouped: Record<string, any[]> = {}
     for (const day of days) {
@@ -68,10 +69,11 @@ export default function WeekView({
     setColumns(grouped)
   }, [tasks])
 
-  // 🎯 obsługa drag & drop (bez typów TS)
+  // 🎯 Obsługa drag & drop
   const handleDragEnd = (result: any) => {
     const { destination, source, draggableId } = result
     setActiveDay(null)
+    setDraggingTask(null)
     if (!destination) return
     if (
       destination.droppableId === source.droppableId &&
@@ -114,7 +116,11 @@ export default function WeekView({
       {/* 🧱 Siatka dni */}
       <DragDropContext
         onDragEnd={handleDragEnd}
-        onDragStart={(e: any) => setActiveDay(e.source.droppableId)}
+        onDragStart={(e: any) => {
+          setActiveDay(e.source.droppableId)
+          const all = columns[e.source.droppableId]
+          setDraggingTask(all?.find((t) => t.id === e.draggableId))
+        }}
       >
         <div className="grid grid-cols-7 gap-3 px-3 pb-6 flex-1 overflow-x-auto">
           {days.map((date) => {
@@ -125,7 +131,7 @@ export default function WeekView({
 
             return (
               <Droppable key={key} droppableId={key}>
-                {(provided, snapshot) => (
+                {(provided: any, snapshot: any) => (
                   <motion.div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
@@ -155,7 +161,7 @@ export default function WeekView({
                     </div>
 
                     {/* 🧾 Zadania */}
-                    <div className="flex-1 overflow-y-auto space-y-2">
+                    <div className="flex-1 overflow-y-auto space-y-2 relative">
                       <AnimatePresence>
                         {dayTasks.length === 0 ? (
                           <motion.p
@@ -174,87 +180,107 @@ export default function WeekView({
                               draggableId={task.id}
                               index={index}
                             >
-                              {(provided, snapshot) => (
-                                <motion.div
-                                  ref={provided.innerRef}
-                                  {...provided.draggableProps}
-                                  {...provided.dragHandleProps}
-                                  layout
-                                  initial={{ opacity: 0, y: 10 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  exit={{ opacity: 0, y: -10 }}
-                                  transition={{ duration: 0.25 }}
-                                  className={`relative group bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-lg p-2 flex items-center justify-between shadow-sm hover:shadow-md cursor-grab ${
-                                    snapshot.isDragging
-                                      ? 'shadow-xl scale-[1.02] border-blue-300'
-                                      : ''
-                                  }`}
-                                >
-                                  {/* ⭕ Ukończ */}
-                                  <button
-                                    onClick={() => onComplete?.(task.id)}
-                                    className="w-4 h-4 rounded-full border-2 border-gray-400 hover:border-green-500 hover:bg-green-500 transition flex items-center justify-center"
-                                    title="Ukończ"
+                              {(provided: any, snapshot: any) => (
+                                <>
+                                  <motion.div
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    {...provided.dragHandleProps}
+                                    layout
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -10 }}
+                                    transition={{ duration: 0.25 }}
+                                    className={`relative group bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-lg p-2 flex items-center justify-between shadow-sm hover:shadow-md cursor-grab ${
+                                      snapshot.isDragging
+                                        ? 'opacity-50 border-blue-300 scale-[1.03]'
+                                        : ''
+                                    }`}
                                   >
-                                    <CheckCircle2
-                                      size={12}
-                                      className="text-white opacity-0 group-hover:opacity-100 transition"
-                                    />
-                                  </button>
-
-                                  {/* 📋 Treść */}
-                                  <div className="flex-1 mx-2 min-w-0">
-                                    <p className="text-[13px] font-medium text-gray-800 truncate">
-                                      {task.content}
-                                    </p>
-                                    {task.project_name && (
-                                      <p className="text-[10px] text-gray-500 truncate">
-                                        📁 {task.project_name}
-                                      </p>
-                                    )}
-                                  </div>
-
-                                  {/* ⋯ Menu */}
-                                  <div className="relative group/menu">
-                                    <button className="p-1 text-gray-400 hover:text-gray-700 transition">
-                                      <MoreVertical size={14} />
+                                    {/* ⭕ Ukończ */}
+                                    <button
+                                      onClick={() => onComplete?.(task.id)}
+                                      className="w-4 h-4 rounded-full border-2 border-gray-400 hover:border-green-500 hover:bg-green-500 transition flex items-center justify-center"
+                                      title="Ukończ"
+                                    >
+                                      <CheckCircle2
+                                        size={12}
+                                        className="text-white opacity-0 group-hover:opacity-100 transition"
+                                      />
                                     </button>
 
+                                    {/* 📋 Treść */}
+                                    <div className="flex-1 mx-2 min-w-0">
+                                      <p className="text-[13px] font-medium text-gray-800 truncate">
+                                        {task.content}
+                                      </p>
+                                      {task.project_name && (
+                                        <p className="text-[10px] text-gray-500 truncate">
+                                          📁 {task.project_name}
+                                        </p>
+                                      )}
+                                    </div>
+
+                                    {/* ⋯ Menu */}
+                                    <div className="relative group/menu">
+                                      <button className="p-1 text-gray-400 hover:text-gray-700 transition">
+                                        <MoreVertical size={14} />
+                                      </button>
+
+                                      <motion.div
+                                        initial={{ opacity: 0, y: -4 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -4 }}
+                                        transition={{ duration: 0.15 }}
+                                        className="absolute right-0 top-5 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-50 opacity-0 group-hover/menu:opacity-100 pointer-events-none group-hover/menu:pointer-events-auto"
+                                      >
+                                        <button
+                                          onClick={() => onHelp?.(task)}
+                                          className="block w-full text-left px-3 py-1 text-xs hover:bg-gray-100"
+                                        >
+                                          💬 Pomóż mi
+                                        </button>
+                                        <button
+                                          onClick={() => onDelete?.(task.id)}
+                                          className="block w-full text-left px-3 py-1 text-xs hover:bg-gray-100"
+                                        >
+                                          🗑 Usuń
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            const newDate = prompt(
+                                              'Nowa data (rrrr-mm-dd)',
+                                              key
+                                            )
+                                            if (newDate)
+                                              onMove?.(task.id, new Date(newDate))
+                                          }}
+                                          className="block w-full text-left px-3 py-1 text-xs hover:bg-gray-100"
+                                        >
+                                          📦 Przenieś
+                                        </button>
+                                      </motion.div>
+                                    </div>
+                                  </motion.div>
+
+                                  {/* 👻 Ghost task (efekt przeciągania) */}
+                                  {snapshot.isDragging && draggingTask?.id === task.id && (
                                     <motion.div
-                                      initial={{ opacity: 0, y: -4 }}
-                                      animate={{ opacity: 1, y: 0 }}
-                                      exit={{ opacity: 0, y: -4 }}
-                                      transition={{ duration: 0.15 }}
-                                      className="absolute right-0 top-5 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-50 opacity-0 group-hover/menu:opacity-100 pointer-events-none group-hover/menu:pointer-events-auto"
+                                      className="absolute left-0 right-0 bg-white border border-blue-300 rounded-lg shadow-xl z-50 pointer-events-none"
+                                      style={{
+                                        opacity: 0.6,
+                                        transform: 'rotate(1deg)',
+                                      }}
+                                      initial={{ scale: 0.95 }}
+                                      animate={{ scale: 1.02 }}
+                                      transition={{ duration: 0.2 }}
                                     >
-                                      <button
-                                        onClick={() => onHelp?.(task)}
-                                        className="block w-full text-left px-3 py-1 text-xs hover:bg-gray-100"
-                                      >
-                                        💬 Pomóż mi
-                                      </button>
-                                      <button
-                                        onClick={() => onDelete?.(task.id)}
-                                        className="block w-full text-left px-3 py-1 text-xs hover:bg-gray-100"
-                                      >
-                                        🗑 Usuń
-                                      </button>
-                                      <button
-                                        onClick={() => {
-                                          const newDate = prompt(
-                                            'Nowa data (rrrr-mm-dd)',
-                                            key
-                                          )
-                                          if (newDate)
-                                            onMove?.(task.id, new Date(newDate))
-                                        }}
-                                        className="block w-full text-left px-3 py-1 text-xs hover:bg-gray-100"
-                                      >
-                                        📦 Przenieś
-                                      </button>
+                                      <div className="p-2 text-[13px] text-gray-700 font-medium">
+                                        {draggingTask.content}
+                                      </div>
                                     </motion.div>
-                                  </div>
-                                </motion.div>
+                                  )}
+                                </>
                               )}
                             </Draggable>
                           ))
