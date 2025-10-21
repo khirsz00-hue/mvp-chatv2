@@ -7,7 +7,7 @@ import { pl } from 'date-fns/locale'
 interface WeekViewProps {
   tasks: any[]
   onComplete?: (id: string) => void
-  onMove?: (id: string) => void
+  onMove?: (id: string, newDate: Date) => void // ✅ poprawione — przyjmuje też datę
   onDelete?: (id: string) => void
   onHelp?: (task: any) => void
 }
@@ -79,7 +79,15 @@ export default function WeekView({
                       ✅ Ukończ
                     </button>
                     <button
-                      onClick={() => onMove?.(task.id)}
+                      onClick={() => {
+                        const newDate = prompt(
+                          'Podaj nową datę (rrrr-mm-dd)',
+                          format(date, 'yyyy-MM-dd')
+                        )
+                        if (newDate) {
+                          onMove?.(task.id, new Date(newDate))
+                        }
+                      }}
                       className="text-[11px] bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200"
                     >
                       📦 Przenieś
