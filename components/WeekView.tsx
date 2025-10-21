@@ -1,7 +1,13 @@
 'use client'
 
-import React from 'react'
-import { format, startOfWeek, addDays, parseISO, differenceInCalendarDays } from 'date-fns'
+import React, { useEffect } from 'react'
+import {
+  format,
+  addDays,
+  parseISO,
+  differenceInCalendarDays,
+  isValid,
+} from 'date-fns'
 import { pl } from 'date-fns/locale'
 
 interface WeekViewProps {
@@ -19,31 +25,48 @@ export default function WeekView({
   onDelete,
   onHelp,
 }: WeekViewProps) {
-  // 📆 Poniedziałek → Niedziela
-  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 })
-  const days = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i))
+  // 📅 Faktyczny zakres 7 dni od dziś
+  const today = new Date()
+  const days = Array.from({ length: 7 }).map((_, i) => addDays(today, i))
 
-  // 🧩 Bezpieczne parsowanie dat z tolerancją 1 dnia (Todoist zwraca UTC)
+  // 🧩 Normalizacja dat Todoista (usuwa czas i strefę)
   const normalizeDate = (dateStr: string) => {
     if (!dateStr) return null
-    const base = dateStr.split('T')[0] // obetnij strefę
     try {
-      return parseISO(base)
+      const iso = dateStr.split('T')[0] // tylko część YYYY-MM-DD
+      const parsed = parseISO(iso)
+      return isValid(parsed) ? parsed : null
     } catch {
       return null
     }
   }
 
-  // 🗂️ Grupowanie zadań po dniu (z tolerancją ±1 dzień)
+  // 🗂️ Grupowanie z tolerancją ±1 dzień (UTC fix)
   const tasksByDay = days.map((day) => {
     const dayTasks = tasks.filter((t) => {
       const taskDate = normalizeDate(t.due?.date)
       if (!taskDate) return false
       const diff = differenceInCalendarDays(taskDate, day)
-      return diff >= -1 && diff <= 1 // tolerancja, łapie błędy UTC
+      return Math.abs(diff) <= 1 // tolerancja – łapie UTC różnice
     })
     return { date: day, tasks: dayTasks }
   })
+
+  // 🔍 Logi diagnostyczne — pomogą potwierdzić przyczynę
+  useEffect(() => {
+    console.groupCollapsed('🧠 Debug WeekView')
+    console.log('📋 Liczba zadań przekazanych z TodoistTasksView:', tasks.length)
+    if (tasks.length > 0) {
+      console.log(
+        '🗓️ Przykładowe daty (pierwsze 5):',
+        tasks.slice(0, 5).map((t) => t.due?.date)
+      )
+      const withoutDue = tasks.filter((t) => !t.due?.date)
+      if (withoutDue.length > 0)
+        console.warn('⚠️ Zadania bez daty due:', withoutDue.length)
+    }
+    console.groupEnd()
+  }, [tasks])
 
   return (
     <div className="grid grid-cols-7 gap-3 px-3 pb-6">
@@ -79,6 +102,11 @@ export default function WeekView({
                     {task.project_id && (
                       <p className="text-[11px] text-gray-500 mt-1">
                         📁 {task.project_name || task.project_id}
+                      </p>
+                    )}
+                    {task.due?.date && (
+                      <p className="text-[11px] text-gray-400">
+                        📅 {task.due.date}
                       </p>
                     )}
                   </div>
