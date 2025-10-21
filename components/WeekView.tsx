@@ -7,7 +7,7 @@ import { pl } from 'date-fns/locale'
 interface WeekViewProps {
   tasks: any[]
   onComplete?: (id: string) => void
-  onMove?: (id: string, newDate: Date) => void // ✅ poprawione — przyjmuje też datę
+  onMove?: (id: string, newDate: Date) => void
   onDelete?: (id: string) => void
   onHelp?: (task: any) => void
 }
@@ -27,7 +27,11 @@ export default function WeekView({
   const tasksByDay = days.map((day) => {
     const dayTasks = tasks.filter((t) => {
       if (!t.due?.date) return false
-      const taskDate = parseISO(t.due.date)
+
+      // 🧠 Naprawa — usuń strefę czasową, aby nie przesuwało dat
+      const dateStr = t.due.date.split('T')[0]
+      const taskDate = parseISO(dateStr)
+
       return isSameDay(taskDate, day)
     })
     return { date: day, tasks: dayTasks }
