@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { format, startOfWeek, addDays, isSameDay, parseISO } from 'date-fns'
+import { format, startOfWeek, addDays, parseISO, differenceInCalendarDays } from 'date-fns'
 import { pl } from 'date-fns/locale'
 
 interface WeekViewProps {
@@ -23,24 +23,24 @@ export default function WeekView({
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 })
   const days = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i))
 
-  // 🧩 Normalizacja dat Todoista
+  // 🧩 Bezpieczne parsowanie dat z tolerancją 1 dnia (Todoist zwraca UTC)
   const normalizeDate = (dateStr: string) => {
     if (!dateStr) return null
-    // usuń strefę czasową, bo Todoist zwraca "2025-10-14T00:00:00Z"
-    const clean = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr
+    const base = dateStr.split('T')[0] // obetnij strefę
     try {
-      return parseISO(clean)
+      return parseISO(base)
     } catch {
       return null
     }
   }
 
-  // 🗂️ Grupowanie zadań po dniu
+  // 🗂️ Grupowanie zadań po dniu (z tolerancją ±1 dzień)
   const tasksByDay = days.map((day) => {
     const dayTasks = tasks.filter((t) => {
-      const normalized = normalizeDate(t.due?.date)
-      if (!normalized) return false
-      return isSameDay(normalized, day)
+      const taskDate = normalizeDate(t.due?.date)
+      if (!taskDate) return false
+      const diff = differenceInCalendarDays(taskDate, day)
+      return diff >= -1 && diff <= 1 // tolerancja, łapie błędy UTC
     })
     return { date: day, tasks: dayTasks }
   })
