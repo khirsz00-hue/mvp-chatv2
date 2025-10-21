@@ -70,9 +70,7 @@ export default function TodoistTasksView({
           break
       }
 
-      const res = await fetch(`/api/todoist/tasks?filter=${encodeURIComponent(filterQuery)}`, {
-        headers: { 'x-todoist-token': token },
-      })
+     const res = await fetch(`/api/todoist/tasks?token=${token}&filter=${encodeURIComponent(filterQuery)}`)
       const data = await res.json()
       let fetched = data.tasks || []
 
