@@ -23,16 +23,24 @@ export default function WeekView({
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 })
   const days = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i))
 
+  // 🧩 Normalizacja dat Todoista
+  const normalizeDate = (dateStr: string) => {
+    if (!dateStr) return null
+    // usuń strefę czasową, bo Todoist zwraca "2025-10-14T00:00:00Z"
+    const clean = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr
+    try {
+      return parseISO(clean)
+    } catch {
+      return null
+    }
+  }
+
   // 🗂️ Grupowanie zadań po dniu
   const tasksByDay = days.map((day) => {
     const dayTasks = tasks.filter((t) => {
-      if (!t.due?.date) return false
-
-      // 🧠 Naprawa — usuń strefę czasową, aby nie przesuwało dat
-      const dateStr = t.due.date.split('T')[0]
-      const taskDate = parseISO(dateStr)
-
-      return isSameDay(taskDate, day)
+      const normalized = normalizeDate(t.due?.date)
+      if (!normalized) return false
+      return isSameDay(normalized, day)
     })
     return { date: day, tasks: dayTasks }
   })
