@@ -40,9 +40,9 @@ export default function WeekView({
   const days = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i))
 
   const [columns, setColumns] = useState<Record<string, any[]>>({})
-  const [activeDay, setActiveDay] = useState<string | null>(null)
   const [draggingTask, setDraggingTask] = useState<any | null>(null)
 
+  // 🧩 Pomocnicza funkcja parsowania dat
   const parseDateSafe = (value?: string) => {
     if (!value) return null
     try {
@@ -54,25 +54,35 @@ export default function WeekView({
     }
   }
 
-  // 📅 Grupowanie zadań po dniu
+  // 🗂️ Grupowanie zadań po dniu
   useEffect(() => {
+    if (!tasks || tasks.length === 0) {
+      console.log('⚠️ Brak zadań w WeekView')
+      setColumns({})
+      return
+    }
+
+    console.log('✅ WeekView otrzymał taski:', tasks)
+
     const grouped: Record<string, any[]> = {}
     for (const day of days) {
       const key = format(day, 'yyyy-MM-dd')
       grouped[key] = []
     }
+
     for (const t of tasks) {
       const parsed = parseDateSafe(t?.due?.date)
       const key = parsed ? format(parsed, 'yyyy-MM-dd') : null
       if (key && grouped[key]) grouped[key].push(t)
     }
+
+    console.log('📅 Zgrupowane kolumny:', grouped)
     setColumns(grouped)
-  }, [tasks])
+  }, [tasks.length])
 
   // 🎯 Obsługa drag & drop
   const handleDragEnd = (result: any) => {
     const { destination, source, draggableId } = result
-    setActiveDay(null)
     setDraggingTask(null)
     if (!destination) return
     if (
@@ -99,6 +109,16 @@ export default function WeekView({
     }
   }
 
+  // 🔄 Render fallback, jeśli brak danych
+  if (!tasks || tasks.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-sm text-gray-500 italic">
+        ⏳ Brak zadań do wyświetlenia w tym tygodniu.
+      </div>
+    )
+  }
+
+  // ✅ Widok główny
   return (
     <div className="flex flex-col h-full select-none">
       {/* 📆 Nagłówek tygodnia */}
@@ -117,7 +137,6 @@ export default function WeekView({
       <DragDropContext
         onDragEnd={handleDragEnd}
         onDragStart={(e: any) => {
-          setActiveDay(e.source.droppableId)
           const all = columns[e.source.droppableId]
           setDraggingTask(all?.find((t) => t.id === e.draggableId))
         }}
@@ -197,7 +216,6 @@ export default function WeekView({
                                         : ''
                                     }`}
                                   >
-                                    {/* ⭕ Ukończ */}
                                     <button
                                       onClick={() => onComplete?.(task.id)}
                                       className="w-4 h-4 rounded-full border-2 border-gray-400 hover:border-green-500 hover:bg-green-500 transition flex items-center justify-center"
@@ -209,7 +227,6 @@ export default function WeekView({
                                       />
                                     </button>
 
-                                    {/* 📋 Treść */}
                                     <div className="flex-1 mx-2 min-w-0">
                                       <p className="text-[13px] font-medium text-gray-800 truncate">
                                         {task.content}
@@ -221,7 +238,6 @@ export default function WeekView({
                                       )}
                                     </div>
 
-                                    {/* ⋯ Menu */}
                                     <div className="relative group/menu">
                                       <button className="p-1 text-gray-400 hover:text-gray-700 transition">
                                         <MoreVertical size={14} />
@@ -246,24 +262,11 @@ export default function WeekView({
                                         >
                                           🗑 Usuń
                                         </button>
-                                        <button
-                                          onClick={() => {
-                                            const newDate = prompt(
-                                              'Nowa data (rrrr-mm-dd)',
-                                              key
-                                            )
-                                            if (newDate)
-                                              onMove?.(task.id, new Date(newDate))
-                                          }}
-                                          className="block w-full text-left px-3 py-1 text-xs hover:bg-gray-100"
-                                        >
-                                          📦 Przenieś
-                                        </button>
                                       </motion.div>
                                     </div>
                                   </motion.div>
 
-                                  {/* 👻 Ghost task (efekt przeciągania) */}
+                                  {/* 👻 Ghost */}
                                   {snapshot.isDragging && draggingTask?.id === task.id && (
                                     <motion.div
                                       className="absolute left-0 right-0 bg-white border border-blue-300 rounded-lg shadow-xl z-50 pointer-events-none"
