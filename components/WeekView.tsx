@@ -14,8 +14,7 @@ import {
   Draggable,
 } from 'react-beautiful-dnd'
 import { motion, AnimatePresence } from 'framer-motion'
-import { MoreVertical, CheckCircle2, CalendarDays } from 'lucide-react'
-import { Tooltip } from 'react-tooltip'
+import { MoreVertical, CheckCircle2 } from 'lucide-react'
 
 interface WeekViewProps {
   tasks: any[]
@@ -39,7 +38,6 @@ export default function WeekView({
   const [columns, setColumns] = useState<Record<string, any[]>>({})
   const [draggingTask, setDraggingTask] = useState<any | null>(null)
 
-  // ✅ poprawne parsowanie dat z Todoista (bez przesunięcia strefy)
   const parseDateSafe = (value?: string) => {
     if (!value) return null
     try {
@@ -50,7 +48,6 @@ export default function WeekView({
     }
   }
 
-  // 🗂️ Grupowanie zadań po dniu
   useEffect(() => {
     if (!tasks || tasks.length === 0) return
     const grouped: Record<string, any[]> = {}
@@ -62,12 +59,9 @@ export default function WeekView({
       if (key && grouped[key]) grouped[key].push(t)
     }
 
-    console.log('✅ WeekView otrzymał taski:', tasks.length)
-    console.log('📅 Zgrupowane kolumny:', grouped)
     setColumns(grouped)
   }, [tasks])
 
-  // 🎯 Drag & Drop
   const handleDragEnd = (result: any) => {
     const { destination, source, draggableId } = result
     setDraggingTask(null)
@@ -96,7 +90,6 @@ export default function WeekView({
     }
   }
 
-  // 🚫 Gdy brak danych
   if (!Object.keys(columns).length) {
     return (
       <div className="flex items-center justify-center h-full text-sm text-gray-500 italic">
@@ -105,10 +98,8 @@ export default function WeekView({
     )
   }
 
-  // 🎨 Widok tygodnia
   return (
     <div className="flex flex-col h-full bg-gradient-to-b from-gray-50 to-white">
-      {/* Nagłówek tygodnia */}
       <motion.div
         className="text-center py-4 border-b border-gray-200 bg-white shadow-sm mb-3 sticky top-0 z-20"
         initial={{ opacity: 0, y: -10 }}
@@ -120,7 +111,6 @@ export default function WeekView({
         </h2>
       </motion.div>
 
-      {/* Siatka dni */}
       <DragDropContext
         onDragEnd={handleDragEnd}
         onDragStart={(e: any) => {
@@ -148,7 +138,6 @@ export default function WeekView({
                     animate={{ scale: snapshot.isDraggingOver ? 1.02 : 1 }}
                     transition={{ duration: 0.15 }}
                   >
-                    {/* Nagłówek dnia */}
                     <div className="text-center font-semibold text-gray-700 mb-2 text-sm border-b pb-1">
                       <span
                         className={`capitalize ${
@@ -165,7 +154,6 @@ export default function WeekView({
                       </span>
                     </div>
 
-                    {/* Lista zadań */}
                     <div className="flex-1 overflow-y-auto space-y-2 relative">
                       <AnimatePresence>
                         {dayTasks.map((task, index) => (
@@ -185,9 +173,10 @@ export default function WeekView({
                                     ? 'opacity-50 border-blue-300 scale-[1.02]'
                                     : ''
                                 }`}
-                                data-tooltip-id={`task-${task.id}`}
+                                title={`${task.content}\n📅 ${task.due?.date || 'Brak daty'}\n📁 ${
+                                  task.project_name || 'Bez projektu'
+                                }`}
                               >
-                                {/* Checkbox */}
                                 <button
                                   onClick={() => onComplete?.(task.id)}
                                   className="w-4 h-4 rounded-full border-2 border-gray-400 hover:border-green-500 hover:bg-green-500 transition flex items-center justify-center"
@@ -205,7 +194,6 @@ export default function WeekView({
                                   </p>
                                 </div>
 
-                                {/* ⋮ Menu */}
                                 <div className="relative group/menu">
                                   <button className="p-1 text-gray-400 hover:text-gray-700 transition">
                                     <MoreVertical size={14} />
@@ -232,24 +220,6 @@ export default function WeekView({
                                     </button>
                                   </motion.div>
                                 </div>
-
-                                {/* Tooltip */}
-                                <Tooltip
-                                  id={`task-${task.id}`}
-                                  place="bottom"
-                                  className="z-50 bg-gray-900 text-white text-xs rounded-md px-3 py-1 shadow-lg"
-                                  content={
-                                    <>
-                                      <div className="flex items-center gap-1">
-                                        <CalendarDays size={12} />{' '}
-                                        {task.due?.date || 'Brak daty'}
-                                      </div>
-                                      <div className="text-gray-300">
-                                        📁 {task.project_name || 'Bez projektu'}
-                                      </div>
-                                    </>
-                                  }
-                                />
                               </motion.div>
                             )}
                           </Draggable>
