@@ -12,7 +12,6 @@ type Task = {
   due?: string | { date: string } | null
   priority?: number
   labels?: string[]
-  // optional fields sometimes present in other places
   estimated?: string
 }
 
@@ -42,6 +41,8 @@ export default function TaskCard({
   const dueLabel = dueDate ? readableDue(dueDate) : 'Brak terminu'
 
   function safeParseDate(d: string) {
+    // if input looks like "YYYY-MM-DD" (no time) -> parse as local midday to avoid timezone shifts
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return new Date(d + 'T12:00:00')
     try {
       const p = parseISO(d)
       if (!isNaN(p.getTime())) return p
@@ -53,7 +54,7 @@ export default function TaskCard({
 
   function readableDue(d: Date) {
     try {
-      return `🗓 ${format(d, 'dd LLL yyyy')}`
+      return `${format(d, 'dd LLL yyyy')}`
     } catch {
       return d.toLocaleDateString()
     }
@@ -61,9 +62,9 @@ export default function TaskCard({
 
   const priorityLabel = (p?: number) => {
     if (!p) return null
-    if (p === 4) return { text: 'High', color: 'bg-red-100 text-red-700' }
-    if (p === 3) return { text: 'Medium', color: 'bg-yellow-100 text-yellow-700' }
-    return { text: 'Low', color: 'bg-green-100 text-green-700' }
+    if (p === 4) return { text: 'Wysoki', color: 'bg-red-100 text-red-700' }
+    if (p === 3) return { text: 'Średni', color: 'bg-yellow-100 text-yellow-700' }
+    return { text: 'Niski', color: 'bg-green-100 text-green-700' }
   }
 
   const pr = priorityLabel(task.priority)
@@ -130,17 +131,12 @@ export default function TaskCard({
   }
 
   const handleHelp = () => {
-    // Dispatch global event in the same shape other parts of app expect
     setHelping(true)
     try {
-      window.dispatchEvent(
-        new CustomEvent('chatSelect', {
-          detail: {
-            mode: 'todoist',
-            task: { id: task.id, title: task.content },
-          },
-        })
-      )
+      // Dispatch two events for compatibility: 'chatSelect' (existing) and 'taskHelp' (redundant alias)
+      const detail = { mode: 'todoist', task: { id: task.id, title: task.content } }
+      window.dispatchEvent(new CustomEvent('chatSelect', { detail }))
+      window.dispatchEvent(new CustomEvent('taskHelp', { detail }))
     } catch (err) {
       console.error('help dispatch failed', err)
     } finally {
@@ -151,7 +147,7 @@ export default function TaskCard({
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 relative">
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           {selectable && (
             <input
               type="checkbox"
@@ -165,9 +161,7 @@ export default function TaskCard({
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-semibold text-gray-800 truncate">{task.content}</h3>
               {pr && (
-                <span
-                  className={`text-xs font-medium px-2 py-0.5 rounded-full ${pr.color} ml-2`}
-                >
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${pr.color} ml-2`}>
                   {pr.text}
                 </span>
               )}
@@ -184,7 +178,9 @@ export default function TaskCard({
             title="Szczegóły"
             onClick={() =>
               window.dispatchEvent(
-                new CustomEvent('chatSelect', { detail: { mode: 'todoist', task: { id: task.id, title: task.content } } })
+                new CustomEvent('chatSelect', {
+                  detail: { mode: 'todoist', task: { id: task.id, title: task.content } },
+                })
               )
             }
             className="p-1 rounded hover:bg-gray-50"
@@ -194,7 +190,6 @@ export default function TaskCard({
         </div>
       </div>
 
-      {/* meta */}
       <div className="mt-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 text-xs text-gray-500">
           <span className="inline-flex items-center gap-1">
@@ -207,62 +202,30 @@ export default function TaskCard({
           )}
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* optional small status */}
-        </div>
+        <div className="flex items-center gap-2" />
       </div>
 
-      {/* actions */}
       <div className="mt-4 flex items-center gap-3">
-        <button
-          onClick={handlePostponePick}
-          className="task-action postpone"
-          title="Przenieś"
-          disabled={loading}
-        >
+        <button onClick={handlePostponePick} className="task-action postpone" title="Przenieś" disabled={loading}>
           Przenieś
         </button>
 
-        <button
-          onClick={handleComplete}
-          className="task-action complete"
-          title="Ukończ"
-          disabled={loading}
-        >
+        <button onClick={handleComplete} className="task-action complete" title="Ukończ" disabled={loading}>
           Ukończ
         </button>
 
-        <button
-          onClick={handleDelete}
-          className="task-action delete"
-          title="Usuń"
-          disabled={loading}
-        >
+        <button onClick={handleDelete} className="task-action delete" title="Usuń" disabled={loading}>
           Usuń
         </button>
 
         <div className="ml-auto">
-          <button
-            onClick={handleHelp}
-            className="task-action help"
-            title="Pomóż mi"
-            disabled={helping}
-          >
+          <button onClick={handleHelp} className="task-action help" title="Pomóż mi" disabled={helping}>
             Pomóż mi
           </button>
         </div>
       </div>
 
-      {/* hidden date input */}
-      <input
-        ref={dateRef}
-        type="date"
-        className="hidden"
-        onChange={handlePostpone}
-      />
+      <input ref={dateRef} type="date" className="hidden" onChange={handlePostpone} />
     </div>
   )
 }
-
-// small CSS utilities (if tailwind classes from globals.css are present these helpers map to them)
-// but component uses class names defined in globals.css provided previously.
