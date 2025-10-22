@@ -29,6 +29,7 @@ type TodoistSession = {
   title: string
   timestamp: number
   last?: string
+  description?: string
 }
 
 export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
@@ -93,7 +94,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
       id: s.id,
       title: s.title,
       last: s.last || '(brak wiadomości)',
-      date: new Date(s.timestamp).toLocaleString('pl-PL', {
+      date: new Date(s.timestamp).toLocaleDateString('pl-PL', {
         day: '2-digit',
         month: '2-digit',
         hour: '2-digit',
@@ -105,9 +106,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
     // 🔗 Połącz obie listy (unikalne ID, preferuj dane z sessions)
     const mergedTasks: TaskPreview[] = [
       ...tasksFromSessions,
-      ...tasksFromChats.filter(
-        (t) => !tasksFromSessions.some((s) => s.id === t.id)
-      ),
+      ...tasksFromChats.filter((t) => !tasksFromSessions.some((s) => s.id === t.id)),
     ]
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, 25)
@@ -156,23 +155,25 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
       window.removeEventListener('storage', loadChats)
       window.removeEventListener('chatUpdated', loadChats)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleSelect = (mode: 'global' | 'task' | 'six_hats' | 'todoist', session: any) => {
     setActiveSessionId(session.id)
 
-    // 🔥 Emit global event for modal (TaskDialog)
+    // zawsze informujemy rodzica aby przełączył główny widok
+    onSelectChat?.(mode, { id: session.id, content: session.title || session.last || '' })
+
+    // dla sesji dotyczących zadań dodatkowo wyślij dedykowane eventy
     if (mode === 'todoist' || mode === 'task') {
-      window.dispatchEvent(
-        new CustomEvent('chatSelect', {
-          detail: {
-            mode,
-            task: { id: session.id, title: session.title },
-          },
-        })
-      )
-    } else {
-      onSelectChat?.(mode, { id: session.id, content: session.title })
+      const detail = {
+        mode: 'todoist',
+        task: { id: session.id, title: session.title || session.last || '', description: (session as any).description || '' },
+      }
+      // dispatch eventy które TodoistConnection nasłuchuje
+      window.dispatchEvent(new CustomEvent('taskSelect', { detail }))
+      // dodatkowy alias dla kompatybilności
+      window.dispatchEvent(new CustomEvent('taskHelp', { detail }))
     }
   }
 
@@ -200,9 +201,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
         ].map((t) => (
           <button
             key={t.key}
-            className={`flex-1 py-2 ${
-              tab === t.key ? 'bg-white text-green-700 font-semibold' : 'hover:bg-gray-200'
-            }`}
+            className={`flex-1 py-2 ${tab === t.key ? 'bg-white text-green-700 font-semibold' : 'hover:bg-gray-200'}`}
             onClick={() => setTab(t.key as any)}
           >
             {t.label} ({t.count})
@@ -222,11 +221,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
                 key={s.id}
                 onClick={() => handleSelect('todoist', s)}
                 title={s.last}
-                className={`cursor-pointer border rounded-lg p-2 transition ${
-                  activeSessionId === s.id
-                    ? 'bg-green-100 border-green-300'
-                    : 'bg-white hover:bg-green-50'
-                }`}
+                className={`cursor-pointer border rounded-lg p-2 transition ${activeSessionId === s.id ? 'bg-green-100 border-green-300' : 'bg-white hover:bg-green-50'}`}
               >
                 <p className="font-medium text-gray-800 truncate">{s.title}</p>
                 <p className="text-xs text-gray-500">
@@ -252,11 +247,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
                 key={t.id}
                 onClick={() => handleSelect('task', { id: t.id, title: t.title })}
                 title={t.last}
-                className={`cursor-pointer border rounded-lg p-2 transition ${
-                  activeSessionId === t.id
-                    ? 'bg-green-100 border-green-300'
-                    : 'bg-white hover:bg-green-50'
-                }`}
+                className={`cursor-pointer border rounded-lg p-2 transition ${activeSessionId === t.id ? 'bg-green-100 border-green-300' : 'bg-white hover:bg-green-50'}`}
               >
                 <p className="font-medium text-gray-800 truncate">{t.title}</p>
                 <p className="text-xs text-gray-500">{t.date}</p>
@@ -275,11 +266,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
                 key={i}
                 onClick={() => handleSelect('six_hats', { id: `six_${i}`, title: chat.content })}
                 title={chat.content}
-                className={`cursor-pointer border rounded-lg p-2 transition ${
-                  activeSessionId === `six_${i}`
-                    ? 'bg-green-100 border-green-300'
-                    : 'bg-white hover:bg-green-50'
-                }`}
+                className={`cursor-pointer border rounded-lg p-2 transition ${activeSessionId === `six_${i}` ? 'bg-green-100 border-green-300' : 'bg-white hover:bg-green-50'}`}
               >
                 <p className="text-xs text-gray-500">{chat.date}</p>
                 <p className="truncate text-gray-800">{chat.content}</p>
@@ -297,11 +284,7 @@ export default function ChatSidebar({ onSelectChat }: ChatSidebarProps) {
                 key={i}
                 onClick={() => handleSelect('global', { id: `global_${i}`, title: chat.content })}
                 title={chat.content}
-                className={`cursor-pointer border rounded-lg p-2 transition ${
-                  activeSessionId === `global_${i}`
-                    ? 'bg-green-100 border-green-300'
-                    : 'bg-white hover:bg-green-50'
-                }`}
+                className={`cursor-pointer border rounded-lg p-2 transition ${activeSessionId === `global_${i}` ? 'bg-green-100 border-green-300' : 'bg-white hover:bg-green-50'}`}
               >
                 <p className="text-xs text-gray-500">{chat.date}</p>
                 <p className="truncate text-gray-800">{chat.content}</p>
