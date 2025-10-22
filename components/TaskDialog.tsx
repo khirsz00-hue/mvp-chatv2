@@ -42,25 +42,25 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose, 
     if (initialTaskData) setTaskData(initialTaskData)
   }, [initialTaskData])
 
-  // Load chat from localStorage — robust: try several key patterns and fallbacks
+  // Robust loader: try multiple keys and fallback search
   useEffect(() => {
     if (!isOpen || !taskObj) return
-    const chatKeyCandidates = [
+    const candidates = [
       `chat_task_${taskObj.id}`,
       `chat_todoist_${taskObj.id}`,
       `chat_${taskObj.id}`,
     ]
 
     let foundKey: string | null = null
-    for (const k of chatKeyCandidates) {
+    for (const k of candidates) {
       if (localStorage.getItem(k)) {
         foundKey = k
         break
       }
     }
 
-    // fallback: search localStorage keys that include the id (to be tolerant)
     if (!foundKey) {
+      // search any key that contains the id and starts with chat_
       for (const k of Object.keys(localStorage)) {
         if (k.startsWith('chat_') && k.includes(taskObj.id)) {
           foundKey = k
@@ -80,7 +80,7 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose, 
       }
     }
 
-    // If nothing found, initialize empty intro
+    // no history -> init intro
     const introMsg: ChatMessage = {
       role: 'assistant',
       content: `Zaczynamy! Pomagam Ci w zadaniu **${taskObj.title}**.`,
@@ -88,16 +88,50 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose, 
     }
     setChat([introMsg])
     try {
+      // write to canonical keys both for backward compatibility
       localStorage.setItem(`chat_task_${taskObj.id}`, JSON.stringify([introMsg]))
+      localStorage.setItem(`chat_todoist_${taskObj.id}`, JSON.stringify([introMsg]))
     } catch {}
   }, [isOpen, taskObj])
 
-  // Save chat to localStorage on changes
+  // Save chat to localStorage on changes + update sessions lists
   useEffect(() => {
     if (!taskObj) return
     try {
-      localStorage.setItem(`chat_task_${taskObj.id}`, JSON.stringify(chat))
-    } catch {}
+      const key1 = `chat_task_${taskObj.id}`
+      const key2 = `chat_todoist_${taskObj.id}`
+      const payload = JSON.stringify(chat)
+      localStorage.setItem(key1, payload)
+      localStorage.setItem(key2, payload)
+
+      // update chat_sessions_task (for TaskDialog history list)
+      const sessionsTask = JSON.parse(localStorage.getItem('chat_sessions_task') || '[]')
+      const idx = sessionsTask.findIndex((s: any) => s.id === taskObj.id)
+      const entry = {
+        id: taskObj.id,
+        title: taskObj.title,
+        timestamp: Date.now(),
+        last: chat[chat.length - 1]?.content?.slice(0, 200) || '',
+      }
+      if (idx >= 0) {
+        sessionsTask[idx] = { ...sessionsTask[idx], ...entry }
+      } else {
+        sessionsTask.unshift(entry)
+      }
+      localStorage.setItem('chat_sessions_task', JSON.stringify(sessionsTask))
+
+      // also update chat_sessions_todoist (used by ChatSidebar)
+      const sessionsTodo = JSON.parse(localStorage.getItem('chat_sessions_todoist') || '[]')
+      const idx2 = sessionsTodo.findIndex((s: any) => s.id === taskObj.id)
+      if (idx2 >= 0) {
+        sessionsTodo[idx2] = { ...sessionsTodo[idx2], ...entry }
+      } else {
+        sessionsTodo.unshift(entry)
+      }
+      localStorage.setItem('chat_sessions_todoist', JSON.stringify(sessionsTodo))
+    } catch (err) {
+      console.error('Błąd zapisu historii czatu:', err)
+    }
   }, [chat, taskObj])
 
   // sendMessage (same pattern)
@@ -128,13 +162,44 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose, 
       const newChat = [...updated, ai]
       setChat(newChat)
       try {
+        // persist under both canonical keys
         localStorage.setItem(`chat_task_${taskObj.id}`, JSON.stringify(newChat))
-      } catch {}
+        localStorage.setItem(`chat_todoist_${taskObj.id}`, JSON.stringify(newChat))
+
+        // update session entries as above
+        const sessionsTask = JSON.parse(localStorage.getItem('chat_sessions_task') || '[]')
+        const idx = sessionsTask.findIndex((s: any) => s.id === taskObj.id)
+        const entry = {
+          id: taskObj.id,
+          title: taskObj.title,
+          timestamp: Date.now(),
+          last: ai.content.slice(0, 200),
+        }
+        if (idx >= 0) {
+          sessionsTask[idx] = { ...sessionsTask[idx], ...entry }
+        } else {
+          sessionsTask.unshift(entry)
+        }
+        localStorage.setItem('chat_sessions_task', JSON.stringify(sessionsTask))
+
+        const sessionsTodo = JSON.parse(localStorage.getItem('chat_sessions_todoist') || '[]')
+        const idx2 = sessionsTodo.findIndex((s: any) => s.id === taskObj.id)
+        if (idx2 >= 0) {
+          sessionsTodo[idx2] = { ...sessionsTodo[idx2], ...entry }
+        } else {
+          sessionsTodo.unshift(entry)
+        }
+        localStorage.setItem('chat_sessions_todoist', JSON.stringify(sessionsTodo))
+      } catch (err) {
+        console.error('Błąd zapisu historii po sendMessage:', err)
+      }
     } catch (err) {
       console.error('sendMessage error', err)
       setChat(prev => [...prev, { role: 'assistant', content: '⚠️ Błąd komunikacji z AI.', timestamp: Date.now() }])
     } finally {
       setLoading(false)
+      // notify sidebar to refresh lists
+      window.dispatchEvent(new Event('chatUpdated'))
     }
   }
 
