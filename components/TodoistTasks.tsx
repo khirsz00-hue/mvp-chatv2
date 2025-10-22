@@ -4,14 +4,17 @@ import { useEffect, useState, useRef } from 'react'
 import TaskCard from './TaskCard'
 import { motion, AnimatePresence } from 'framer-motion'
 
+// types
 interface Task {
   id: string
   content: string
-  due?: string
+  due?: string | { date?: string } | null
   priority?: number
   project_id?: string
   project_name?: string
   labels?: string[]
+  description?: string
+  estimated?: string
 }
 
 interface Project {
@@ -23,9 +26,8 @@ interface TodoistTasksProps {
   token: string
   filter: 'today' | 'tomorrow' | 'overdue' | '7 days' | '30 days'
   onChangeFilter: (filter: 'today' | 'tomorrow' | 'overdue' | '7 days' | '30 days') => void
-  onUpdate?: (tasks: Task[]) => void
+  onUpdate?: (tasks?: Task[]) => void
   onOpenTaskChat?: (task: Task) => void
-  /** Ustaw true tylko jeśli chcesz pokazać wbudowany górny pasek filtrów. Domyślnie ukryty, by uniknąć duplikatu. */
   showHeaderFilters?: boolean
 }
 
@@ -43,45 +45,57 @@ export default function TodoistTasks({
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const lastUpdate = useRef<number>(0)
-  const batchDateRef = useRef<HTMLInputElement>(null)
 
-  // 📦 Pobieranie zadań i projektów
+  // helper to normalize due date strings (avoid timezone drift)
+  const normalizeDue = (due: any) => {
+    if (!due) return null
+    const dueStr = typeof due === 'string' ? due : due?.date ?? null
+    if (!dueStr) return null
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dueStr)) return new Date(dueStr + 'T12:00:00')
+    const d = new Date(dueStr)
+    return isNaN(d.getTime()) ? null : d
+  }
+
+  // load tasks & projects
   const loadTasks = async (silent = false) => {
     if (!token) return
     if (!silent) setLoading(true)
-
     try {
       const [tasksRes, projectsRes] = await Promise.all([
-        fetch(`/api/todoist/tasks?token=${token}&filter=${filter}`).then((r) => r.json()),
-        fetch(`/api/todoist/projects?token=${token}`).then((r) => r.json()),
+        fetch(`/api/todoist/tasks?token=${token}&filter=${filter}`).then(r => r.json()).catch(() => ({ tasks: [] })),
+        fetch('/api/todoist/projects', { headers: { 'x-todoist-token': token } }).then(r => r.json()).catch(() => ({ projects: [] })),
       ])
 
-      const allTasks: Task[] = tasksRes.tasks || []
-      const allProjects: Project[] = projectsRes.projects || []
-
-      const enriched = allTasks.map((t: Task) => ({
+      const fetchedTasks = tasksRes.tasks || tasksRes || []
+      // ensure each task has normalized due/description if possible
+      const mapped = (fetchedTasks as any[]).map((t) => ({
         ...t,
-        project_name:
-          allProjects.find((p: Project) => p.id === t.project_id)?.name || 'Brak projektu',
+        due: t.due,
+        _dueDate: normalizeDue(t.due),
+        description: t.description || t.note || '',
       }))
+      setTasks(mapped)
 
-      setTasks(enriched)
-      setProjects(allProjects)
-      onUpdate?.(enriched)
+      // projectsRes might be { projects: [...] } or an array
+      if (Array.isArray(projectsRes)) setProjects(projectsRes)
+      else if (projectsRes.projects) setProjects(projectsRes.projects)
+      else setProjects([])
+
+      setLoading(false)
     } catch (err) {
-      console.error('❌ Błąd ładowania:', err)
-    } finally {
-      if (!silent) setLoading(false)
+      console.error('loadTasks error', err)
+      setTasks([])
+      setProjects([])
+      setLoading(false)
     }
   }
 
-  // 🔄 Pierwsze ładowanie po zmianie filtru
   useEffect(() => {
     loadTasks()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter])
 
-  // 🔁 Odświeżanie po eventach (np. SSE / webhook)
+  // reload on external events
   useEffect(() => {
     const handleUpdate = () => {
       const now = Date.now()
@@ -89,49 +103,19 @@ export default function TodoistTasks({
       lastUpdate.current = now
       loadTasks(true)
     }
-
     window.addEventListener('taskUpdated', handleUpdate)
     return () => window.removeEventListener('taskUpdated', handleUpdate)
-  }, [])
+  }, [token, filter])
 
-  // 🗂 Filtrowanie po projekcie
-  const visibleTasks =
-    selectedProject === 'all'
-      ? tasks
-      : tasks.filter((t) => t.project_id === selectedProject)
-
-  // ✅ Zaznaczanie wielu zadań
-  const toggleSelect = (id: string, checked: boolean) => {
-    setSelectedTasks((prev) => {
-      const copy = new Set(prev)
-      checked ? copy.add(id) : copy.delete(id)
-      return copy
-    })
-  }
-
-  // 📅 Grupowanie po dacie
-  const groupedByDate = visibleTasks.reduce((acc, t) => {
-    const date = t.due || 'Brak terminu'
-    if (!acc[date]) acc[date] = []
-    acc[date].push(t)
-    return acc
-  }, {} as Record<string, Task[]>)
-
-  const sortedDates = Object.keys(groupedByDate).sort(
-    (a, b) => new Date(a).getTime() - new Date(b).getTime()
-  )
+  // Filter by selected project
+  const visibleTasks = selectedProject === 'all' ? tasks : tasks.filter(t => t.project_id === selectedProject)
 
   if (loading) {
-    return (
-      <p className="text-sm text-neutral-500 mt-4 text-center">
-        ⏳ Wczytywanie zadań...
-      </p>
-    )
+    return <p className="text-sm text-neutral-500 mt-4 text-center">⏳ Wczytywanie zadań...</p>
   }
 
   return (
     <div className="space-y-4 relative overflow-visible">
-      {/* 🔹 Pasek filtrów (opcjonalny – ukryty domyślnie) + projekty */}
       {showHeaderFilters && (
         <div className="sticky top-0 z-30 flex flex-col md:flex-row items-center justify-between gap-2 px-3 py-3 bg-white/80 backdrop-blur-md border-b border-gray-200 shadow-sm rounded-b-xl">
           <div className="flex flex-wrap justify-center gap-2">
@@ -142,112 +126,58 @@ export default function TodoistTasks({
               { key: '30 days', label: 'Miesiąc' },
               { key: 'overdue', label: 'Przeterminowane' },
             ].map((f) => (
-              <motion.button
-                key={f.key}
-                onClick={() => onChangeFilter(f.key as any)}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.97 }}
-                className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 ${
-                  filter === f.key
-                    ? 'bg-gray-900 text-white shadow-sm'
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                }`}
-              >
+              <button key={f.key} onClick={() => onChangeFilter(f.key as any)} className={`filter-pill ${filter === f.key ? 'filter-pill--active' : ''}`}>
                 {f.label}
-              </motion.button>
+              </button>
             ))}
           </div>
 
-          {/* Projekty */}
-          <select
-            value={selectedProject}
-            onChange={(e) => setSelectedProject(e.target.value)}
-            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
-          >
-            <option value="all">📁 Wszystkie projekty</option>
-            {projects.map((p: Project) => (
-              <option key={p.id} value={p.id}>
-                💼 {p.name}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2">
+            <select
+              value={selectedProject}
+              onChange={(e) => setSelectedProject(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
+            >
+              <option value="all">📁 Wszystkie projekty</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>💼 {p.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
       )}
 
-      {/* 🔹 Lista zadań */}
       <div className="relative overflow-visible pb-16">
         <AnimatePresence mode="popLayout">
-          {['7 days', '30 days', 'overdue'].includes(filter) ? (
-            sortedDates.map((date) => (
-              <motion.div
-                key={date}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-                className="mb-6"
-              >
-                <h3 className="text-sm font-semibold text-neutral-700 mb-2 border-b pb-1 flex items-center gap-1">
-                  {filter === 'overdue' ? '⏰' : '📅'}{' '}
-                  {date === 'Brak terminu'
-                    ? 'Brak terminu'
-                    : new Date(date).toLocaleDateString('pl-PL', {
-                        weekday: 'long',
-                        day: '2-digit',
-                        month: '2-digit',
-                      })}
-                </h3>
-                <div className="space-y-2 overflow-visible">
-                  {groupedByDate[date].map((t) => (
-                    <motion.div
-                      key={t.id}
-                      whileHover={{ scale: 1.01 }}
-                      className="cursor-pointer transition rounded-lg hover:bg-gray-50 overflow-visible"
-                      onClick={(e) => {
-                        if ((e.target as HTMLElement).tagName === 'INPUT') return
-                        onOpenTaskChat?.(t)
-                      }}
-                    >
-                      <TaskCard
-                        task={t}
-                        token={token}
-                        onAction={() => {}}
-                        selectable
-                        selected={selectedTasks.has(t.id)}
-                        onSelectChange={(checked) => toggleSelect(t.id, checked)}
-                      />
-                    </motion.div>
-                  ))}
-                </div>
-              </motion.div>
-            ))
-          ) : visibleTasks.length === 0 ? (
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-sm text-neutral-500 mt-4 text-center"
-            >
+          {visibleTasks.length === 0 ? (
+            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-sm text-neutral-500 mt-4 text-center">
               Brak zadań dla tego filtru.
             </motion.p>
           ) : (
-            <ul className="space-y-2 overflow-visible">
+            <ul className="space-y-2">
               {visibleTasks.map((t) => (
                 <motion.li
                   key={t.id}
                   whileHover={{ scale: 1.01 }}
                   className="cursor-pointer transition rounded-lg hover:bg-gray-50 overflow-visible"
                   onClick={(e) => {
-                    if ((e.target as HTMLElement).tagName === 'INPUT') return
+                    // if user clicked an input/button inside card, ignore
+                    if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).tagName === 'INPUT') return
                     onOpenTaskChat?.(t)
                   }}
                 >
                   <TaskCard
                     task={t}
                     token={token}
-                    onAction={() => {}}
+                    onAction={() => loadTasks()}
                     selectable
                     selected={selectedTasks.has(t.id)}
-                    onSelectChange={(checked) => toggleSelect(t.id, checked)}
+                    onSelectChange={(checked) => {
+                      const copy = new Set(selectedTasks)
+                      if (checked) copy.add(t.id)
+                      else copy.delete(t.id)
+                      setSelectedTasks(copy)
+                    }}
                   />
                 </motion.li>
               ))}
@@ -255,85 +185,6 @@ export default function TodoistTasks({
           )}
         </AnimatePresence>
       </div>
-
-      {/* 🧰 Pasek działań masowych */}
-      <AnimatePresence>
-        {selectedTasks.size > 0 && (
-          <motion.div
-            initial={{ y: 100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 100, opacity: 0 }}
-            transition={{ duration: 0.25 }}
-            className="fixed bottom-0 left-0 right-0 z-[9999] bg-gray-900 text-white py-2 px-4 flex items-center justify-between shadow-lg"
-          >
-            <span className="text-sm">
-              Wybrano {selectedTasks.size}{' '}
-              {selectedTasks.size === 1 ? 'zadanie' : 'zadań'}
-            </span>
-
-            <div className="flex gap-2">
-              {/* ✅ Ukończ */}
-              <button
-                onClick={async () => {
-                  for (const id of selectedTasks)
-                    await fetch('/api/todoist/complete', {
-                      method: 'POST',
-                      body: JSON.stringify({ id, token }),
-                    })
-                  window.dispatchEvent(new Event('taskUpdated'))
-                  setSelectedTasks(new Set())
-                }}
-                className="bg-green-600 hover:bg-green-700 px-3 py-1 rounded-md text-sm"
-              >
-                ✅ Ukończ
-              </button>
-
-              {/* 🗑 Usuń */}
-              <button
-                onClick={async () => {
-                  for (const id of selectedTasks)
-                    await fetch('/api/todoist/delete', {
-                      method: 'POST',
-                      body: JSON.stringify({ id, token }),
-                    })
-                  window.dispatchEvent(new Event('taskUpdated'))
-                  setSelectedTasks(new Set())
-                }}
-                className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded-md text-sm"
-              >
-                🗑 Usuń
-              </button>
-
-              {/* 📅 Przenieś */}
-              <button
-                onClick={() => batchDateRef.current?.showPicker?.()}
-                className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded-md text-sm"
-              >
-                📅 Przenieś
-              </button>
-
-              {/* Ukryty input date */}
-              <input
-                ref={batchDateRef}
-                type="date"
-                className="hidden"
-                onChange={async (e) => {
-                  const newDate = e.target.value
-                  if (!newDate) return
-                  for (const id of selectedTasks)
-                    await fetch('/api/todoist/postpone', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ id, token, newDate }),
-                    })
-                  window.dispatchEvent(new Event('taskUpdated'))
-                  setSelectedTasks(new Set())
-                }}
-              />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   )
 }
