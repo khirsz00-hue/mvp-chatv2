@@ -10,12 +10,7 @@ import {
   isSameDay,
 } from 'date-fns'
 import { pl } from 'date-fns/locale'
-import {
-  DragDropContext,
-  Droppable,
-  Draggable,
-  DropResult,
-} from 'react-beautiful-dnd'
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MoreVertical, CheckCircle2 } from 'lucide-react'
 
@@ -78,7 +73,8 @@ export default function WeekView({
     setLoading(false)
   }, [tasks])
 
-  const handleDragEnd = (result: DropResult) => {
+  // NOTE: use `any` for result to avoid TS namespace/type issues in some setups
+  const handleDragEnd = (result: any) => {
     const { destination, source, draggableId } = result
     if (!destination) return
     if (
