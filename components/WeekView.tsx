@@ -249,7 +249,7 @@ export default function WeekView({
 
                             {/* hidden date input per task */}
                             <input
-                              ref={(el) => (datePickers.current[task.id] = el)}
+                              ref={(el) => { datePickers.current[task.id] = el }}
                               type="date"
                               className="hidden"
                               onChange={(e) => {
