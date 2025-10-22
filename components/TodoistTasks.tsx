@@ -1,22 +1,10 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import TaskCard from './TaskCard'
+import TaskCard, { TaskType } from './TaskCard'
 import { motion, AnimatePresence } from 'framer-motion'
 
 // types
-interface Task {
-  id: string
-  content: string
-  due?: string | { date?: string } | null
-  priority?: number
-  project_id?: string
-  project_name?: string
-  labels?: string[]
-  description?: string
-  estimated?: string
-}
-
 interface Project {
   id: string
   name: string
@@ -26,8 +14,8 @@ interface TodoistTasksProps {
   token: string
   filter: 'today' | 'tomorrow' | 'overdue' | '7 days' | '30 days'
   onChangeFilter: (filter: 'today' | 'tomorrow' | 'overdue' | '7 days' | '30 days') => void
-  onUpdate?: (tasks?: Task[]) => void
-  onOpenTaskChat?: (task: Task) => void
+  onUpdate?: (tasks?: TaskType[]) => void
+  onOpenTaskChat?: (task: TaskType) => void
   showHeaderFilters?: boolean
 }
 
@@ -39,7 +27,7 @@ export default function TodoistTasks({
   onOpenTaskChat,
   showHeaderFilters = false,
 }: TodoistTasksProps) {
-  const [tasks, setTasks] = useState<Task[]>([])
+  const [tasks, setTasks] = useState<TaskType[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProject, setSelectedProject] = useState<string>('all')
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set())
@@ -73,7 +61,7 @@ export default function TodoistTasks({
         due: t.due,
         _dueDate: normalizeDue(t.due),
         description: t.description || t.note || '',
-      }))
+      })) as TaskType[]
       setTasks(mapped)
 
       // projectsRes might be { projects: [...] } or an array
@@ -82,6 +70,7 @@ export default function TodoistTasks({
       else setProjects([])
 
       setLoading(false)
+      onUpdate?.(mapped)
     } catch (err) {
       console.error('loadTasks error', err)
       setTasks([])
