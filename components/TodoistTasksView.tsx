@@ -27,7 +27,9 @@ export default function TodoistTasksView({
   const [projects, setProjects] = useState<any[]>([])
   const [selectedProject, setSelectedProject] = useState<string>('all')
   const [toast, setToast] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'list' | 'week'>('list')
+  const [viewMode, setViewMode] = useState<'list' | 'week'>(() =>
+    (typeof window !== 'undefined' && (localStorage.getItem('todoist_filter') === '7 days')) ? 'week' : 'list'
+  )
   const lastEvent = useRef<number>(0)
 
   // helper — bezpieczne pobranie daty z t.due (obsługa string lub { date })
@@ -43,7 +45,7 @@ export default function TodoistTasksView({
     }
   }
 
-  // === 🔁 Pobieranie projektów (dynamicznie) ===
+  // fetchProjects
   useEffect(() => {
     if (!token) return
     const fetchProjects = async () => {
@@ -60,7 +62,6 @@ export default function TodoistTasksView({
     fetchProjects()
   }, [token])
 
-  // === 🔁 Pobieranie zadań ===
   const fetchTasks = async () => {
     if (!token) return
     try {
@@ -83,7 +84,7 @@ export default function TodoistTasksView({
           break
       }
 
-     const res = await fetch(`/api/todoist/tasks?token=${token}&filter=${encodeURIComponent(filterQuery)}`)
+      const res = await fetch(`/api/todoist/tasks?token=${token}&filter=${encodeURIComponent(filterQuery)}`)
       const data = await res.json()
       let fetched = data.tasks || []
 
@@ -109,7 +110,7 @@ export default function TodoistTasksView({
     }
   }
 
-  // 🔁 SSE + Polling
+  // SSE + Polling
   useEffect(() => {
     if (!token) return
     console.log('🚀 Uruchomiono Todoist listener...')
@@ -161,12 +162,14 @@ export default function TodoistTasksView({
     }
   }, [token])
 
-  // 📦 Odświeżanie przy zmianie filtra lub projektu
   useEffect(() => {
     fetchTasks()
+    // when filter changes, set viewMode: '7 days' -> week otherwise list
+    setViewMode((f) => (filter === '7 days' ? 'week' : 'list'))
+    if (typeof window !== 'undefined') localStorage.setItem('todoist_filter', filter)
   }, [filter, selectedProject])
 
-  // === HANDLERY: complete / move / delete / help ===
+  // --- HANDLERY: complete / move / delete / help ---
   const handleComplete = async (id: string) => {
     if (!token) return
     try {
@@ -189,6 +192,7 @@ export default function TodoistTasksView({
   const handleMove = async (id: string, newDate: Date) => {
     if (!token) return
     try {
+      // format YYYY-MM-DD (server expects newDate string)
       const dateStr = newDate.toISOString().slice(0, 10)
       await fetch('/api/todoist/postpone', {
         method: 'POST',
@@ -234,60 +238,56 @@ export default function TodoistTasksView({
   // === Widok ===
   return (
     <div className="flex flex-col h-full bg-gray-50 rounded-b-xl overflow-hidden relative w-full">
-      {/* 🔘 Pasek filtrów i projektów */}
+      {/* header */}
       {!hideHeader && (
-        <div className="flex flex-wrap justify-between items-center px-4 py-3 border-b bg-neutral-900 text-white shadow-sm gap-2">
-          <div className="flex gap-2 flex-wrap">
-            {[
-              { key: 'today', label: 'Dziś' },
-              { key: 'tomorrow', label: 'Jutro' },
-              { key: '7 days', label: 'Tydzień' },
-              { key: '30 days', label: 'Miesiąc' },
-              { key: 'overdue', label: 'Przeterminowane' },
-            ].map((f) => (
-              <button
-                key={f.key}
-                onClick={() => {
-                  setFilter(f.key as any)
-                  setViewMode(f.key === '7 days' ? 'week' : 'list')
-                }}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${
-                  filter === f.key
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-neutral-800 text-gray-200 hover:bg-neutral-700'
-                }`}
+        <div className="bg-white rounded-md p-3 border border-gray-200 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-green-50 text-green-700 border border-green-100">
+                <span className="text-sm font-medium">📋 Lista zadań</span>
+              </div>
+
+              {/* filtr - prosty pill bar */}
+              <div className="filter-bar ml-1">
+                {[
+                  { key: 'today', label: 'Dziś' },
+                  { key: 'tomorrow', label: 'Jutro' },
+                  { key: '7 days', label: 'Tydzień' },
+                  { key: '30 days', label: 'Miesiąc' },
+                  { key: 'overdue', label: 'Przeterminowane' },
+                ].map((f) => (
+                  <button
+                    key={f.key}
+                    onClick={() => setFilter(f.key as any)}
+                    className={`filter-pill ${filter === f.key ? 'filter-pill--active' : ''}`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <select
+                value={selectedProject}
+                onChange={(e) => setSelectedProject(e.target.value)}
+                className="bg-neutral-900/5 text-sm px-3 py-1.5 rounded-md border border-neutral-200 focus:outline-none"
               >
-                {f.label}
-              </button>
-            ))}
-          </div>
+                <option value="all">📁 Wszystkie projekty</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
 
-          <div className="flex items-center gap-2">
-            <select
-              value={selectedProject}
-              onChange={(e) => setSelectedProject(e.target.value)}
-              className="bg-neutral-800 text-white text-sm px-3 py-1.5 rounded-md border border-neutral-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">📁 Wszystkie projekty</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-
-            <button
-              onClick={() => setViewMode(viewMode === 'list' ? 'week' : 'list')}
-              className="text-sm bg-neutral-800 text-gray-200 px-3 py-1.5 rounded-md hover:bg-neutral-700"
-            >
-              {viewMode === 'list' ? '📅 Widok tygodnia' : '📋 Lista zadań'}
-            </button>
+              <div className="text-sm text-green-600 font-medium">🟢 Połączono z Todoist</div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* 📋 Główna zawartość */}
-      <div className="flex-1 overflow-y-auto p-3 w-full">
+      <div className="flex-1 overflow-y-auto p-3">
         {viewMode === 'week' ? (
           <WeekView
             tasks={tasks}
@@ -306,7 +306,6 @@ export default function TodoistTasksView({
         )}
       </div>
 
-      {/* 🔔 Toast */}
       <AnimatePresence>
         {toast && (
           <motion.div
