@@ -43,7 +43,7 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
   }, [])
 
   return (
-    <div className="relative flex flex-col h-[calc(100vh-100px)] bg-gray-50 border border-green-200 rounded-xl overflow-hidden">
+    <div className="relative flex flex-col h-[calc(100vh-100px)] w-full bg-gray-50 border border-green-200 rounded-xl overflow-hidden">
       {/* === 🔹 Nagłówek === */}
       <div className="flex justify-between items-center p-2 px-4 bg-white border-b shadow-sm">
         {/* Tryby */}
@@ -87,7 +87,7 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
       </div>
 
       {/* === 🔸 Główna sekcja === */}
-      <div className="flex-1 relative overflow-hidden">
+      <div className="flex-1 relative w-full overflow-hidden">
         <AnimatePresence mode="wait">
           {mode === 'tasks' ? (
             <motion.div
@@ -96,7 +96,7 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 40 }}
               transition={{ duration: 0.25 }}
-              className="absolute inset-0"
+              className="absolute inset-0 w-full"
             >
               <TodoistTasksView
                 token={token}
@@ -110,7 +110,7 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -40 }}
               transition={{ duration: 0.25 }}
-              className="absolute inset-0"
+              className="absolute inset-0 w-full"
             >
               <TodoistAIView token={token} />
             </motion.div>
