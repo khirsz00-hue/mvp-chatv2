@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { formatISO, isBefore, parseISO, isToday } from 'date-fns'
 import TodoistTasks from './TodoistTasks'
 import WeekView from './WeekView'
+import TaskDialog from './TaskDialog'
 
 export default function TodoistTasksView({
   token,
@@ -37,6 +38,10 @@ export default function TodoistTasksView({
   const [newTitle, setNewTitle] = useState('')
   const [newDate, setNewDate] = useState<string>('')
   const [newProject, setNewProject] = useState<string>('')
+  const [newDescription, setNewDescription] = useState<string>('')
+
+  // Modal for viewing a single task (opened from list or week)
+  const [openTask, setOpenTask] = useState<any | null>(null)
 
   // helper — bezpieczne pobranie daty z t.due (obsługa string lub { date })
   const getDueDate = (t: any): Date | null => {
@@ -62,9 +67,13 @@ export default function TodoistTasksView({
           headers: { 'x-todoist-token': token },
         })
         const data = await res.json()
-        if (data.projects) setProjects(data.projects)
+        // support both { projects: [...] } and direct array
+        if (Array.isArray(data)) setProjects(data)
+        else if (data.projects) setProjects(data.projects)
+        else setProjects([])
       } catch (err) {
         console.error('❌ Błąd pobierania projektów:', err)
+        setProjects([])
       }
     }
     fetchProjects()
@@ -178,7 +187,7 @@ export default function TodoistTasksView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter, selectedProject])
 
-  // ADD TASK: simple POST to /api/todoist/add (expects token in header)
+  // ADD TASK: simple POST to /api/todoist/add (expects token in payload)
   const handleCreateTask = async () => {
     if (!token) return alert('Brak tokena')
     if (!newTitle.trim()) return alert('Podaj nazwę zadania')
@@ -186,7 +195,7 @@ export default function TodoistTasksView({
       const payload: any = { content: newTitle.trim(), token }
       if (newDate) payload.due = newDate
       if (newProject) payload.project_id = newProject
-      if (newTitle) payload.content = newTitle.trim()
+      if (newDescription) payload.description = newDescription.trim()
 
       const res = await fetch('/api/todoist/add', {
         method: 'POST',
@@ -203,6 +212,7 @@ export default function TodoistTasksView({
       setNewTitle('')
       setNewDate('')
       setNewProject('')
+      setNewDescription('')
       setToast('🆕 Dodano zadanie')
       setTimeout(() => setToast(null), 2000)
       fetchTasks()
@@ -273,9 +283,12 @@ export default function TodoistTasksView({
   }
 
   const handleHelp = (task: any) => {
+    // keep toast and analytics
     console.log('Pomóż mi dla', task)
     setToast('🧠 Poproszono o pomoc dla zadania')
     setTimeout(() => setToast(null), 2000)
+    // open TaskDialog locally
+    setOpenTask({ id: task.id, title: task.content, description: task.description })
   }
 
   return (
@@ -341,7 +354,17 @@ export default function TodoistTasksView({
             onHelp={(task) => handleHelp(task)}
           />
         ) : (
-          <TodoistTasks token={token} filter={filter} onChangeFilter={setFilter} onUpdate={fetchTasks} />
+          <TodoistTasks
+            token={token}
+            filter={filter}
+            onChangeFilter={setFilter}
+            onUpdate={fetchTasks}
+            onOpenTaskChat={(t: any) => {
+              // open TaskDialog with full task data
+              setOpenTask({ id: t.id, title: t.content, description: t.description })
+            }}
+            showHeaderFilters={false}
+          />
         )}
       </div>
 
@@ -378,7 +401,20 @@ export default function TodoistTasksView({
             >
               <h3 className="text-lg font-semibold mb-3">Dodaj nowe zadanie</h3>
               <div className="space-y-3">
-                <input className="w-full border px-3 py-2 rounded" placeholder="Tytuł zadania" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
+                <input
+                  className="w-full border px-3 py-2 rounded"
+                  placeholder="Tytuł zadania"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                />
+
+                <textarea
+                  className="w-full border px-3 py-2 rounded min-h-[90px]"
+                  placeholder="Opis zadania (opcjonalnie)"
+                  value={newDescription}
+                  onChange={(e) => setNewDescription(e.target.value)}
+                />
+
                 <div className="flex gap-2">
                   <input type="date" className="border px-3 py-2 rounded" value={newDate} onChange={(e) => setNewDate(e.target.value)} />
                   <select className="border px-3 py-2 rounded flex-1" value={newProject} onChange={(e) => setNewProject(e.target.value)}>
@@ -394,6 +430,19 @@ export default function TodoistTasksView({
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Task detail modal (opened from list/week) */}
+      <AnimatePresence>
+        {openTask && (
+          <TaskDialog
+            task={{ id: openTask.id, title: openTask.title }}
+            // pass full data (TaskDialog will use description if provided)
+            initialTaskData={{ description: openTask.description }}
+            mode="task"
+            onClose={() => setOpenTask(null)}
+          />
         )}
       </AnimatePresence>
     </div>
