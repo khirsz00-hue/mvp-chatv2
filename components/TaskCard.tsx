@@ -4,15 +4,18 @@ import React, { useRef, useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { CheckCircle2, Clock, Calendar, MoreVertical } from 'lucide-react'
 
-type Task = {
+export type TaskType = {
   id: string
   content: string
   project_id?: string
   project_name?: string
-  due?: string | { date: string } | null
+  // allow optional date field inside object to be compatible with different sources
+  due?: string | { date?: string } | null
   priority?: number
   labels?: string[]
+  // optional fields sometimes present in other places
   estimated?: string
+  description?: string
 }
 
 export default function TaskCard({
@@ -23,7 +26,7 @@ export default function TaskCard({
   selected = false,
   onSelectChange,
 }: {
-  task: Task
+  task: TaskType
   token?: string | null
   onAction?: () => void
   selectable?: boolean
