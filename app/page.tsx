@@ -167,7 +167,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="min-h-screen flex flex-col bg-gray-50 w-full">
       {/* 🔹 Nagłówek */}
       <header className="flex items-center justify-between px-6 py-3 bg-white border-b shadow-sm">
         <h1 className="text-lg font-semibold text-gray-800">AI Assistants PRO</h1>
@@ -206,7 +206,7 @@ export default function HomePage() {
       </header>
 
       {/* 🔸 Główna sekcja */}
-      <main className="flex flex-1 overflow-hidden">
+      <main className="flex flex-1 overflow-hidden w-full">
         <ChatSidebar
           onSelectChat={(mode) => {
             if (mode === 'six_hats') setActive('six_hats')
@@ -215,29 +215,31 @@ export default function HomePage() {
           }}
         />
 
-        <div className="flex-1 p-4 overflow-y-auto">
+        <div className="flex-1 p-4 overflow-y-auto w-full">
           {/* 🧩 TODOIST */}
           {active === 'todoist' && (
             <>
               {!token ? (
-                <div className="flex items-center justify-center h-full">
+                <div className="flex items-center justify-center h-full w-full">
                   <TodoistAuthButton />
                 </div>
               ) : (
-                <TodoistConnection
-                  token={token}
-                  onDisconnect={() => {
-                    localStorage.removeItem('todoist_token')
-                    setToken(null)
-                  }}
-                />
+                <div className="w-full">
+                  <TodoistConnection
+                    token={token}
+                    onDisconnect={() => {
+                      localStorage.removeItem('todoist_token')
+                      setToken(null)
+                    }}
+                  />
+                </div>
               )}
             </>
           )}
 
           {/* 🎩 SIX HATS */}
           {active === 'six_hats' && (
-            <div className="max-w-4xl mx-auto w-full bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+            <div className="w-full bg-white border border-gray-200 rounded-xl shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-800 mb-3">
                 🎩 Six Hats Assistant
               </h2>
@@ -250,7 +252,7 @@ export default function HomePage() {
 
           {/* 🌍 GLOBAL */}
           {active === 'global' && (
-            <div className="max-w-4xl mx-auto w-full bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+            <div className="w-full bg-white border border-gray-200 rounded-xl shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-800 mb-3">
                 🌍 Global Chat
               </h2>
