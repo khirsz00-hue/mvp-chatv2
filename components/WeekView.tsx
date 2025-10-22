@@ -4,10 +4,8 @@ import React, { useEffect, useState } from 'react'
 import {
   format,
   addDays,
-  parseISO,
-  isValid,
-  startOfDay,
   startOfWeek,
+  startOfDay,
 } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import {
@@ -16,7 +14,8 @@ import {
   Draggable,
 } from 'react-beautiful-dnd'
 import { motion, AnimatePresence } from 'framer-motion'
-import { MoreVertical, CheckCircle2 } from 'lucide-react'
+import { MoreVertical, CheckCircle2, CalendarDays } from 'lucide-react'
+import { Tooltip } from 'react-tooltip'
 
 interface WeekViewProps {
   tasks: any[]
@@ -40,23 +39,20 @@ export default function WeekView({
   const [columns, setColumns] = useState<Record<string, any[]>>({})
   const [draggingTask, setDraggingTask] = useState<any | null>(null)
 
-  // ✅ naprawione parsowanie dat Todoist
+  // ✅ poprawne parsowanie dat z Todoista (bez przesunięcia strefy)
   const parseDateSafe = (value?: string) => {
     if (!value) return null
     try {
-      const parsed = parseISO(value)
-      // kompensacja strefy UTC → lokalna
-      const local = new Date(parsed.getTime() + parsed.getTimezoneOffset() * 60000)
-      return isValid(local) ? startOfDay(local) : null
+      const [y, m, d] = value.split('-').map(Number)
+      return new Date(y, m - 1, d)
     } catch {
       return null
     }
   }
 
-  // 🗂️ Grupowanie po dniu
+  // 🗂️ Grupowanie zadań po dniu
   useEffect(() => {
     if (!tasks || tasks.length === 0) return
-
     const grouped: Record<string, any[]> = {}
     for (const day of days) grouped[format(day, 'yyyy-MM-dd')] = []
 
@@ -76,7 +72,6 @@ export default function WeekView({
     const { destination, source, draggableId } = result
     setDraggingTask(null)
     if (!destination) return
-
     if (
       destination.droppableId === source.droppableId &&
       destination.index === source.index
@@ -95,7 +90,6 @@ export default function WeekView({
     }
 
     setColumns(newColumns)
-
     if (source.droppableId !== destination.droppableId) {
       const newDate = new Date(destination.droppableId)
       onMove?.(draggableId, newDate)
@@ -111,9 +105,9 @@ export default function WeekView({
     )
   }
 
-  // 🎨 Widok
+  // 🎨 Widok tygodnia
   return (
-    <div className="flex flex-col h-full select-none bg-gradient-to-b from-gray-50 to-white">
+    <div className="flex flex-col h-full bg-gradient-to-b from-gray-50 to-white">
       {/* Nagłówek tygodnia */}
       <motion.div
         className="text-center py-4 border-b border-gray-200 bg-white shadow-sm mb-3 sticky top-0 z-20"
@@ -191,6 +185,7 @@ export default function WeekView({
                                     ? 'opacity-50 border-blue-300 scale-[1.02]'
                                     : ''
                                 }`}
+                                data-tooltip-id={`task-${task.id}`}
                               >
                                 {/* Checkbox */}
                                 <button
@@ -237,6 +232,24 @@ export default function WeekView({
                                     </button>
                                   </motion.div>
                                 </div>
+
+                                {/* Tooltip */}
+                                <Tooltip
+                                  id={`task-${task.id}`}
+                                  place="bottom"
+                                  className="z-50 bg-gray-900 text-white text-xs rounded-md px-3 py-1 shadow-lg"
+                                  content={
+                                    <>
+                                      <div className="flex items-center gap-1">
+                                        <CalendarDays size={12} />{' '}
+                                        {task.due?.date || 'Brak daty'}
+                                      </div>
+                                      <div className="text-gray-300">
+                                        📁 {task.project_name || 'Bez projektu'}
+                                      </div>
+                                    </>
+                                  }
+                                />
                               </motion.div>
                             )}
                           </Draggable>
