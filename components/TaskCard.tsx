@@ -1,277 +1,268 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import TooltipPortal from './TooltipPortal'
+import React, { useRef, useState } from 'react'
+import { format, parseISO } from 'date-fns'
+import { CheckCircle2, Clock, Calendar, MoreVertical } from 'lucide-react'
 
-interface Task {
+type Task = {
   id: string
   content: string
-  due?: string
-  priority?: number
   project_id?: string
   project_name?: string
+  due?: string | { date: string } | null
+  priority?: number
   labels?: string[]
-}
-
-interface TaskCardProps {
-  task: Task
-  token: string
-  onAction: (action: 'completed' | 'deleted' | 'postponed') => void
-  selectable?: boolean
-  selected?: boolean
-  onSelectChange?: (checked: boolean) => void
+  // optional fields sometimes present in other places
+  estimated?: string
 }
 
 export default function TaskCard({
   task,
   token,
   onAction,
-  selectable,
-  selected,
+  selectable = false,
+  selected = false,
   onSelectChange,
-}: TaskCardProps) {
-  const [summary, setSummary] = useState<string | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
-  const [isHidden, setIsHidden] = useState(false)
-  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null)
-  const dateInputRef = useRef<HTMLInputElement>(null)
+}: {
+  task: Task
+  token?: string | null
+  onAction?: () => void
+  selectable?: boolean
+  selected?: boolean
+  onSelectChange?: (checked: boolean) => void
+}) {
+  const [loading, setLoading] = useState(false)
+  const [helping, setHelping] = useState(false)
+  const dateRef = useRef<HTMLInputElement | null>(null)
 
-  // 💡 Wczytaj AI-summary jeśli istnieje
-  useEffect(() => {
-    const saved = localStorage.getItem(`summary_${task.id}`)
-    setSummary(saved || null)
-  }, [task.id])
+  const dueStr =
+    typeof task.due === 'string' ? task.due : (task.due && (task.due as any).date) || null
 
-  const triggerUpdate = (msg: string) => {
-    window.dispatchEvent(new Event('taskUpdated'))
-    setToast(msg)
-    setTimeout(() => setToast(null), 2500)
+  const dueDate = dueStr ? safeParseDate(dueStr) : null
+  const dueLabel = dueDate ? readableDue(dueDate) : 'Brak terminu'
+
+  function safeParseDate(d: string) {
+    try {
+      const p = parseISO(d)
+      if (!isNaN(p.getTime())) return p
+      return new Date(d)
+    } catch {
+      return new Date(d)
+    }
   }
 
-  // ✅ Ukończenie zadania
+  function readableDue(d: Date) {
+    try {
+      return `🗓 ${format(d, 'dd LLL yyyy')}`
+    } catch {
+      return d.toLocaleDateString()
+    }
+  }
+
+  const priorityLabel = (p?: number) => {
+    if (!p) return null
+    if (p === 4) return { text: 'High', color: 'bg-red-100 text-red-700' }
+    if (p === 3) return { text: 'Medium', color: 'bg-yellow-100 text-yellow-700' }
+    return { text: 'Low', color: 'bg-green-100 text-green-700' }
+  }
+
+  const pr = priorityLabel(task.priority)
+
   const handleComplete = async () => {
-    await fetch('/api/todoist/complete', {
-      method: 'POST',
-      body: JSON.stringify({ id: task.id, token }),
-    })
-    setIsHidden(true)
-    triggerUpdate('✅ Zadanie ukończone')
-    setTimeout(() => onAction('completed'), 400)
-  }
-
-  // 🗑 Usunięcie zadania
-  const handleDelete = async () => {
-    await fetch('/api/todoist/delete', {
-      method: 'POST',
-      body: JSON.stringify({ id: task.id, token }),
-    })
-    setIsHidden(true)
-    triggerUpdate('🗑 Zadanie usunięte')
-    setTimeout(() => onAction('deleted'), 400)
-  }
-
-  // 📅 Przeniesienie na nową datę
-  const handlePostpone = async (newDate: string) => {
-    if (!newDate) return
-    await fetch('/api/todoist/postpone', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: task.id, token, newDate }),
-    })
-    triggerUpdate(`📅 Przeniesiono na ${new Date(newDate).toLocaleDateString('pl-PL')}`)
-    onAction('postponed')
-  }
-
-  const openDatePicker = () => dateInputRef.current?.showPicker?.()
-
-  // 💬 Otwiera modal pomocy AI
-  const handleHelp = () => {
-    window.dispatchEvent(
-      new CustomEvent('chatSelect', {
-        detail: {
-          mode: 'todoist',
-          task: { id: task.id, title: task.content },
-        },
+    if (!token) return alert('Brak tokena Todoist')
+    setLoading(true)
+    try {
+      await fetch('/api/todoist/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: task.id, token }),
       })
-    )
+      onAction?.()
+    } catch (err) {
+      console.error('complete error', err)
+      alert('Błąd przy ukończeniu')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  // 🎨 Kolor priorytetu
-  const priorityColor =
-    task.priority === 4
-      ? 'border-red-300'
-      : task.priority === 3
-      ? 'border-yellow-300'
-      : task.priority === 2
-      ? 'border-blue-300'
-      : 'border-gray-200'
+  const handleDelete = async () => {
+    if (!token) return alert('Brak tokena Todoist')
+    if (!confirm('Czy na pewno chcesz usunąć to zadanie?')) return
+    setLoading(true)
+    try {
+      await fetch('/api/todoist/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: task.id, token }),
+      })
+      onAction?.()
+    } catch (err) {
+      console.error('delete error', err)
+      alert('Błąd przy usuwaniu')
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  // 🕐 Czy zadanie jest po terminie
-  const isOverdue =
-    task.due && new Date(task.due).getTime() < Date.now() - 24 * 60 * 60 * 1000
+  const handlePostponePick = () => {
+    const el = dateRef.current
+    ;(el as any)?.showPicker?.() || el?.click?.()
+  }
+
+  const handlePostpone = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value
+    if (!v || !token) return
+    setLoading(true)
+    try {
+      await fetch('/api/todoist/postpone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: task.id, token, newDate: v }),
+      })
+      onAction?.()
+    } catch (err) {
+      console.error('postpone error', err)
+      alert('Błąd przy przenoszeniu')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleHelp = () => {
+    // Dispatch global event in the same shape other parts of app expect
+    setHelping(true)
+    try {
+      window.dispatchEvent(
+        new CustomEvent('chatSelect', {
+          detail: {
+            mode: 'todoist',
+            task: { id: task.id, title: task.content },
+          },
+        })
+      )
+    } catch (err) {
+      console.error('help dispatch failed', err)
+    } finally {
+      setHelping(false)
+    }
+  }
 
   return (
-    <AnimatePresence mode="popLayout">
-      {!isHidden && (
-        <motion.div
-          key={task.id}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.25 }}
-          className={`relative border ${priorityColor} rounded-lg p-3 bg-white shadow-sm hover:shadow-md transition-all overflow-visible ${
-            selected ? 'ring-2 ring-blue-300' : ''
-          }`}
-        >
-          {/* 📋 Treść zadania */}
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start gap-2">
-                {selectable && (
-                  <input
-                    type="checkbox"
-                    checked={selected}
-                    onChange={(e) => onSelectChange?.(e.target.checked)}
-                    className="mt-1 accent-blue-600 cursor-pointer"
-                  />
-                )}
-
-                <div className="flex flex-col">
-                  <p
-                    className={`font-medium text-gray-800 text-[13px] leading-snug break-words ${
-                      isOverdue ? 'text-red-600 line-through' : ''
-                    }`}
-                  >
-                    {task.content}
-                  </p>
-
-                  <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-gray-500">
-                    {task.due && (
-                      <span
-                        className={`${
-                          isOverdue ? 'text-red-600 font-medium' : 'text-gray-600'
-                        }`}
-                      >
-                        {new Date(task.due).toLocaleDateString('pl-PL', {
-                          day: '2-digit',
-                          month: 'short',
-                        })}
-                      </span>
-                    )}
-
-                    {task.project_name && (
-                      <span className="bg-gray-100 px-1.5 py-[1px] rounded text-gray-600">
-                        📁 {task.project_name}
-                      </span>
-                    )}
-
-                    {task.labels?.map((label) => (
-                      <span
-                        key={label}
-                        className="bg-gray-100 px-1.5 py-[1px] rounded text-gray-600"
-                      >
-                        #{label}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {summary && (
-                  <div
-                    className="ml-1 text-yellow-500 cursor-pointer select-none hover:scale-110 transition-transform"
-                    onMouseEnter={(e) => setTooltipPos({ x: e.clientX, y: e.clientY + 24 })}
-                    onMouseMove={(e) => setTooltipPos({ x: e.clientX, y: e.clientY + 24 })}
-                    onMouseLeave={() => setTooltipPos(null)}
-                  >
-                    💡
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* 💬 Tooltip z podsumowaniem */}
-          {tooltipPos && summary && (
-            <TooltipPortal>
-              <motion.div
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.15 }}
-                className="fixed z-[99999] bg-white border border-gray-200 text-gray-700 text-xs rounded-md p-2.5 w-64 shadow-2xl pointer-events-none"
-                style={{
-                  top: tooltipPos.y,
-                  left: tooltipPos.x - 260,
-                }}
-              >
-                <p className="font-semibold text-gray-800 mb-1">🧠 Wnioski AI:</p>
-                <p className="text-gray-600 whitespace-pre-line leading-snug">{summary}</p>
-              </motion.div>
-            </TooltipPortal>
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 relative">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          {selectable && (
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={(e) => onSelectChange?.(e.target.checked)}
+              className="w-4 h-4"
+            />
           )}
 
-          {/* 🔘 Przyciski akcji */}
-          <div className="flex flex-wrap justify-end gap-2 mt-3 text-xs">
-            <motion.button
-              whileTap={{ scale: 0.96 }}
-              whileHover={{ scale: 1.05 }}
-              onClick={handleComplete}
-              className="flex items-center gap-1 px-2 py-1 rounded-md bg-green-50 hover:bg-green-100 text-green-700 border border-green-200"
-            >
-              ✅ <span>Ukończ</span>
-            </motion.button>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-gray-800 truncate">{task.content}</h3>
+              {pr && (
+                <span
+                  className={`text-xs font-medium px-2 py-0.5 rounded-full ${pr.color} ml-2`}
+                >
+                  {pr.text}
+                </span>
+              )}
+            </div>
 
-            <motion.button
-              whileTap={{ scale: 0.96 }}
-              whileHover={{ scale: 1.05 }}
-              onClick={openDatePicker}
-              className="flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200"
-            >
-              📅 <span>Przenieś</span>
-            </motion.button>
-            <input
-              ref={dateInputRef}
-              type="date"
-              className="hidden"
-              onChange={(e) => handlePostpone(e.target.value)}
-            />
-
-            <motion.button
-              whileTap={{ scale: 0.96 }}
-              whileHover={{ scale: 1.05 }}
-              onClick={handleDelete}
-              className="flex items-center gap-1 px-2 py-1 rounded-md bg-red-50 hover:bg-red-100 text-red-700 border border-red-200"
-            >
-              🗑 <span>Usuń</span>
-            </motion.button>
-
-            <motion.button
-              whileTap={{ scale: 0.96 }}
-              whileHover={{ scale: 1.05 }}
-              onClick={handleHelp}
-              className="flex items-center gap-1 px-2 py-1 rounded-md bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200"
-            >
-              💬 <span>Pomóż mi</span>
-            </motion.button>
-          </div>
-
-          {/* ✅ Toast */}
-          <AnimatePresence>
-            {toast && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 20 }}
-                transition={{ duration: 0.3 }}
-                className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] bg-gray-900 text-white text-xs px-3 py-1.5 rounded-md shadow-lg backdrop-blur-sm"
-              >
-                {toast}
-              </motion.div>
+            {task.project_name && (
+              <div className="text-xs text-gray-500 mt-1 truncate">{task.project_name}</div>
             )}
-          </AnimatePresence>
-        </motion.div>
-      )}
-    </AnimatePresence>
+          </div>
+        </div>
+
+        <div className="flex items-start gap-2">
+          <button
+            title="Szczegóły"
+            onClick={() =>
+              window.dispatchEvent(
+                new CustomEvent('chatSelect', { detail: { mode: 'todoist', task: { id: task.id, title: task.content } } })
+              )
+            }
+            className="p-1 rounded hover:bg-gray-50"
+          >
+            <MoreVertical size={16} />
+          </button>
+        </div>
+      </div>
+
+      {/* meta */}
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 text-xs text-gray-500">
+          <span className="inline-flex items-center gap-1">
+            <Calendar size={14} /> {dueLabel}
+          </span>
+          {task.estimated && (
+            <span className="inline-flex items-center gap-1">
+              <Clock size={14} /> {task.estimated}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* optional small status */}
+        </div>
+      </div>
+
+      {/* actions */}
+      <div className="mt-4 flex items-center gap-3">
+        <button
+          onClick={handlePostponePick}
+          className="task-action postpone"
+          title="Przenieś"
+          disabled={loading}
+        >
+          Przenieś
+        </button>
+
+        <button
+          onClick={handleComplete}
+          className="task-action complete"
+          title="Ukończ"
+          disabled={loading}
+        >
+          Ukończ
+        </button>
+
+        <button
+          onClick={handleDelete}
+          className="task-action delete"
+          title="Usuń"
+          disabled={loading}
+        >
+          Usuń
+        </button>
+
+        <div className="ml-auto">
+          <button
+            onClick={handleHelp}
+            className="task-action help"
+            title="Pomóż mi"
+            disabled={helping}
+          >
+            Pomóż mi
+          </button>
+        </div>
+      </div>
+
+      {/* hidden date input */}
+      <input
+        ref={dateRef}
+        type="date"
+        className="hidden"
+        onChange={handlePostpone}
+      />
+    </div>
   )
 }
+
+// small CSS utilities (if tailwind classes from globals.css are present these helpers map to them)
+// but component uses class names defined in globals.css provided previously.
