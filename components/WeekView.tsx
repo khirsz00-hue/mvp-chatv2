@@ -40,7 +40,7 @@ export default function WeekView({
   const [columns, setColumns] = useState<Record<string, any[]>>({})
   const [loading, setLoading] = useState(true)
 
-  // 🔧 grupowanie po dniu
+  // 🔧 grupowanie po dniu (obsługa obu formatów due: string lub due: { date })
   useEffect(() => {
     if (!tasks || tasks.length === 0) return setLoading(true)
 
@@ -48,11 +48,21 @@ export default function WeekView({
     for (const day of days) grouped[format(day, 'yyyy-MM-dd')] = []
 
     for (const t of tasks) {
-      const date =
-        typeof t.due?.date === 'string'
-          ? parseISO(t.due.date)
-          : new Date(t.due?.date ?? '')
-      const match = days.find((d) => isSameDay(d, date))
+      // obsłuż zarówno { due: { date: '...' } } jak i { due: '...' }
+      const dueStr =
+        typeof t.due === 'string' ? t.due : t.due?.date ?? null
+      if (!dueStr) continue
+
+      let dateObj: Date
+      try {
+        dateObj = parseISO(dueStr)
+        if (isNaN(dateObj.getTime())) dateObj = new Date(dueStr)
+      } catch {
+        dateObj = new Date(dueStr)
+      }
+      if (isNaN(dateObj.getTime())) continue
+
+      const match = days.find((d) => isSameDay(d, dateObj))
       if (match) {
         const key = format(match, 'yyyy-MM-dd')
         grouped[key].push(t)
@@ -122,111 +132,29 @@ export default function WeekView({
             const dayTasks = columns[key] || []
             const isToday =
               format(date, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')
-
             return (
-              <Droppable key={key} droppableId={key}>
-                {(provided: any, snapshot: any) => (
-                  <motion.div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    className={`flex flex-col bg-white border border-gray-200 rounded-xl p-2 shadow-sm min-w-[180px] transition-all duration-200 ${
-                      snapshot.isDraggingOver
-                        ? 'bg-blue-50 border-blue-300 shadow-lg'
-                        : 'hover:border-gray-300'
-                    } ${isToday ? 'ring-2 ring-blue-500 ring-offset-1' : ''}`}
-                  >
-                    <div className="text-center font-semibold text-gray-700 mb-2 text-sm border-b pb-1">
-                      <span
-                        className={`capitalize ${
-                          isToday ? 'text-blue-600 font-bold' : ''
-                        }`}
-                      >
-                        {format(date, 'EEE', { locale: pl })}
-                      </span>
-                      <span className="text-xs text-gray-500 block">
-                        {format(date, 'd MMM', { locale: pl })}
-                      </span>
-                      <span className="text-[10px] text-gray-400 block">
-                        📋 {dayTasks.length}
-                      </span>
+              <div key={key} className="week-column">
+                <div className="week-column-header">
+                  <div>
+                    <div className={isToday ? 'week-day-today' : ''}>
+                      {format(date, 'EEE d', { locale: pl })}
                     </div>
-
-                    <div className="flex-1 overflow-y-auto space-y-2 relative">
-                      <AnimatePresence>
-                        {dayTasks.map((task, index) => (
-                          <Draggable key={task.id} draggableId={task.id} index={index}>
-                            {(provided: any, snapshot: any) => (
-                              <motion.div
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                {...provided.dragHandleProps}
-                                layout
-                                initial={{ opacity: 0, y: 8 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -8 }}
-                                transition={{ duration: 0.25 }}
-                                className={`relative group bg-white border border-gray-200 rounded-lg p-2 flex items-center justify-between shadow-sm hover:shadow-md cursor-grab ${
-                                  snapshot.isDragging
-                                    ? 'opacity-50 border-blue-300 scale-[1.02]'
-                                    : ''
-                                }`}
-                                title={`${task.content}\n📅 ${task.due?.date || 'Brak daty'}\n📁 ${
-                                  task.project_name || 'Bez projektu'
-                                }`}
-                              >
-                                <button
-                                  onClick={() => onComplete?.(task.id)}
-                                  className="w-4 h-4 rounded-full border-2 border-gray-400 hover:border-green-500 hover:bg-green-500 transition flex items-center justify-center"
-                                  title="Ukończ"
-                                >
-                                  <CheckCircle2
-                                    size={12}
-                                    className="text-white opacity-0 group-hover:opacity-100 transition"
-                                  />
-                                </button>
-
-                                <div className="flex-1 mx-2 min-w-0">
-                                  <p className="text-[13px] font-medium text-gray-800 truncate">
-                                    {task.content}
-                                  </p>
-                                </div>
-
-                                <div className="relative group/menu">
-                                  <button className="p-1 text-gray-400 hover:text-gray-700 transition">
-                                    <MoreVertical size={14} />
-                                  </button>
-
-                                  <motion.div
-                                    initial={{ opacity: 0, y: -4 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -4 }}
-                                    transition={{ duration: 0.15 }}
-                                    className="absolute right-0 top-5 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-50 opacity-0 group-hover/menu:opacity-100 pointer-events-none group-hover/menu:pointer-events-auto"
-                                  >
-                                    <button
-                                      onClick={() => onHelp?.(task)}
-                                      className="block w-full text-left px-3 py-1 text-xs hover:bg-gray-100"
-                                    >
-                                      💬 Pomóż mi
-                                    </button>
-                                    <button
-                                      onClick={() => onDelete?.(task.id)}
-                                      className="block w-full text-left px-3 py-1 text-xs hover:bg-gray-100 text-red-600"
-                                    >
-                                      🗑 Usuń
-                                    </button>
-                                  </motion.div>
-                                </div>
-                              </motion.div>
-                            )}
-                          </Draggable>
-                        ))}
-                        {provided.placeholder}
-                      </AnimatePresence>
+                  </div>
+                </div>
+                <div className="week-column-tasks">
+                  {dayTasks.map((task: any, index: number) => (
+                    <div key={task.id} className="task-card">
+                      <div className="flex justify-between items-start gap-2">
+                        <div>
+                          <div className="text-sm font-medium text-gray-800">
+                            {task.content}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </motion.div>
-                )}
-              </Droppable>
+                  ))}
+                </div>
+              </div>
             )
           })}
         </div>
