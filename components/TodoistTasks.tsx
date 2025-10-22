@@ -43,7 +43,10 @@ export default function TodoistTasks({
     if (!due) return null
     const dueStr = typeof due === 'string' ? due : due?.date ?? null
     if (!dueStr) return null
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dueStr)) return new Date(dueStr + 'T00:00:00')
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dueStr)) {
+      const [y, m, d] = dueStr.split('-').map(Number)
+      return new Date(y, m - 1, d)
+    }
     const d = new Date(dueStr)
     return isNaN(d.getTime()) ? null : d
   }
@@ -54,12 +57,8 @@ export default function TodoistTasks({
     if (!silent) setLoading(true)
     try {
       const [tasksRes, projectsRes] = await Promise.all([
-        fetch(`/api/todoist/tasks?token=${encodeURIComponent(token)}&filter=${encodeURIComponent(filter)}`)
-          .then(r => r.json())
-          .catch(() => ({ tasks: [] })),
-        fetch(`/api/todoist/projects?token=${encodeURIComponent(token)}`, { headers: { 'x-todoist-token': token } })
-          .then(r => r.json())
-          .catch(() => ({ projects: [] })),
+        fetch(`/api/todoist/tasks?token=${encodeURIComponent(token)}&filter=${encodeURIComponent(filter)}`).then(r => r.json()).catch(() => ({ tasks: [] })),
+        fetch(`/api/todoist/projects?token=${encodeURIComponent(token)}`, { headers: { 'x-todoist-token': token } }).then(r => r.json()).catch(() => ({ projects: [] })),
       ])
 
       const fetchedTasks = tasksRes.tasks || tasksRes || []
@@ -131,7 +130,6 @@ export default function TodoistTasks({
           </div>
 
           <div className="flex items-center gap-2">
-            {/* jeśli parent kontroluje projekt, pokaż go, ale nie zmieniaj; w przeciwnym razie pozwól wybrać */}
             {selectedProject == null ? (
               <select value={localSelectedProject} onChange={(e) => setLocalSelectedProject(e.target.value)} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400">
                 <option value="all">📁 Wszystkie projekty</option>
