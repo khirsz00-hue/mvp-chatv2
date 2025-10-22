@@ -1,3 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* === Global overrides / resets (keep these before custom styles) === */
+/* Ensure body uses tailwind defaults */
+html, body, #__next {
+  height: 100%;
+}
+
+/* Optional sensible defaults */
+body {
+  @apply bg-gray-50 text-gray-800 antialiased;
+}
+
 /* === WEEK VIEW (aktualizacja responsywności + drag & UX) === */
 .week-column {
   @apply flex flex-col gap-2 rounded-xl p-3 border border-gray-200 shadow-sm min-w-0 w-full transition-all;
@@ -86,4 +101,24 @@ html, body {
 /* optional: narrow sidebar forcing full width for todo area */
 .todoist-main-wrapper {
   width: 100%;
+}
+
+/* Extra UX polish: shadows, subtle hover on cards */
+.task-card:hover {
+  @apply shadow-md transform -translate-y-0.5 transition;
+}
+
+/* menu popover smoother */
+.motion-popover {
+  @apply origin-top-right;
+}
+
+/* Toast styling (kept compact) */
+.toast {
+  @apply fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] bg-gray-900 text-white text-sm px-4 py-2 rounded-lg shadow-lg;
+}
+
+/* Ensure pre-existing components that rely on container classes still look good */
+.container-fixed {
+  @apply max-w-full px-4;
 }
