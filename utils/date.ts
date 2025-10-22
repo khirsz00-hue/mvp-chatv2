@@ -1,4 +1,5 @@
-// lokalny util daty - zwraca lokalny YMD (YYYY-MM-DD) lub null
+// utils/date.ts
+// Lokalny util daty - zwraca lokalny YMD (YYYY-MM-DD) lub null
 export function pad(n: number) {
   return n < 10 ? '0' + n : '' + n
 }
@@ -8,9 +9,9 @@ export function ymdFromDate(d: Date) {
 }
 
 /**
- * Parse różne formaty due (string | {date}) i ZAWSZE zwróć lokalne YMD (YYYY-MM-DD) lub null.
+ * Parse różne formaty due (string | { date }) i ZAWSZE zwróć lokalne YMD (YYYY-MM-DD) lub null.
  * - Jeśli mamy date-only 'YYYY-MM-DD' -> traktujemy jako lokalną datę (new Date(y, m-1, d))
- * - Jeśli mamy ISO z offsetem -> parseISO/new Date -> konwertuj do lokalnego YMD
+ * - Jeśli mamy ISO z offsetem -> new Date(...) -> konwertuj do lokalnego YMD
  */
 export function parseDueToLocalYMD(dueRaw: any): string | null {
   if (!dueRaw) return null
@@ -24,7 +25,7 @@ export function parseDueToLocalYMD(dueRaw: any): string | null {
     return ymdFromDate(local)
   }
 
-  // otherwise try Date / parseISO
+  // otherwise try Date
   try {
     const parsed = new Date(dueStr)
     if (!isNaN(parsed.getTime())) return ymdFromDate(parsed)
