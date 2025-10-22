@@ -43,7 +43,7 @@ export default function TodoistTasksView({
     }
   }
 
-  // fetchProjects, fetchTasks, SSE etc. (bez zmian — zachowano istniejącą logikę)
+  // === 🔁 Pobieranie projektów (dynamicznie) ===
   useEffect(() => {
     if (!token) return
     const fetchProjects = async () => {
@@ -60,6 +60,7 @@ export default function TodoistTasksView({
     fetchProjects()
   }, [token])
 
+  // === 🔁 Pobieranie zadań ===
   const fetchTasks = async () => {
     if (!token) return
     try {
@@ -82,7 +83,7 @@ export default function TodoistTasksView({
           break
       }
 
-      const res = await fetch(`/api/todoist/tasks?token=${token}&filter=${encodeURIComponent(filterQuery)}`)
+     const res = await fetch(`/api/todoist/tasks?token=${token}&filter=${encodeURIComponent(filterQuery)}`)
       const data = await res.json()
       let fetched = data.tasks || []
 
@@ -108,7 +109,7 @@ export default function TodoistTasksView({
     }
   }
 
-  // SSE + Polling (bez zmian)
+  // 🔁 SSE + Polling
   useEffect(() => {
     if (!token) return
     console.log('🚀 Uruchomiono Todoist listener...')
@@ -160,11 +161,12 @@ export default function TodoistTasksView({
     }
   }, [token])
 
+  // 📦 Odświeżanie przy zmianie filtra lub projektu
   useEffect(() => {
     fetchTasks()
   }, [filter, selectedProject])
 
-  // --- HANDLERY: complete / move / delete / help ---
+  // === HANDLERY: complete / move / delete / help ===
   const handleComplete = async (id: string) => {
     if (!token) return
     try {
@@ -187,7 +189,6 @@ export default function TodoistTasksView({
   const handleMove = async (id: string, newDate: Date) => {
     if (!token) return
     try {
-      // format YYYY-MM-DD (server expects newDate string)
       const dateStr = newDate.toISOString().slice(0, 10)
       await fetch('/api/todoist/postpone', {
         method: 'POST',
@@ -225,17 +226,15 @@ export default function TodoistTasksView({
   }
 
   const handleHelp = (task: any) => {
-    // wywołaj dowolne zachowanie "Pomóż mi" — tu przykładowo otwieramy console lub wysyłamy event
     console.log('Pomóż mi dla', task)
     setToast('🧠 Poproszono o pomoc dla zadania')
     setTimeout(() => setToast(null), 2000)
-    // możesz też przekazać to dalej do onUpdate lub innego handlera
   }
 
   // === Widok ===
   return (
-    <div className="flex flex-col h-full bg-gray-50 rounded-b-xl overflow-hidden relative">
-      {/* header (bez zmian) */}
+    <div className="flex flex-col h-full bg-gray-50 rounded-b-xl overflow-hidden relative w-full">
+      {/* 🔘 Pasek filtrów i projektów */}
       {!hideHeader && (
         <div className="flex flex-wrap justify-between items-center px-4 py-3 border-b bg-neutral-900 text-white shadow-sm gap-2">
           <div className="flex gap-2 flex-wrap">
@@ -287,7 +286,8 @@ export default function TodoistTasksView({
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto p-3">
+      {/* 📋 Główna zawartość */}
+      <div className="flex-1 overflow-y-auto p-3 w-full">
         {viewMode === 'week' ? (
           <WeekView
             tasks={tasks}
@@ -306,6 +306,7 @@ export default function TodoistTasksView({
         )}
       </div>
 
+      {/* 🔔 Toast */}
       <AnimatePresence>
         {toast && (
           <motion.div
