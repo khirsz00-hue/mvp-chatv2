@@ -1,8 +1,10 @@
+// Zaktualizowany komponent: używa utils/parseDueToLocalYMD i dodaje _dueYmd dla każdego taska
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
 import TaskCard, { TaskType } from './TaskCard'
 import { motion, AnimatePresence } from 'framer-motion'
+import { parseDueToLocalYMD } from '../utils/date' // <- importuj util
 
 interface Project {
   id: string
@@ -16,7 +18,7 @@ interface TodoistTasksProps {
   onUpdate?: (tasks?: TaskType[]) => void
   onOpenTaskChat?: (task: TaskType) => void
   showHeaderFilters?: boolean
-  selectedProject?: string // <- controlled project selection from parent (optional)
+  selectedProject?: string
 }
 
 export default function TodoistTasks({
@@ -35,23 +37,8 @@ export default function TodoistTasks({
   const [loading, setLoading] = useState(true)
   const lastUpdate = useRef<number>(0)
 
-  // If parent passed selectedProject, prefer that; otherwise use local control
   const effectiveProject = selectedProject ?? localSelectedProject
 
-  // helper to normalize due date strings (avoid timezone drift)
-  const normalizeDue = (due: any) => {
-    if (!due) return null
-    const dueStr = typeof due === 'string' ? due : due?.date ?? null
-    if (!dueStr) return null
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dueStr)) {
-      const [y, m, d] = dueStr.split('-').map(Number)
-      return new Date(y, m - 1, d)
-    }
-    const d = new Date(dueStr)
-    return isNaN(d.getTime()) ? null : d
-  }
-
-  // load tasks & projects
   const loadTasks = async (silent = false) => {
     if (!token) return
     if (!silent) setLoading(true)
@@ -62,12 +49,15 @@ export default function TodoistTasks({
       ])
 
       const fetchedTasks = tasksRes.tasks || tasksRes || []
-      const mapped = (fetchedTasks as any[]).map((t) => ({
-        ...t,
-        due: t.due,
-        _dueDate: normalizeDue(t.due),
-        description: t.description || t.note || '',
-      })) as TaskType[]
+      const mapped = (fetchedTasks as any[]).map((t) => {
+        const _dueYmd = parseDueToLocalYMD(t.due) // <- normalized local YMD
+        return {
+          ...t,
+          due: t.due,
+          _dueYmd,
+          description: t.description || t.note || '',
+        }
+      }) as TaskType[]
       setTasks(mapped)
 
       if (Array.isArray(projectsRes)) setProjects(projectsRes)
@@ -100,7 +90,6 @@ export default function TodoistTasks({
     return () => window.removeEventListener('taskUpdated', handleUpdate)
   }, [token, filter])
 
-  // Filter by effectiveProject (parent-controlled or local)
   const visibleTasks = effectiveProject === 'all' ? tasks : tasks.filter(t => t.project_id === effectiveProject)
 
   if (loading) {
