@@ -1,241 +1,16 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-/* === OGÓLNY STYL STRONY === */
-body {
-  @apply bg-gradient-to-b from-neutral-50 via-white to-neutral-50 text-neutral-900 font-inter antialiased;
-  background-attachment: fixed;
-}
-
-/* === KARTY === */
-.card {
-  @apply bg-white/90 backdrop-blur rounded-2xl shadow-sm border border-neutral-200 p-4 transition-all hover:shadow-md;
-}
-
-/* === PRZYCISKI === */
-.btn {
-  @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-neutral-300 text-sm font-medium 
-         hover:bg-neutral-50 transition active:scale-[.98] select-none;
-}
-.btn-primary {
-  @apply bg-neutral-900 text-white border-neutral-900 hover:bg-neutral-800 active:bg-neutral-950 shadow-glow;
-}
-.btn-outline {
-  @apply bg-transparent border-neutral-300 text-neutral-700 hover:bg-neutral-50 active:bg-neutral-100;
-}
-.btn-danger {
-  @apply bg-red-600 text-white border-red-600 hover:bg-red-700 active:bg-red-800;
-}
-
-/* === INPUTY === */
-.input {
-  @apply w-full rounded-xl border border-neutral-200 px-3 py-2 bg-white shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
-}
-
-/* === TOAST === */
-.toast {
-  @apply fixed right-4 bottom-4 bg-neutral-900 text-white px-4 py-2 rounded-xl shadow-lg animate-fadeIn;
-  backdrop-filter: blur(6px);
-}
-
-/* === MARKDOWN === */
-.prose {
-  @apply text-gray-800 leading-relaxed;
-}
-
-.prose h1,
-.prose h2,
-.prose h3 {
-  @apply font-semibold text-gray-900 mt-4 mb-2;
-}
-
-.prose h1 {
-  @apply text-2xl border-b border-gray-200 pb-1;
-}
-
-.prose h2 {
-  @apply text-xl text-gray-800 mt-3 mb-2;
-}
-
-.prose h3 {
-  @apply text-lg text-gray-700 mt-2 mb-1;
-}
-
-.prose p {
-  @apply mb-2 text-gray-700;
-}
-
-.prose strong {
-  @apply font-semibold text-gray-900;
-}
-
-.prose em {
-  @apply italic text-gray-700;
-}
-
-.prose ul,
-.prose ol {
-  @apply pl-5 my-2 list-disc;
-}
-
-.prose li {
-  @apply mb-1 text-gray-700;
-}
-
-.prose code {
-  @apply bg-gray-100 text-gray-800 px-1 py-0.5 rounded text-sm font-mono;
-}
-
-.prose pre {
-  @apply bg-gray-900 text-gray-100 p-3 rounded-lg overflow-x-auto text-sm my-3;
-}
-
-.prose a {
-  @apply text-blue-600 underline hover:text-blue-700 transition;
-}
-
-.prose blockquote {
-  @apply border-l-4 border-blue-400 pl-4 italic text-gray-600 bg-blue-50 rounded-r-md py-1 my-2;
-}
-
-.prose table {
-  @apply border border-gray-200 rounded-md my-3 w-full text-sm;
-}
-
-.prose th,
-.prose td {
-  @apply border border-gray-200 px-3 py-1;
-}
-
-.prose th {
-  @apply bg-gray-100 font-semibold;
-}
-
-/* === MAŁY MARKDOWN (CHAT DIALOG) === */
-.prose-sm {
-  @apply text-[0.92rem] leading-relaxed;
-}
-
-.prose-sm p {
-  @apply mb-2;
-}
-
-.prose-sm ul,
-.prose-sm ol {
-  @apply my-1.5;
-}
-
-/* === ANIMACJE === */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-fadeIn {
-  animation: fadeIn 0.25s ease-out;
-}
-
-@keyframes slideInRight {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-.animate-slideInRight {
-  animation: slideInRight 0.3s ease-out;
-}
-
-/* === CHAT === */
-.markdown-user p,
-.markdown-user ul,
-.markdown-user li,
-.markdown-user strong,
-.markdown-user em,
-.markdown-user a,
-.markdown-user h1,
-.markdown-user h2,
-.markdown-user h3 {
-  color: white !important;
-}
-
-/* === TOOLTIP === */
-.tooltip {
-  @apply absolute z-[99999] bg-neutral-800 text-white text-xs py-1 px-2 rounded-md shadow-md whitespace-nowrap;
-  animation: fadeIn 0.15s ease-out;
-}
-
-/* === SCROLLBAR === */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 8px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.35);
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-/* === KARTY ZADAŃ (TaskCard) === */
-.task-card {
-  @apply relative border border-gray-200 rounded-xl p-3 bg-white shadow-sm hover:shadow-md transition-all;
-}
-.task-card:hover {
-  @apply border-gray-300;
-}
-.task-card-overdue {
-  @apply border-red-300 bg-red-50/30;
-}
-.task-card-priority-high {
-  @apply border-yellow-300;
-}
-
-/* === WEEK VIEW === */
+/* === WEEK VIEW (aktualizacja responsywności + drag & UX) === */
 .week-column {
-  @apply flex flex-col gap-2 bg-white/80 backdrop-blur rounded-xl p-3 border border-gray-200 shadow-sm min-w-[220px];
-}
-.week-column-header {
-  @apply text-sm font-semibold text-gray-700 border-b border-gray-100 pb-1 mb-2 flex items-center justify-between;
-}
-.week-column-tasks {
-  @apply flex flex-col gap-2;
-}
-.week-day-today {
-  @apply text-blue-700 font-bold;
-}
-.week-day-empty {
-  @apply text-gray-400 italic text-xs text-center py-2;
-}
-
-
-/* === WEEK VIEW (aktualizacja responsywności) === */
-.week-column {
-  @apply flex flex-col gap-2 bg-white/80 backdrop-blur rounded-xl p-3 border border-gray-200 shadow-sm min-w-0 w-full;
+  @apply flex flex-col gap-2 rounded-xl p-3 border border-gray-200 shadow-sm min-w-0 w-full transition-all;
 }
 
 /* przy większych ekranach kolumny mogą mieć minimalną szerokość */
 @media (min-width: 768px) {
   .week-column {
-    @apply min-w-[220px];
+    @apply min-w-[260px]; /* większa kolumna by rozłożyć zadania lepiej */
   }
 }
 
+/* header i tasks */
 .week-column-header {
   @apply text-sm font-semibold text-gray-700 border-b border-gray-100 pb-1 mb-2 flex items-center justify-between;
 }
@@ -245,11 +20,70 @@ body {
 .week-day-today {
   @apply text-blue-700 font-bold;
 }
-.week-day-empty {
-  @apply text-gray-400 italic text-xs text-center py-2;
+
+/* card */
+.task-card {
+  @apply bg-white rounded-lg p-3 border border-gray-100 shadow-sm;
 }
 
-/* droppable highlight (opcjonalne) */
-.week-column.bg-blue-50 {
-  @apply bg-blue-50/40;
+/* stronger drop target highlight */
+.week-column.ring-2 {
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.06);
+}
+
+/* dragging card styles */
+.dragging-card {
+  box-shadow: 0 20px 40px rgba(20, 20, 60, 0.18);
+  border-color: rgba(59, 130, 246, 0.2);
+  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(250,250,255,0.98));
+  animation: vib 0.35s infinite linear;
+  transform-origin: center;
+}
+
+/* vibration animation for dragged card */
+@keyframes vib {
+  0% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-1px) rotate(-0.3deg); }
+  50% { transform: translateY(0) rotate(0.3deg); }
+  75% { transform: translateY(-1px) rotate(-0.2deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+
+/* highlight for drop target (blue) */
+.week-column.bg-blue-50\/30, .week-column.ring-blue-300 {
+  background-color: rgba(59,130,246,0.06);
+  border-color: rgba(59,130,246,0.15);
+}
+
+/* highlight for source column (green) */
+.week-column.bg-green-50\/30, .week-column.ring-green-200 {
+  background-color: rgba(16,185,129,0.03);
+  border-color: rgba(16,185,129,0.12);
+}
+
+/* global override to ensure main layout can be full width */
+.app-full-width, .min-h-screen {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* disable text selection while dragging (set in JS) */
+.dragging-active {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+/* make the page scroll smoothing nicer for large grids */
+html, body {
+  scroll-behavior: smooth;
+}
+
+/* small helper to ensure placeholders show nicely */
+.react-beautiful-dnd-placeholder {
+  min-height: 20px;
+}
+
+/* optional: narrow sidebar forcing full width for todo area */
+.todoist-main-wrapper {
+  width: 100%;
 }
