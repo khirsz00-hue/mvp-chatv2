@@ -11,12 +11,6 @@ import {
 } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'
-import type {
-  DroppableProvided,
-  DroppableStateSnapshot,
-  DraggableProvided,
-  DraggableStateSnapshot,
-} from 'react-beautiful-dnd'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MoreVertical, CheckCircle2 } from 'lucide-react'
 
@@ -79,7 +73,7 @@ export default function WeekView({
     setLoading(false)
   }, [tasks])
 
-  // NOTE: używamy `any` dla result aby uniknąć problemów z DropResult w niektórych konfiguracjach TS
+  // NOTE: use `any` for result to avoid TS namespace/type issues in some setups
   const handleDragEnd = (result: any) => {
     const { destination, source, draggableId } = result
     if (!destination) return
@@ -171,7 +165,7 @@ export default function WeekView({
               format(date, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')
             return (
               <Droppable droppableId={key} key={key}>
-                {(provided: DroppableProvided, snapshot: DroppableStateSnapshot) => (
+                {(provided: any, snapshot: any) => (
                   <div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
@@ -188,12 +182,8 @@ export default function WeekView({
 
                     <div className="week-column-tasks">
                       {dayTasks.map((task: any, index: number) => (
-                        <Draggable
-                          draggableId={String(task.id)}
-                          index={index}
-                          key={task.id}
-                        >
-                          {(prov: DraggableProvided, snap: DraggableStateSnapshot) => (
+                        <Draggable draggableId={String(task.id)} index={index} key={task.id}>
+                          {(prov: any, snap: any) => (
                             <div
                               ref={prov.innerRef}
                               {...prov.draggableProps}
