@@ -41,6 +41,9 @@ export default function TodoistTasksView({
   // Modal for viewing a single task (opened from list or week)
   const [openTask, setOpenTask] = useState<any | null>(null)
 
+  // compute refreshFilter once to avoid inline ternary in JSX/handlers
+  const refreshFilter: FilterType = viewMode === 'week' ? '7 days' : filter
+
   // ---- Fetch projects ----
   useEffect(() => {
     if (!token) return
@@ -149,10 +152,10 @@ export default function TodoistTasksView({
             if (data.event?.startsWith('item:')) {
               const now = Date.now()
               if (data.event === 'item:added') {
-                setTimeout(() => fetchTasks(viewMode === 'week' ? '7 days' : filter), 1500)
+                setTimeout(() => fetchTasks(refreshFilter), 1500)
               } else if (now - lastEvent.current > 1500) {
                 lastEvent.current = now
-                fetchTasks(viewMode === 'week' ? '7 days' : filter)
+                fetchTasks(refreshFilter)
               }
               const msg =
                 data.event === 'item:added'
@@ -177,9 +180,9 @@ export default function TodoistTasksView({
     }
 
     connect()
-    const poll = setInterval(() => fetchTasks(viewMode === 'week' ? '7 days' : filter), 45000)
+    const poll = setInterval(() => fetchTasks(refreshFilter), 45000)
     // initial fetch
-    fetchTasks(viewMode === 'week' ? '7 days' : filter)
+    fetchTasks(refreshFilter)
 
     return () => {
       mounted = false
@@ -222,7 +225,7 @@ export default function TodoistTasksView({
       setNewDescription('')
       setToast('🆕 Dodano zadanie')
       setTimeout(() => setToast(null), 2000)
-      fetchTasks(viewMode === 'week' ? '7 days' : filter)
+      fetchTasks(refreshFilter)
       onUpdate?.()
     } catch (err: any) {
       console.error('create task error', err)
@@ -237,7 +240,7 @@ export default function TodoistTasksView({
       await fetch('/api/todoist/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, token }) })
       setToast('✅ Ukończono zadanie')
       setTimeout(() => setToast(null), 1500)
-      fetchTasks(viewMode === 'week' ? '7 days' : filter)
+      fetchTasks(refreshFilter)
       onUpdate?.()
     } catch (err) {
       console.error(err)
@@ -251,7 +254,7 @@ export default function TodoistTasksView({
       await fetch('/api/todoist/postpone', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, token, newDate: dateStr }) })
       setToast('📅 Przeniesiono zadanie')
       setTimeout(() => setToast(null), 1500)
-      fetchTasks(viewMode === 'week' ? '7 days' : filter)
+      fetchTasks(refreshFilter)
       onUpdate?.()
     } catch (err) {
       console.error(err)
@@ -264,7 +267,7 @@ export default function TodoistTasksView({
       await fetch('/api/todoist/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, token }) })
       setToast('🗑 Usunięto zadanie')
       setTimeout(() => setToast(null), 1500)
-      fetchTasks(viewMode === 'week' ? '7 days' : filter)
+      fetchTasks(refreshFilter)
       onUpdate?.()
     } catch (err) {
       console.error(err)
@@ -278,9 +281,6 @@ export default function TodoistTasksView({
   }
 
   // ---- Render ----
-  // compute refreshFilter once to avoid ambiguous inline ternary typing
-  const refreshFilter: FilterType = viewMode === 'week' ? ('7 days' as FilterType) : filter
-
   return (
     <div className="flex flex-col h-full bg-gray-50 rounded-b-xl overflow-hidden relative w-full">
       {!hideHeader && (
