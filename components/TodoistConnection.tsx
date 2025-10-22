@@ -29,21 +29,28 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
   }, [mode])
 
   useEffect(() => {
-    // Uwaga: poprzednio nasłuchiwaliśmy 'chatSelect' co kolidowało z historią.
-    // Teraz reagujemy tylko na taskHelp / taskSelect — eventy dedykowane do otwierania TaskDialog.
     const handleTaskEvent = (event: any) => {
       const detail = event?.detail
       if (!detail?.task) return
-      // zabezpieczenie: wymagamy, żeby event miał mode 'todoist' lub type taskHelp/taskSelect
       setOpenTask({ id: detail.task.id, title: detail.task.title, description: detail.task.description })
+    }
+
+    const handleChatSelect = (event: any) => {
+      const detail = event?.detail || {}
+      // only open TaskDialog for chatSelect if it explicitly requests opening the task dialog
+      if (detail.openTaskDialog && detail.task) {
+        setOpenTask({ id: detail.task.id, title: detail.task.title, description: detail.task.description })
+      }
     }
 
     window.addEventListener('taskHelp', handleTaskEvent as EventListener)
     window.addEventListener('taskSelect', handleTaskEvent as EventListener)
+    window.addEventListener('chatSelect', handleChatSelect as EventListener)
 
     return () => {
       window.removeEventListener('taskHelp', handleTaskEvent as EventListener)
       window.removeEventListener('taskSelect', handleTaskEvent as EventListener)
+      window.removeEventListener('chatSelect', handleChatSelect as EventListener)
     }
   }, [])
 
