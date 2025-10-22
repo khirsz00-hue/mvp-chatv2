@@ -22,14 +22,12 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
 
   const [openTask, setOpenTask] = useState<{ id: string; title: string } | null>(null)
 
-  // 💾 Zapamiętaj ostatni tryb (tasks / ai)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('todoist_mode', mode)
     }
   }, [mode])
 
-  // 📡 Globalny event „Pomóż mi” — otwiera TaskDialog
   useEffect(() => {
     const handleChatSelect = (event: CustomEvent) => {
       if (event.detail?.task) {
@@ -44,49 +42,32 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
 
   return (
     <div className="relative flex flex-col h-[calc(100vh-100px)] w-full bg-gray-50 border border-green-200 rounded-xl overflow-hidden">
-      {/* === 🔹 Nagłówek === */}
+      {/* header */}
       <div className="flex justify-between items-center p-2 px-4 bg-white border-b shadow-sm">
-        {/* Tryby */}
         <div className="flex items-center gap-3">
           <div className="flex bg-gray-100 rounded-lg overflow-hidden">
             <button
               onClick={() => setMode('tasks')}
-              className={`px-4 py-1.5 text-sm font-medium transition ${
-                mode === 'tasks'
-                  ? 'bg-green-600 text-white shadow-sm'
-                  : 'text-gray-700 hover:bg-gray-200'
-              }`}
+              className={`px-4 py-1.5 text-sm font-medium transition ${mode === 'tasks' ? 'bg-green-600 text-white shadow-sm' : 'text-gray-700 hover:bg-gray-200'}`}
             >
               📋 Lista zadań
             </button>
             <button
               onClick={() => setMode('ai')}
-              className={`px-4 py-1.5 text-sm font-medium transition ${
-                mode === 'ai'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-gray-700 hover:bg-gray-200'
-              }`}
+              className={`px-4 py-1.5 text-sm font-medium transition ${mode === 'ai' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-700 hover:bg-gray-200'}`}
             >
               🤖 Asystent AI
             </button>
           </div>
         </div>
 
-        {/* Status połączenia */}
         <div className="flex items-center gap-3">
-          <span className="text-sm font-semibold text-green-700 whitespace-nowrap">
-            🟢 Połączono z Todoist
-          </span>
-          <button
-            onClick={onDisconnect}
-            className="text-xs px-3 py-1 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 transition"
-          >
-            Odłącz
-          </button>
+          <span className="text-sm font-semibold text-green-700 whitespace-nowrap">🟢 Połączono z Todoist</span>
+          <button onClick={onDisconnect} className="text-xs px-3 py-1 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 transition">Odłącz</button>
         </div>
       </div>
 
-      {/* === 🔸 Główna sekcja === */}
+      {/* main area */}
       <div className="flex-1 relative w-full overflow-hidden">
         <AnimatePresence mode="wait">
           {mode === 'tasks' ? (
@@ -98,10 +79,7 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
               transition={{ duration: 0.25 }}
               className="absolute inset-0 w-full"
             >
-              <TodoistTasksView
-                token={token}
-                onUpdate={() => window.dispatchEvent(new Event('taskUpdated'))}
-              />
+              <TodoistTasksView token={token} onUpdate={() => window.dispatchEvent(new Event('taskUpdated'))} />
             </motion.div>
           ) : (
             <motion.div
@@ -118,13 +96,8 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
         </AnimatePresence>
       </div>
 
-      {/* === 💬 Modal pomocy === */}
       {openTask && (
-        <TaskDialog
-          task={{ id: openTask.id, title: openTask.title }}
-          mode="help"
-          onClose={() => setOpenTask(null)}
-        />
+        <TaskDialog task={{ id: openTask.id, title: openTask.title }} mode="help" onClose={() => setOpenTask(null)} />
       )}
     </div>
   )
