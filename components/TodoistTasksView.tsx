@@ -30,6 +30,19 @@ export default function TodoistTasksView({
   const [viewMode, setViewMode] = useState<'list' | 'week'>('list')
   const lastEvent = useRef<number>(0)
 
+  // helper — bezpieczne pobranie daty z t.due (obsługa string lub { date })
+  const getDueDate = (t: any): Date | null => {
+    const dueStr = typeof t.due === 'string' ? t.due : t.due?.date ?? null
+    if (!dueStr) return null
+    try {
+      const d = parseISO(dueStr)
+      return isNaN(d.getTime()) ? new Date(dueStr) : d
+    } catch {
+      const dx = new Date(dueStr)
+      return isNaN(dx.getTime()) ? null : dx
+    }
+  }
+
   // === 🔁 Pobieranie projektów (dynamicznie) ===
   useEffect(() => {
     if (!token) return
@@ -79,12 +92,14 @@ export default function TodoistTasksView({
       }
 
       if (filter === 'today') {
-        const overdue = fetched.filter(
-          (t: any) => t.due?.date && isBefore(parseISO(t.due.date), new Date())
-        )
-        const today = fetched.filter(
-          (t: any) => t.due?.date && isToday(parseISO(t.due.date))
-        )
+        const overdue = fetched.filter((t: any) => {
+          const d = getDueDate(t)
+          return d ? isBefore(d, new Date()) : false
+        })
+        const today = fetched.filter((t: any) => {
+          const d = getDueDate(t)
+          return d ? isToday(d) : false
+        })
         setTasks([...overdue, ...today])
       } else {
         setTasks(fetched)
