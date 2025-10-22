@@ -16,6 +16,7 @@ interface TodoistTasksProps {
   onUpdate?: (tasks?: TaskType[]) => void
   onOpenTaskChat?: (task: TaskType) => void
   showHeaderFilters?: boolean
+  selectedProject?: string // <- NEW: controlled project selection from parent
 }
 
 export default function TodoistTasks({
@@ -25,20 +26,24 @@ export default function TodoistTasks({
   onUpdate,
   onOpenTaskChat,
   showHeaderFilters = false,
+  selectedProject,
 }: TodoistTasksProps) {
   const [tasks, setTasks] = useState<TaskType[]>([])
   const [projects, setProjects] = useState<Project[]>([])
-  const [selectedProject, setSelectedProject] = useState<string>('all')
+  const [localSelectedProject, setLocalSelectedProject] = useState<string>('all')
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const lastUpdate = useRef<number>(0)
+
+  // If parent passed selectedProject, prefer that; otherwise use local control
+  const effectiveProject = selectedProject ?? localSelectedProject
 
   // helper to normalize due date strings (avoid timezone drift)
   const normalizeDue = (due: any) => {
     if (!due) return null
     const dueStr = typeof due === 'string' ? due : due?.date ?? null
     if (!dueStr) return null
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dueStr)) return new Date(dueStr + 'T12:00:00')
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dueStr)) return new Date(dueStr + 'T00:00:00')
     const d = new Date(dueStr)
     return isNaN(d.getTime()) ? null : d
   }
@@ -92,8 +97,8 @@ export default function TodoistTasks({
     return () => window.removeEventListener('taskUpdated', handleUpdate)
   }, [token, filter])
 
-  // Filter by selected project
-  const visibleTasks = selectedProject === 'all' ? tasks : tasks.filter(t => t.project_id === selectedProject)
+  // Filter by effectiveProject (parent-controlled or local)
+  const visibleTasks = effectiveProject === 'all' ? tasks : tasks.filter(t => t.project_id === effectiveProject)
 
   if (loading) {
     return (
@@ -122,16 +127,17 @@ export default function TodoistTasks({
           </div>
 
           <div className="flex items-center gap-2">
-            <select
-              value={selectedProject}
-              onChange={(e) => setSelectedProject(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
-            >
-              <option value="all">📁 Wszystkie projekty</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>💼 {p.name}</option>
-              ))}
-            </select>
+            {/* jeśli parent kontroluje projekt, pokaż go, ale nie zmieniaj; w przeciwnym razie pozwól wybrać */}
+            {selectedProject == null ? (
+              <select value={localSelectedProject} onChange={(e) => setLocalSelectedProject(e.target.value)} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400">
+                <option value="all">📁 Wszystkie projekty</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>💼 {p.name}</option>
+                ))}
+              </select>
+            ) : (
+              <div className="text-sm text-gray-600">📁 {projects.find(p => p.id === selectedProject)?.name || 'Wszystkie projekty'}</div>
+            )}
           </div>
         </div>
       )}
