@@ -278,6 +278,9 @@ export default function TodoistTasksView({
   }
 
   // ---- Render ----
+  // compute refreshFilter once to avoid ambiguous inline ternary typing
+  const refreshFilter: FilterType = viewMode === 'week' ? ('7 days' as FilterType) : filter
+
   return (
     <div className="flex flex-col h-full bg-gray-50 rounded-b-xl overflow-hidden relative w-full">
       {!hideHeader && (
@@ -327,7 +330,7 @@ export default function TodoistTasksView({
         {viewMode === 'week' ? (
           <WeekView tasks={tasks} onMove={(id, date) => handleMove(id, date)} onComplete={(id) => handleComplete(id)} onDelete={(id) => handleDelete(id)} onHelp={(t) => handleHelp(t)} />
         ) : (
-          <TodoistTasks token={token} filter={filter} onChangeFilter={setFilter} onUpdate={() => fetchTasks(viewMode === 'week' ? '7 days' : filter)} onOpenTaskChat={(t: any) => setOpenTask({ id: t.id, title: t.content, description: t.description })} showHeaderFilters={false} selectedProject={selectedProject} />
+          <TodoistTasks token={token} filter={filter} onChangeFilter={setFilter} onUpdate={() => fetchTasks(refreshFilter)} onOpenTaskChat={(t: any) => setOpenTask({ id: t.id, title: t.content, description: t.description })} showHeaderFilters={false} selectedProject={selectedProject} />
         )}
       </div>
 
