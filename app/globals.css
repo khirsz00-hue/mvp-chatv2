@@ -8,24 +8,30 @@ html, body, #__next {
   height: 100%;
 }
 
-/* Optional sensible defaults */
 body {
   @apply bg-gray-50 text-gray-800 antialiased;
 }
 
-/* === WEEK VIEW (aktualizacja responsywności + drag & UX) === */
+/* FILTER BAR - nowy, prosty, elegancki */
+.filter-bar {
+  @apply inline-flex items-center gap-2 ml-3;
+}
+.filter-pill {
+  @apply px-3 py-1.5 rounded-full text-sm text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition;
+}
+.filter-pill--active {
+  @apply bg-blue-600 text-white shadow-sm;
+}
+
+/* Week view / column niceties */
 .week-column {
   @apply flex flex-col gap-2 rounded-xl p-3 border border-gray-200 shadow-sm min-w-0 w-full transition-all;
 }
-
-/* przy większych ekranach kolumny mogą mieć minimalną szerokość */
 @media (min-width: 768px) {
   .week-column {
-    @apply min-w-[260px]; /* większa kolumna by rozłożyć zadania lepiej */
+    @apply min-w-[260px];
   }
 }
-
-/* header i tasks */
 .week-column-header {
   @apply text-sm font-semibold text-gray-700 border-b border-gray-100 pb-1 mb-2 flex items-center justify-between;
 }
@@ -36,124 +42,22 @@ body {
   @apply text-blue-700 font-bold;
 }
 
-/* card */
-.task-card {
-  @apply bg-white rounded-lg p-3 border border-gray-100 shadow-sm;
-}
+/* task card basic */
+.task-card-outer { @apply w-full; }
+.task-card-inner { @apply bg-white rounded-lg p-3 border border-gray-100 shadow-sm; }
 
-/* stronger drop target highlight */
-.week-column.ring-2 {
-  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.06);
+/* small button styles used in TaskCard / interactions */
+.task-action {
+  @apply inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm transition;
 }
+.task-action.postpone { @apply bg-blue-50 text-blue-700; }
+.task-action.complete { @apply bg-green-50 text-green-700; }
+.task-action.delete { @apply bg-red-50 text-red-700; }
+.task-action.help { @apply bg-violet-600 text-white; }
 
-/* dragging card styles */
-.dragging-card {
-  box-shadow: 0 20px 40px rgba(20, 20, 60, 0.18);
-  border-color: rgba(59, 130, 246, 0.2);
-  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(250,250,255,0.98));
-  animation: vib 0.35s infinite linear;
-  transform-origin: center;
-}
+/* UI polish */
+.toast { @apply fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] bg-gray-900 text-white text-sm px-4 py-2 rounded-lg shadow-lg; }
 
-/* vibration animation for dragged card */
-@keyframes vib {
-  0% { transform: translateY(0) rotate(0deg); }
-  25% { transform: translateY(-1px) rotate(-0.3deg); }
-  50% { transform: translateY(0) rotate(0.3deg); }
-  75% { transform: translateY(-1px) rotate(-0.2deg); }
-  100% { transform: translateY(0) rotate(0deg); }
-}
-
-/* highlight for drop target (blue) */
-.week-column.bg-blue-50\/30, .week-column.ring-blue-300 {
-  background-color: rgba(59,130,246,0.06);
-  border-color: rgba(59,130,246,0.15);
-}
-
-/* highlight for source column (green) */
-.week-column.bg-green-50\/30, .week-column.ring-green-200 {
-  background-color: rgba(16,185,129,0.03);
-  border-color: rgba(16,185,129,0.12);
-}
-
-/* global override to ensure main layout can be full width */
-.app-full-width, .min-h-screen {
-  width: 100% !important;
-  max-width: 100% !important;
-}
-
-/* disable text selection while dragging (set in JS) */
-.dragging-active {
-  user-select: none !important;
-  -webkit-user-select: none !important;
-}
-
-/* make the page scroll smoothing nicer for large grids */
-html, body {
-  scroll-behavior: smooth;
-}
-
-/* small helper to ensure placeholders show nicely */
-.react-beautiful-dnd-placeholder {
-  min-height: 20px;
-}
-
-/* optional: narrow sidebar forcing full width for todo area */
-.todoist-main-wrapper {
-  width: 100%;
-}
-
-/* Extra UX polish: shadows, subtle hover on cards */
-.task-card:hover {
-  @apply shadow-md transform -translate-y-0.5 transition;
-}
-
-/* menu popover smoother */
-.motion-popover {
-  @apply origin-top-right;
-}
-
-/* Toast styling (kept compact) */
-.toast {
-  @apply fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] bg-gray-900 text-white text-sm px-4 py-2 rounded-lg shadow-lg;
-}
-
-/* Ensure pre-existing components that rely on container classes still look good */
-.container-fixed {
-  @apply max-w-full px-4;
-}
-
-/* ---- Drag visual fixes (ensure root keeps inline transform from DnD) ---- */
-
-/* outer wrapper — must NOT apply transform-based animations here */
-.task-card-outer {
-  @apply w-full;
-}
-
-/* inner wrapper — visual effects live here */
-.task-card-inner {
-  @apply bg-white rounded-lg p-3 border border-gray-100 shadow-sm;
-}
-
-/* When dragged — apply animation *only* to inner element so it doesn't override DnD inline transform */
-.dragging-inner {
-  box-shadow: 0 20px 40px rgba(20,20,60,0.18);
-  border-color: rgba(59,130,246,0.2);
-  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(250,250,255,0.98));
-  animation: vib 0.35s infinite linear;
-  transform-origin: center;
-}
-
-/* small vibration */
-@keyframes vib {
-  0% { transform: translateY(0) rotate(0deg); }
-  25% { transform: translateY(-1px) rotate(-0.3deg); }
-  50% { transform: translateY(0) rotate(0.3deg); }
-  75% { transform: translateY(-1px) rotate(-0.2deg); }
-  100% { transform: translateY(0) rotate(0deg); }
-}
-
-/* keep placeholder visible */
-.react-beautiful-dnd-placeholder {
-  min-height: 20px;
-}
+/* re-enable dragging helpers */
+.dragging-active { user-select: none !important; -webkit-user-select: none !important; }
+.react-beautiful-dnd-placeholder { min-height: 20px; }
