@@ -6,6 +6,8 @@ import {
   addDays,
   startOfWeek,
   startOfDay,
+  parseISO,
+  isSameDay,
 } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import {
@@ -36,35 +38,33 @@ export default function WeekView({
   const days = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i))
 
   const [columns, setColumns] = useState<Record<string, any[]>>({})
-  const [draggingTask, setDraggingTask] = useState<any | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  const parseDateSafe = (value?: string) => {
-    if (!value) return null
-    try {
-      const [y, m, d] = value.split('-').map(Number)
-      return new Date(y, m - 1, d)
-    } catch {
-      return null
-    }
-  }
-
+  // 🔧 grupowanie po dniu
   useEffect(() => {
-    if (!tasks || tasks.length === 0) return
+    if (!tasks || tasks.length === 0) return setLoading(true)
+
     const grouped: Record<string, any[]> = {}
     for (const day of days) grouped[format(day, 'yyyy-MM-dd')] = []
 
     for (const t of tasks) {
-      const parsed = parseDateSafe(t?.due?.date)
-      const key = parsed ? format(parsed, 'yyyy-MM-dd') : null
-      if (key && grouped[key]) grouped[key].push(t)
+      const date =
+        typeof t.due?.date === 'string'
+          ? parseISO(t.due.date)
+          : new Date(t.due?.date ?? '')
+      const match = days.find((d) => isSameDay(d, date))
+      if (match) {
+        const key = format(match, 'yyyy-MM-dd')
+        grouped[key].push(t)
+      }
     }
 
     setColumns(grouped)
+    setLoading(false)
   }, [tasks])
 
   const handleDragEnd = (result: any) => {
     const { destination, source, draggableId } = result
-    setDraggingTask(null)
     if (!destination) return
     if (
       destination.droppableId === source.droppableId &&
@@ -90,39 +90,38 @@ export default function WeekView({
     }
   }
 
-  if (!Object.keys(columns).length) {
+  if (loading) {
     return (
-      <div className="flex items-center justify-center h-full text-sm text-gray-500 italic">
+      <div className="flex items-center justify-center h-full text-gray-500 text-sm italic">
         ⏳ Wczytywanie zadań...
       </div>
     )
   }
 
+  if (Object.values(columns).every((col) => col.length === 0)) {
+    return (
+      <div className="flex items-center justify-center h-full text-gray-400 text-sm italic">
+        Brak zadań w tym tygodniu.
+      </div>
+    )
+  }
+
   return (
-    <div className="flex flex-col h-full bg-gradient-to-b from-gray-50 to-white">
-      <motion.div
-        className="text-center py-4 border-b border-gray-200 bg-white shadow-sm mb-3 sticky top-0 z-20"
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
+    <div className="flex flex-col h-full bg-gray-50">
+      <div className="text-center py-3 border-b border-gray-200 bg-white shadow-sm mb-3">
         <h2 className="text-lg font-semibold text-gray-800 tracking-tight">
           {format(weekStart, 'd MMM', { locale: pl })} –{' '}
           {format(addDays(weekStart, 6), 'd MMM yyyy', { locale: pl })}
         </h2>
-      </motion.div>
+      </div>
 
-      <DragDropContext
-        onDragEnd={handleDragEnd}
-        onDragStart={(e: any) => {
-          const all = columns[e.source.droppableId]
-          setDraggingTask(all?.find((t) => t.id === e.draggableId))
-        }}
-      >
+      <DragDropContext onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-7 gap-3 px-3 pb-6 flex-1 overflow-x-auto">
           {days.map((date) => {
             const key = format(date, 'yyyy-MM-dd')
             const dayTasks = columns[key] || []
-            const isToday = format(date, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')
+            const isToday =
+              format(date, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')
 
             return (
               <Droppable key={key} droppableId={key}>
@@ -130,110 +129,4 @@ export default function WeekView({
                   <motion.div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
-                    className={`flex flex-col bg-white border border-gray-200 rounded-xl p-2 shadow-sm min-w-[180px] transition-all duration-200 ${
-                      snapshot.isDraggingOver
-                        ? 'bg-blue-50 border-blue-300 shadow-lg'
-                        : 'hover:border-gray-300'
-                    } ${isToday ? 'ring-2 ring-blue-500 ring-offset-1' : ''}`}
-                    animate={{ scale: snapshot.isDraggingOver ? 1.02 : 1 }}
-                    transition={{ duration: 0.15 }}
-                  >
-                    <div className="text-center font-semibold text-gray-700 mb-2 text-sm border-b pb-1">
-                      <span
-                        className={`capitalize ${
-                          isToday ? 'text-blue-600 font-bold' : ''
-                        }`}
-                      >
-                        {format(date, 'EEE', { locale: pl })}
-                      </span>
-                      <span className="text-xs text-gray-500 block">
-                        {format(date, 'd MMM', { locale: pl })}
-                      </span>
-                      <span className="text-[10px] text-gray-400 block">
-                        📋 {dayTasks.length}
-                      </span>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto space-y-2 relative">
-                      <AnimatePresence>
-                        {dayTasks.map((task, index) => (
-                          <Draggable key={task.id} draggableId={task.id} index={index}>
-                            {(provided: any, snapshot: any) => (
-                              <motion.div
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                {...provided.dragHandleProps}
-                                layout
-                                initial={{ opacity: 0, y: 8 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -8 }}
-                                transition={{ duration: 0.25 }}
-                                className={`relative group bg-white border border-gray-200 rounded-lg p-2 flex items-center justify-between shadow-sm hover:shadow-md cursor-grab ${
-                                  snapshot.isDragging
-                                    ? 'opacity-50 border-blue-300 scale-[1.02]'
-                                    : ''
-                                }`}
-                                title={`${task.content}\n📅 ${task.due?.date || 'Brak daty'}\n📁 ${
-                                  task.project_name || 'Bez projektu'
-                                }`}
-                              >
-                                <button
-                                  onClick={() => onComplete?.(task.id)}
-                                  className="w-4 h-4 rounded-full border-2 border-gray-400 hover:border-green-500 hover:bg-green-500 transition flex items-center justify-center"
-                                  title="Ukończ"
-                                >
-                                  <CheckCircle2
-                                    size={12}
-                                    className="text-white opacity-0 group-hover:opacity-100 transition"
-                                  />
-                                </button>
-
-                                <div className="flex-1 mx-2 min-w-0">
-                                  <p className="text-[13px] font-medium text-gray-800 truncate">
-                                    {task.content}
-                                  </p>
-                                </div>
-
-                                <div className="relative group/menu">
-                                  <button className="p-1 text-gray-400 hover:text-gray-700 transition">
-                                    <MoreVertical size={14} />
-                                  </button>
-
-                                  <motion.div
-                                    initial={{ opacity: 0, y: -4 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -4 }}
-                                    transition={{ duration: 0.15 }}
-                                    className="absolute right-0 top-5 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-50 opacity-0 group-hover/menu:opacity-100 pointer-events-none group-hover/menu:pointer-events-auto"
-                                  >
-                                    <button
-                                      onClick={() => onHelp?.(task)}
-                                      className="block w-full text-left px-3 py-1 text-xs hover:bg-gray-100"
-                                    >
-                                      💬 Pomóż mi
-                                    </button>
-                                    <button
-                                      onClick={() => onDelete?.(task.id)}
-                                      className="block w-full text-left px-3 py-1 text-xs hover:bg-gray-100 text-red-600"
-                                    >
-                                      🗑 Usuń
-                                    </button>
-                                  </motion.div>
-                                </div>
-                              </motion.div>
-                            )}
-                          </Draggable>
-                        ))}
-                        {provided.placeholder}
-                      </AnimatePresence>
-                    </div>
-                  </motion.div>
-                )}
-              </Droppable>
-            )
-          })}
-        </div>
-      </DragDropContext>
-    </div>
-  )
-}
+                    className={`flex flex-col bg-white border
