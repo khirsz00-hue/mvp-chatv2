@@ -1,54 +1,54 @@
-// Helper functions for consistent storage keys and sessions management
-export type AssistantKey = 'Default' | 'GPT' | 'Todoist AI'
+// utils/chatStorage.ts
+// Centralized helpers for chat storage keys and session management.
 
-export function assistantToStorageKey(assistant: AssistantKey) {
-  switch (assistant) {
-    case 'GPT':
-      return 'chat_gpt'
-    case 'Todoist AI':
-      return 'chat_todoist'
-    default:
-      return 'chat_global'
-  }
-}
-
-// sessions list key for assistant
-export function assistantSessionsKey(assistant: AssistantKey) {
-  switch (assistant) {
-    case 'GPT':
-      return 'chat_sessions_gpt'
-    case 'Todoist AI':
-      return 'chat_sessions_todoist'
-    default:
-      return 'chat_sessions_global'
-  }
-}
+export type AssistantKey = 'Todoist Helper' | 'AI Planner' | '6 Hats'
 
 export type ChatMessage = { role: 'user' | 'assistant'; content: string; timestamp: number }
+export type SessionEntry = { id: string; title: string; timestamp: number; last?: string; meta?: any }
 
-// load conversation array from localStorage
-export function loadConversation(storageKey: string): ChatMessage[] {
+// Returns the canonical storage key for a given assistant and optional session id.
+// - For Todoist Helper we typically use task-scoped keys: `chat_task_<id>`
+// - For AI Planner and 6 Hats we use assistant-prefixed keys: `chat_planner_<id>` or `chat_6hats_<id>`
+export function storageKeyFor(assistant: AssistantKey, sessionId?: string) {
+  if (assistant === 'Todoist Helper') {
+    // If sessionId looks like a task id, store under chat_task_<id> so Task components can reuse it.
+    if (sessionId) return `chat_task_${sessionId}`
+    return 'chat_todoist' // assistant-level fallback
+  }
+  if (assistant === 'AI Planner') {
+    return sessionId ? `chat_planner_${sessionId}` : 'chat_planner'
+  }
+  // 6 Hats
+  return sessionId ? `chat_6hats_${sessionId}` : 'chat_6hats'
+}
+
+export function sessionsKeyFor(assistant: AssistantKey) {
+  if (assistant === 'Todoist Helper') return 'chat_sessions_todoist'
+  if (assistant === 'AI Planner') return 'chat_sessions_planner'
+  return 'chat_sessions_6hats'
+}
+
+// localStorage helpers
+export function loadConversation(key: string): ChatMessage[] {
   if (typeof window === 'undefined') return []
   try {
-    const raw = localStorage.getItem(storageKey)
+    const raw = localStorage.getItem(key)
     if (!raw) return []
     const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
-    return parsed
+    return Array.isArray(parsed) ? parsed : []
   } catch {
     return []
   }
 }
 
-export function saveConversation(storageKey: string, conv: ChatMessage[]) {
+export function saveConversation(key: string, conv: ChatMessage[]) {
   if (typeof window === 'undefined') return
   try {
-    localStorage.setItem(storageKey, JSON.stringify(conv))
+    localStorage.setItem(key, JSON.stringify(conv))
+    // also emit storage event for internal listeners
+    window.dispatchEvent(new Event('chatUpdated'))
   } catch {}
 }
-
-// sessions are simplified objects: { id: string, title: string, timestamp: number, last: string }
-export type SessionEntry = { id: string; title: string; timestamp: number; last: string }
 
 export function loadSessions(key: string): SessionEntry[] {
   if (typeof window === 'undefined') return []
@@ -56,8 +56,7 @@ export function loadSessions(key: string): SessionEntry[] {
     const raw = localStorage.getItem(key)
     if (!raw) return []
     const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
-    return parsed
+    return Array.isArray(parsed) ? parsed : []
   } catch {
     return []
   }
@@ -70,13 +69,46 @@ export function saveSessions(key: string, sessions: SessionEntry[]) {
   } catch {}
 }
 
+// Upsert session into assistant's sessions list (keeps newest first, caps at 100)
 export function upsertSession(key: string, session: SessionEntry) {
-  const sessions = loadSessions(key)
-  const idx = sessions.findIndex((s) => s.id === session.id)
-  if (idx >= 0) {
-    sessions[idx] = { ...sessions[idx], ...session }
-  } else {
-    sessions.unshift(session)
-  }
-  saveSessions(key, sessions.slice(0, 50))
+  const current = loadSessions(key)
+  const idx = current.findIndex((s) => s.id === session.id)
+  if (idx >= 0) current[idx] = { ...current[idx], ...session }
+  else current.unshift(session)
+  saveSessions(key, current.slice(0, 100))
+}
+
+// Helper: scan localStorage for any keys relevant to an assistant (fallback for migration)
+export function scanSessionsFallback(assistant: AssistantKey): SessionEntry[] {
+  if (typeof window === 'undefined') return []
+  const out: SessionEntry[] = []
+  try {
+    const keys = Object.keys(localStorage)
+    for (const k of keys) {
+      // Todoist Helper: include chat_task_*
+      if (assistant === 'Todoist Helper') {
+        if (k.startsWith('chat_task_')) {
+          const id = k.replace('chat_task_', '')
+          const conv = loadConversation(k)
+          const last = conv[conv.length - 1]?.content || ''
+          out.push({ id, title: id, timestamp: Date.now(), last: last.slice(0, 300) })
+        }
+      } else if (assistant === 'AI Planner') {
+        if (k.startsWith('chat_planner_') || k === 'chat_planner') {
+          const id = k.replace('chat_planner_', '').replace('chat_planner', '')
+          const conv = loadConversation(k)
+          const last = conv[conv.length - 1]?.content || ''
+          out.push({ id: id || k, title: id || k, timestamp: Date.now(), last: last.slice(0, 300) })
+        }
+      } else {
+        if (k.startsWith('chat_6hats_') || k === 'chat_6hats') {
+          const id = k.replace('chat_6hats_', '').replace('chat_6hats', '')
+          const conv = loadConversation(k)
+          const last = conv[conv.length - 1]?.content || ''
+          out.push({ id: id || k, title: id || k, timestamp: Date.now(), last: last.slice(0, 300) })
+        }
+      }
+    }
+  } catch {}
+  return out.slice(0, 100)
 }
