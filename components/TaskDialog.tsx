@@ -23,70 +23,87 @@ interface TaskDialogProps {
 export default function TaskDialog({ task: initialTask, mode = 'help', onClose, initialTaskData }: TaskDialogProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [modeState, setModeState] = useState<'help' | 'task' | 'todoist'>(mode)
-  const [task, setTask] = useState<{ id: string; title: string } | null>(initialTask || null)
+  const [taskObj, setTaskObj] = useState<{ id: string; title: string } | null>(initialTask || null)
   const [taskData, setTaskData] = useState<any>(initialTaskData || null)
   const [chat, setChat] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  // open on mount if we have a task
+  // open when a task prop is provided
   useEffect(() => {
     if (initialTask) {
-      setTask(initialTask)
+      setTaskObj(initialTask)
       setIsOpen(true)
     }
   }, [initialTask])
 
-  // if initialTaskData changes, update
   useEffect(() => {
     if (initialTaskData) setTaskData(initialTaskData)
   }, [initialTaskData])
 
-  // load chat history similarly as before (existing logic)...
-  // For brevity keep existing local chat logic (unchanged except that we use 'task' variable)
-
+  // Load chat from localStorage — robust: try several key patterns and fallbacks
   useEffect(() => {
-    if (!isOpen || !task) return
-    const chatKey = task ? `chat_task_${task.id}` : null
-    if (!chatKey) return
-    try {
-      const saved = localStorage.getItem(chatKey)
-      if (saved) setChat(JSON.parse(saved))
-      else setChat([])
-    } catch {
-      setChat([])
-    }
-  }, [isOpen, task])
+    if (!isOpen || !taskObj) return
+    const chatKeyCandidates = [
+      `chat_task_${taskObj.id}`,
+      `chat_todoist_${taskObj.id}`,
+      `chat_${taskObj.id}`,
+    ]
 
-  useEffect(() => {
-    if (task) {
-      // auto intro if no chat
-      if (chat.length === 0) {
-        const intro: ChatMessage = {
-          role: 'assistant',
-          content: `Rozpoczynam rozmowę o zadaniu **${task.title}**.`,
-          timestamp: Date.now(),
-        }
-        setChat([intro])
-        try {
-          if (task) localStorage.setItem(`chat_task_${task.id}`, JSON.stringify([intro]))
-        } catch {}
+    let foundKey: string | null = null
+    for (const k of chatKeyCandidates) {
+      if (localStorage.getItem(k)) {
+        foundKey = k
+        break
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [task])
 
-  useEffect(() => {
+    // fallback: search localStorage keys that include the id (to be tolerant)
+    if (!foundKey) {
+      for (const k of Object.keys(localStorage)) {
+        if (k.startsWith('chat_') && k.includes(taskObj.id)) {
+          foundKey = k
+          break
+        }
+      }
+    }
+
+    if (foundKey) {
+      try {
+        const saved = localStorage.getItem(foundKey) || '[]'
+        const parsed = JSON.parse(saved)
+        setChat(Array.isArray(parsed) ? parsed : [])
+        return
+      } catch (err) {
+        console.error('Błąd odczytu historii z fallback key', err)
+      }
+    }
+
+    // If nothing found, initialize empty intro
+    const introMsg: ChatMessage = {
+      role: 'assistant',
+      content: `Zaczynamy! Pomagam Ci w zadaniu **${taskObj.title}**.`,
+      timestamp: Date.now(),
+    }
+    setChat([introMsg])
     try {
-      if (task) localStorage.setItem(`chat_task_${task.id}`, JSON.stringify(chat))
+      localStorage.setItem(`chat_task_${taskObj.id}`, JSON.stringify([introMsg]))
     } catch {}
-  }, [chat, task])
+  }, [isOpen, taskObj])
 
-  // send message (same as before)
+  // Save chat to localStorage on changes
+  useEffect(() => {
+    if (!taskObj) return
+    try {
+      localStorage.setItem(`chat_task_${taskObj.id}`, JSON.stringify(chat))
+    } catch {}
+  }, [chat, taskObj])
+
+  // sendMessage (same pattern)
   const sendMessage = async () => {
     const text = input.trim()
-    if (!text || !task) return
+    if (!text || !taskObj) return
     setInput('')
     setLoading(true)
     const userMsg: ChatMessage = { role: 'user', content: text, timestamp: Date.now() }
@@ -100,8 +117,8 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose, 
         body: JSON.stringify({
           message: text,
           mode: modeState,
-          taskId: task.id,
-          taskTitle: task.title,
+          taskId: taskObj.id,
+          taskTitle: taskObj.title,
           history: updated,
         }),
       })
@@ -111,7 +128,7 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose, 
       const newChat = [...updated, ai]
       setChat(newChat)
       try {
-        localStorage.setItem(`chat_task_${task.id}`, JSON.stringify(newChat))
+        localStorage.setItem(`chat_task_${taskObj.id}`, JSON.stringify(newChat))
       } catch {}
     } catch (err) {
       console.error('sendMessage error', err)
@@ -124,13 +141,13 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose, 
   const handleClose = () => {
     setIsOpen(false)
     setTimeout(() => {
-      setTask(null)
+      setTaskObj(null)
       setTaskData(null)
       onClose?.()
     }, 200)
   }
 
-  if (!isOpen || !task) return null
+  if (!isOpen || !taskObj) return null
 
   const modal = (
     <AnimatePresence>
@@ -138,7 +155,7 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose, 
         <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} transition={{ duration: 0.2 }} className="relative bg-white w-full max-w-3xl rounded-2xl shadow-2xl flex flex-col border border-gray-200 overflow-hidden max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
           <div className="sticky top-0 z-10 flex justify-between items-center px-5 py-3 border-b bg-gray-50">
             <div>
-              <h2 className="text-lg font-semibold text-gray-800 truncate pr-4">{task.title}</h2>
+              <h2 className="text-lg font-semibold text-gray-800 truncate pr-4">{taskObj.title}</h2>
               {taskData?.description ? (
                 <div className="text-sm text-gray-600 mt-1 max-w-[70vw]">
                   <ReactMarkdown remarkPlugins={[remarkGfm]} className="prose prose-sm max-w-none">
