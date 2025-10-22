@@ -1,10 +1,9 @@
-// Zaktualizowany komponent: używa utils/parseDueToLocalYMD i dodaje _dueYmd dla każdego taska
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
 import TaskCard, { TaskType } from './TaskCard'
 import { motion, AnimatePresence } from 'framer-motion'
-import { parseDueToLocalYMD } from '../utils/date' // <- importuj util
+import { parseDueToLocalYMD } from '../utils/date'
 
 interface Project {
   id: string
@@ -18,7 +17,7 @@ interface TodoistTasksProps {
   onUpdate?: (tasks?: TaskType[]) => void
   onOpenTaskChat?: (task: TaskType) => void
   showHeaderFilters?: boolean
-  selectedProject?: string
+  selectedProject?: string // optional parent control
 }
 
 export default function TodoistTasks({
@@ -37,20 +36,26 @@ export default function TodoistTasks({
   const [loading, setLoading] = useState(true)
   const lastUpdate = useRef<number>(0)
 
+  // parent-controlled project selection takes precedence
   const effectiveProject = selectedProject ?? localSelectedProject
 
+  // normalize & load
   const loadTasks = async (silent = false) => {
     if (!token) return
     if (!silent) setLoading(true)
     try {
       const [tasksRes, projectsRes] = await Promise.all([
-        fetch(`/api/todoist/tasks?token=${encodeURIComponent(token)}&filter=${encodeURIComponent(filter)}`).then(r => r.json()).catch(() => ({ tasks: [] })),
-        fetch(`/api/todoist/projects?token=${encodeURIComponent(token)}`, { headers: { 'x-todoist-token': token } }).then(r => r.json()).catch(() => ({ projects: [] })),
+        fetch(`/api/todoist/tasks?token=${encodeURIComponent(token)}&filter=${encodeURIComponent(filter)}`)
+          .then((r) => r.json())
+          .catch(() => ({ tasks: [] })),
+        fetch(`/api/todoist/projects?token=${encodeURIComponent(token)}`, { headers: { 'x-todoist-token': token } })
+          .then((r) => r.json())
+          .catch(() => ({ projects: [] })),
       ])
 
       const fetchedTasks = tasksRes.tasks || tasksRes || []
       const mapped = (fetchedTasks as any[]).map((t) => {
-        const _dueYmd = parseDueToLocalYMD(t.due) // <- normalized local YMD
+        const _dueYmd = parseDueToLocalYMD(t.due)
         return {
           ...t,
           due: t.due,
@@ -58,6 +63,7 @@ export default function TodoistTasks({
           description: t.description || t.note || '',
         }
       }) as TaskType[]
+
       setTasks(mapped)
 
       if (Array.isArray(projectsRes)) setProjects(projectsRes)
@@ -90,14 +96,10 @@ export default function TodoistTasks({
     return () => window.removeEventListener('taskUpdated', handleUpdate)
   }, [token, filter])
 
-  const visibleTasks = effectiveProject === 'all' ? tasks : tasks.filter(t => t.project_id === effectiveProject)
+  const visibleTasks = effectiveProject === 'all' ? tasks : tasks.filter((t) => t.project_id === effectiveProject)
 
   if (loading) {
-    return (
-      <p className="text-sm text-neutral-500 mt-4 text-center">
-        ⏳ Wczytywanie zadań...
-      </p>
-    )
+    return <p className="text-sm text-neutral-500 mt-4 text-center">⏳ Wczytywanie zadań...</p>
   }
 
   return (
@@ -123,11 +125,13 @@ export default function TodoistTasks({
               <select value={localSelectedProject} onChange={(e) => setLocalSelectedProject(e.target.value)} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400">
                 <option value="all">📁 Wszystkie projekty</option>
                 {projects.map((p) => (
-                  <option key={p.id} value={p.id}>💼 {p.name}</option>
+                  <option key={p.id} value={p.id}>
+                    💼 {p.name}
+                  </option>
                 ))}
               </select>
             ) : (
-              <div className="text-sm text-gray-600">📁 {projects.find(p => p.id === selectedProject)?.name || 'Wszystkie projekty'}</div>
+              <div className="text-sm text-gray-600">📁 {projects.find((p) => p.id === selectedProject)?.name || 'Wszystkie projekty'}</div>
             )}
           </div>
         </div>
@@ -159,8 +163,7 @@ export default function TodoistTasks({
                     selected={selectedTasks.has(t.id)}
                     onSelectChange={(checked) => {
                       const copy = new Set(selectedTasks)
-                      if (checked) copy.add(t.id)
-                      else copy.delete(t.id)
+                      checked ? copy.add(t.id) : copy.delete(t.id)
                       setSelectedTasks(copy)
                     }}
                   />
