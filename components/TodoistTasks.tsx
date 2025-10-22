@@ -16,7 +16,7 @@ interface TodoistTasksProps {
   onUpdate?: (tasks?: TaskType[]) => void
   onOpenTaskChat?: (task: TaskType) => void
   showHeaderFilters?: boolean
-  selectedProject?: string // <- NEW: controlled project selection from parent
+  selectedProject?: string // <- controlled project selection from parent (optional)
 }
 
 export default function TodoistTasks({
@@ -54,8 +54,12 @@ export default function TodoistTasks({
     if (!silent) setLoading(true)
     try {
       const [tasksRes, projectsRes] = await Promise.all([
-        fetch(`/api/todoist/tasks?token=${encodeURIComponent(token)}&filter=${encodeURIComponent(filter)}`).then(r => r.json()).catch(() => ({ tasks: [] })),
-        fetch(`/api/todoist/projects?token=${encodeURIComponent(token)}`, { headers: { 'x-todoist-token': token } }).then(r => r.json()).catch(() => ({ projects: [] })),
+        fetch(`/api/todoist/tasks?token=${encodeURIComponent(token)}&filter=${encodeURIComponent(filter)}`)
+          .then(r => r.json())
+          .catch(() => ({ tasks: [] })),
+        fetch(`/api/todoist/projects?token=${encodeURIComponent(token)}`, { headers: { 'x-todoist-token': token } })
+          .then(r => r.json())
+          .catch(() => ({ projects: [] })),
       ])
 
       const fetchedTasks = tasksRes.tasks || tasksRes || []
