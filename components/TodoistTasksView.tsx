@@ -41,7 +41,7 @@ export default function TodoistTasksView({
   // Modal for viewing a single task (opened from list or week)
   const [openTask, setOpenTask] = useState<any | null>(null)
 
-  // compute refreshFilter once to avoid inline ternary in JSX/handlers
+  // compute refreshFilter once per render to avoid inline ternaries in JSX props
   const refreshFilter: FilterType = viewMode === 'week' ? '7 days' : filter
 
   // ---- Fetch projects ----
@@ -69,7 +69,7 @@ export default function TodoistTasksView({
     }
   }, [token])
 
-  // ---- Fetch tasks (supports override for viewMode) ----
+  // ---- Fetch tasks (supports override filter) ----
   const fetchTasks = async (overrideFilter?: FilterType) => {
     if (!token) return
     try {
@@ -110,33 +110,38 @@ export default function TodoistTasksView({
         return { ...t, _dueYmd }
       })
 
-      // If we're in list "Dziś" filter -> keep overdue + today
+      // If list filter "today": keep overdue + today
       if (effectiveFilter === 'today') {
         const todayYmd = ymdFromDate(new Date())
         const overdue = mapped.filter((t) => (t._dueYmd ? t._dueYmd < todayYmd : false))
         const todayTasks = mapped.filter((t) => (t._dueYmd ? t._dueYmd === todayYmd : false))
         setTasks([...overdue, ...todayTasks])
-      } else if (viewMode === 'week') {
-        // If user is in week view, include tasks within next 7 days OR tasks without due (to avoid disappearing)
+        return
+      }
+
+      // If currently in week view - show tasks for next 7 days and tasks without due
+      if (viewMode === 'week') {
         const today = new Date()
         const in7 = new Date(today)
         in7.setDate(today.getDate() + 7)
         const in7Ymd = ymdFromDate(in7)
         const todayYmd = ymdFromDate(today)
         const weekTasks = mapped.filter((t) => {
-          if (!t._dueYmd) return true // include tasks without due so they don't disappear from week view
+          if (!t._dueYmd) return true // include tasks without due so they don't disappear
           return t._dueYmd >= todayYmd && t._dueYmd <= in7Ymd
         })
         setTasks(weekTasks)
-      } else {
-        setTasks(mapped)
+        return
       }
+
+      // default: set all mapped tasks for other filters
+      setTasks(mapped)
     } catch (err) {
       console.error('Błąd pobierania zadań:', err)
     }
   }
 
-  // SSE + polling: EventSource try + polling fallback. Poll uses viewMode to choose proper filter.
+  // SSE + polling: EventSource try + polling fallback. Poll uses refreshFilter computed above.
   useEffect(() => {
     if (!token) return
     let es: EventSource | null = null
