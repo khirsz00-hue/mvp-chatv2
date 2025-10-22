@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { parseISO, startOfDay, isSameDay } from 'date-fns'
+import { parseISO } from 'date-fns'
 import TodoistTasks from './TodoistTasks'
 import WeekView from './WeekView'
 import TaskDialog from './TaskDialog'
@@ -43,29 +43,33 @@ export default function TodoistTasksView({
   // Modal for viewing a single task (opened from list or week)
   const [openTask, setOpenTask] = useState<any | null>(null)
 
-  // Robust parser: always return local Date normalized to startOfDay or null.
-  const parseDueToLocalDay = (dueRaw: any): Date | null => {
+  // Helpers: format local YYYY-MM-DD and extract YMD from inputs
+  const pad = (n: number) => (n < 10 ? '0' + n : '' + n)
+  const ymdFromDate = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+
+  // Robust parser -> returns local YMD string (e.g. "2025-10-22") or null
+  const parseDueToLocalYMD = (dueRaw: any): string | null => {
     if (!dueRaw) return null
     const dueStr = typeof dueRaw === 'string' ? dueRaw : dueRaw?.date ?? null
     if (!dueStr) return null
 
-    // date-only 'YYYY-MM-DD' -> construct local date with year/month/day
-    const dateOnlyMatch = /^\d{4}-\d{2}-\d{2}$/.test(dueStr)
-    if (dateOnlyMatch) {
+    // date-only 'YYYY-MM-DD'
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dueStr)) {
       const [y, m, d] = dueStr.split('-').map(Number)
-      // new Date(year, monthIndex, day) constructs local date at 00:00 local
-      return startOfDay(new Date(y, m - 1, d))
+      // construct local date (year, monthIndex, day)
+      const local = new Date(y, m - 1, d)
+      return ymdFromDate(local)
     }
 
-    // otherwise try ISO parse (may include timezone). Use parseISO/new Date and normalize to local startOfDay
+    // otherwise parse ISO/timestamp - then convert to local YMD
     try {
       const parsed = parseISO(dueStr)
-      if (!isNaN(parsed.getTime())) return startOfDay(parsed)
+      if (!isNaN(parsed.getTime())) return ymdFromDate(parsed)
       const fallback = new Date(dueStr)
-      return isNaN(fallback.getTime()) ? null : startOfDay(fallback)
+      return isNaN(fallback.getTime()) ? null : ymdFromDate(fallback)
     } catch {
       const fallback = new Date(dueStr)
-      return isNaN(fallback.getTime()) ? null : startOfDay(fallback)
+      return isNaN(fallback.getTime()) ? null : ymdFromDate(fallback)
     }
   }
 
@@ -121,16 +125,16 @@ export default function TodoistTasksView({
       }
 
       if (filter === 'today') {
-        const todayStart = startOfDay(new Date())
+        const todayYmd = ymdFromDate(new Date())
         const overdue = fetched.filter((t: any) => {
-          const d = parseDueToLocalDay(t.due)
-          return d ? d.getTime() < todayStart.getTime() : false
+          const ymd = parseDueToLocalYMD(t.due)
+          return ymd ? ymd < todayYmd : false
         })
-        const today = fetched.filter((t: any) => {
-          const d = parseDueToLocalDay(t.due)
-          return d ? isSameDay(d, todayStart) : false
+        const todayTasks = fetched.filter((t: any) => {
+          const ymd = parseDueToLocalYMD(t.due)
+          return ymd ? ymd === todayYmd : false
         })
-        setTasks([...overdue, ...today])
+        setTasks([...overdue, ...todayTasks])
       } else {
         setTasks(fetched)
       }
@@ -237,7 +241,7 @@ export default function TodoistTasksView({
     }
   }
 
-  // handlers delegowane do WeekView / TodoistTasks
+  // handlers delegowane to WeekView / TodoistTasks
   const handleComplete = async (id: string) => {
     if (!token) return
     try {
