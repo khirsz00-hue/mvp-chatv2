@@ -29,20 +29,24 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
   }, [mode])
 
   useEffect(() => {
-    const handleChatSelect = (event: CustomEvent) => {
-      if (event.detail?.task) {
+    // handle both chatSelect (existing) and taskHelp (redundant alias)
+    const handleChatSelect = (event: any) => {
+      if (event?.detail?.task) {
         setOpenTask({ id: event.detail.task.id, title: event.detail.task.title })
       }
     }
+
     window.addEventListener('chatSelect', handleChatSelect as EventListener)
+    window.addEventListener('taskHelp', handleChatSelect as EventListener)
+
     return () => {
       window.removeEventListener('chatSelect', handleChatSelect as EventListener)
+      window.removeEventListener('taskHelp', handleChatSelect as EventListener)
     }
   }, [])
 
   return (
     <div className="relative flex flex-col h-[calc(100vh-100px)] w-full bg-gray-50 border border-green-200 rounded-xl overflow-hidden">
-      {/* header */}
       <div className="flex justify-between items-center p-2 px-4 bg-white border-b shadow-sm">
         <div className="flex items-center gap-3">
           <div className="flex bg-gray-100 rounded-lg overflow-hidden">
@@ -67,7 +71,6 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
         </div>
       </div>
 
-      {/* main area */}
       <div className="flex-1 relative w-full overflow-hidden">
         <AnimatePresence mode="wait">
           {mode === 'tasks' ? (
