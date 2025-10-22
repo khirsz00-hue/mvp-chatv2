@@ -66,12 +66,13 @@ export default function TodoistTasksView({
     }
   }, [token])
 
-  // ---- Fetch tasks ----
-  const fetchTasks = async () => {
+  // ---- Fetch tasks (supports override for viewMode) ----
+  const fetchTasks = async (overrideFilter?: FilterType) => {
     if (!token) return
     try {
+      const effectiveFilter = overrideFilter ?? filter
       let filterQuery = ''
-      switch (filter) {
+      switch (effectiveFilter) {
         case 'today':
           filterQuery = 'today | overdue'
           break
@@ -106,11 +107,24 @@ export default function TodoistTasksView({
         return { ...t, _dueYmd }
       })
 
-      if (filter === 'today') {
+      // If we're in list "Dziś" filter -> keep overdue + today
+      if (effectiveFilter === 'today') {
         const todayYmd = ymdFromDate(new Date())
         const overdue = mapped.filter((t) => (t._dueYmd ? t._dueYmd < todayYmd : false))
         const todayTasks = mapped.filter((t) => (t._dueYmd ? t._dueYmd === todayYmd : false))
         setTasks([...overdue, ...todayTasks])
+      } else if (viewMode === 'week') {
+        // If user is in week view, include tasks within next 7 days OR tasks without due (to avoid disappearing)
+        const today = new Date()
+        const in7 = new Date(today)
+        in7.setDate(today.getDate() + 7)
+        const in7Ymd = ymdFromDate(in7)
+        const todayYmd = ymdFromDate(today)
+        const weekTasks = mapped.filter((t) => {
+          if (!t._dueYmd) return true // include tasks without due so they don't disappear from week view
+          return t._dueYmd >= todayYmd && t._dueYmd <= in7Ymd
+        })
+        setTasks(weekTasks)
       } else {
         setTasks(mapped)
       }
@@ -119,7 +133,7 @@ export default function TodoistTasksView({
     }
   }
 
-  // SSE + polling: attempt EventSource then fallback polling
+  // SSE + polling: EventSource try + polling fallback. Poll uses viewMode to choose proper filter.
   useEffect(() => {
     if (!token) return
     let es: EventSource | null = null
@@ -135,10 +149,10 @@ export default function TodoistTasksView({
             if (data.event?.startsWith('item:')) {
               const now = Date.now()
               if (data.event === 'item:added') {
-                setTimeout(fetchTasks, 1500)
+                setTimeout(() => fetchTasks(viewMode === 'week' ? '7 days' : filter), 1500)
               } else if (now - lastEvent.current > 1500) {
                 lastEvent.current = now
-                fetchTasks()
+                fetchTasks(viewMode === 'week' ? '7 days' : filter)
               }
               const msg =
                 data.event === 'item:added'
@@ -156,18 +170,16 @@ export default function TodoistTasksView({
         es.onerror = () => {
           es?.close()
           es = null
-          // keep polling fallback, reconnect later
         }
-      } catch (err) {
-        // ignore EventSource init errors
+      } catch {
         es = null
       }
     }
 
     connect()
-    const poll = setInterval(fetchTasks, 45000)
+    const poll = setInterval(() => fetchTasks(viewMode === 'week' ? '7 days' : filter), 45000)
     // initial fetch
-    fetchTasks()
+    fetchTasks(viewMode === 'week' ? '7 days' : filter)
 
     return () => {
       mounted = false
@@ -175,9 +187,8 @@ export default function TodoistTasksView({
       clearInterval(poll)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, filter, selectedProject])
+  }, [token, filter, selectedProject, viewMode])
 
-  // keep viewMode in sync with filter
   useEffect(() => {
     setViewMode(filter === '7 days' ? 'week' : 'list')
     if (typeof window !== 'undefined') localStorage.setItem('todoist_filter', filter)
@@ -186,7 +197,7 @@ export default function TodoistTasksView({
   // ---- Add task ----
   const handleCreateTask = async () => {
     if (!token) return alert('Brak tokena')
-    if (!newTitle.trim()) return alert('Podaj tytuł')
+    if (!newTitle.trim()) return alert('Podaj nazwę zadania')
     try {
       const payload: any = { content: newTitle.trim() }
       if (newDate) payload.due = newDate
@@ -198,10 +209,12 @@ export default function TodoistTasksView({
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(payload),
       })
+
       if (!res.ok) {
         const txt = await res.text().catch(() => '')
-        throw new Error('Serwer: ' + txt)
+        throw new Error('Błąd serwera: ' + txt)
       }
+
       setShowAdd(false)
       setNewTitle('')
       setNewDate('')
@@ -209,7 +222,7 @@ export default function TodoistTasksView({
       setNewDescription('')
       setToast('🆕 Dodano zadanie')
       setTimeout(() => setToast(null), 2000)
-      fetchTasks()
+      fetchTasks(viewMode === 'week' ? '7 days' : filter)
       onUpdate?.()
     } catch (err: any) {
       console.error('create task error', err)
@@ -217,14 +230,14 @@ export default function TodoistTasksView({
     }
   }
 
-  // handlers to pass into WeekView so actions refresh tasks
+  // handlers passed to WeekView to refresh properly
   const handleComplete = async (id: string) => {
     if (!token) return
     try {
       await fetch('/api/todoist/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, token }) })
       setToast('✅ Ukończono zadanie')
       setTimeout(() => setToast(null), 1500)
-      fetchTasks()
+      fetchTasks(viewMode === 'week' ? '7 days' : filter)
       onUpdate?.()
     } catch (err) {
       console.error(err)
@@ -238,7 +251,7 @@ export default function TodoistTasksView({
       await fetch('/api/todoist/postpone', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, token, newDate: dateStr }) })
       setToast('📅 Przeniesiono zadanie')
       setTimeout(() => setToast(null), 1500)
-      fetchTasks()
+      fetchTasks(viewMode === 'week' ? '7 days' : filter)
       onUpdate?.()
     } catch (err) {
       console.error(err)
@@ -251,7 +264,7 @@ export default function TodoistTasksView({
       await fetch('/api/todoist/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, token }) })
       setToast('🗑 Usunięto zadanie')
       setTimeout(() => setToast(null), 1500)
-      fetchTasks()
+      fetchTasks(viewMode === 'week' ? '7 days' : filter)
       onUpdate?.()
     } catch (err) {
       console.error(err)
@@ -259,7 +272,7 @@ export default function TodoistTasksView({
   }
 
   const handleHelp = (taskObj: any) => {
-    setToast('🧠 Proszę o pomoc dla zadania')
+    setToast('🧠 Poproszono o pomoc dla zadania')
     setTimeout(() => setToast(null), 2000)
     setOpenTask({ id: taskObj.id, title: taskObj.content, description: taskObj.description })
   }
@@ -314,16 +327,12 @@ export default function TodoistTasksView({
         {viewMode === 'week' ? (
           <WeekView tasks={tasks} onMove={(id, date) => handleMove(id, date)} onComplete={(id) => handleComplete(id)} onDelete={(id) => handleDelete(id)} onHelp={(t) => handleHelp(t)} />
         ) : (
-          <TodoistTasks token={token} filter={filter} onChangeFilter={setFilter} onUpdate={fetchTasks} onOpenTaskChat={(t: any) => setOpenTask({ id: t.id, title: t.content, description: t.description })} showHeaderFilters={false} selectedProject={selectedProject} />
+          <TodoistTasks token={token} filter={filter} onChangeFilter={setFilter} onUpdate={() => fetchTasks(viewMode === 'week' ? '7 days' : filter)} onOpenTaskChat={(t: any) => setOpenTask({ id: t.id, title: t.content, description: t.description })} showHeaderFilters={false} selectedProject={selectedProject} />
         )}
       </div>
 
       <AnimatePresence>
-        {toast && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} transition={{ duration: 0.2 }} className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] bg-gray-900 text-white px-4 py-2 rounded-lg text-sm shadow-lg">
-            {toast}
-          </motion.div>
-        )}
+        {toast && <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} transition={{ duration: 0.2 }} className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] bg-gray-900 text-white px-4 py-2 rounded-lg text-sm shadow-lg">{toast}</motion.div>}
       </AnimatePresence>
 
       {/* Add Task Modal */}
