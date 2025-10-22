@@ -16,7 +16,6 @@ interface TaskDialogProps {
   task?: { id: string; title: string }
   mode?: 'help' | 'task' | 'todoist'
   onClose?: () => void
-  // optional initial data (description, subtasks) — parent can pass full task object
   initialTaskData?: { description?: string; subtasks?: any[] }
 }
 
@@ -30,7 +29,6 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose, 
   const [loading, setLoading] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  // open when a task prop is provided
   useEffect(() => {
     if (initialTask) {
       setTaskObj(initialTask)
@@ -42,15 +40,10 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose, 
     if (initialTaskData) setTaskData(initialTaskData)
   }, [initialTaskData])
 
-  // Robust loader: try multiple keys and fallback search
+  // Robust loader: try multiple keys and fallback pattern search; migrate to canonical keys
   useEffect(() => {
     if (!isOpen || !taskObj) return
-    const candidates = [
-      `chat_task_${taskObj.id}`,
-      `chat_todoist_${taskObj.id}`,
-      `chat_${taskObj.id}`,
-    ]
-
+    const candidates = [`chat_task_${taskObj.id}`, `chat_todoist_${taskObj.id}`, `chat_${taskObj.id}`]
     let foundKey: string | null = null
     for (const k of candidates) {
       if (localStorage.getItem(k)) {
@@ -58,9 +51,7 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose, 
         break
       }
     }
-
     if (!foundKey) {
-      // search any key that contains the id and starts with chat_
       for (const k of Object.keys(localStorage)) {
         if (k.startsWith('chat_') && k.includes(taskObj.id)) {
           foundKey = k
@@ -74,13 +65,22 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose, 
         const saved = localStorage.getItem(foundKey) || '[]'
         const parsed = JSON.parse(saved)
         setChat(Array.isArray(parsed) ? parsed : [])
+        // migrate to canonical keys if needed
+        const canonical1 = `chat_task_${taskObj.id}`
+        const canonical2 = `chat_todoist_${taskObj.id}`
+        if (foundKey !== canonical1) {
+          localStorage.setItem(canonical1, JSON.stringify(parsed))
+        }
+        if (foundKey !== canonical2) {
+          localStorage.setItem(canonical2, JSON.stringify(parsed))
+        }
         return
       } catch (err) {
         console.error('Błąd odczytu historii z fallback key', err)
       }
     }
 
-    // no history -> init intro
+    // init intro if nothing found
     const introMsg: ChatMessage = {
       role: 'assistant',
       content: `Zaczynamy! Pomagam Ci w zadaniu **${taskObj.title}**.`,
@@ -88,13 +88,12 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose, 
     }
     setChat([introMsg])
     try {
-      // write to canonical keys both for backward compatibility
       localStorage.setItem(`chat_task_${taskObj.id}`, JSON.stringify([introMsg]))
       localStorage.setItem(`chat_todoist_${taskObj.id}`, JSON.stringify([introMsg]))
     } catch {}
   }, [isOpen, taskObj])
 
-  // Save chat to localStorage on changes + update sessions lists
+  // Save chat to localStorage and update session indices
   useEffect(() => {
     if (!taskObj) return
     try {
@@ -104,37 +103,26 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose, 
       localStorage.setItem(key1, payload)
       localStorage.setItem(key2, payload)
 
-      // update chat_sessions_task (for TaskDialog history list)
+      // update chat_sessions_task
       const sessionsTask = JSON.parse(localStorage.getItem('chat_sessions_task') || '[]')
       const idx = sessionsTask.findIndex((s: any) => s.id === taskObj.id)
-      const entry = {
-        id: taskObj.id,
-        title: taskObj.title,
-        timestamp: Date.now(),
-        last: chat[chat.length - 1]?.content?.slice(0, 200) || '',
-      }
-      if (idx >= 0) {
-        sessionsTask[idx] = { ...sessionsTask[idx], ...entry }
-      } else {
-        sessionsTask.unshift(entry)
-      }
+      const entry = { id: taskObj.id, title: taskObj.title, timestamp: Date.now(), last: chat[chat.length - 1]?.content?.slice(0, 200) || '' }
+      if (idx >= 0) sessionsTask[idx] = { ...sessionsTask[idx], ...entry }
+      else sessionsTask.unshift(entry)
       localStorage.setItem('chat_sessions_task', JSON.stringify(sessionsTask))
 
-      // also update chat_sessions_todoist (used by ChatSidebar)
+      // update chat_sessions_todoist (Sidebar)
       const sessionsTodo = JSON.parse(localStorage.getItem('chat_sessions_todoist') || '[]')
       const idx2 = sessionsTodo.findIndex((s: any) => s.id === taskObj.id)
-      if (idx2 >= 0) {
-        sessionsTodo[idx2] = { ...sessionsTodo[idx2], ...entry }
-      } else {
-        sessionsTodo.unshift(entry)
-      }
+      if (idx2 >= 0) sessionsTodo[idx2] = { ...sessionsTodo[idx2], ...entry }
+      else sessionsTodo.unshift(entry)
       localStorage.setItem('chat_sessions_todoist', JSON.stringify(sessionsTodo))
     } catch (err) {
       console.error('Błąd zapisu historii czatu:', err)
     }
   }, [chat, taskObj])
 
-  // sendMessage (same pattern)
+  // sendMessage
   const sendMessage = async () => {
     const text = input.trim()
     if (!text || !taskObj) return
@@ -148,57 +136,19 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose, 
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text,
-          mode: modeState,
-          taskId: taskObj.id,
-          taskTitle: taskObj.title,
-          history: updated,
-        }),
+        body: JSON.stringify({ message: text, mode: modeState, taskId: taskObj.id, taskTitle: taskObj.title, history: updated }),
       })
       const data = await res.json()
       const reply = data.reply || data.content || 'Brak odpowiedzi'
       const ai: ChatMessage = { role: 'assistant', content: reply, timestamp: Date.now() }
       const newChat = [...updated, ai]
       setChat(newChat)
-      try {
-        // persist under both canonical keys
-        localStorage.setItem(`chat_task_${taskObj.id}`, JSON.stringify(newChat))
-        localStorage.setItem(`chat_todoist_${taskObj.id}`, JSON.stringify(newChat))
-
-        // update session entries as above
-        const sessionsTask = JSON.parse(localStorage.getItem('chat_sessions_task') || '[]')
-        const idx = sessionsTask.findIndex((s: any) => s.id === taskObj.id)
-        const entry = {
-          id: taskObj.id,
-          title: taskObj.title,
-          timestamp: Date.now(),
-          last: ai.content.slice(0, 200),
-        }
-        if (idx >= 0) {
-          sessionsTask[idx] = { ...sessionsTask[idx], ...entry }
-        } else {
-          sessionsTask.unshift(entry)
-        }
-        localStorage.setItem('chat_sessions_task', JSON.stringify(sessionsTask))
-
-        const sessionsTodo = JSON.parse(localStorage.getItem('chat_sessions_todoist') || '[]')
-        const idx2 = sessionsTodo.findIndex((s: any) => s.id === taskObj.id)
-        if (idx2 >= 0) {
-          sessionsTodo[idx2] = { ...sessionsTodo[idx2], ...entry }
-        } else {
-          sessionsTodo.unshift(entry)
-        }
-        localStorage.setItem('chat_sessions_todoist', JSON.stringify(sessionsTodo))
-      } catch (err) {
-        console.error('Błąd zapisu historii po sendMessage:', err)
-      }
+      // persist done in useEffect above
     } catch (err) {
       console.error('sendMessage error', err)
-      setChat(prev => [...prev, { role: 'assistant', content: '⚠️ Błąd komunikacji z AI.', timestamp: Date.now() }])
+      setChat((prev) => [...prev, { role: 'assistant', content: '⚠️ Błąd komunikacji z AI.', timestamp: Date.now() }])
     } finally {
       setLoading(false)
-      // notify sidebar to refresh lists
       window.dispatchEvent(new Event('chatUpdated'))
     }
   }
@@ -223,9 +173,7 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose, 
               <h2 className="text-lg font-semibold text-gray-800 truncate pr-4">{taskObj.title}</h2>
               {taskData?.description ? (
                 <div className="text-sm text-gray-600 mt-1 max-w-[70vw]">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]} className="prose prose-sm max-w-none">
-                    {taskData.description}
-                  </ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} className="prose prose-sm max-w-none">{taskData.description}</ReactMarkdown>
                 </div>
               ) : (
                 <div className="text-xs text-gray-400 mt-1">Brak opisu — możesz dodać w edycji zadania.</div>
@@ -237,33 +185,23 @@ export default function TaskDialog({ task: initialTask, mode = 'help', onClose, 
             </div>
           </div>
 
-          {/* CHAT / DETAILS */}
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-gray-50">
             {chat.map((m, i) => (
               <div key={i} className={`p-3 rounded-lg text-sm shadow-sm ${m.role === 'user' ? 'self-end bg-blue-600 text-white' : 'self-start bg-white border border-gray-200 text-gray-800'}`}>
-                <ReactMarkdown remarkPlugins={[remarkGfm]} className="prose prose-sm max-w-none">
-                  {m.content}
-                </ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]} className="prose prose-sm max-w-none">{m.content}</ReactMarkdown>
               </div>
             ))}
 
             {taskData?.subtasks && taskData.subtasks.length > 0 && (
               <div className="mt-2">
                 <div className="text-xs text-gray-500 mb-2">Subtaski:</div>
-                <ul className="space-y-1">
-                  {taskData.subtasks.map((s: any) => (
-                    <li key={s.id} className="text-sm text-gray-700">
-                      • {s.content}
-                    </li>
-                  ))}
-                </ul>
+                <ul className="space-y-1">{taskData.subtasks.map((s: any) => <li key={s.id} className="text-sm text-gray-700">• {s.content}</li>)}</ul>
               </div>
             )}
 
             {loading && <div className="text-sm text-gray-500 animate-pulse">AI myśli...</div>}
           </div>
 
-          {/* INPUT */}
           <div className="sticky bottom-0 border-t bg-white flex p-3 space-x-2">
             <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendMessage()} placeholder="Napisz np. 'Pogrupuj zadania'..." className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             <button onClick={sendMessage} disabled={loading} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition disabled:opacity-50">Wyślij</button>
