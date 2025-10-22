@@ -64,12 +64,12 @@ export async function GET(req: Request) {
       }
     })
 
-    // 🎯 Upraszczamy dane
+    // 🎯 Upraszczamy dane — ZWRACAMY due JAKO OBIEKT { date: ... } (zgodnie z oczekiwaniem UI)
     const simplified = filtered.map((t: any) => ({
       id: t.id,
       content: t.content,
       project_id: t.project_id,
-      due: t.due?.date || null,
+      due: t.due ? { date: t.due.date } : null,
       priority: t.priority,
     }))
 
