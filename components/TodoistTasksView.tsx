@@ -32,11 +32,19 @@ export default function TodoistTasksView({
   )
   const lastEvent = useRef<number>(0)
 
+  // Add task modal state
+  const [showAdd, setShowAdd] = useState(false)
+  const [newTitle, setNewTitle] = useState('')
+  const [newDate, setNewDate] = useState<string>('')
+  const [newProject, setNewProject] = useState<string>('')
+
   // helper — bezpieczne pobranie daty z t.due (obsługa string lub { date })
   const getDueDate = (t: any): Date | null => {
     const dueStr = typeof t.due === 'string' ? t.due : t.due?.date ?? null
     if (!dueStr) return null
     try {
+      // jeśli mamy format YYYY-MM-DD (bez czasu) ustawiamy południe lokalnie, żeby uniknąć przesunięć strefowych
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dueStr)) return new Date(dueStr + 'T12:00:00')
       const d = parseISO(dueStr)
       return isNaN(d.getTime()) ? new Date(dueStr) : d
     } catch {
@@ -93,6 +101,7 @@ export default function TodoistTasksView({
       }
 
       if (filter === 'today') {
+        // normalize due dates using getDueDate to avoid timezone drift
         const overdue = fetched.filter((t: any) => {
           const d = getDueDate(t)
           return d ? isBefore(d, new Date()) : false
@@ -164,12 +173,47 @@ export default function TodoistTasksView({
 
   useEffect(() => {
     fetchTasks()
-    // when filter changes, set viewMode: '7 days' -> week otherwise list
     setViewMode((f) => (filter === '7 days' ? 'week' : 'list'))
     if (typeof window !== 'undefined') localStorage.setItem('todoist_filter', filter)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter, selectedProject])
 
-  // --- HANDLERY: complete / move / delete / help ---
+  // ADD TASK: simple POST to /api/todoist/add (expects token in header)
+  const handleCreateTask = async () => {
+    if (!token) return alert('Brak tokena')
+    if (!newTitle.trim()) return alert('Podaj nazwę zadania')
+    try {
+      const payload: any = { content: newTitle.trim(), token }
+      if (newDate) payload.due = newDate
+      if (newProject) payload.project_id = newProject
+      if (newTitle) payload.content = newTitle.trim()
+
+      const res = await fetch('/api/todoist/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '')
+        throw new Error('Błąd serwera: ' + txt)
+      }
+
+      setShowAdd(false)
+      setNewTitle('')
+      setNewDate('')
+      setNewProject('')
+      setToast('🆕 Dodano zadanie')
+      setTimeout(() => setToast(null), 2000)
+      fetchTasks()
+      onUpdate?.()
+    } catch (err) {
+      console.error('create task error', err)
+      alert('Błąd dodawania zadania')
+    }
+  }
+
+  // handlers complete/move/delete/help
   const handleComplete = async (id: string) => {
     if (!token) return
     try {
@@ -192,7 +236,6 @@ export default function TodoistTasksView({
   const handleMove = async (id: string, newDate: Date) => {
     if (!token) return
     try {
-      // format YYYY-MM-DD (server expects newDate string)
       const dateStr = newDate.toISOString().slice(0, 10)
       await fetch('/api/todoist/postpone', {
         method: 'POST',
@@ -235,10 +278,8 @@ export default function TodoistTasksView({
     setTimeout(() => setToast(null), 2000)
   }
 
-  // === Widok ===
   return (
     <div className="flex flex-col h-full bg-gray-50 rounded-b-xl overflow-hidden relative w-full">
-      {/* header */}
       {!hideHeader && (
         <div className="bg-white rounded-md p-3 border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between gap-3">
@@ -247,7 +288,6 @@ export default function TodoistTasksView({
                 <span className="text-sm font-medium">📋 Lista zadań</span>
               </div>
 
-              {/* filtr - prosty pill bar */}
               <div className="filter-bar ml-1">
                 {[
                   { key: 'today', label: 'Dziś' },
@@ -281,6 +321,10 @@ export default function TodoistTasksView({
                 ))}
               </select>
 
+              <button onClick={() => setShowAdd(true)} className="px-3 py-1.5 bg-violet-600 text-white rounded-md text-sm shadow-sm">
+                + Dodaj zadanie
+              </button>
+
               <div className="text-sm text-green-600 font-medium">🟢 Połączono z Todoist</div>
             </div>
           </div>
@@ -297,12 +341,7 @@ export default function TodoistTasksView({
             onHelp={(task) => handleHelp(task)}
           />
         ) : (
-          <TodoistTasks
-            token={token}
-            filter={filter}
-            onChangeFilter={setFilter}
-            onUpdate={fetchTasks}
-          />
+          <TodoistTasks token={token} filter={filter} onChangeFilter={setFilter} onUpdate={fetchTasks} />
         )}
       </div>
 
@@ -316,6 +355,44 @@ export default function TodoistTasksView({
             className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] bg-gray-900 text-white text-sm px-4 py-2 rounded-lg shadow-lg backdrop-blur-sm"
           >
             {toast}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Add Task Modal */}
+      <AnimatePresence>
+        {showAdd && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4"
+            onClick={() => setShowAdd(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.98, y: 10 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.98, y: 10 }}
+              className="bg-white rounded-lg shadow-xl w-full max-w-xl p-5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-semibold mb-3">Dodaj nowe zadanie</h3>
+              <div className="space-y-3">
+                <input className="w-full border px-3 py-2 rounded" placeholder="Tytuł zadania" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
+                <div className="flex gap-2">
+                  <input type="date" className="border px-3 py-2 rounded" value={newDate} onChange={(e) => setNewDate(e.target.value)} />
+                  <select className="border px-3 py-2 rounded flex-1" value={newProject} onChange={(e) => setNewProject(e.target.value)}>
+                    <option value="">Brak projektu</option>
+                    {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <button className="px-3 py-2 rounded bg-gray-100" onClick={() => setShowAdd(false)}>Anuluj</button>
+                  <button className="px-4 py-2 rounded bg-violet-600 text-white" onClick={handleCreateTask}>Dodaj</button>
+                </div>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
