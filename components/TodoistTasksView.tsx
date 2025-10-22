@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { parseISO, isBefore, isToday, startOfDay, isSameDay } from 'date-fns'
+import { parseISO, startOfDay, isSameDay } from 'date-fns'
 import TodoistTasks from './TodoistTasks'
 import WeekView from './WeekView'
 import TaskDialog from './TaskDialog'
@@ -16,8 +16,12 @@ export default function TodoistTasksView({
   onUpdate?: () => void
   hideHeader?: boolean
 }) {
-  const [filter, setFilter] = useState<'today' | 'tomorrow' | 'overdue' | '7 days' | '30 days'>(() =>
-    typeof window !== 'undefined' ? ((localStorage.getItem('todoist_filter') as any) || 'today') : 'today'
+  const [filter, setFilter] = useState<
+    'today' | 'tomorrow' | 'overdue' | '7 days' | '30 days'
+  >(() =>
+    typeof window !== 'undefined'
+      ? ((localStorage.getItem('todoist_filter') as any) || 'today')
+      : 'today'
   )
 
   const [tasks, setTasks] = useState<any[]>([])
@@ -25,7 +29,7 @@ export default function TodoistTasksView({
   const [selectedProject, setSelectedProject] = useState<string>('all')
   const [toast, setToast] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'list' | 'week'>(() =>
-    typeof window !== 'undefined' && localStorage.getItem('todoist_filter') === '7 days' ? 'week' : 'list'
+    (typeof window !== 'undefined' && (localStorage.getItem('todoist_filter') === '7 days')) ? 'week' : 'list'
   )
   const lastEvent = useRef<number>(0)
 
@@ -39,20 +43,29 @@ export default function TodoistTasksView({
   // Modal for viewing a single task (opened from list or week)
   const [openTask, setOpenTask] = useState<any | null>(null)
 
-  // helper — parsowanie due: obsługa zarówno 'YYYY-MM-DD' (date-only) jak i pełnych timestampów
-  const parseDue = (due: any): Date | null => {
-    if (!due) return null
-    const dueStr = typeof due === 'string' ? due : due?.date ?? null
+  // Robust parser: always return local Date normalized to startOfDay or null.
+  const parseDueToLocalDay = (dueRaw: any): Date | null => {
+    if (!dueRaw) return null
+    const dueStr = typeof dueRaw === 'string' ? dueRaw : dueRaw?.date ?? null
     if (!dueStr) return null
-    // date-only (YYYY-MM-DD) — traktujemy jako lokalny dzień (bez przesuwania strefowego)
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dueStr)) return startOfDay(new Date(dueStr + 'T00:00:00'))
+
+    // date-only 'YYYY-MM-DD' -> construct local date with year/month/day
+    const dateOnlyMatch = /^\d{4}-\d{2}-\d{2}$/.test(dueStr)
+    if (dateOnlyMatch) {
+      const [y, m, d] = dueStr.split('-').map(Number)
+      // new Date(year, monthIndex, day) constructs local date at 00:00 local
+      return startOfDay(new Date(y, m - 1, d))
+    }
+
+    // otherwise try ISO parse (may include timezone). Use parseISO/new Date and normalize to local startOfDay
     try {
       const parsed = parseISO(dueStr)
-      if (isNaN(parsed.getTime())) return null
-      return parsed
+      if (!isNaN(parsed.getTime())) return startOfDay(parsed)
+      const fallback = new Date(dueStr)
+      return isNaN(fallback.getTime()) ? null : startOfDay(fallback)
     } catch {
-      const dx = new Date(dueStr)
-      return isNaN(dx.getTime()) ? null : dx
+      const fallback = new Date(dueStr)
+      return isNaN(fallback.getTime()) ? null : startOfDay(fallback)
     }
   }
 
@@ -108,18 +121,16 @@ export default function TodoistTasksView({
       }
 
       if (filter === 'today') {
-        const today = new Date()
+        const todayStart = startOfDay(new Date())
         const overdue = fetched.filter((t: any) => {
-          const d = parseDue(t.due)
-          if (!d) return false
-          // przeterminowane: data < startOfDay(today)
-          return d.getTime() < startOfDay(today).getTime()
+          const d = parseDueToLocalDay(t.due)
+          return d ? d.getTime() < todayStart.getTime() : false
         })
-        const todayTasks = fetched.filter((t: any) => {
-          const d = parseDue(t.due)
-          return d ? isSameDay(d, today) : false
+        const today = fetched.filter((t: any) => {
+          const d = parseDueToLocalDay(t.due)
+          return d ? isSameDay(d, todayStart) : false
         })
-        setTasks([...overdue, ...todayTasks])
+        setTasks([...overdue, ...today])
       } else {
         setTasks(fetched)
       }
@@ -131,7 +142,10 @@ export default function TodoistTasksView({
   // SSE + Polling
   useEffect(() => {
     if (!token) return
+    console.log('🚀 Uruchomiono Todoist listener...')
+
     let es: EventSource | null = null
+
     const connectSSE = () => {
       try {
         es = new EventSource('/api/todoist/stream')
@@ -146,23 +160,27 @@ export default function TodoistTasksView({
                 lastEvent.current = now
                 fetchTasks()
               }
+
               const msg =
                 data.event === 'item:added'
                   ? '🆕 Dodano zadanie'
                   : data.event === 'item:completed'
                   ? '✅ Ukończono zadanie'
                   : '🔄 Lista zadań zaktualizowana'
+
               setToast(msg)
               setTimeout(() => setToast(null), 2500)
             }
           } catch {}
         }
+
         es.onerror = () => {
           es?.close()
           setTimeout(connectSSE, 5000)
         }
       } catch {}
     }
+
     connectSSE()
     const ping = setInterval(() => fetch('/api/todoist/stream/ping').catch(() => {}), 25000)
     const poll = setInterval(fetchTasks, 45000)
