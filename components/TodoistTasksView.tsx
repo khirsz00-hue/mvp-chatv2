@@ -9,7 +9,7 @@ import WeekView from './WeekView'
 export default function TodoistTasksView({
   token,
   onUpdate,
-  hideHeader = false, // ✅ obsługa parametru (nie wymagana)
+  hideHeader = false,
 }: {
   token: string
   onUpdate?: () => void
@@ -43,7 +43,7 @@ export default function TodoistTasksView({
     }
   }
 
-  // === 🔁 Pobieranie projektów (dynamicznie) ===
+  // fetchProjects, fetchTasks, SSE etc. (bez zmian — zachowano istniejącą logikę)
   useEffect(() => {
     if (!token) return
     const fetchProjects = async () => {
@@ -60,7 +60,6 @@ export default function TodoistTasksView({
     fetchProjects()
   }, [token])
 
-  // === 🔁 Pobieranie zadań ===
   const fetchTasks = async () => {
     if (!token) return
     try {
@@ -83,7 +82,7 @@ export default function TodoistTasksView({
           break
       }
 
-     const res = await fetch(`/api/todoist/tasks?token=${token}&filter=${encodeURIComponent(filterQuery)}`)
+      const res = await fetch(`/api/todoist/tasks?token=${token}&filter=${encodeURIComponent(filterQuery)}`)
       const data = await res.json()
       let fetched = data.tasks || []
 
@@ -109,7 +108,7 @@ export default function TodoistTasksView({
     }
   }
 
-  // 🔁 SSE + Polling
+  // SSE + Polling (bez zmian)
   useEffect(() => {
     if (!token) return
     console.log('🚀 Uruchomiono Todoist listener...')
@@ -161,16 +160,83 @@ export default function TodoistTasksView({
     }
   }, [token])
 
-  // 📦 Odświeżanie przy zmianie filtra lub projektu
   useEffect(() => {
     fetchTasks()
   }, [filter, selectedProject])
 
-  // === ⚡ Widok ===
+  // --- HANDLERY: complete / move / delete / help ---
+  const handleComplete = async (id: string) => {
+    if (!token) return
+    try {
+      await fetch('/api/todoist/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, token }),
+      })
+      setToast('✅ Ukończono zadanie')
+      setTimeout(() => setToast(null), 2000)
+      fetchTasks()
+      onUpdate?.()
+    } catch (err) {
+      console.error('❌ complete error', err)
+      setToast('❌ Błąd przy ukończeniu')
+      setTimeout(() => setToast(null), 2000)
+    }
+  }
+
+  const handleMove = async (id: string, newDate: Date) => {
+    if (!token) return
+    try {
+      // format YYYY-MM-DD (server expects newDate string)
+      const dateStr = newDate.toISOString().slice(0, 10)
+      await fetch('/api/todoist/postpone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, token, newDate: dateStr }),
+      })
+      setToast('📅 Przeniesiono zadanie')
+      setTimeout(() => setToast(null), 2000)
+      fetchTasks()
+      onUpdate?.()
+    } catch (err) {
+      console.error('❌ move error', err)
+      setToast('❌ Błąd przy przenoszeniu')
+      setTimeout(() => setToast(null), 2000)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!token) return
+    try {
+      await fetch('/api/todoist/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, token }),
+      })
+      setToast('🗑 Usunięto zadanie')
+      setTimeout(() => setToast(null), 2000)
+      fetchTasks()
+      onUpdate?.()
+    } catch (err) {
+      console.error('❌ delete error', err)
+      setToast('❌ Błąd przy usuwaniu')
+      setTimeout(() => setToast(null), 2000)
+    }
+  }
+
+  const handleHelp = (task: any) => {
+    // wywołaj dowolne zachowanie "Pomóż mi" — tu przykładowo otwieramy console lub wysyłamy event
+    console.log('Pomóż mi dla', task)
+    setToast('🧠 Poproszono o pomoc dla zadania')
+    setTimeout(() => setToast(null), 2000)
+    // możesz też przekazać to dalej do onUpdate lub innego handlera
+  }
+
+  // === Widok ===
   return (
     <div className="flex flex-col h-full bg-gray-50 rounded-b-xl overflow-hidden relative">
-      {/* 🔘 Pasek filtrów i projektów */}
-      {!hideHeader && ( // ✅ ukrycie paska jeśli hideHeader = true
+      {/* header (bez zmian) */}
+      {!hideHeader && (
         <div className="flex flex-wrap justify-between items-center px-4 py-3 border-b bg-neutral-900 text-white shadow-sm gap-2">
           <div className="flex gap-2 flex-wrap">
             {[
@@ -221,14 +287,14 @@ export default function TodoistTasksView({
         </div>
       )}
 
-      {/* 📋 Główna zawartość */}
       <div className="flex-1 overflow-y-auto p-3">
         {viewMode === 'week' ? (
           <WeekView
             tasks={tasks}
-            onMove={(id, newDate) => {
-              console.log(`📆 Przenoszę zadanie ${id} → ${formatISO(newDate)}`)
-            }}
+            onMove={(id, newDate) => handleMove(id, newDate)}
+            onComplete={(id) => handleComplete(id)}
+            onDelete={(id) => handleDelete(id)}
+            onHelp={(task) => handleHelp(task)}
           />
         ) : (
           <TodoistTasks
@@ -240,7 +306,6 @@ export default function TodoistTasksView({
         )}
       </div>
 
-      {/* 🔔 Toast */}
       <AnimatePresence>
         {toast && (
           <motion.div
