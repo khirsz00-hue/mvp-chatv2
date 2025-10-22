@@ -119,13 +119,26 @@ export default function HomePage() {
 
           {active === 'six_hats' && (
             <div className="w-full bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-              <Chat onSend={async (msg) => await sendMessage(msg, 'six_hats')} messages={sixHatsMessages} hideHistory />
+              {/* wrap sendMessage so prop matches expected signature (returns void | Promise<void>) */}
+              <Chat
+                onSend={async (msg: string) => {
+                  await sendMessage(msg, 'six_hats')
+                }}
+                messages={sixHatsMessages}
+                hideHistory
+              />
             </div>
           )}
 
           {active === 'global' && (
             <div className="w-full bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-              <Chat onSend={async (msg) => await sendMessage(msg, 'global')} messages={globalMessages} hideHistory />
+              <Chat
+                onSend={async (msg: string) => {
+                  await sendMessage(msg, 'global')
+                }}
+                messages={globalMessages}
+                hideHistory
+              />
             </div>
           )}
         </div>
