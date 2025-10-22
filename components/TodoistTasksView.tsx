@@ -16,12 +16,8 @@ export default function TodoistTasksView({
   onUpdate?: () => void
   hideHeader?: boolean
 }) {
-  const [filter, setFilter] = useState<
-    'today' | 'tomorrow' | 'overdue' | '7 days' | '30 days'
-  >(() =>
-    typeof window !== 'undefined'
-      ? ((localStorage.getItem('todoist_filter') as any) || 'today')
-      : 'today'
+  const [filter, setFilter] = useState<'today' | 'tomorrow' | 'overdue' | '7 days' | '30 days'>(() =>
+    typeof window !== 'undefined' ? ((localStorage.getItem('todoist_filter') as any) || 'today') : 'today'
   )
 
   const [tasks, setTasks] = useState<any[]>([])
@@ -29,7 +25,7 @@ export default function TodoistTasksView({
   const [selectedProject, setSelectedProject] = useState<string>('all')
   const [toast, setToast] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'list' | 'week'>(() =>
-    (typeof window !== 'undefined' && (localStorage.getItem('todoist_filter') === '7 days')) ? 'week' : 'list'
+    typeof window !== 'undefined' && localStorage.getItem('todoist_filter') === '7 days' ? 'week' : 'list'
   )
   const lastEvent = useRef<number>(0)
 
@@ -43,17 +39,20 @@ export default function TodoistTasksView({
   // Modal for viewing a single task (opened from list or week)
   const [openTask, setOpenTask] = useState<any | null>(null)
 
-  // helper — bezpieczne pobranie daty z t.due (obsługa string lub { date })
-  const getDueDate = (t: any): Date | null => {
-    const dueStr = typeof t.due === 'string' ? t.due : t.due?.date ?? null
+  // helper — parsowanie due: obsługa zarówno 'YYYY-MM-DD' (date-only) jak i pełnych timestampów
+  const parseDue = (due: any): Date | null => {
+    if (!due) return null
+    const dueStr = typeof due === 'string' ? due : due?.date ?? null
     if (!dueStr) return null
+    // date-only (YYYY-MM-DD) — traktujemy jako lokalny dzień (bez przesuwania strefowego)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dueStr)) return startOfDay(new Date(dueStr + 'T00:00:00'))
     try {
-      if (/^\d{4}-\d{2}-\d{2}$/.test(dueStr)) return startOfDay(new Date(dueStr + 'T12:00:00'))
-      const d = parseISO(dueStr)
-      return isNaN(d.getTime()) ? new Date(dueStr) : startOfDay(d)
+      const parsed = parseISO(dueStr)
+      if (isNaN(parsed.getTime())) return null
+      return parsed
     } catch {
       const dx = new Date(dueStr)
-      return isNaN(dx.getTime()) ? null : startOfDay(dx)
+      return isNaN(dx.getTime()) ? null : dx
     }
   }
 
@@ -109,16 +108,18 @@ export default function TodoistTasksView({
       }
 
       if (filter === 'today') {
-        const todayStart = startOfDay(new Date())
+        const today = new Date()
         const overdue = fetched.filter((t: any) => {
-          const d = getDueDate(t)
-          return d ? d.getTime() < todayStart.getTime() : false
+          const d = parseDue(t.due)
+          if (!d) return false
+          // przeterminowane: data < startOfDay(today)
+          return d.getTime() < startOfDay(today).getTime()
         })
-        const today = fetched.filter((t: any) => {
-          const d = getDueDate(t)
-          return d ? isSameDay(d, todayStart) : false
+        const todayTasks = fetched.filter((t: any) => {
+          const d = parseDue(t.due)
+          return d ? isSameDay(d, today) : false
         })
-        setTasks([...overdue, ...today])
+        setTasks([...overdue, ...todayTasks])
       } else {
         setTasks(fetched)
       }
@@ -130,10 +131,7 @@ export default function TodoistTasksView({
   // SSE + Polling
   useEffect(() => {
     if (!token) return
-    console.log('🚀 Uruchomiono Todoist listener...')
-
     let es: EventSource | null = null
-
     const connectSSE = () => {
       try {
         es = new EventSource('/api/todoist/stream')
@@ -148,27 +146,23 @@ export default function TodoistTasksView({
                 lastEvent.current = now
                 fetchTasks()
               }
-
               const msg =
                 data.event === 'item:added'
                   ? '🆕 Dodano zadanie'
                   : data.event === 'item:completed'
                   ? '✅ Ukończono zadanie'
                   : '🔄 Lista zadań zaktualizowana'
-
               setToast(msg)
               setTimeout(() => setToast(null), 2500)
             }
           } catch {}
         }
-
         es.onerror = () => {
           es?.close()
           setTimeout(connectSSE, 5000)
         }
       } catch {}
     }
-
     connectSSE()
     const ping = setInterval(() => fetch('/api/todoist/stream/ping').catch(() => {}), 25000)
     const poll = setInterval(fetchTasks, 45000)
@@ -186,19 +180,22 @@ export default function TodoistTasksView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter, selectedProject, token])
 
-  // ADD TASK: simple POST to /api/todoist/add (expects token in payload)
+  // ADD TASK: wysyłamy token także w Authorization header (dla pewności)
   const handleCreateTask = async () => {
     if (!token) return alert('Brak tokena')
     if (!newTitle.trim()) return alert('Podaj nazwę zadania')
     try {
-      const payload: any = { content: newTitle.trim(), token }
+      const payload: any = { content: newTitle.trim() }
       if (newDate) payload.due = newDate
       if (newProject) payload.project_id = newProject
       if (newDescription) payload.description = newDescription.trim()
 
       const res = await fetch('/api/todoist/add', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`, // dodajemy header
+        },
         body: JSON.stringify(payload),
       })
 
@@ -222,7 +219,7 @@ export default function TodoistTasksView({
     }
   }
 
-  // handlers complete/move/delete/help
+  // handlers delegowane do WeekView / TodoistTasks
   const handleComplete = async (id: string) => {
     if (!token) return
     try {
@@ -282,7 +279,6 @@ export default function TodoistTasksView({
   }
 
   const handleHelp = (task: any) => {
-    console.log('Pomóż mi dla', task)
     setToast('🧠 Poproszono o pomoc dla zadania')
     setTimeout(() => setToast(null), 2000)
     setOpenTask({ id: task.id, title: task.content, description: task.description })
@@ -360,6 +356,7 @@ export default function TodoistTasksView({
               setOpenTask({ id: t.id, title: t.content, description: t.description })
             }}
             showHeaderFilters={false}
+            selectedProject={selectedProject} // <-- pass header selection
           />
         )}
       </div>
