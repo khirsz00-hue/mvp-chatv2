@@ -20,7 +20,7 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
     return 'tasks'
   })
 
-  const [openTask, setOpenTask] = useState<{ id: string; title: string } | null>(null)
+  const [openTask, setOpenTask] = useState<{ id: string; title: string; description?: string } | null>(null)
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -29,19 +29,21 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
   }, [mode])
 
   useEffect(() => {
-    // handle both chatSelect (existing) and taskHelp (redundant alias)
-    const handleChatSelect = (event: any) => {
-      if (event?.detail?.task) {
-        setOpenTask({ id: event.detail.task.id, title: event.detail.task.title })
-      }
+    // Uwaga: poprzednio nasłuchiwaliśmy 'chatSelect' co kolidowało z historią.
+    // Teraz reagujemy tylko na taskHelp / taskSelect — eventy dedykowane do otwierania TaskDialog.
+    const handleTaskEvent = (event: any) => {
+      const detail = event?.detail
+      if (!detail?.task) return
+      // zabezpieczenie: wymagamy, żeby event miał mode 'todoist' lub type taskHelp/taskSelect
+      setOpenTask({ id: detail.task.id, title: detail.task.title, description: detail.task.description })
     }
 
-    window.addEventListener('chatSelect', handleChatSelect as EventListener)
-    window.addEventListener('taskHelp', handleChatSelect as EventListener)
+    window.addEventListener('taskHelp', handleTaskEvent as EventListener)
+    window.addEventListener('taskSelect', handleTaskEvent as EventListener)
 
     return () => {
-      window.removeEventListener('chatSelect', handleChatSelect as EventListener)
-      window.removeEventListener('taskHelp', handleChatSelect as EventListener)
+      window.removeEventListener('taskHelp', handleTaskEvent as EventListener)
+      window.removeEventListener('taskSelect', handleTaskEvent as EventListener)
     }
   }, [])
 
@@ -100,7 +102,7 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
       </div>
 
       {openTask && (
-        <TaskDialog task={{ id: openTask.id, title: openTask.title }} mode="help" onClose={() => setOpenTask(null)} />
+        <TaskDialog task={{ id: openTask.id, title: openTask.title }} initialTaskData={{ description: openTask.description }} mode="task" onClose={() => setOpenTask(null)} />
       )}
     </div>
   )
