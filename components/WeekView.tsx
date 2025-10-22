@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import {
   format,
   addDays,
@@ -39,6 +39,8 @@ export default function WeekView({
 
   const [columns, setColumns] = useState<Record<string, any[]>>({})
   const [loading, setLoading] = useState(true)
+  const [openMenuFor, setOpenMenuFor] = useState<string | null>(null)
+  const datePickers = useRef<Record<string, HTMLInputElement | null>>({})
 
   // 🔧 grupowanie po dniu (obsługa obu formatów due: string lub due: { date })
   useEffect(() => {
@@ -100,6 +102,34 @@ export default function WeekView({
     }
   }
 
+  const handleCompleteClick = (id: string) => {
+    onComplete?.(id)
+    // optionally optimistically update UI
+    setColumns((prev) => {
+      const copy = { ...prev }
+      for (const k of Object.keys(copy)) {
+        copy[k] = copy[k].filter((t) => t.id !== id)
+      }
+      return copy
+    })
+  }
+
+  const handleDeleteClick = (id: string) => {
+    onDelete?.(id)
+    setColumns((prev) => {
+      const copy = { ...prev }
+      for (const k of Object.keys(copy)) {
+        copy[k] = copy[k].filter((t) => t.id !== id)
+      }
+      return copy
+    })
+  }
+
+  const openDatePicker = (id: string) => {
+    const el = datePickers.current[id]
+    el?.showPicker?.() || el?.click?.()
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full text-gray-500 text-sm italic">
@@ -143,11 +173,102 @@ export default function WeekView({
                 </div>
                 <div className="week-column-tasks">
                   {dayTasks.map((task: any, index: number) => (
-                    <div key={task.id} className="task-card">
-                      <div className="flex justify-between items-start gap-2">
-                        <div>
-                          <div className="text-sm font-medium text-gray-800">
-                            {task.content}
+                    <div key={task.id} className="task-card flex items-start gap-2">
+                      <div className="flex-1">
+                        <div className="flex justify-between items-start gap-2">
+                          <div>
+                            <div className="text-sm font-medium text-gray-800">
+                              {task.content}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {task.project_name || ''}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {/* ✅ Ukończ (kółeczko) */}
+                            <button
+                              title="Ukończ"
+                              onClick={() => handleCompleteClick(task.id)}
+                              className="p-1 rounded-full hover:bg-gray-100"
+                            >
+                              <CheckCircle2 size={18} className="text-green-600" />
+                            </button>
+
+                            {/* menu kontekstowe */}
+                            <div className="relative">
+                              <button
+                                onClick={() =>
+                                  setOpenMenuFor(openMenuFor === task.id ? null : task.id)
+                                }
+                                className="p-1 rounded hover:bg-gray-100"
+                                title="Więcej"
+                              >
+                                <MoreVertical size={16} />
+                              </button>
+
+                              <AnimatePresence>
+                                {openMenuFor === task.id && (
+                                  <motion.div
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.95 }}
+                                    className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-50"
+                                  >
+                                    <button
+                                      onClick={() => {
+                                        setOpenMenuFor(null)
+                                        onHelp?.(task)
+                                      }}
+                                      className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                    >
+                                      Pomóż mi
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setOpenMenuFor(null)
+                                        openDatePicker(task.id)
+                                      }}
+                                      className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                    >
+                                      Przenieś
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setOpenMenuFor(null)
+                                        handleDeleteClick(task.id)
+                                      }}
+                                      className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm text-red-600"
+                                    >
+                                      Usuń
+                                    </button>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
+
+                            {/* hidden date input per task */}
+                            <input
+                              ref={(el) => (datePickers.current[task.id] = el)}
+                              type="date"
+                              className="hidden"
+                              onChange={(e) => {
+                                const v = e.target.value
+                                if (!v) return
+                                const newDate = new Date(v + 'T12:00:00') // midday to avoid timezone shifts
+                                onMove?.(task.id, newDate)
+                                // opt. update UI
+                                setColumns((prev) => {
+                                  const copy = { ...prev }
+                                  for (const k of Object.keys(copy)) {
+                                    copy[k] = copy[k].filter((t) => t.id !== task.id)
+                                  }
+                                  const key = format(newDate, 'yyyy-MM-dd')
+                                  copy[key] = [...(copy[key] || []), task]
+                                  return copy
+                                })
+                              }}
+                            />
                           </div>
                         </div>
                       </div>
