@@ -18,6 +18,7 @@ interface TodoistTasksProps {
   onOpenTaskChat?: (task: TaskType) => void
   showHeaderFilters?: boolean
   selectedProject?: string // optional parent control
+  showContextMenu?: boolean // NEW: allow parent to decide whether TaskCard shows context menu
 }
 
 export default function TodoistTasks({
@@ -28,6 +29,7 @@ export default function TodoistTasks({
   onOpenTaskChat,
   showHeaderFilters = false,
   selectedProject,
+  showContextMenu = false,
 }: TodoistTasksProps) {
   const [tasks, setTasks] = useState<TaskType[]>([])
   const [projects, setProjects] = useState<Project[]>([])
@@ -122,11 +124,11 @@ export default function TodoistTasks({
 
           <div className="flex items-center gap-2">
             {selectedProject == null ? (
-              <select value={localSelectedProject} onChange={(e) => setLocalSelectedProject(e.target.value)} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400">
+              <select value={localSelectedProject} onChange={(e) => setLocalSelectedProject(e.target.value)} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white text-gray-700">
                 <option value="all">📁 Wszystkie projekty</option>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>
-                    💼 {p.name}
+                    🗂 {p.name}
                   </option>
                 ))}
               </select>
@@ -166,6 +168,7 @@ export default function TodoistTasks({
                       checked ? copy.add(t.id) : copy.delete(t.id)
                       setSelectedTasks(copy)
                     }}
+                    showContextMenu={showContextMenu} // <- pass-through prop
                   />
                 </motion.li>
               ))}
