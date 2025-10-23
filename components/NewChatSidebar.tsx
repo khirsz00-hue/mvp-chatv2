@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import ChatModal from './ChatModal'
 import type { AssistantKey, SessionEntry } from '../utils/chatStorage'
-import { loadSessions, sessionsKeyFor, scanSessionsFallback, storageKeyFor, upsertSession, saveSessions } from '../utils/chatStorage'
+import { loadSessions, sessionsKeyFor, scanSessionsFallback, storageKeyFor, upsertSession, loadConversation, saveConversation } from '../utils/chatStorage'
 import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
 
 export default function NewChatSidebar({
@@ -39,7 +39,6 @@ export default function NewChatSidebar({
       try {
         const detail = e.detail
         if (!detail) return
-        // if taskSelect is used to open TaskDialog, we still upsert session so history is available
         if (detail.mode === 'todoist' && detail.task) {
           const t = detail.task
           const entry: SessionEntry = { id: t.id, title: t.title || t.id, timestamp: Date.now(), last: '' }
@@ -55,18 +54,56 @@ export default function NewChatSidebar({
       } catch {}
     }
 
-    const handleTaskHelp = (e: any) => {
+    // handleTaskHelp will create/update chat session for the task and auto-send a "help" prompt (one message)
+    const handleTaskHelp = async (e: any) => {
       try {
         const detail = e.detail
         if (!detail || !detail.task) return
         const t = detail.task
         const entry: SessionEntry = { id: t.id, title: t.title || t.id, timestamp: Date.now(), last: '' }
+        const sk = storageKeyFor('Todoist Helper', t.id)
+        // ensure the session is registered
         upsertSession(sessionsKeyFor('Todoist Helper'), entry)
         setTimeout(() => loadList(), 100)
+
+        // Prevent duplicate auto-messages: check last message
+        const conv = loadConversation(sk)
+        const userPrompt = `Pomóż mi z zadaniem: "${t.title}".\n\nOpis: ${t.description || ''}`.trim()
+        let needToSend = true
+        if (conv && conv.length) {
+          const lastUser = [...conv].reverse().find((m) => m.role === 'user')
+          if (lastUser && lastUser.content === userPrompt) needToSend = false
+        }
+
+        if (needToSend) {
+          // Append user message
+          const userMsg = { role: 'user' as const, content: userPrompt, timestamp: Date.now() }
+          const newConv = conv.concat(userMsg)
+          saveConversation(sk, newConv)
+          // call backend to get AI reply
+          try {
+            const res = await fetch('/api/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ message: userPrompt, assistant: 'Todoist Helper', sessionId: t.id, task: t }),
+            })
+            const data = await res.json()
+            const reply = data?.reply || data?.content || 'Brak odpowiedzi od AI.'
+            const aiMsg = { role: 'assistant' as const, content: reply, timestamp: Date.now() }
+            const finalConv = newConv.concat(aiMsg)
+            saveConversation(sk, finalConv)
+          } catch (err) {
+            console.error('taskHelp api error', err)
+          }
+        }
+
+        // open modal and set assistant
         setActiveSession(entry)
         setModalOpen(true)
         if (onAssistantChange) onAssistantChange('Todoist Helper')
-      } catch {}
+      } catch (err) {
+        console.error('handleTaskHelp error', err)
+      }
     }
 
     window.addEventListener('taskSelect', handleTaskSelect)
@@ -111,7 +148,7 @@ export default function NewChatSidebar({
       // remove from sessions index
       const key = sessionsKeyFor(assistant)
       const arr = loadSessions(key).filter((x) => x.id !== s.id)
-      saveSessions(key, arr)
+      localStorage.setItem(key, JSON.stringify(arr))
       setSessions(arr)
       if (activeSession?.id === s.id) {
         setActiveSession(null)
