@@ -10,7 +10,7 @@ export default function TaskDialog({
   onClose,
 }: {
   task: { id: string; title?: string }
-  initialTaskData?: { description?: string; project_name?: string; due?: any }
+  initialTaskData?: { description?: string; project_name?: string; project_id?: string; due?: any; created_at?: any }
   onClose?: () => void
 }) {
   const [data, setData] = useState<any>({
@@ -78,11 +78,9 @@ export default function TaskDialog({
       if (data.description !== undefined) payload.description = data.description
       if (data.due !== undefined) payload.due = data.due || null
       if (data.project_id !== undefined) payload.project_id = data.project_id
-      // call backend update (existing endpoint)
       await fetch('/api/todoist/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       window.dispatchEvent(new Event('taskUpdated'))
       showToast('Zapisano zmiany')
-      // refresh local history display
       setHistoryState(getHistory(task.id))
       onClose?.()
     } catch (err) {
