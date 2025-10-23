@@ -6,8 +6,6 @@ import {
   addDays,
   startOfWeek,
   startOfDay,
-  parseISO,
-  isSameDay,
 } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'
@@ -18,10 +16,9 @@ import TaskCard from './TaskCard'
 interface WeekViewProps {
   tasks: any[]
   onComplete?: (id: string) => void
-  // NOTE: onMove now receives (id, newDateYmd: string)
+  // onMove now receives (id, newDateYmd: string)
   onMove?: (id: string, newDateYmd: string) => void
   onDelete?: (id: string) => void
-  // removed onHelp usage; menu will dispatch taskHelp event instead
   onHelp?: (task: any) => void
 }
 
@@ -46,7 +43,7 @@ export default function WeekView({
   const [dragDestinationId, setDragDestinationId] = useState<string | null>(null)
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null)
 
-  // grupowanie po dniach (obsługa due: string lub due: {date})
+  // grupowanie po dniach (PREFERUJEMY t._dueYmd — to pozwala na optymistyczne update'y)
   useEffect(() => {
     if (!tasks || tasks.length === 0) {
       setColumns({})
@@ -57,28 +54,24 @@ export default function WeekView({
     for (const day of days) grouped[format(day, 'yyyy-MM-dd')] = []
 
     for (const t of tasks) {
-      const dueStr = typeof t.due === 'string' ? t.due : t.due?.date ?? null
-      if (!dueStr) {
+      // Preferuj _dueYmd (ustawiane przez TodoistTasksView przy fetch i przez optymistyczne handleMove)
+      const dueYmdFromOpt = t._dueYmd ?? null
+      const dueRaw = t.due?.date ?? (typeof t.due === 'string' ? t.due : null)
+
+      // Determine canonical due YMD string if available
+      const dueYmd = dueYmdFromOpt ?? dueRaw ?? null
+
+      if (!dueYmd) {
         // include tasks without due in first column (start of week)
         const key = format(days[0], 'yyyy-MM-dd')
         grouped[key].push(t)
         continue
       }
 
-      let dateObj: Date
-      try {
-        // try ISO parse first
-        dateObj = parseISO(dueStr)
-        if (isNaN(dateObj.getTime())) dateObj = new Date(dueStr)
-      } catch {
-        dateObj = new Date(dueStr)
-      }
-      if (isNaN(dateObj.getTime())) continue
-
-      const match = days.find((d) => isSameDay(d, dateObj))
-      if (match) {
-        const key = format(match, 'yyyy-MM-dd')
-        grouped[key].push(t)
+      // dueYmd expected to be 'YYYY-MM-DD' — compare as string to each day's YMD
+      const matchKey = days.map((d) => format(d, 'yyyy-MM-dd')).find((k) => k === dueYmd)
+      if (matchKey) {
+        grouped[matchKey].push(t)
       } else {
         // if due outside this week, put into first column for visibility
         const key = format(days[0], 'yyyy-MM-dd')
@@ -88,7 +81,7 @@ export default function WeekView({
 
     setColumns(grouped)
     setLoading(false)
-  }, [tasks])
+  }, [tasks, days])
 
   // DnD handlers (any dla zgodności TS w tej konfiguracji)
   const handleDragStart = (start: any) => {
@@ -247,7 +240,6 @@ export default function WeekView({
                                 style={{ ...prov.draggableProps.style }}
                                 data-task-id={task.id}
                               >
-                                {/* Inner element receives visual effects (animation, scale) — does NOT override inline transform on root */}
                                 <motion.div
                                   className={`task-card-inner flex items-start gap-2 p-3 rounded-lg shadow-sm border border-gray-100 cursor-grab transition-all duration-150 ${isBeingDragged ? 'dragging-inner z-50' : 'bg-white'}`}
                                   whileDrag={{ scale: 1.02, rotate: [0, -1.5, 1.5, 0], y: -4 }}
@@ -273,7 +265,6 @@ export default function WeekView({
                                           <AnimatePresence>
                                             {openMenuFor === task.id && (
                                               <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="absolute right-0 mt-2 w-44 bg-white border border-gray-200 rounded-md shadow-lg z-50">
-                                                {/* Dispatch taskHelp so NewChatSidebar opens chat modal */}
                                                 <button onClick={() => { setOpenMenuFor(null); window.dispatchEvent(new CustomEvent('taskHelp', { detail: { task: { id: task.id, title: task.content, description: task.description } } })); }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm">Pomóż mi</button>
                                                 <button onClick={() => { setOpenMenuFor(null); openDatePicker(task.id); }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm">Przenieś</button>
                                                 <button onClick={() => { setOpenMenuFor(null); handleDeleteClick(task.id); }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm text-red-600">Usuń</button>
