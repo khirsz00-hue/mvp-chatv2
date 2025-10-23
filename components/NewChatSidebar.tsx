@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from 'react'
 import ChatModal from './ChatModal'
-import { AssistantKey, loadSessions, sessionsKeyFor, scanSessionsFallback, SessionEntry, storageKeyFor, upsertSession } from '../utils/chatStorage'
+import type { AssistantKey, SessionEntry } from '../utils/chatStorage'
+import { loadSessions, sessionsKeyFor, scanSessionsFallback, storageKeyFor, upsertSession } from '../utils/chatStorage'
 import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
 
 export default function NewChatSidebar({
