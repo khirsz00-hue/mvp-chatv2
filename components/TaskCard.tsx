@@ -12,6 +12,11 @@ export type TaskType = {
   _dueYmd?: string | null
   priority?: number
   project_name?: string
+  // possible fields for estimated time — support multiple keys
+  estimated_time?: string | number
+  estimate?: string | number
+  time_estimate?: string | number
+  estimated?: string | number
 }
 
 export default function TaskCard({
@@ -19,7 +24,6 @@ export default function TaskCard({
   token,
   showContextMenu = false,
   onAction,
-  // onHelp kept for compatibility but NOT called to avoid duplicate flows
   onHelp,
   selectable = false,
   selected = false,
@@ -82,20 +86,21 @@ export default function TaskCard({
   }
 
   const handleHelp = () => {
-    // Emit single event; NewChatSidebar listens for 'taskHelp' and opens chat modal and handles history.
     const detail = { task: { id: task.id, title: task.content, description: task.description } }
     window.dispatchEvent(new CustomEvent('taskHelp', { detail }))
-    // intentionally DO NOT call onHelp here to avoid duplicate flows (weekview/menu used to call onHelp)
+    onHelp?.(task)
   }
 
   const handleSelectToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
     onSelectChange?.(e.target.checked)
   }
 
+  const estimated = task.estimated_time ?? task.estimate ?? task.time_estimate ?? task.estimated
+
   return (
     <div className="p-3 bg-white rounded-lg border flex flex-col gap-3 shadow-sm">
-      <div className="flex items-start justify-between">
-        <div className="flex items-start gap-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3 w-full min-w-0">
           {selectable && (
             <input
               type="checkbox"
@@ -106,24 +111,25 @@ export default function TaskCard({
             />
           )}
 
-          <div>
-            <div className="font-medium text-gray-800">{task.content}</div>
+          <div className="min-w-0 grow">
+            <div className="font-medium text-gray-800 truncate">{task.content}</div>
             {task.description ? <div className="text-xs text-gray-500 mt-1 line-clamp-2">{task.description}</div> : null}
             {task.project_name ? <div className="text-xs text-gray-400 mt-1">{task.project_name}</div> : null}
           </div>
         </div>
 
         {showContextMenu && (
-          <div className="text-xs text-gray-400">
+          <div className="text-xs text-gray-400 ml-2">
             <button className="px-2 py-1">⋮</button>
           </div>
         )}
       </div>
 
       <div className="flex items-center justify-between">
-        <div className="text-xs text-gray-500">
-          {dueYmd ? `Due: ${dueYmd}` : ''}
+        <div className="text-xs text-gray-500 flex items-center gap-3">
+          <span>{dueYmd ? `Due: ${dueYmd}` : ''}</span>
           {typeof task.priority !== 'undefined' ? <span className="ml-2">• Priorytet: {task.priority}</span> : null}
+          {estimated ? <span className="ml-2 text-xs bg-slate-100 px-2 py-0.5 rounded">Est: {estimated}</span> : null}
         </div>
 
         <div className="flex items-center gap-2">
