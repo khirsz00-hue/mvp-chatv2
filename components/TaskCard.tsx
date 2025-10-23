@@ -19,6 +19,7 @@ export default function TaskCard({
   token,
   showContextMenu = false,
   onAction,
+  // onHelp kept for compatibility but NOT called to avoid duplicate flows
   onHelp,
   selectable = false,
   selected = false,
@@ -81,9 +82,10 @@ export default function TaskCard({
   }
 
   const handleHelp = () => {
+    // Emit single event; NewChatSidebar listens for 'taskHelp' and opens chat modal and handles history.
     const detail = { task: { id: task.id, title: task.content, description: task.description } }
     window.dispatchEvent(new CustomEvent('taskHelp', { detail }))
-    onHelp?.(task)
+    // intentionally DO NOT call onHelp here to avoid duplicate flows (weekview/menu used to call onHelp)
   }
 
   const handleSelectToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
