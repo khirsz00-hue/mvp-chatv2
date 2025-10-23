@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown'
 import { motion } from 'framer-motion'
 import remarkGfm from 'remark-gfm'
 import TaskCard from './TaskCard'
+import type { AssistantKey } from '../utils/chatStorage'
 
 type TodoistTask = {
   id: string
@@ -12,6 +13,7 @@ type TodoistTask = {
   due?: { date: string } | null
   priority?: number
   completed?: boolean
+  project_name?: string
 }
 
 type ChatMessage = {
@@ -24,7 +26,13 @@ type ChatMessage = {
   tasks?: TodoistTask[]
 }
 
-export default function TodoistAIView({ token }: { token: string }) {
+export default function TodoistAIView({
+  token,
+  assistant,
+}: {
+  token: string
+  assistant?: AssistantKey
+}) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [tasks, setTasks] = useState<TodoistTask[]>([]) // ostatnio pobrane (do "Pogrupuj tematycznie")
   const [loading, setLoading] = useState(false)
@@ -73,21 +81,17 @@ export default function TodoistAIView({ token }: { token: string }) {
   ): null | { key: 'today' | '7days' | '30days' | 'overdue'; title: string } => {
     const t = text.toLowerCase()
 
-    // dziś
     if (
       t.includes('dziś') || t.includes('dzis') || t.includes('dzisiaj') || t.includes('na dziś') || t.includes('na dzis')
     ) {
       return { key: 'today', title: 'Zadania na dziś' }
     }
-    // tydzień
     if (t.includes('tydzień') || t.includes('tydzien') || t.includes('7 dni') || t.includes('na tydzień')) {
       return { key: '7days', title: 'Zadania na tydzień' }
     }
-    // miesiąc
     if (t.includes('miesiąc') || t.includes('miesiac') || t.includes('30 dni') || t.includes('na miesiąc')) {
       return { key: '30days', title: 'Zadania na miesiąc' }
     }
-    // przeterminowane
     if (t.includes('przetermin')) {
       return { key: 'overdue', title: 'Zadania przeterminowane' }
     }
@@ -96,6 +100,7 @@ export default function TodoistAIView({ token }: { token: string }) {
 
   // 📡 Pobierz zadania z Todoist wg filtra
   const fetchTasksByFilter = async (filter: 'today' | '7days' | '30days' | 'overdue') => {
+    // If AI Planner would require calendar integration, this function can be extended.
     const res = await fetch('https://api.todoist.com/rest/v2/tasks', {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -103,8 +108,10 @@ export default function TodoistAIView({ token }: { token: string }) {
     const now = new Date()
 
     const filtered: TodoistTask[] = all.filter((t: any) => {
-      if (!t.due?.date) return false
-      const due = new Date(t.due.date)
+      // handle different shapes of due (string or object)
+      const dueDateRaw = t.due?.date ?? (typeof t.due === 'string' ? t.due : null)
+      if (!dueDateRaw) return false
+      const due = new Date(dueDateRaw)
       const diff = (due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
       if (filter === 'today') return diff >= -0.5 && diff < 1.5
       if (filter === '7days') return diff >= -0.5 && diff < 7
@@ -113,7 +120,15 @@ export default function TodoistAIView({ token }: { token: string }) {
       return true
     })
 
-    return filtered
+    // map to expected shape
+    return filtered.map((t: any) => ({
+      id: t.id,
+      content: t.content,
+      due: t.due ? { date: t.due.date ?? t.due } : null,
+      priority: t.priority,
+      completed: t.completed,
+      project_name: t.project_name || t.project || '',
+    }))
   }
 
   // 🧠 Jeżeli użytkownik poprosił o listę zadań – dołącz je jako wiadomość AI typu "tasks"
@@ -175,7 +190,7 @@ export default function TodoistAIView({ token }: { token: string }) {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, tasks }),
+        body: JSON.stringify({ message, tasks, assistant }),
       })
       const data = await res.json()
       const reply = (data.reply || data.content || '🤖 Brak odpowiedzi od AI.').trim()
@@ -220,22 +235,14 @@ export default function TodoistAIView({ token }: { token: string }) {
   return (
     <div className="flex flex-col h-[85vh] max-h-[85vh] p-3 space-y-3 overflow-hidden">
       {/* Status */}
-      <div className="text-sm font-medium text-green-600 mb-1">
-        🟢 Połączono z Todoist
-      </div>
+      <div className="text-sm font-medium text-green-600 mb-1">🟢 Połączono z Todoist</div>
 
-      {/* Panel akcji (bez filtrów i bez listy zadań) */}
+      {/* Panel akcji */}
       <div className="flex justify-end gap-3">
-        <button
-          onClick={() => startNewChat('Nowy czat')}
-          className="text-sm text-blue-600 hover:text-blue-800"
-        >
+        <button onClick={() => startNewChat('Nowy czat')} className="text-sm text-blue-600 hover:text-blue-800">
           ➕ Nowy czat
         </button>
-        <button
-          onClick={handleClear}
-          className="text-sm text-red-600 hover:text-red-800"
-        >
+        <button onClick={handleClear} className="text-sm text-red-600 hover:text-red-800">
           🗑️ Wyczyść
         </button>
       </div>
@@ -246,12 +253,7 @@ export default function TodoistAIView({ token }: { token: string }) {
           if (m.type === 'tasks' && m.tasks) {
             // Wiadomość asystenta w formie kart zadań
             return (
-              <motion.div
-                key={m.id}
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-4 text-left"
-              >
+              <motion.div key={m.id} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="mb-4 text-left">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                   {m.tasks.map((t) => (
                     <div key={t.id} className="cursor-default">
@@ -265,19 +267,8 @@ export default function TodoistAIView({ token }: { token: string }) {
 
           // zwykła bańka tekstowa
           return (
-            <motion.div
-              key={m.id}
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`mb-3 ${m.role === 'user' ? 'text-right' : 'text-left'}`}
-            >
-              <div
-                className={`inline-block px-3 py-2 rounded-xl text-sm whitespace-pre-wrap ${
-                  m.role === 'user'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-800'
-                }`}
-              >
+            <motion.div key={m.id} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className={`mb-3 ${m.role === 'user' ? 'text-right' : 'text-left'}`}>
+              <div className={`inline-block px-3 py-2 rounded-xl text-sm whitespace-pre-wrap ${m.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-800'}`}>
                 <ReactMarkdown remarkPlugins={[remarkGfm]} className="prose prose-sm max-w-none">
                   {m.content || ''}
                 </ReactMarkdown>
@@ -322,11 +313,7 @@ export default function TodoistAIView({ token }: { token: string }) {
 
       {tasks.length > 0 && (
         <div className="flex justify-center pt-2">
-          <button
-            onClick={handleGroupTasks}
-            disabled={loading}
-            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
-          >
+          <button onClick={handleGroupTasks} disabled={loading} className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition disabled:opacity-50">
             🧠 Pogrupuj tematycznie
           </button>
         </div>
