@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import TaskCard, { TaskType } from './TaskCard'
 import { motion, AnimatePresence } from 'framer-motion'
-import { parseDueToLocalYMD } from '../utils/date'
+import { parseDueToLocalYMD, ymdFromDate } from '../utils/date'
 
 interface Project {
   id: string
@@ -18,7 +18,7 @@ interface TodoistTasksProps {
   onOpenTaskChat?: (task: TaskType) => void
   showHeaderFilters?: boolean
   selectedProject?: string // optional parent control
-  showContextMenu?: boolean // NEW: allow parent to decide whether TaskCard shows context menu
+  showContextMenu?: boolean // allow parent to decide whether TaskCard shows context menu
 }
 
 export default function TodoistTasks({
@@ -27,7 +27,7 @@ export default function TodoistTasks({
   onChangeFilter,
   onUpdate,
   onOpenTaskChat,
-  showHeaderFilters = false,
+  showHeaderFilters = true,
   selectedProject,
   showContextMenu = false,
 }: TodoistTasksProps) {
@@ -66,7 +66,19 @@ export default function TodoistTasks({
         }
       }) as TaskType[]
 
-      setTasks(mapped)
+      // Client-side project filter (apply BEFORE strict date filtering)
+      const projectFiltered = effectiveProject === 'all' ? mapped : mapped.filter((t) => t.project_id === effectiveProject)
+
+      // Strict filtering for "today": only include tasks with _dueYmd === today or overdue (_dueYmd < today)
+      if (filter === 'today') {
+        const todayYmd = ymdFromDate(new Date())
+        const overdue = projectFiltered.filter((t) => (t._dueYmd ? t._dueYmd < todayYmd : false))
+        const todayTasks = projectFiltered.filter((t) => (t._dueYmd ? t._dueYmd === todayYmd : false))
+        setTasks([...overdue, ...todayTasks])
+      } else {
+        // For other filters, keep mapped results (they were already filtered by API query param)
+        setTasks(projectFiltered)
+      }
 
       if (Array.isArray(projectsRes)) setProjects(projectsRes)
       else if (projectsRes.projects) setProjects(projectsRes.projects)
@@ -85,7 +97,7 @@ export default function TodoistTasks({
   useEffect(() => {
     loadTasks()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter])
+  }, [filter, effectiveProject])
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -96,9 +108,9 @@ export default function TodoistTasks({
     }
     window.addEventListener('taskUpdated', handleUpdate)
     return () => window.removeEventListener('taskUpdated', handleUpdate)
-  }, [token, filter])
+  }, [token, filter, effectiveProject])
 
-  const visibleTasks = effectiveProject === 'all' ? tasks : tasks.filter((t) => t.project_id === effectiveProject)
+  const visibleTasks = tasks // already filtered appropriately above
 
   if (loading) {
     return <p className="text-sm text-neutral-500 mt-4 text-center">⏳ Wczytywanie zadań...</p>
@@ -168,7 +180,7 @@ export default function TodoistTasks({
                       checked ? copy.add(t.id) : copy.delete(t.id)
                       setSelectedTasks(copy)
                     }}
-                    showContextMenu={showContextMenu} // <- pass-through prop
+                    showContextMenu={showContextMenu}
                   />
                 </motion.li>
               ))}
