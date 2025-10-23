@@ -252,11 +252,12 @@ export default function TodoistTasksView({
     }
   }
 
-  const handleMove = async (id: string, newDate: Date) => {
+  // NOTE: handleMove now receives newDateYmd string (yyyy-mm-dd)
+  const handleMove = async (id: string, newDateYmd: string) => {
     if (!token) return
     try {
-      const dateStr = newDate.toISOString().slice(0, 10)
-      await fetch('/api/todoist/postpone', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, token, newDate: dateStr }) })
+      // send date string directly (date-only) to backend
+      await fetch('/api/todoist/postpone', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, token, newDate: newDateYmd }) })
       setToast('📅 Przeniesiono zadanie')
       setTimeout(() => setToast(null), 1500)
       fetchTasks(refreshFilter)
@@ -282,6 +283,7 @@ export default function TodoistTasksView({
   const handleHelp = (taskObj: any) => {
     setToast('🤖 Poproszono o pomoc dla zadania')
     setTimeout(() => setToast(null), 2000)
+    // Open TaskDialog by default when user explicitly requests details; for help use event
     setOpenTask({ id: taskObj.id, title: taskObj.content, description: taskObj.description })
   }
 
@@ -294,20 +296,6 @@ export default function TodoistTasksView({
             <div className="flex items-center gap-3">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-green-50 text-green-700 border border-green-100">
                 <span className="text-sm font-medium">📋 Lista zadań</span>
-              </div>
-
-              <div className="filter-bar ml-1">
-                {[
-                  { key: 'today', label: 'Dziś' },
-                  { key: 'tomorrow', label: 'Jutro' },
-                  { key: '7 days', label: 'Tydzień' },
-                  { key: '30 days', label: 'Miesiąc' },
-                  { key: 'overdue', label: 'Przeterminowane' },
-                ].map((f) => (
-                  <button key={f.key} onClick={() => setFilter(f.key as FilterType)} className={`filter-pill ${filter === f.key ? 'filter-pill--active' : ''}`}>
-                    {f.label}
-                  </button>
-                ))}
               </div>
             </div>
 
@@ -329,7 +317,7 @@ export default function TodoistTasksView({
 
       <div className="flex-1 overflow-y-auto p-3">
         {viewMode === 'week' ? (
-          <WeekView tasks={tasks} onMove={(id, date) => handleMove(id, date)} onComplete={(id) => handleComplete(id)} onDelete={(id) => handleDelete(id)} onHelp={(t) => handleHelp(t)} />
+          <WeekView tasks={tasks} onMove={(id, ymd) => handleMove(id, ymd)} onComplete={(id) => handleComplete(id)} onDelete={(id) => handleDelete(id)} onHelp={(t) => handleHelp(t)} />
         ) : (
           <TodoistTasks
             token={token}
