@@ -10,7 +10,7 @@ export type TaskType = {
   due?: any
   project_id?: string
   _dueYmd?: string | null
-  priority?: number // added to match places that pass priority
+  priority?: number
   project_name?: string
 }
 
@@ -20,12 +20,18 @@ export default function TaskCard({
   showContextMenu = false,
   onAction,
   onHelp,
+  selectable = false,
+  selected = false,
+  onSelectChange,
 }: {
   task: TaskType
   token?: string
   showContextMenu?: boolean
   onAction?: () => void
   onHelp?: (task: TaskType) => void
+  selectable?: boolean
+  selected?: boolean
+  onSelectChange?: (checked: boolean) => void
 }) {
   const dueYmd = task._dueYmd ?? parseDueToLocalYMD(task.due)
 
@@ -80,14 +86,31 @@ export default function TaskCard({
     onHelp?.(task)
   }
 
+  const handleSelectToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onSelectChange?.(e.target.checked)
+  }
+
   return (
     <div className="p-3 bg-white rounded-lg border flex flex-col gap-3 shadow-sm">
       <div className="flex items-start justify-between">
-        <div>
-          <div className="font-medium text-gray-800">{task.content}</div>
-          {task.description ? <div className="text-xs text-gray-500 mt-1 line-clamp-2">{task.description}</div> : null}
-          {task.project_name ? <div className="text-xs text-gray-400 mt-1">{task.project_name}</div> : null}
+        <div className="flex items-start gap-3">
+          {selectable && (
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={handleSelectToggle}
+              className="mt-1"
+              aria-label="Wybierz zadanie"
+            />
+          )}
+
+          <div>
+            <div className="font-medium text-gray-800">{task.content}</div>
+            {task.description ? <div className="text-xs text-gray-500 mt-1 line-clamp-2">{task.description}</div> : null}
+            {task.project_name ? <div className="text-xs text-gray-400 mt-1">{task.project_name}</div> : null}
+          </div>
         </div>
+
         {showContextMenu && (
           <div className="text-xs text-gray-400">
             <button className="px-2 py-1">⋮</button>
