@@ -16,7 +16,6 @@ import TaskCard from './TaskCard'
 interface WeekViewProps {
   tasks: any[]
   onComplete?: (id: string) => void
-  // onMove now receives (id, newDateYmd: string)
   onMove?: (id: string, newDateYmd: string) => void
   onDelete?: (id: string) => void
   onHelp?: (task: any) => void
@@ -43,7 +42,6 @@ export default function WeekView({
   const [dragDestinationId, setDragDestinationId] = useState<string | null>(null)
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null)
 
-  // grupowanie po dniach — PREFERUJEMY pole _dueYmd (optymizm) i pokazujemy TYLKO zadania w bieżącym tygodniu
   useEffect(() => {
     if (!tasks || tasks.length === 0) {
       setColumns({})
@@ -53,27 +51,23 @@ export default function WeekView({
     const grouped: Record<string, any[]> = {}
     for (const day of days) grouped[format(day, 'yyyy-MM-dd')] = []
 
-    // zbuduj set dni tygodnia dla szybkich porównań
     const dayKeys = days.map((d) => format(d, 'yyyy-MM-dd'))
     const firstColKey = dayKeys[0]
 
     for (const t of tasks) {
-      // prefer _dueYmd (optymistyczne update'y), fallback do t.due.date lub string
       const dueYmdFromOpt = t._dueYmd ?? null
       const dueRaw = t.due?.date ?? (typeof t.due === 'string' ? t.due : null)
       const dueYmd = dueYmdFromOpt ?? dueRaw ?? null
 
       if (!dueYmd) {
-        // zadania bez terminu — umieść w pierwszej kolumnie (poniedziałek)
         grouped[firstColKey].push(t)
         continue
       }
 
-      // jeśli dueYmd mieści się w tym tygodniu — do odpowiedniej kolumny; w przeciwnym razie POMIŃ
       if (dayKeys.includes(dueYmd)) {
         grouped[dueYmd].push(t)
       } else {
-        // nie wrzucamy tasków spoza tygodnia do pierwszej kolumny — po prostu pomijamy
+        // skip tasks outside this week to avoid flicker
       }
     }
 
@@ -81,7 +75,6 @@ export default function WeekView({
     setLoading(false)
   }, [tasks, days])
 
-  // DnD handlers
   const handleDragStart = (start: any) => {
     setDragSourceId(start.source.droppableId ?? null)
     setDraggingTaskId(start.draggableId ?? null)
@@ -121,7 +114,6 @@ export default function WeekView({
 
       setColumns(newColumns)
 
-      // IMPORTANT: pass YMD string (destination.droppableId) to onMove so parent will use the exact date string
       if (source.droppableId !== destination.droppableId) {
         onMove?.(draggableId, destination.droppableId)
       }
@@ -240,8 +232,13 @@ export default function WeekView({
                               >
                                 <motion.div
                                   className={`task-card-inner flex items-start gap-2 p-3 rounded-lg shadow-sm border border-gray-100 cursor-grab transition-all duration-150 ${isBeingDragged ? 'dragging-inner z-50' : 'bg-white'}`}
-                                  whileDrag={{ scale: 1.02, rotate: [0, -1.5, 1.5, 0], y: -4 }}
-                                  transition={{ duration: 0.12 }}
+                                  whileDrag={{
+                                    scale: 1.03,
+                                    y: -6,
+                                    rotate: [0, -2, 2, -2, 2, 0],
+                                    x: [0, -2, 2, -2, 2, 0],
+                                  }}
+                                  transition={{ duration: 0.35, ease: 'linear', repeat: Infinity }}
                                 >
                                   <div className="flex-1">
                                     <div className="flex justify-between items-start gap-2">
