@@ -7,10 +7,12 @@ import { getEstimate, setEstimate, getHistory } from '../utils/localTaskStore'
 export default function TaskDialog({
   task,
   initialTaskData,
+  mode = 'task',
   onClose,
 }: {
   task: { id: string; title?: string }
   initialTaskData?: { description?: string; project_name?: string; project_id?: string; due?: any; created_at?: any }
+  mode?: 'task' | 'other'
   onClose?: () => void
 }) {
   const [data, setData] = useState<any>({
