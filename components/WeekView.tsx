@@ -13,6 +13,7 @@ import { pl } from 'date-fns/locale'
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MoreVertical, CheckCircle2 } from 'lucide-react'
+import TaskCard from './TaskCard'
 
 interface WeekViewProps {
   tasks: any[]
@@ -176,8 +177,7 @@ export default function WeekView({
     <div className="flex flex-col h-full bg-gray-50 w-full">
       <div className="text-center py-3 border-b border-gray-200 bg-white shadow-sm mb-3">
         <h2 className="text-lg font-semibold text-gray-800 tracking-tight">
-          {format(weekStart, 'd MMM', { locale: pl })} –{' '}
-          {format(addDays(weekStart, 6), 'd MMM yyyy', { locale: pl })}
+          {format(weekStart, 'd MMM', { locale: pl })} – {format(addDays(weekStart, 6), 'd MMM yyyy', { locale: pl })}
         </h2>
       </div>
 
@@ -225,88 +225,44 @@ export default function WeekView({
                             const isDragging = snap.isDragging
                             const isBeingDragged = draggingTaskId === String(task.id) || isDragging
 
-                            // ROOT elem receives draggable inline style (so it can follow cursor)
                             return (
                               <div
                                 ref={prov.innerRef}
                                 {...prov.draggableProps}
                                 {...prov.dragHandleProps}
-                                className={`task-card-outer mb-2`}
+                                className="task-card-outer mb-2"
                                 style={{ ...prov.draggableProps.style }}
                                 data-task-id={task.id}
                               >
                                 {/* Inner element receives visual effects (animation, scale) — does NOT override inline transform on root */}
-                                <div
-                                  className={`task-card-inner flex items-start gap-2 p-3 rounded-lg shadow-sm border border-gray-100 cursor-grab transition-all duration-150 ${
-                                    isBeingDragged ? 'dragging-inner z-50' : 'bg-white'
-                                  }`}
+                                <motion.div
+                                  className={`task-card-inner flex items-start gap-2 p-3 rounded-lg shadow-sm border border-gray-100 cursor-grab transition-all duration-150 ${isBeingDragged ? 'dragging-inner z-50' : 'bg-white'}`}
+                                  whileDrag={{ scale: 1.02, rotate: [0, -1.5, 1.5, 0], y: -4 }}
+                                  transition={{ duration: 0.12 }}
                                 >
                                   <div className="flex-1">
                                     <div className="flex justify-between items-start gap-2">
                                       <div>
-                                        <div className="text-sm font-medium text-gray-800">
-                                          {task.content}
-                                        </div>
-                                        <div className="text-xs text-gray-500 mt-1">
-                                          {task.project_name || ''}
-                                        </div>
+                                        <div className="text-sm font-medium text-gray-800">{task.content}</div>
+                                        <div className="text-xs text-gray-500 mt-1">{task.project_name || ''}</div>
                                       </div>
 
                                       <div className="flex items-center gap-2">
-                                        <button
-                                          title="Ukończ"
-                                          onClick={() => handleCompleteClick(task.id)}
-                                          className="p-1 rounded-full hover:bg-gray-100"
-                                        >
+                                        <button title="Ukończ" onClick={() => handleCompleteClick(task.id)} className="p-1 rounded-full hover:bg-gray-100">
                                           <CheckCircle2 size={18} className="text-green-600" />
                                         </button>
 
                                         <div className="relative">
-                                          <button
-                                            onClick={() =>
-                                              setOpenMenuFor(openMenuFor === task.id ? null : task.id)
-                                            }
-                                            className="p-1 rounded hover:bg-gray-100"
-                                            title="Więcej"
-                                          >
+                                          <button onClick={() => setOpenMenuFor(openMenuFor === task.id ? null : task.id)} className="p-1 rounded hover:bg-gray-100" title="Więcej">
                                             <MoreVertical size={16} />
                                           </button>
 
                                           <AnimatePresence>
                                             {openMenuFor === task.id && (
-                                              <motion.div
-                                                initial={{ opacity: 0, scale: 0.95 }}
-                                                animate={{ opacity: 1, scale: 1 }}
-                                                exit={{ opacity: 0, scale: 0.95 }}
-                                                className="absolute right-0 mt-2 w-44 bg-white border border-gray-200 rounded-md shadow-lg z-50"
-                                              >
-                                                <button
-                                                  onClick={() => {
-                                                    setOpenMenuFor(null)
-                                                    onHelp?.(task)
-                                                  }}
-                                                  className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                                >
-                                                  Pomóż mi
-                                                </button>
-                                                <button
-                                                  onClick={() => {
-                                                    setOpenMenuFor(null)
-                                                    openDatePicker(task.id)
-                                                  }}
-                                                  className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                                >
-                                                  Przenieś
-                                                </button>
-                                                <button
-                                                  onClick={() => {
-                                                    setOpenMenuFor(null)
-                                                    handleDeleteClick(task.id)
-                                                  }}
-                                                  className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm text-red-600"
-                                                >
-                                                  Usuń
-                                                </button>
+                                              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="absolute right-0 mt-2 w-44 bg-white border border-gray-200 rounded-md shadow-lg z-50">
+                                                <button onClick={() => { setOpenMenuFor(null); onHelp?.(task); }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm">Pomóż mi</button>
+                                                <button onClick={() => { setOpenMenuFor(null); openDatePicker(task.id); }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm">Przenieś</button>
+                                                <button onClick={() => { setOpenMenuFor(null); handleDeleteClick(task.id); }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm text-red-600">Usuń</button>
                                               </motion.div>
                                             )}
                                           </AnimatePresence>
@@ -314,7 +270,7 @@ export default function WeekView({
                                       </div>
                                     </div>
                                   </div>
-                                </div>
+                                </motion.div>
                               </div>
                             )
                           }}
