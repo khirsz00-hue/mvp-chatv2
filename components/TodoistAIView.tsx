@@ -26,6 +26,28 @@ type ChatMessage = {
   tasks?: TodoistTask[]
 }
 
+/**
+ * Helper: convert internal ChatMessage[] -> storage ChatMessage[] expected by utils/chatStorage
+ * utils/chatStorage.ChatMessage = { role: 'user'|'assistant', content: string, timestamp: number }
+ */
+function toStorageMessages(msgs: ChatMessage[]) {
+  return msgs.map((m) => {
+    let content = m.content ?? ''
+    // If it's a tasks-type message and content is empty, create a small summary
+    if (!content && m.type === 'tasks' && Array.isArray(m.tasks)) {
+      content = m.tasks.map((t) => `• ${t.content}`).join('\n')
+      if (!content) content = `(${m.tasks.length} zadań)`
+    }
+    // Fallback to empty string if still missing
+    if (!content) content = ''
+    return {
+      role: m.role,
+      content,
+      timestamp: m.timestamp || Date.now(),
+    }
+  })
+}
+
 export default function TodoistAIView({
   token,
   assistant,
@@ -55,16 +77,15 @@ export default function TodoistAIView({
       const id = det.task?.id || det.sessionId
       if (!id) return
       const key = storageKeyFor(assistantKey, id)
-      const saved = loadConversation(key) // may be utils.ChatMessage[] (no id) or our saved shape
+      const saved = loadConversation(key) // returns utils.chatStorage.ChatMessage[]
       if (saved && saved.length) {
-        // normalize saved entries to local ChatMessage type (ensure id exists)
+        // normalize saved entries to local ChatMessage type (ensure id exists and map fields)
         const normalized: ChatMessage[] = (saved as any[]).map((m) => ({
-          id: m.id ?? crypto.randomUUID(),
+          id: crypto.randomUUID(),
           role: m.role,
           timestamp: m.timestamp || Date.now(),
-          type: m.type,
-          content: m.content,
-          tasks: m.tasks,
+          type: undefined,
+          content: m.content ?? '',
         }))
         setMessages(normalized)
         setSessionId(id)
@@ -130,12 +151,15 @@ export default function TodoistAIView({
     const list = await fetchTasksByFilter(match.key)
     setTasks(list)
     const infoMsg: ChatMessage = { id: crypto.randomUUID(), role: 'assistant', type: 'text', content: `📋 Załadowano ${list.length} zadań (${match.title}).`, timestamp: Date.now() }
-    const tasksMsg: ChatMessage = { id: crypto.randomUUID(), role: 'assistant', type: 'tasks', tasks: list, timestamp: Date.now() }
+    const tasksMsg: ChatMessage = { id: crypto.randomUUID(), role: 'assistant', type: 'tasks', tasks: list, content: '', timestamp: Date.now() }
 
     const final = [...messages, infoMsg, tasksMsg]
     setMessages(final)
+
+    // convert to storage shape before saving
+    const storage = toStorageMessages(final)
     const sk = storageKeyFor(assistantKey, newId)
-    saveConversation(sk, final)
+    saveConversation(sk, storage)
     upsertSession(sessionsKey, { id: newId, title: match.title, timestamp: Date.now(), last: (infoMsg.content || '').slice(0, 300) })
     window.dispatchEvent(new Event('chatUpdated'))
     return true
@@ -147,8 +171,10 @@ export default function TodoistAIView({
     const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: message, timestamp: Date.now(), type: 'text' }
     const updated = [...messages, userMsg]
     setMessages(updated)
+
+    // save normalized to storage
     const sk = storageKeyFor(assistantKey, sessionId)
-    saveConversation(sk, updated)
+    saveConversation(sk, toStorageMessages(updated))
     upsertSession(sessionsKey, { id: sessionId, title: `Rozmowa ${new Date().toLocaleString()}`, timestamp: Date.now(), last: message.slice(0, 300) })
     window.dispatchEvent(new Event('chatUpdated'))
 
@@ -170,7 +196,9 @@ export default function TodoistAIView({
       const aiMsg: ChatMessage = { id: crypto.randomUUID(), role: 'assistant', content: reply, timestamp: Date.now(), type: 'text' }
       const final = [...updated, aiMsg]
       setMessages(final)
-      saveConversation(storageKeyFor(assistantKey, sessionId), final)
+
+      // save normalized to storage
+      saveConversation(storageKeyFor(assistantKey, sessionId), toStorageMessages(final))
       upsertSession(sessionsKey, { id: sessionId, title: `Rozmowa ${new Date().toLocaleString()}`, timestamp: Date.now(), last: aiMsg.content.slice(0, 300) })
       window.dispatchEvent(new Event('chatUpdated'))
     } catch (err) {
