@@ -6,6 +6,7 @@ import TodoistTasks from './TodoistTasks'
 import WeekView from './WeekView'
 import TaskDialog from './TaskDialog'
 import { parseDueToLocalYMD, ymdFromDate, daysUntil } from '../utils/date'
+import { addDays, startOfWeek } from 'date-fns'
 
 type FilterType = 'today' | 'tomorrow' | 'overdue' | '7 days' | '30 days'
 
@@ -30,12 +31,6 @@ export default function TodoistTasksView({
     typeof window !== 'undefined' && localStorage.getItem('todoist_filter') === '7 days' ? 'week' : 'list'
   )
   const lastEvent = useRef<number>(0)
-  const lastLocalAction = useRef<number>(0) // track recent local moves to avoid race with polling/ES
-
-  // fetch control refs to avoid races and out-of-order writes
-  const fetchSeqRef = useRef(0)
-  const fetchInProgress = useRef(false)
-  const pendingFetch = useRef(false)
 
   // Add task modal state
   const [showAdd, setShowAdd] = useState(false)
@@ -78,16 +73,6 @@ export default function TodoistTasksView({
   // ---- Fetch tasks (supports override filter) ----
   const fetchTasks = async (overrideFilter?: FilterType) => {
     if (!token) return
-    // Coalesce / sequence protection:
-    if (fetchInProgress.current) {
-      // mark that another fetch should run after current completes
-      pendingFetch.current = true
-      return
-    }
-
-    fetchInProgress.current = true
-    const mySeq = ++fetchSeqRef.current // increment seq for this fetch
-
     try {
       const effectiveFilter = overrideFilter ?? filter
       let filterQuery = ''
@@ -126,40 +111,35 @@ export default function TodoistTasksView({
         return { ...t, _dueYmd }
       })
 
-      // apply result only if this is still the latest fetch
-      if (mySeq === fetchSeqRef.current) {
-        // If list filter "today": keep overdue + today
-        if (effectiveFilter === 'today') {
-          const todayYmd = ymdFromDate(new Date())
-          const overdue = mapped.filter((t) => (t._dueYmd ? t._dueYmd < todayYmd : false))
-          const todayTasks = mapped.filter((t) => (t._dueYmd ? t._dueYmd === todayYmd : false))
-          setTasks([...overdue, ...todayTasks])
-        } else if (viewMode === 'week') {
-          const today = new Date()
-          const in7 = new Date(today)
-          in7.setDate(today.getDate() + 7)
-          const in7Ymd = ymdFromDate(in7)
-          const todayYmd = ymdFromDate(today)
-          const weekTasks = mapped.filter((t) => {
-            if (!t._dueYmd) return true // include tasks without due so they don't disappear
-            return t._dueYmd >= todayYmd && t._dueYmd <= in7Ymd
-          })
-          setTasks(weekTasks)
-        } else {
-          setTasks(mapped)
-        }
-      } else {
-        // outdated response - ignore
+      // If list filter "today": keep overdue + today
+      if (effectiveFilter === 'today') {
+        const todayYmd = ymdFromDate(new Date())
+        const overdue = mapped.filter((t) => (t._dueYmd ? t._dueYmd < todayYmd : false))
+        const todayTasks = mapped.filter((t) => (t._dueYmd ? t._dueYmd === todayYmd : false))
+        setTasks([...overdue, ...todayTasks])
+        return
       }
+
+      // If currently in week view - show tasks for the current week (weekStart .. weekEnd)
+      if (viewMode === 'week') {
+        const today = new Date()
+        const weekStart = startOfWeek(today, { weekStartsOn: 1 })
+        const weekEnd = addDays(weekStart, 6)
+        const weekStartYmd = ymdFromDate(weekStart)
+        const weekEndYmd = ymdFromDate(weekEnd)
+
+        const weekTasks = mapped.filter((t) => {
+          if (!t._dueYmd) return true // include tasks without due so they don't disappear
+          return t._dueYmd >= weekStartYmd && t._dueYmd <= weekEndYmd
+        })
+        setTasks(weekTasks)
+        return
+      }
+
+      // default: set all mapped tasks for other filters
+      setTasks(mapped)
     } catch (err) {
       console.error('Błąd pobierania zadań:', err)
-    } finally {
-      fetchInProgress.current = false
-      if (pendingFetch.current) {
-        pendingFetch.current = false
-        // run a fresh fetch (ensure latest filter/view)
-        setTimeout(() => fetchTasks(undefined), 50)
-      }
     }
   }
 
@@ -178,11 +158,6 @@ export default function TodoistTasksView({
             const data = JSON.parse(event.data)
             if (data.event?.startsWith('item:')) {
               const now = Date.now()
-              // If we recently performed a local action (move/delete/complete), skip one immediate overwrite to avoid race
-              if (now - lastLocalAction.current < 2000) {
-                return
-              }
-
               if (data.event === 'item:added') {
                 setTimeout(() => fetchTasks(refreshFilter), 1500)
               } else if (now - lastEvent.current > 1500) {
@@ -212,11 +187,7 @@ export default function TodoistTasksView({
     }
 
     connect()
-    const poll = setInterval(() => {
-      // also skip polling right after local action
-      if (Date.now() - lastLocalAction.current < 1500) return
-      fetchTasks(refreshFilter)
-    }, 45000)
+    const poll = setInterval(() => fetchTasks(refreshFilter), 45000)
     // initial fetch
     fetchTasks(refreshFilter)
 
@@ -273,10 +244,6 @@ export default function TodoistTasksView({
   const handleComplete = async (id: string) => {
     if (!token) return
     try {
-      // optimistic removal from local week list
-      setTasks((prev) => prev.filter((t) => t.id !== id))
-      lastLocalAction.current = Date.now()
-
       await fetch('/api/todoist/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, token }) })
       setToast('✅ Ukończono zadanie')
       setTimeout(() => setToast(null), 1500)
@@ -284,25 +251,21 @@ export default function TodoistTasksView({
       onUpdate?.()
     } catch (err) {
       console.error(err)
-      // rollback by refetch
-      fetchTasks(refreshFilter)
     }
   }
 
-  // NOTE: handleMove now receives newDateYmd string (yyyy-mm-dd) and performs optimistic update
+  // NOTE: handleMove now receives newDateYmd string (yyyy-mm-dd)
   const handleMove = async (id: string, newDateYmd: string) => {
     if (!token) return
     try {
       // optimistic update: update local tasks so UI reflects move immediately
       setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, _dueYmd: newDateYmd } : t)))
-      lastLocalAction.current = Date.now()
 
       // send date string directly (date-only) to backend
       await fetch('/api/todoist/postpone', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, token, newDate: newDateYmd }) })
       setToast('📅 Przeniesiono zadanie')
       setTimeout(() => setToast(null), 1500)
-
-      // delay slightly to give backend time to settle before full refetch
+      // slight delay to allow backend to settle
       setTimeout(() => fetchTasks(refreshFilter), 700)
       onUpdate?.()
     } catch (err) {
@@ -315,10 +278,6 @@ export default function TodoistTasksView({
   const handleDelete = async (id: string) => {
     if (!token) return
     try {
-      // optimistic removal
-      setTasks((prev) => prev.filter((t) => t.id !== id))
-      lastLocalAction.current = Date.now()
-
       await fetch('/api/todoist/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, token }) })
       setToast('🗑 Usunięto zadanie')
       setTimeout(() => setToast(null), 1500)
@@ -326,7 +285,6 @@ export default function TodoistTasksView({
       onUpdate?.()
     } catch (err) {
       console.error(err)
-      fetchTasks(refreshFilter)
     }
   }
 
