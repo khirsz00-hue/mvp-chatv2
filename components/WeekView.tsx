@@ -42,6 +42,7 @@ export default function WeekView({
   const [dragDestinationId, setDragDestinationId] = useState<string | null>(null)
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null)
 
+  // build grouped columns — prefer _dueYmd (opt. updates) and only include tasks inside this week (or undated -> first col)
   useEffect(() => {
     if (!tasks || tasks.length === 0) {
       setColumns({})
@@ -75,6 +76,7 @@ export default function WeekView({
     setLoading(false)
   }, [tasks, days])
 
+  // DnD handlers
   const handleDragStart = (start: any) => {
     setDragSourceId(start.source.droppableId ?? null)
     setDraggingTaskId(start.draggableId ?? null)
@@ -169,8 +171,23 @@ export default function WeekView({
     )
   }
 
+  // Inline keyframes via styled-jsx for shake animation
   return (
     <div className="flex flex-col h-full bg-gray-50 w-full">
+      <style jsx>{`
+        @keyframes shake {
+          0% { transform: translateX(0) rotate(0deg); }
+          20% { transform: translateX(-2px) rotate(-1deg); }
+          40% { transform: translateX(2px) rotate(1deg); }
+          60% { transform: translateX(-1px) rotate(-0.6deg); }
+          80% { transform: translateX(1px) rotate(0.6deg); }
+          100% { transform: translateX(0) rotate(0deg); }
+        }
+        .dragging-inner-anim {
+          animation: shake 0.35s linear infinite;
+        }
+      `}</style>
+
       <div className="text-center py-3 border-b border-gray-200 bg-white shadow-sm mb-3">
         <h2 className="text-lg font-semibold text-gray-800 tracking-tight">
           {format(weekStart, 'd MMM', { locale: pl })} – {format(addDays(weekStart, 6), 'd MMM yyyy', { locale: pl })}
@@ -230,16 +247,8 @@ export default function WeekView({
                                 style={{ ...prov.draggableProps.style }}
                                 data-task-id={task.id}
                               >
-                                <motion.div
-                                  className={`task-card-inner flex items-start gap-2 p-3 rounded-lg shadow-sm border border-gray-100 cursor-grab transition-all duration-150 ${isBeingDragged ? 'dragging-inner z-50' : 'bg-white'}`}
-                                  whileDrag={{
-                                    scale: 1.03,
-                                    y: -6,
-                                    rotate: [0, -2, 2, -2, 2, 0],
-                                    x: [0, -2, 2, -2, 2, 0],
-                                  }}
-                                  transition={{ duration: 0.35, ease: 'linear', repeat: Infinity }}
-                                >
+                                {/* inner element — apply CSS-based shake when being dragged */}
+                                <div className={`task-card-inner flex items-start gap-2 p-3 rounded-lg shadow-sm border border-gray-100 cursor-grab transition-all duration-150 ${isBeingDragged ? 'dragging-inner-anim z-50 bg-white' : 'bg-white'}`}>
                                   <div className="flex-1">
                                     <div className="flex justify-between items-start gap-2">
                                       <div>
@@ -270,7 +279,7 @@ export default function WeekView({
                                       </div>
                                     </div>
                                   </div>
-                                </motion.div>
+                                </div>
                               </div>
                             )
                           }}
