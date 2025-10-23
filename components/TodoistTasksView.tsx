@@ -33,6 +33,16 @@ export default function TodoistTasksView({
   const lastEvent = useRef<number>(0)
   const lastLocalAction = useRef<number>(0)
 
+  // Add task modal state (restored/ensured)
+  const [showAdd, setShowAdd] = useState(false)
+  const [newTitle, setNewTitle] = useState('')
+  const [newDate, setNewDate] = useState<string>('')
+  const [newProject, setNewProject] = useState<string>('')
+  const [newDescription, setNewDescription] = useState<string>('')
+
+  // Modal for viewing a single task (opened from list or week)
+  const [openTask, setOpenTask] = useState<any | null>(null)
+
   // compute refreshFilter once per render
   const refreshFilter: FilterType = viewMode === 'week' ? '7 days' : filter
 
