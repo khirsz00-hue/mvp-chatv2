@@ -30,7 +30,12 @@ export default function TodoistTasksView({
     typeof window !== 'undefined' && localStorage.getItem('todoist_filter') === '7 days' ? 'week' : 'list'
   )
   const lastEvent = useRef<number>(0)
-  const lastLocalAction = useRef<number>(0) // NEW: track recent local moves to avoid race with polling/ES
+  const lastLocalAction = useRef<number>(0) // track recent local moves to avoid race with polling/ES
+
+  // fetch control refs to avoid races and out-of-order writes
+  const fetchSeqRef = useRef(0)
+  const fetchInProgress = useRef(false)
+  const pendingFetch = useRef(false)
 
   // Add task modal state
   const [showAdd, setShowAdd] = useState(false)
@@ -73,6 +78,16 @@ export default function TodoistTasksView({
   // ---- Fetch tasks (supports override filter) ----
   const fetchTasks = async (overrideFilter?: FilterType) => {
     if (!token) return
+    // Coalesce / sequence protection:
+    if (fetchInProgress.current) {
+      // mark that another fetch should run after current completes
+      pendingFetch.current = true
+      return
+    }
+
+    fetchInProgress.current = true
+    const mySeq = ++fetchSeqRef.current // increment seq for this fetch
+
     try {
       const effectiveFilter = overrideFilter ?? filter
       let filterQuery = ''
@@ -111,34 +126,40 @@ export default function TodoistTasksView({
         return { ...t, _dueYmd }
       })
 
-      // If list filter "today": keep overdue + today
-      if (effectiveFilter === 'today') {
-        const todayYmd = ymdFromDate(new Date())
-        const overdue = mapped.filter((t) => (t._dueYmd ? t._dueYmd < todayYmd : false))
-        const todayTasks = mapped.filter((t) => (t._dueYmd ? t._dueYmd === todayYmd : false))
-        setTasks([...overdue, ...todayTasks])
-        return
+      // apply result only if this is still the latest fetch
+      if (mySeq === fetchSeqRef.current) {
+        // If list filter "today": keep overdue + today
+        if (effectiveFilter === 'today') {
+          const todayYmd = ymdFromDate(new Date())
+          const overdue = mapped.filter((t) => (t._dueYmd ? t._dueYmd < todayYmd : false))
+          const todayTasks = mapped.filter((t) => (t._dueYmd ? t._dueYmd === todayYmd : false))
+          setTasks([...overdue, ...todayTasks])
+        } else if (viewMode === 'week') {
+          const today = new Date()
+          const in7 = new Date(today)
+          in7.setDate(today.getDate() + 7)
+          const in7Ymd = ymdFromDate(in7)
+          const todayYmd = ymdFromDate(today)
+          const weekTasks = mapped.filter((t) => {
+            if (!t._dueYmd) return true // include tasks without due so they don't disappear
+            return t._dueYmd >= todayYmd && t._dueYmd <= in7Ymd
+          })
+          setTasks(weekTasks)
+        } else {
+          setTasks(mapped)
+        }
+      } else {
+        // outdated response - ignore
       }
-
-      // If currently in week view - show tasks for next 7 days and tasks without due
-      if (viewMode === 'week') {
-        const today = new Date()
-        const in7 = new Date(today)
-        in7.setDate(today.getDate() + 7)
-        const in7Ymd = ymdFromDate(in7)
-        const todayYmd = ymdFromDate(today)
-        const weekTasks = mapped.filter((t) => {
-          if (!t._dueYmd) return true // include tasks without due so they don't disappear
-          return t._dueYmd >= todayYmd && t._dueYmd <= in7Ymd
-        })
-        setTasks(weekTasks)
-        return
-      }
-
-      // default: set all mapped tasks for other filters
-      setTasks(mapped)
     } catch (err) {
       console.error('Błąd pobierania zadań:', err)
+    } finally {
+      fetchInProgress.current = false
+      if (pendingFetch.current) {
+        pendingFetch.current = false
+        // run a fresh fetch (ensure latest filter/view)
+        setTimeout(() => fetchTasks(undefined), 50)
+      }
     }
   }
 
@@ -159,7 +180,6 @@ export default function TodoistTasksView({
               const now = Date.now()
               // If we recently performed a local action (move/delete/complete), skip one immediate overwrite to avoid race
               if (now - lastLocalAction.current < 2000) {
-                // skip this server-initiated fetch to avoid overwriting optimistic update
                 return
               }
 
