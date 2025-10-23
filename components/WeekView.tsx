@@ -1,17 +1,13 @@
 'use client'
 
 import React, { useEffect, useState, useRef } from 'react'
-import {
-  format,
-  addDays,
-  startOfWeek,
-  startOfDay,
-} from 'date-fns'
+import { format, addDays, startOfWeek, startOfDay } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'
-import { motion, AnimatePresence } from 'framer-motion'
-import { MoreVertical, CheckCircle2 } from 'lucide-react'
 import TaskCard from './TaskCard'
+import { Plus, CheckCircle2, MoreVertical } from 'lucide-react'
+import { parseDueToLocalYMD } from '../utils/date'
+import { appendHistory } from '../utils/localTaskStore'
 
 interface WeekViewProps {
   tasks: any[]
@@ -19,6 +15,8 @@ interface WeekViewProps {
   onMove?: (id: string, newDateYmd: string) => void
   onDelete?: (id: string) => void
   onHelp?: (task: any) => void
+  onOpenTask?: (task: any) => void
+  onAddForDate?: (ymd: string) => void // open add task modal prefilled with date
 }
 
 export default function WeekView({
@@ -27,6 +25,8 @@ export default function WeekView({
   onMove,
   onDelete,
   onHelp,
+  onOpenTask,
+  onAddForDate,
 }: WeekViewProps) {
   const today = startOfDay(new Date())
   const weekStart = startOfWeek(today, { weekStartsOn: 1 })
@@ -35,73 +35,49 @@ export default function WeekView({
   const [columns, setColumns] = useState<Record<string, any[]>>({})
   const [loading, setLoading] = useState(true)
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null)
+  const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null)
   const datePickers = useRef<Record<string, HTMLInputElement | null>>({})
 
-  // Drag UX state
-  const [dragSourceId, setDragSourceId] = useState<string | null>(null)
-  const [dragDestinationId, setDragDestinationId] = useState<string | null>(null)
-  const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null)
-
-  // build grouped columns — prefer _dueYmd (opt. updates) and only include tasks inside this week (or undated -> first col)
   useEffect(() => {
     if (!tasks || tasks.length === 0) {
       setColumns({})
       return setLoading(true)
     }
-
     const grouped: Record<string, any[]> = {}
     for (const day of days) grouped[format(day, 'yyyy-MM-dd')] = []
-
     const dayKeys = days.map((d) => format(d, 'yyyy-MM-dd'))
     const firstColKey = dayKeys[0]
-
     for (const t of tasks) {
       const dueYmdFromOpt = t._dueYmd ?? null
       const dueRaw = t.due?.date ?? (typeof t.due === 'string' ? t.due : null)
       const dueYmd = dueYmdFromOpt ?? dueRaw ?? null
-
       if (!dueYmd) {
         grouped[firstColKey].push(t)
         continue
       }
-
-      if (dayKeys.includes(dueYmd)) {
-        grouped[dueYmd].push(t)
-      } else {
-        // skip tasks outside this week to avoid flicker
-      }
+      if (dayKeys.includes(dueYmd)) grouped[dueYmd].push(t)
     }
-
     setColumns(grouped)
     setLoading(false)
   }, [tasks, days])
 
-  // DnD handlers
   const handleDragStart = (start: any) => {
-    setDragSourceId(start.source.droppableId ?? null)
     setDraggingTaskId(start.draggableId ?? null)
-    setDragDestinationId(null)
     if (typeof document !== 'undefined') document.body.classList.add('dragging-active')
   }
 
   const handleDragUpdate = (update: any) => {
-    setDragDestinationId(update?.destination?.droppableId ?? null)
+    // nothing special for now
   }
 
   const handleDragEnd = (result: any) => {
     try {
       const { destination, source, draggableId } = result
       if (typeof document !== 'undefined') document.body.classList.remove('dragging-active')
-      setDragSourceId(null)
-      setDragDestinationId(null)
       setDraggingTaskId(null)
 
       if (!destination) return
-      if (
-        destination.droppableId === source.droppableId &&
-        destination.index === source.index
-      )
-        return
+      if (destination.droppableId === source.droppableId && destination.index === source.index) return
 
       const sourceTasks = Array.from(columns[source.droppableId] || [])
       const [moved] = sourceTasks.splice(source.index, 1)
@@ -113,16 +89,16 @@ export default function WeekView({
         [source.droppableId]: sourceTasks,
         [destination.droppableId]: destTasks,
       }
-
       setColumns(newColumns)
 
       if (source.droppableId !== destination.droppableId) {
+        // optimistic: inform parent
         onMove?.(draggableId, destination.droppableId)
+        // append local history
+        try { appendHistory(draggableId, source.droppableId, destination.droppableId) } catch {}
       }
     } catch (err) {
       if (typeof document !== 'undefined') document.body.classList.remove('dragging-active')
-      setDragSourceId(null)
-      setDragDestinationId(null)
       setDraggingTaskId(null)
       console.error('handleDragEnd error', err)
     }
@@ -132,9 +108,7 @@ export default function WeekView({
     onComplete?.(id)
     setColumns((prev) => {
       const copy: Record<string, any[]> = {}
-      for (const k of Object.keys(prev)) {
-        copy[k] = prev[k].filter((t) => t.id !== id)
-      }
+      for (const k of Object.keys(prev)) copy[k] = prev[k].filter((t) => t.id !== id)
       return copy
     })
   }
@@ -143,119 +117,53 @@ export default function WeekView({
     onDelete?.(id)
     setColumns((prev) => {
       const copy: Record<string, any[]> = {}
-      for (const k of Object.keys(prev)) {
-        copy[k] = prev[k].filter((t) => t.id !== id)
-      }
+      for (const k of Object.keys(prev)) copy[k] = prev[k].filter((t) => t.id !== id)
       return copy
     })
   }
 
-  const openDatePicker = (id: string) => {
-    const el = datePickers.current[id]
-    ;(el as any)?.showPicker?.() || el?.click?.()
-  }
+  if (loading) return <div className="flex items-center justify-center h-full text-gray-500 text-sm italic">⏳ Wczytywanie zadań...</div>
+  if (!columns || Object.values(columns).every((col) => col.length === 0)) return <div className="flex items-center justify-center h-full text-gray-400 text-sm italic">Brak zadań w tym tygodniu.</div>
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full text-gray-500 text-sm italic">
-        ⏳ Wczytywanie zadań...
-      </div>
-    )
-  }
-
-  if (!columns || Object.values(columns).every((col) => col.length === 0)) {
-    return (
-      <div className="flex items-center justify-center h-full text-gray-400 text-sm italic">
-        Brak zadań w tym tygodniu.
-      </div>
-    )
-  }
-
-  // Inline keyframes via styled-jsx for shake animation
   return (
     <div className="flex flex-col h-full bg-gray-50 w-full">
-      <style jsx>{`
-        @keyframes shake {
-          0% { transform: translateX(0) rotate(0deg); }
-          20% { transform: translateX(-2px) rotate(-1deg); }
-          40% { transform: translateX(2px) rotate(1deg); }
-          60% { transform: translateX(-1px) rotate(-0.6deg); }
-          80% { transform: translateX(1px) rotate(0.6deg); }
-          100% { transform: translateX(0) rotate(0deg); }
-        }
-        .dragging-inner-anim {
-          animation: shake 0.35s linear infinite;
-        }
-      `}</style>
-
       <div className="text-center py-3 border-b border-gray-200 bg-white shadow-sm mb-3">
-        <h2 className="text-lg font-semibold text-gray-800 tracking-tight">
-          {format(weekStart, 'd MMM', { locale: pl })} – {format(addDays(weekStart, 6), 'd MMM yyyy', { locale: pl })}
-        </h2>
+        <h2 className="text-lg font-semibold text-gray-800 tracking-tight">{format(weekStart, 'd MMM', { locale: pl })} – {format(addDays(weekStart, 6), 'd MMM yyyy', { locale: pl })}</h2>
       </div>
 
-      <DragDropContext
-        onDragStart={handleDragStart}
-        onDragUpdate={handleDragUpdate}
-        onDragEnd={handleDragEnd}
-      >
+      <DragDropContext onDragStart={handleDragStart} onDragUpdate={handleDragUpdate} onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-1 md:grid-cols-7 gap-3 px-2 md:px-3 pb-6 flex-1 overflow-x-auto w-full">
           {days.map((date) => {
             const key = format(date, 'yyyy-MM-dd')
             const dayTasks = columns[key] || []
             const isToday = format(date, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')
-
-            const isSource = dragSourceId === key
-            const isTarget = dragDestinationId === key
-
             return (
               <Droppable droppableId={key} key={key}>
                 {(provided: any, snapshot: any) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    className={`week-column transition-all duration-150 ease-in-out ${
-                      snapshot.isDraggingOver || isTarget
-                        ? 'ring-2 ring-blue-300 bg-blue-50/30'
-                        : isSource
-                        ? 'ring-2 ring-green-200 bg-green-50/30'
-                        : 'bg-white/80'
-                    }`}
-                    aria-label={`Dzień ${key}`}
-                  >
-                    <div className="week-column-header">
-                      <div>
-                        <div className={isToday ? 'week-day-today' : ''}>
-                          {format(date, 'EEE d', { locale: pl })}
-                        </div>
+                  <div ref={provided.innerRef} {...provided.droppableProps} className={`week-column transition-all duration-150 ease-in-out ${snapshot.isDraggingOver ? 'ring-2 ring-blue-300 bg-blue-50/30' : 'bg-white/80'}`}>
+                    <div className="week-column-header relative p-2">
+                      <div className={`inline-block ${isToday ? 'font-semibold week-day-today' : ''}`}>{format(date, 'EEE d', { locale: pl })}</div>
+                      <div className="absolute right-2 top-1">
+                        <button onClick={() => onAddForDate?.(key)} title="Dodaj zadanie na ten dzień" className="p-1 rounded bg-white shadow-sm hover:bg-gray-100">
+                          <Plus size={14} />
+                        </button>
                       </div>
                     </div>
 
-                    <div className="week-column-tasks">
+                    <div className="week-column-tasks p-2">
                       {dayTasks.map((task: any, index: number) => (
                         <Draggable draggableId={String(task.id)} index={index} key={task.id}>
                           {(prov: any, snap: any) => {
                             const isDragging = snap.isDragging
-                            const isBeingDragged = draggingTaskId === String(task.id) || isDragging
-
                             return (
-                              <div
-                                ref={prov.innerRef}
-                                {...prov.draggableProps}
-                                {...prov.dragHandleProps}
-                                className="task-card-outer mb-2"
-                                style={{ ...prov.draggableProps.style }}
-                                data-task-id={task.id}
-                              >
-                                {/* inner element — apply CSS-based shake when being dragged */}
-                                <div className={`task-card-inner flex items-start gap-2 p-3 rounded-lg shadow-sm border border-gray-100 cursor-grab transition-all duration-150 ${isBeingDragged ? 'dragging-inner-anim z-50 bg-white' : 'bg-white'}`}>
-                                  <div className="flex-1">
+                              <div ref={prov.innerRef} {...prov.draggableProps} {...prov.dragHandleProps} className="task-card-outer mb-2" style={{ ...prov.draggableProps.style }}>
+                                <div className={`task-card-inner flex items-start gap-2 p-3 rounded-lg shadow-sm border border-gray-100 cursor-grab ${isDragging ? 'z-50 bg-white' : 'bg-white'}`}>
+                                  <div className="flex-1" onClick={() => onOpenTask?.(task)}>
                                     <div className="flex justify-between items-start gap-2">
                                       <div>
-                                        <div className="text-sm font-medium text-gray-800">{task.content}</div>
+                                        <div className="text-sm font-medium text-gray-800 truncate">{task.content}</div>
                                         <div className="text-xs text-gray-500 mt-1">{task.project_name || ''}</div>
                                       </div>
-
                                       <div className="flex items-center gap-2">
                                         <button title="Ukończ" onClick={() => handleCompleteClick(task.id)} className="p-1 rounded-full hover:bg-gray-100">
                                           <CheckCircle2 size={18} className="text-green-600" />
@@ -265,16 +173,12 @@ export default function WeekView({
                                           <button onClick={() => setOpenMenuFor(openMenuFor === task.id ? null : task.id)} className="p-1 rounded hover:bg-gray-100" title="Więcej">
                                             <MoreVertical size={16} />
                                           </button>
-
-                                          <AnimatePresence>
-                                            {openMenuFor === task.id && (
-                                              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="absolute right-0 mt-2 w-44 bg-white border border-gray-200 rounded-md shadow-lg z-50">
-                                                <button onClick={() => { setOpenMenuFor(null); window.dispatchEvent(new CustomEvent('taskHelp', { detail: { task: { id: task.id, title: task.content, description: task.description } } })); }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm">Pomóż mi</button>
-                                                <button onClick={() => { setOpenMenuFor(null); openDatePicker(task.id); }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm">Przenieś</button>
-                                                <button onClick={() => { setOpenMenuFor(null); handleDeleteClick(task.id); }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm text-red-600">Usuń</button>
-                                              </motion.div>
-                                            )}
-                                          </AnimatePresence>
+                                          {openMenuFor === task.id && (
+                                            <div className="absolute right-0 mt-2 w-44 bg-white border border-gray-200 rounded-md shadow-lg z-50">
+                                              <button onClick={() => { setOpenMenuFor(null); onHelp?.(task) }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm">Pomóż mi</button>
+                                              <button onClick={() => { setOpenMenuFor(null); handleDeleteClick(task.id) }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm text-red-600">Usuń</button>
+                                            </div>
+                                          )}
                                         </div>
                                       </div>
                                     </div>
@@ -285,7 +189,6 @@ export default function WeekView({
                           }}
                         </Draggable>
                       ))}
-
                       {provided.placeholder}
                     </div>
                   </div>
