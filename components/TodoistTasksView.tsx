@@ -298,13 +298,45 @@ export default function TodoistTasksView({
   // ---- Render ----
   return (
     <div className="flex flex-col h-full bg-gray-50 rounded-b-xl overflow-hidden relative w-full">
-      <div className="text-center py-3 border-b border-gray-200 bg-white shadow-sm mb-3">
-        <h2 className="text-lg font-semibold text-gray-800 tracking-tight">
-          {/* show week range */}
-          {/* compute weekStart again for header */}
-          {new Date().toLocaleDateString()}
-        </h2>
-      </div>
+      {/* HEADER: filters + project selector — VISIBLE both in list and week mode */}
+      {!hideHeader && (
+        <div className="bg-white rounded-md p-3 border border-gray-200 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-green-50 text-green-700 border border-green-100">
+                <span className="text-sm font-medium">📋 Lista zadań</span>
+              </div>
+
+              <div className="filter-bar ml-1">
+                {[
+                  { key: 'today', label: 'Dziś' },
+                  { key: 'tomorrow', label: 'Jutro' },
+                  { key: '7 days', label: 'Tydzień' },
+                  { key: '30 days', label: 'Miesiąc' },
+                  { key: 'overdue', label: 'Przeterminowane' },
+                ].map((f) => (
+                  <button key={f.key} onClick={() => setFilter(f.key as FilterType)} className={`filter-pill ${filter === f.key ? 'filter-pill--active' : ''}`}>
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)} className="bg-neutral-50 text-sm px-3 py-1.5 rounded-md border border-neutral-200">
+                <option value="all">📁 Wszystkie projekty</option>
+                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+
+              <button onClick={() => setShowAdd(true)} className="px-3 py-1.5 bg-violet-600 text-white rounded-md text-sm shadow-sm">
+                + Dodaj zadanie
+              </button>
+
+              <div className="text-sm text-green-600 font-medium">🟢 Połączono z Todoist</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-3">
         {viewMode === 'week' ? (
@@ -316,7 +348,7 @@ export default function TodoistTasksView({
             onChangeFilter={setFilter}
             onUpdate={() => fetchTasks(refreshFilter)}
             onOpenTaskChat={(t: any) => setOpenTask({ id: t.id, title: t.content, description: t.description })}
-            showHeaderFilters={true}                // list mode shows header filters so you can switch to 'Tydzień'
+            showHeaderFilters={false}                // header is rendered here now, so disable inside TodoistTasks
             selectedProject={selectedProject}
             showContextMenu={false} // LIST MODE: do not show context menu on TaskCard
           />
