@@ -1,13 +1,17 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import AssistantSelector from './AssistantSelector'
 import ChatModal from './ChatModal'
 import { AssistantKey, loadSessions, sessionsKeyFor, scanSessionsFallback, SessionEntry, storageKeyFor, upsertSession } from '../utils/chatStorage'
 import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
 
-export default function NewChatSidebar() {
-  const [assistant, setAssistant] = useState<AssistantKey>('Todoist Helper')
+export default function NewChatSidebar({
+  assistant,
+  onAssistantChange,
+}: {
+  assistant: AssistantKey
+  onAssistantChange?: (a: AssistantKey) => void
+}) {
   const [collapsed, setCollapsed] = useState(false)
   const [sessions, setSessions] = useState<SessionEntry[]>([])
   const [activeSession, setActiveSession] = useState<SessionEntry | null>(null)
@@ -29,25 +33,29 @@ export default function NewChatSidebar() {
     const onUpdate = () => loadList()
     window.addEventListener('storage', onUpdate)
     window.addEventListener('chatUpdated', onUpdate)
-    // listen for taskSelect events from task list UI (Todoist tasks)
+
+    // handle taskSelect events emitted from task UI -> ensure Todoist Helper is selected and open task session
     const handleTaskSelect = (e: any) => {
       try {
         const detail = e.detail
         if (!detail) return
-        // Expecting detail: { mode: 'todoist', task: { id, title, description } }
         if (detail.mode === 'todoist' && detail.task) {
           const t = detail.task
           const entry: SessionEntry = { id: t.id, title: t.title || t.id, timestamp: Date.now(), last: '' }
+
+          // switch page-level assistant to Todoist Helper so history is consistent
+          if (onAssistantChange) onAssistantChange('Todoist Helper')
+
           upsertSession(sessionsKeyFor('Todoist Helper'), entry)
           setTimeout(() => loadList(), 100)
-          // open modal for Todoist Helper automatically
           setActiveSession(entry)
           setModalOpen(true)
-          setAssistant('Todoist Helper')
         }
       } catch {}
     }
+
     window.addEventListener('taskSelect', handleTaskSelect)
+
     return () => {
       window.removeEventListener('storage', onUpdate)
       window.removeEventListener('chatUpdated', onUpdate)
@@ -59,7 +67,6 @@ export default function NewChatSidebar() {
   const startNew = () => {
     const id = `${assistant.replace(/\s+/g, '_').toLowerCase()}_${Date.now()}`
     const entry: SessionEntry = { id, title: `Nowa rozmowa ${new Date().toLocaleString()}`, timestamp: Date.now(), last: '' }
-    // create intro
     const sk = storageKeyFor(assistant, id)
     const intro: any[] = [{ role: 'assistant', content: `Nowa rozmowa z ${assistant}`, timestamp: Date.now() }]
     try {
@@ -80,11 +87,7 @@ export default function NewChatSidebar() {
 
   return (
     <aside className={`flex flex-col transition-all bg-gray-50 border-r border-gray-200 ${collapsed ? 'w-16' : 'w-80'}`}>
-      {/* assistant selector full width */}
-      <div className={`${collapsed ? 'hidden' : ''}`}>
-        <AssistantSelector value={assistant} onChange={(v) => setAssistant(v as AssistantKey)} />
-      </div>
-
+      {/* header */}
       <div className="flex items-center justify-between px-3 py-2 border-b bg-white">
         <div className="text-sm font-semibold text-gray-700">{collapsed ? 'Hist' : `Historia — ${assistant}`}</div>
         <div className="flex items-center gap-2">
