@@ -199,7 +199,8 @@ export default function TodoistAIView({
 
       // save normalized to storage
       saveConversation(storageKeyFor(assistantKey, sessionId), toStorageMessages(final))
-      upsertSession(sessionsKey, { id: sessionId, title: `Rozmowa ${new Date().toLocaleString()}`, timestamp: Date.now(), last: aiMsg.content.slice(0, 300) })
+      // ensure we safely read content (aiMsg.content may be optional in the type)
+      upsertSession(sessionsKey, { id: sessionId, title: `Rozmowa ${new Date().toLocaleString()}`, timestamp: Date.now(), last: (aiMsg.content ?? '').slice(0, 300) })
       window.dispatchEvent(new Event('chatUpdated'))
     } catch (err) {
       console.error('❌ Błąd AI:', err)
