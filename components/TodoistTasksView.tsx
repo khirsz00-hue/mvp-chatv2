@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import TodoistTasks from './TodoistTasks'
 import WeekView from './WeekView'
 import TaskDialog from './TaskDialog'
-import { parseDueToLocalYMD, ymdFromDate, daysUntil } from '../utils/date'
+import { parseDueToLocalYMD, ymdFromDate } from '../utils/date'
 import { addDays, startOfWeek } from 'date-fns'
 
 type FilterType = 'today' | 'tomorrow' | 'overdue' | '7 days' | '30 days'
@@ -31,18 +31,9 @@ export default function TodoistTasksView({
     typeof window !== 'undefined' && localStorage.getItem('todoist_filter') === '7 days' ? 'week' : 'list'
   )
   const lastEvent = useRef<number>(0)
+  const lastLocalAction = useRef<number>(0)
 
-  // Add task modal state
-  const [showAdd, setShowAdd] = useState(false)
-  const [newTitle, setNewTitle] = useState('')
-  const [newDate, setNewDate] = useState<string>('')
-  const [newProject, setNewProject] = useState<string>('')
-  const [newDescription, setNewDescription] = useState<string>('')
-
-  // Modal for viewing a single task (opened from list or week)
-  const [openTask, setOpenTask] = useState<any | null>(null)
-
-  // compute refreshFilter once per render to avoid inline ternaries in JSX props
+  // compute refreshFilter once per render
   const refreshFilter: FilterType = viewMode === 'week' ? '7 days' : filter
 
   // ---- Fetch projects ----
@@ -111,49 +102,37 @@ export default function TodoistTasksView({
         return { ...t, _dueYmd }
       })
 
-      // Debug logs to help trace issues (remove if noisy)
-      // eslint-disable-next-line no-console
-      console.log('[fetchTasks] effectiveFilter=', effectiveFilter, 'mapped dueYmds=', mapped.map((m) => m._dueYmd))
-
-      // If list filter "today": keep overdue + today (STRICT filtering on client)
+      // Strict filtering for "today"
       if (effectiveFilter === 'today') {
         const todayYmd = ymdFromDate(new Date())
-        // Strict: only include tasks where _dueYmd exists and equals todayYmd, or where _dueYmd < todayYmd (overdue)
         const overdue = mapped.filter((t) => (t._dueYmd ? t._dueYmd < todayYmd : false))
         const todayTasks = mapped.filter((t) => (t._dueYmd ? t._dueYmd === todayYmd : false))
-
-        // Debug
-        // eslint-disable-next-line no-console
-        console.log('[fetchTasks] todayYmd=', todayYmd, 'overdue=', overdue.map((t) => ({ id: t.id, due: t._dueYmd })), 'today=', todayTasks.map((t) => ({ id: t.id, due: t._dueYmd })))
-
         setTasks([...overdue, ...todayTasks])
         return
       }
 
-      // If currently in week view - show tasks for the current week (weekStart .. weekEnd)
+      // Week mode: use current week boundaries
       if (viewMode === 'week') {
         const today = new Date()
         const weekStart = startOfWeek(today, { weekStartsOn: 1 })
         const weekEnd = addDays(weekStart, 6)
         const weekStartYmd = ymdFromDate(weekStart)
         const weekEndYmd = ymdFromDate(weekEnd)
-
         const weekTasks = mapped.filter((t) => {
-          if (!t._dueYmd) return true // include tasks without due so they don't disappear
+          if (!t._dueYmd) return true
           return t._dueYmd >= weekStartYmd && t._dueYmd <= weekEndYmd
         })
         setTasks(weekTasks)
         return
       }
 
-      // default: set all mapped tasks for other filters
       setTasks(mapped)
     } catch (err) {
       console.error('Błąd pobierania zadań:', err)
     }
   }
 
-  // SSE + polling: EventSource try + polling fallback. Poll uses refreshFilter computed above.
+  // SSE + polling: SKIP server-initiated fetches while in week view to avoid overwrites / flicker
   useEffect(() => {
     if (!token) return
     let es: EventSource | null = null
@@ -168,20 +147,28 @@ export default function TodoistTasksView({
             const data = JSON.parse(event.data)
             if (data.event?.startsWith('item:')) {
               const now = Date.now()
+              // skip server-initiated refreshes if user recently did a local action
+              if (now - lastLocalAction.current < 2000) return
+              // IMPORTANT: when in week view avoid automatic fetch to prevent overwriting local/week UI
+              if (viewMode === 'week') {
+                // show toast only, don't trigger fetch that would replace week state
+                const msg =
+                  data.event === 'item:added'
+                    ? '🔕 Dodano zadanie (aktualizacja w tle)'
+                    : data.event === 'item:completed'
+                    ? '✅ Ukończono zadanie (aktualizacja w tle)'
+                    : '🔄 Lista zadań zaktualizowana (w tle)'
+                setToast(msg)
+                setTimeout(() => setToast(null), 1800)
+                return
+              }
+
               if (data.event === 'item:added') {
                 setTimeout(() => fetchTasks(refreshFilter), 1500)
               } else if (now - lastEvent.current > 1500) {
                 lastEvent.current = now
                 fetchTasks(refreshFilter)
               }
-              const msg =
-                data.event === 'item:added'
-                  ? '🔕 Dodano zadanie'
-                  : data.event === 'item:completed'
-                  ? '✅ Ukończono zadanie'
-                  : '🔄 Lista zadań zaktualizowana'
-              setToast(msg)
-              setTimeout(() => setToast(null), 2000)
             }
           } catch (e) {
             // ignore parse errors
@@ -197,7 +184,11 @@ export default function TodoistTasksView({
     }
 
     connect()
-    const poll = setInterval(() => fetchTasks(refreshFilter), 45000)
+    const poll = setInterval(() => {
+      // don't poll while in week view (avoids overwriting week UI)
+      if (viewMode === 'week') return
+      fetchTasks(refreshFilter)
+    }, 45000)
     // initial fetch
     fetchTasks(refreshFilter)
 
@@ -212,6 +203,12 @@ export default function TodoistTasksView({
   useEffect(() => {
     setViewMode(filter === '7 days' ? 'week' : 'list')
     if (typeof window !== 'undefined') localStorage.setItem('todoist_filter', filter)
+    // when switching to week, trigger immediate fetch and clear any flicker
+    if (filter === '7 days') {
+      // set tasks to empty immediately to avoid previous-list flash
+      setTasks([])
+      fetchTasks('7 days')
+    }
   }, [filter])
 
   // ---- Add task ----
@@ -254,33 +251,35 @@ export default function TodoistTasksView({
   const handleComplete = async (id: string) => {
     if (!token) return
     try {
+      // optimistic removal
+      setTasks((prev) => prev.filter((t) => t.id !== id))
+      lastLocalAction.current = Date.now()
       await fetch('/api/todoist/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, token }) })
       setToast('✅ Ukończono zadanie')
       setTimeout(() => setToast(null), 1500)
-      fetchTasks(refreshFilter)
+      // refresh only if not in week mode (week view skips server overwrites)
+      if (viewMode !== 'week') fetchTasks(refreshFilter)
       onUpdate?.()
     } catch (err) {
       console.error(err)
+      fetchTasks(refreshFilter)
     }
   }
 
-  // NOTE: handleMove now receives newDateYmd string (yyyy-mm-dd)
   const handleMove = async (id: string, newDateYmd: string) => {
     if (!token) return
     try {
-      // optimistic update: update local tasks so UI reflects move immediately
+      // optimistic update
       setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, _dueYmd: newDateYmd } : t)))
-
-      // send date string directly (date-only) to backend
+      lastLocalAction.current = Date.now()
       await fetch('/api/todoist/postpone', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, token, newDate: newDateYmd }) })
       setToast('📅 Przeniesiono zadanie')
       setTimeout(() => setToast(null), 1500)
-      // slight delay to allow backend to settle
-      setTimeout(() => fetchTasks(refreshFilter), 700)
+      // if not in week view, refresh; if in week view we intentionally skip server-initiated overwrite
+      if (viewMode !== 'week') setTimeout(() => fetchTasks(refreshFilter), 700)
       onUpdate?.()
     } catch (err) {
       console.error(err)
-      // rollback by refetch if error
       fetchTasks(refreshFilter)
     }
   }
@@ -288,33 +287,67 @@ export default function TodoistTasksView({
   const handleDelete = async (id: string) => {
     if (!token) return
     try {
+      setTasks((prev) => prev.filter((t) => t.id !== id))
+      lastLocalAction.current = Date.now()
       await fetch('/api/todoist/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, token }) })
       setToast('🗑 Usunięto zadanie')
       setTimeout(() => setToast(null), 1500)
-      fetchTasks(refreshFilter)
+      if (viewMode !== 'week') fetchTasks(refreshFilter)
       onUpdate?.()
     } catch (err) {
       console.error(err)
+      fetchTasks(refreshFilter)
     }
   }
 
   const handleHelp = (taskObj: any) => {
     setToast('🤖 Poproszono o pomoc dla zadania')
     setTimeout(() => setToast(null), 2000)
-    // Open TaskDialog by default when user explicitly requests details; for help use event
     setOpenTask({ id: taskObj.id, title: taskObj.content, description: taskObj.description })
   }
 
   // ---- Render ----
   return (
     <div className="flex flex-col h-full bg-gray-50 rounded-b-xl overflow-hidden relative w-full">
-      <div className="text-center py-3 border-b border-gray-200 bg-white shadow-sm mb-3">
-        <h2 className="text-lg font-semibold text-gray-800 tracking-tight">
-          {/* show week range */}
-          {/* compute weekStart again for header */}
-          {new Date().toLocaleDateString()}
-        </h2>
-      </div>
+      {/* HEADER: filters + project selector — VISIBLE both in list and week mode */}
+      {!hideHeader && (
+        <div className="bg-white rounded-md p-3 border border-gray-200 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-green-50 text-green-700 border border-green-100">
+                <span className="text-sm font-medium">📋 Lista zadań</span>
+              </div>
+
+              <div className="filter-bar ml-1">
+                {[
+                  { key: 'today', label: 'Dziś' },
+                  { key: 'tomorrow', label: 'Jutro' },
+                  { key: '7 days', label: 'Tydzień' },
+                  { key: '30 days', label: 'Miesiąc' },
+                  { key: 'overdue', label: 'Przeterminowane' },
+                ].map((f) => (
+                  <button key={f.key} onClick={() => setFilter(f.key as FilterType)} className={`filter-pill ${filter === f.key ? 'filter-pill--active' : ''}`}>
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)} className="bg-neutral-50 text-sm px-3 py-1.5 rounded-md border border-neutral-200">
+                <option value="all">📁 Wszystkie projekty</option>
+                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+
+              <button onClick={() => setShowAdd(true)} className="px-3 py-1.5 bg-violet-600 text-white rounded-md text-sm shadow-sm">
+                + Dodaj zadanie
+              </button>
+
+              <div className="text-sm text-green-600 font-medium">🟢 Połączono z Todoist</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-3">
         {viewMode === 'week' ? (
@@ -326,9 +359,9 @@ export default function TodoistTasksView({
             onChangeFilter={setFilter}
             onUpdate={() => fetchTasks(refreshFilter)}
             onOpenTaskChat={(t: any) => setOpenTask({ id: t.id, title: t.content, description: t.description })}
-            showHeaderFilters={false}                // header is rendered here now, so disable inside TodoistTasks
+            showHeaderFilters={false}
             selectedProject={selectedProject}
-            showContextMenu={false} // LIST MODE: do not show context menu on TaskCard
+            showContextMenu={false}
           />
         )}
       </div>
