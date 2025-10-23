@@ -1,5 +1,6 @@
 // utils/date.ts
-// Lokalny util daty - zwraca lokalny YMD (YYYY-MM-DD) lub null
+// Lokalny util do normalizacji dat - zwraca lokalny YMD (YYYY-MM-DD) lub null
+
 export function pad(n: number) {
   return n < 10 ? '0' + n : '' + n
 }
