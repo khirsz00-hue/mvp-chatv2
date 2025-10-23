@@ -34,40 +34,17 @@ export default function NewChatSidebar({
     window.addEventListener('storage', onUpdate)
     window.addEventListener('chatUpdated', onUpdate)
 
-    // Listen for taskSelect (open task detail) OR taskHelp (open chat)
-    const handleTaskSelect = (e: any) => {
-      try {
-        const detail = e.detail
-        if (!detail) return
-        if (detail.mode === 'todoist' && detail.task) {
-          const t = detail.task
-          const entry: SessionEntry = { id: t.id, title: t.title || t.id, timestamp: Date.now(), last: '' }
-          upsertSession(sessionsKeyFor('Todoist Helper'), entry)
-          setTimeout(() => loadList(), 100)
-          // if detail.openChat (explicit), open chat modal
-          if (detail.openChat) {
-            setActiveSession(entry)
-            setModalOpen(true)
-            if (onAssistantChange) onAssistantChange('Todoist Helper')
-          }
-        }
-      } catch {}
-    }
-
-    // handleTaskHelp will create/update chat session for the task and auto-send a "help" prompt (one message)
     const handleTaskHelp = async (e: any) => {
       try {
         const detail = e.detail
         if (!detail || !detail.task) return
         const t = detail.task
         const entry: SessionEntry = { id: t.id, title: t.title || t.id, timestamp: Date.now(), last: '' }
-        const sk = storageKeyFor('Todoist Helper', t.id)
-        // ensure the session is registered
-        upsertSession(sessionsKeyFor('Todoist Helper'), entry)
+        const sk = storageKeyFor('Todoist Helper' as AssistantKey, t.id)
+        upsertSession(sessionsKeyFor('Todoist Helper' as AssistantKey), entry)
         setTimeout(() => loadList(), 100)
 
-        // Prevent duplicate auto-messages: check last message
-        const conv = loadConversation(sk)
+        const conv = loadConversation(sk) || []
         const userPrompt = `Pomóż mi z zadaniem: "${t.title}".\n\nOpis: ${t.description || ''}`.trim()
         let needToSend = true
         if (conv && conv.length) {
@@ -76,11 +53,9 @@ export default function NewChatSidebar({
         }
 
         if (needToSend) {
-          // Append user message
           const userMsg = { role: 'user' as const, content: userPrompt, timestamp: Date.now() }
           const newConv = conv.concat(userMsg)
           saveConversation(sk, newConv)
-          // call backend to get AI reply
           try {
             const res = await fetch('/api/chat', {
               method: 'POST',
@@ -97,22 +72,19 @@ export default function NewChatSidebar({
           }
         }
 
-        // open modal and set assistant
         setActiveSession(entry)
         setModalOpen(true)
-        if (onAssistantChange) onAssistantChange('Todoist Helper')
+        if (onAssistantChange) onAssistantChange('Todoist Helper' as AssistantKey)
       } catch (err) {
         console.error('handleTaskHelp error', err)
       }
     }
 
-    window.addEventListener('taskSelect', handleTaskSelect)
     window.addEventListener('taskHelp', handleTaskHelp)
 
     return () => {
       window.removeEventListener('storage', onUpdate)
       window.removeEventListener('chatUpdated', onUpdate)
-      window.removeEventListener('taskSelect', handleTaskSelect)
       window.removeEventListener('taskHelp', handleTaskHelp)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -142,10 +114,8 @@ export default function NewChatSidebar({
   const deleteSession = (s: SessionEntry) => {
     if (!confirm(`Usunąć rozmowę "${s.title}"?`)) return
     try {
-      // remove conversation key
       const sk = storageKeyFor(assistant, s.id)
       localStorage.removeItem(sk)
-      // remove from sessions index
       const key = sessionsKeyFor(assistant)
       const arr = loadSessions(key).filter((x) => x.id !== s.id)
       localStorage.setItem(key, JSON.stringify(arr))
@@ -183,15 +153,12 @@ export default function NewChatSidebar({
           <ul className="space-y-2">
             {sessions.map((s) => (
               <li key={s.id} className="relative">
-                <div className={`w-full text-left p-2 rounded-lg flex flex-col gap-1 hover:bg-gray-100 transition ${activeSession?.id === s.id ? 'bg-green-50 border border-green-200' : 'bg-white border border-transparent'}`}>
-                  <div className="flex items-center justify-between">
-                    <button onClick={() => openSession(s)} className="text-left flex-1">
-                      <div className="font-medium text-gray-800 truncate">{s.title}</div>
-                      <div className="text-xs text-gray-500">{new Date(s.timestamp).toLocaleDateString()}</div>
-                    </button>
-                    <button onClick={() => deleteSession(s)} title="Usuń rozmowę" className="text-sm text-red-500 ml-2 px-2 py-1 rounded hover:bg-red-50">Usuń</button>
-                  </div>
-                  <div className="text-xs text-gray-500 line-clamp-2 italic">{s.last || '— brak podglądu —'}</div>
+                <div className={`w-full text-left p-2 rounded-lg flex items-center justify-between gap-2 hover:bg-gray-100 transition ${activeSession?.id === s.id ? 'bg-green-50 border border-green-200' : 'bg-white border border-transparent'}`}>
+                  <button onClick={() => openSession(s)} className="text-left flex-1 min-w-0">
+                    <div className="font-medium text-gray-800 truncate">{s.title}</div>
+                    <div className="text-xs text-gray-500">{new Date(s.timestamp).toLocaleDateString()}</div>
+                  </button>
+                  <button onClick={() => deleteSession(s)} title="Usuń rozmowę" className="text-sm text-red-500 ml-2 px-2 py-1 rounded hover:bg-red-50">Usuń</button>
                 </div>
               </li>
             ))}
