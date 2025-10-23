@@ -43,7 +43,7 @@ export default function WeekView({
   const [dragDestinationId, setDragDestinationId] = useState<string | null>(null)
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null)
 
-  // grupowanie po dniach (PREFERUJEMY t._dueYmd — to pozwala na optymistyczne update'y)
+  // grupowanie po dniach — PREFERUJEMY pole _dueYmd (optymizm) i pokazujemy TYLKO zadania w bieżącym tygodniu
   useEffect(() => {
     if (!tasks || tasks.length === 0) {
       setColumns({})
@@ -53,29 +53,27 @@ export default function WeekView({
     const grouped: Record<string, any[]> = {}
     for (const day of days) grouped[format(day, 'yyyy-MM-dd')] = []
 
+    // zbuduj set dni tygodnia dla szybkich porównań
+    const dayKeys = days.map((d) => format(d, 'yyyy-MM-dd'))
+    const firstColKey = dayKeys[0]
+
     for (const t of tasks) {
-      // Preferuj _dueYmd (ustawiane przez TodoistTasksView przy fetch i przez optymistyczne handleMove)
+      // prefer _dueYmd (optymistyczne update'y), fallback do t.due.date lub string
       const dueYmdFromOpt = t._dueYmd ?? null
       const dueRaw = t.due?.date ?? (typeof t.due === 'string' ? t.due : null)
-
-      // Determine canonical due YMD string if available
       const dueYmd = dueYmdFromOpt ?? dueRaw ?? null
 
       if (!dueYmd) {
-        // include tasks without due in first column (start of week)
-        const key = format(days[0], 'yyyy-MM-dd')
-        grouped[key].push(t)
+        // zadania bez terminu — umieść w pierwszej kolumnie (poniedziałek)
+        grouped[firstColKey].push(t)
         continue
       }
 
-      // dueYmd expected to be 'YYYY-MM-DD' — compare as string to each day's YMD
-      const matchKey = days.map((d) => format(d, 'yyyy-MM-dd')).find((k) => k === dueYmd)
-      if (matchKey) {
-        grouped[matchKey].push(t)
+      // jeśli dueYmd mieści się w tym tygodniu — do odpowiedniej kolumny; w przeciwnym razie POMIŃ
+      if (dayKeys.includes(dueYmd)) {
+        grouped[dueYmd].push(t)
       } else {
-        // if due outside this week, put into first column for visibility
-        const key = format(days[0], 'yyyy-MM-dd')
-        grouped[key].push(t)
+        // nie wrzucamy tasków spoza tygodnia do pierwszej kolumny — po prostu pomijamy
       }
     }
 
@@ -83,7 +81,7 @@ export default function WeekView({
     setLoading(false)
   }, [tasks, days])
 
-  // DnD handlers (any dla zgodności TS w tej konfiguracji)
+  // DnD handlers
   const handleDragStart = (start: any) => {
     setDragSourceId(start.source.droppableId ?? null)
     setDraggingTaskId(start.draggableId ?? null)
