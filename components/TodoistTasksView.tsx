@@ -65,28 +65,23 @@ export default function TodoistTasksView({
     if (!token) return
     try {
       const effectiveFilter = overrideFilter ?? filter
+
+      // Use safe string comparison instead of switch to avoid TS narrowing issues
+      const ef = effectiveFilter as string
       let filterQuery = ''
-      if (effectiveFilter === '30 days') {
-        // For month view, ask for a broad set (we will filter client-side to current month)
+      if (ef === 'today') {
+        filterQuery = 'today | overdue'
+      } else if (ef === 'tomorrow') {
+        filterQuery = 'tomorrow'
+      } else if (ef === '7 days') {
+        filterQuery = '7 days'
+      } else if (ef === '30 days') {
+        // we'll request a broad set and filter to current month client-side
         filterQuery = '30 days'
+      } else if (ef === 'overdue') {
+        filterQuery = 'overdue'
       } else {
-        switch (effectiveFilter) {
-          case 'today':
-            filterQuery = 'today | overdue'
-            break
-          case 'tomorrow':
-            filterQuery = 'tomorrow'
-            break
-          case '7 days':
-            filterQuery = '7 days'
-            break
-          case '30 days':
-            filterQuery = '30 days'
-            break
-          case 'overdue':
-            filterQuery = 'overdue'
-            break
-        }
+        filterQuery = ''
       }
 
       const res = await fetch(`/api/todoist/tasks?token=${encodeURIComponent(token)}&filter=${encodeURIComponent(filterQuery)}`)
@@ -100,7 +95,7 @@ export default function TodoistTasksView({
       const mapped = (fetched as any[]).map((t) => ({ ...t, _dueYmd: parseDueToLocalYMD(t.due) }))
 
       // Strict today filter
-      if (effectiveFilter === 'today') {
+      if (ef === 'today') {
         const todayYmd = ymdFromDate(new Date())
         const overdue = mapped.filter((t) => (t._dueYmd ? t._dueYmd < todayYmd : false))
         const todayTasks = mapped.filter((t) => (t._dueYmd ? t._dueYmd === todayYmd : false))
@@ -120,8 +115,8 @@ export default function TodoistTasksView({
         return
       }
 
-      // Month view (filter === '30 days' treated as current calendar month)
-      if (effectiveFilter === '30 days') {
+      // Month view (treat '30 days' as current calendar month)
+      if (ef === '30 days') {
         const mStart = startOfMonth(new Date())
         const mEnd = endOfMonth(new Date())
         const ms = ymdFromDate(mStart)
@@ -198,11 +193,9 @@ export default function TodoistTasksView({
     }
   }, [filter])
 
-  // ---- Add task & handlers (same as before) ----
+  // ---- Add task & handlers (simplified) ----
   const handleCreateTask = async () => {
     if (!token) return alert('Brak tokena')
-    // open modal managed in component (assume TodoistTasksView has modal states in current version)
-    // Implementation omitted for brevity; existing create flow retained in earlier file versions
     fetchTasks(refreshFilter)
     onUpdate?.()
   }
@@ -254,14 +247,12 @@ export default function TodoistTasksView({
   // --- Render: header (always visible), and body —
   // If filter === '30 days' render grouped by day
   const renderMonthGrouped = () => {
-    // group tasks by _dueYmd (or 'No date')
     const groups: Record<string, any[]> = {}
     for (const t of tasks) {
       const k = t._dueYmd || 'no-date'
       groups[k] = groups[k] || []
       groups[k].push(t)
     }
-    // sort keys: dates ascending, 'no-date' last
     const keys = Object.keys(groups).filter(k => k !== 'no-date').sort().concat(Object.keys(groups).includes('no-date') ? ['no-date'] : [])
     return (
       <div className="space-y-4">
@@ -289,7 +280,6 @@ export default function TodoistTasksView({
 
   return (
     <div className="flex flex-col h-full bg-gray-50 rounded-b-xl overflow-hidden relative w-full">
-      {/* header always visible */}
       {!hideHeader && (
         <div className="bg-white rounded-md p-3 border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between gap-3">
