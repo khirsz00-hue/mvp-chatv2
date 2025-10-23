@@ -35,6 +35,9 @@ export default function TodoistTasksView({
 
   const refreshFilter: FilterType = viewMode === 'week' ? '7 days' : filter
 
+  // ---- IMPORTANT: openTask state WAS MISSING — restored here ----
+  const [openTask, setOpenTask] = useState<any | null>(null)
+
   // Fetch projects
   useEffect(() => {
     if (!token) return
