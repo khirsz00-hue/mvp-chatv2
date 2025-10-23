@@ -29,11 +29,24 @@ export default function TaskDialog({
         const json = await res.json()
         if (!mounted) return
         const d = json.task || json || {}
+
+        // compute due safely (avoid mixing ?? and || without parentheses)
+        let dueVal = ''
+        if (d.due) {
+          if (typeof d.due === 'string') {
+            dueVal = d.due
+          } else if (d.due.date) {
+            dueVal = d.due.date
+          } else {
+            dueVal = ''
+          }
+        }
+
         setData({
           title: d.content || task.title || '',
           description: d.description || d.note || '',
           project_name: d.project_name || d.project || '',
-          due: d.due?.date ?? (typeof d.due === 'string' ? d.due : '') || '',
+          due: dueVal || '',
         })
       } catch (err) {
         console.error('fetch task detail error', err)
@@ -84,7 +97,18 @@ export default function TaskDialog({
 
           <div>
             <label className="text-sm text-gray-700">Deadline</label>
-            <input type="date" value={data.due ? (typeof data.due === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data.due) ? data.due : parseDueToLocalYMD(data.due) ?? '') : ''} onChange={(e) => setData((p: any) => ({ ...p, due: e.target.value }))} className="w-full border p-2 rounded" />
+            <input
+              type="date"
+              value={
+                data.due
+                  ? (typeof data.due === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data.due)
+                      ? data.due
+                      : parseDueToLocalYMD(data.due) ?? '')
+                  : ''
+              }
+              onChange={(e) => setData((p: any) => ({ ...p, due: e.target.value }))}
+              className="w-full border p-2 rounded"
+            />
           </div>
         </div>
 
