@@ -2,12 +2,15 @@
 
 import { useEffect, useState } from 'react'
 import NewChatSidebar from '@/components/NewChatSidebar'
+import AssistantSelector from '@/components/AssistantSelector'
 import TodoistConnection from '@/components/TodoistConnection'
 import TodoistAuthButton from '@/components/TodoistAuthButton'
+import type { AssistantKey } from '@/utils/chatStorage'
 
 export default function HomePage() {
   const [token, setToken] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'tasks' | 'calendar' | 'assistants'>('tasks')
+  const [assistant, setAssistant] = useState<AssistantKey>('Todoist Helper')
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -27,15 +30,24 @@ export default function HomePage() {
     <div className="min-h-screen flex flex-col bg-gray-50 app-full-width">
       <header className="flex items-center justify-between px-6 py-3 bg-white border-b shadow-sm">
         <h1 className="text-lg font-semibold text-gray-800">AI Assistants PRO</h1>
-        <div className="flex gap-2">
-          <button onClick={() => setActiveTab('tasks')} className={`px-3 py-1.5 rounded ${activeTab === 'tasks' ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}>Lista zadań</button>
-          <button onClick={() => setActiveTab('calendar')} className={`px-3 py-1.5 rounded ${activeTab === 'calendar' ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}>Kalendarz</button>
-          <button onClick={() => setActiveTab('assistants')} className={`px-3 py-1.5 rounded ${activeTab === 'assistants' ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}>Asystenci</button>
+
+        <div className="flex items-center gap-4">
+          <nav className="flex gap-2">
+            <button onClick={() => setActiveTab('tasks')} className={`px-3 py-1.5 rounded ${activeTab === 'tasks' ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}>Lista zadań</button>
+            <button onClick={() => setActiveTab('calendar')} className={`px-3 py-1.5 rounded ${activeTab === 'calendar' ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}>Kalendarz</button>
+            <button onClick={() => setActiveTab('assistants')} className={`px-3 py-1.5 rounded ${activeTab === 'assistants' ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}>Asystenci</button>
+          </nav>
+
+          {/* Global assistant selector — SINGLE source of truth for assistant selection */}
+          <div className="ml-4">
+            <AssistantSelector value={assistant} onChange={(v) => setAssistant(v as AssistantKey)} options={['Todoist Helper', 'AI Planner', '6 Hats']} />
+          </div>
         </div>
       </header>
 
       <main className="flex flex-1">
-        <NewChatSidebar />
+        {/* Sidebar receives selected assistant from page */}
+        <NewChatSidebar assistant={assistant} onAssistantChange={(a) => setAssistant(a)} />
 
         <div className="flex-1 p-6 overflow-auto">
           {activeTab === 'tasks' && (
