@@ -41,28 +41,32 @@ export default function TodoistAIView({
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // helper storage key
   const storageKey = storageKeyFor(assistantKey, sessionId)
   const sessionsKey = sessionsKeyFor(assistantKey)
 
-  // autoscroll
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // load history on chatSelect (sidebar)
+  // Load history when sidebar fires chatSelect
   useEffect(() => {
     const handleChatSelect = (event: any) => {
       const det = event.detail || {}
-      // determine if this chatSelect is for this assistant
-      if (!det?.mode) return
-      // when sidebar dispatches, it uses mode: 'todoist' for todoist tasks; for planner we might use other signals
       const id = det.task?.id || det.sessionId
       if (!id) return
       const key = storageKeyFor(assistantKey, id)
-      const saved = loadConversation(key)
+      const saved = loadConversation(key) // may be utils.ChatMessage[] (no id) or our saved shape
       if (saved && saved.length) {
-        setMessages(saved)
+        // normalize saved entries to local ChatMessage type (ensure id exists)
+        const normalized: ChatMessage[] = (saved as any[]).map((m) => ({
+          id: m.id ?? crypto.randomUUID(),
+          role: m.role,
+          timestamp: m.timestamp || Date.now(),
+          type: m.type,
+          content: m.content,
+          tasks: m.tasks,
+        }))
+        setMessages(normalized)
         setSessionId(id)
       }
     }
@@ -71,7 +75,6 @@ export default function TodoistAIView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assistantKey])
 
-  // create new session entry
   const startNewChat = (title: string) => {
     const newId = crypto.randomUUID()
     setSessionId(newId)
@@ -82,14 +85,12 @@ export default function TodoistAIView({
     return newId
   }
 
-  // fetch tasks helper
   const fetchTasksByFilter = async (filter: 'today' | '7days' | '30days' | 'overdue') => {
     const res = await fetch('https://api.todoist.com/rest/v2/tasks', {
       headers: { Authorization: `Bearer ${token}` },
     })
     const all = await res.json()
     const now = new Date()
-
     const filtered: TodoistTask[] = all.filter((t: any) => {
       const dueDateRaw = t.due?.date ?? (typeof t.due === 'string' ? t.due : null)
       if (!dueDateRaw) return false
@@ -121,7 +122,6 @@ export default function TodoistAIView({
     return null
   }
 
-  // if message requests tasks -> fetch and insert tasks message
   const maybeHandleTaskQuery = async (userText: string): Promise<boolean> => {
     const match = detectFilterFromMessage(userText)
     if (!match || !token) return false
@@ -194,7 +194,6 @@ export default function TodoistAIView({
       setMessages([])
       const key = storageKeyFor(assistantKey, sessionId)
       localStorage.removeItem(key)
-      // also update sessions index last
       upsertSession(sessionsKey, { id: sessionId, title: `Rozmowa ${new Date().toLocaleString()}`, timestamp: Date.now(), last: '' })
       window.dispatchEvent(new Event('chatUpdated'))
     }
