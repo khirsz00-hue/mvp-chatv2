@@ -1,32 +1,21 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import TodoistTasksView from './TodoistTasksView'
 import TodoistAIView from './TodoistAIView'
 import TaskDialog from './TaskDialog'
+import type { AssistantKey } from '@/utils/chatStorage'
 
 interface TodoistConnectionProps {
   token: string
   onDisconnect: () => void
+  assistant: AssistantKey
 }
 
-export default function TodoistConnection({ token, onDisconnect }: TodoistConnectionProps) {
-  const [mode, setMode] = useState<'tasks' | 'ai'>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('todoist_mode')
-      if (saved === 'ai' || saved === 'tasks') return saved
-    }
-    return 'tasks'
-  })
-
+export default function TodoistConnection({ token, onDisconnect, assistant }: TodoistConnectionProps) {
+  // remove local mode switching here — page-level assistant determines view
   const [openTask, setOpenTask] = useState<{ id: string; title: string; description?: string } | null>(null)
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('todoist_mode', mode)
-    }
-  }, [mode])
 
   useEffect(() => {
     const handleTaskEvent = (event: any) => {
@@ -37,7 +26,6 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
 
     const handleChatSelect = (event: any) => {
       const detail = event?.detail || {}
-      // only open TaskDialog for chatSelect if it explicitly requests opening the task dialog
       if (detail.openTaskDialog && detail.task) {
         setOpenTask({ id: detail.task.id, title: detail.task.title, description: detail.task.description })
       }
@@ -54,23 +42,28 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
     }
   }, [])
 
+  // Decide what to render based on the assistant selected at page level:
+  // - Todoist Helper => show Tasks View
+  // - AI Planner => show AI View (uses todoist + calendar context)
+  // - 6 Hats => show AI View placeholder (you can extend later)
+  const renderView = () => {
+    if (assistant === 'Todoist Helper') {
+      return <TodoistTasksView token={token} onUpdate={() => window.dispatchEvent(new Event('taskUpdated'))} />
+    }
+    if (assistant === 'AI Planner') {
+      return <TodoistAIView token={token} />
+    }
+    // 6 Hats fallback (placeholder reuses AI view for now)
+    return <TodoistAIView token={token} />
+  }
+
   return (
     <div className="relative flex flex-col h-[calc(100vh-100px)] w-full bg-gray-50 border border-green-200 rounded-xl overflow-hidden">
       <div className="flex justify-between items-center p-2 px-4 bg-white border-b shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="flex bg-gray-100 rounded-lg overflow-hidden">
-            <button
-              onClick={() => setMode('tasks')}
-              className={`px-4 py-1.5 text-sm font-medium transition ${mode === 'tasks' ? 'bg-green-600 text-white shadow-sm' : 'text-gray-700 hover:bg-gray-200'}`}
-            >
-              📋 Lista zadań
-            </button>
-            <button
-              onClick={() => setMode('ai')}
-              className={`px-4 py-1.5 text-sm font-medium transition ${mode === 'ai' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-700 hover:bg-gray-200'}`}
-            >
-              🤖 Asystent AI
-            </button>
+          {/* Display which assistant is active (read-only here) */}
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-gray-100 text-gray-800 border border-gray-200">
+            <span className="text-sm font-medium">{assistant}</span>
           </div>
         </div>
 
@@ -82,29 +75,16 @@ export default function TodoistConnection({ token, onDisconnect }: TodoistConnec
 
       <div className="flex-1 relative w-full overflow-hidden">
         <AnimatePresence mode="wait">
-          {mode === 'tasks' ? (
-            <motion.div
-              key="tasks"
-              initial={{ opacity: 0, x: -40 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 40 }}
-              transition={{ duration: 0.25 }}
-              className="absolute inset-0 w-full"
-            >
-              <TodoistTasksView token={token} onUpdate={() => window.dispatchEvent(new Event('taskUpdated'))} />
-            </motion.div>
-          ) : (
-            <motion.div
-              key="ai"
-              initial={{ opacity: 0, x: 40 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -40 }}
-              transition={{ duration: 0.25 }}
-              className="absolute inset-0 w-full"
-            >
-              <TodoistAIView token={token} />
-            </motion.div>
-          )}
+          <motion.div
+            key={assistant} // re-mount view when assistant changes for clean state
+            initial={{ opacity: 0, x: assistant === 'Todoist Helper' ? -40 : 40 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: assistant === 'Todoist Helper' ? 40 : -40 }}
+            transition={{ duration: 0.25 }}
+            className="absolute inset-0 w-full"
+          >
+            {renderView()}
+          </motion.div>
         </AnimatePresence>
       </div>
 
