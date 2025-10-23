@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import TodoistTasks from './TodoistTasks'
 import WeekView from './WeekView'
 import TaskDialog from './TaskDialog'
-import { parseDueToLocalYMD, ymdFromDate } from '../utils/date'
+import { parseDueToLocalYMD, ymdFromDate, daysUntil } from '../utils/date'
 
 type FilterType = 'today' | 'tomorrow' | 'overdue' | '7 days' | '30 days'
 
@@ -164,7 +164,7 @@ export default function TodoistTasksView({
               }
               const msg =
                 data.event === 'item:added'
-                  ? '🆕 Dodano zadanie'
+                  ? '🔕 Dodano zadanie'
                   : data.event === 'item:completed'
                   ? '✅ Ukończono zadanie'
                   : '🔄 Lista zadań zaktualizowana'
@@ -280,7 +280,7 @@ export default function TodoistTasksView({
   }
 
   const handleHelp = (taskObj: any) => {
-    setToast('🧠 Poproszono o pomoc dla zadania')
+    setToast('🤖 Poproszono o pomoc dla zadania')
     setTimeout(() => setToast(null), 2000)
     setOpenTask({ id: taskObj.id, title: taskObj.content, description: taskObj.description })
   }
@@ -312,13 +312,9 @@ export default function TodoistTasksView({
             </div>
 
             <div className="flex items-center gap-3">
-              <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)} className="bg-neutral-900/5 text-sm px-3 py-1.5 rounded-md border border-neutral-200 focus:outline-none">
+              <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)} className="bg-neutral-50 text-sm px-3 py-1.5 rounded-md border border-neutral-200">
                 <option value="all">📁 Wszystkie projekty</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
+                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
 
               <button onClick={() => setShowAdd(true)} className="px-3 py-1.5 bg-violet-600 text-white rounded-md text-sm shadow-sm">
@@ -335,12 +331,21 @@ export default function TodoistTasksView({
         {viewMode === 'week' ? (
           <WeekView tasks={tasks} onMove={(id, date) => handleMove(id, date)} onComplete={(id) => handleComplete(id)} onDelete={(id) => handleDelete(id)} onHelp={(t) => handleHelp(t)} />
         ) : (
-          <TodoistTasks token={token} filter={filter} onChangeFilter={setFilter} onUpdate={() => fetchTasks(refreshFilter)} onOpenTaskChat={(t: any) => setOpenTask({ id: t.id, title: t.content, description: t.description })} showHeaderFilters={false} selectedProject={selectedProject} />
+          <TodoistTasks
+            token={token}
+            filter={filter}
+            onChangeFilter={setFilter}
+            onUpdate={() => fetchTasks(refreshFilter)}
+            onOpenTaskChat={(t: any) => setOpenTask({ id: t.id, title: t.content, description: t.description })}
+            showHeaderFilters={false}
+            selectedProject={selectedProject}
+            showContextMenu={false} // LIST MODE: do not show context menu on TaskCard
+          />
         )}
       </div>
 
       <AnimatePresence>
-        {toast && <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} transition={{ duration: 0.2 }} className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] bg-gray-900 text-white px-4 py-2 rounded-lg text-sm shadow-lg">{toast}</motion.div>}
+        {toast && <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} transition={{ duration: 0.2 }} className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black/80 text-white px-4 py-2 rounded-md shadow-md">{toast}</motion.div>}
       </AnimatePresence>
 
       {/* Add Task Modal */}
