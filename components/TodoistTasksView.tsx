@@ -297,6 +297,20 @@ export default function TodoistTasksView({
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-green-50 text-green-700 border border-green-100">
                 <span className="text-sm font-medium">📋 Lista zadań</span>
               </div>
+
+              <div className="filter-bar ml-1">
+                {[
+                  { key: 'today', label: 'Dziś' },
+                  { key: 'tomorrow', label: 'Jutro' },
+                  { key: '7 days', label: 'Tydzień' },
+                  { key: '30 days', label: 'Miesiąc' },
+                  { key: 'overdue', label: 'Przeterminowane' },
+                ].map((f) => (
+                  <button key={f.key} onClick={() => setFilter(f.key as FilterType)} className={`filter-pill ${filter === f.key ? 'filter-pill--active' : ''}`}>
+                    {f.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="flex items-center gap-3">
@@ -325,7 +339,7 @@ export default function TodoistTasksView({
             onChangeFilter={setFilter}
             onUpdate={() => fetchTasks(refreshFilter)}
             onOpenTaskChat={(t: any) => setOpenTask({ id: t.id, title: t.content, description: t.description })}
-            showHeaderFilters={false}
+            showHeaderFilters={true}                // <-- PRZYWRÓCONO: list mode shows header filters so you can switch to 'Tydzień'
             selectedProject={selectedProject}
             showContextMenu={false} // LIST MODE: do not show context menu on TaskCard
           />
