@@ -38,7 +38,7 @@ export default function HomePage() {
             <button onClick={() => setActiveTab('assistants')} className={`px-3 py-1.5 rounded ${activeTab === 'assistants' ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}>Asystenci</button>
           </nav>
 
-          {/* Global assistant selector — SINGLE source of truth for assistant selection */}
+          {/* --- SINGLE SOURCE OF TRUTH: Assistant selector on the page level --- */}
           <div className="ml-4">
             <AssistantSelector value={assistant} onChange={(v) => setAssistant(v as AssistantKey)} options={['Todoist Helper', 'AI Planner', '6 Hats']} />
           </div>
@@ -46,7 +46,7 @@ export default function HomePage() {
       </header>
 
       <main className="flex flex-1">
-        {/* Sidebar receives selected assistant from page */}
+        {/* Sidebar receives selected assistant from page (no selectors inside sidebar) */}
         <NewChatSidebar assistant={assistant} onAssistantChange={(a) => setAssistant(a)} />
 
         <div className="flex-1 p-6 overflow-auto">
@@ -57,7 +57,8 @@ export default function HomePage() {
                   <TodoistAuthButton />
                 </div>
               ) : (
-                <TodoistConnection token={token} onDisconnect={() => { localStorage.removeItem('todoist_token'); setToken(null) }} />
+                // pass chosen assistant down to TodoistConnection so it shows the correct view
+                <TodoistConnection token={token} onDisconnect={() => { localStorage.removeItem('todoist_token'); setToken(null) }} assistant={assistant} />
               )}
             </>
           )}
