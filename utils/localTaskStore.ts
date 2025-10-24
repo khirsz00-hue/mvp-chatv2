@@ -1,16 +1,16 @@
-// Simple client-side store for per-task metadata (estimates, move history).
+// Simple client-side store for per-task metadata (estimates in minutes, move history).
 // Uses localStorage under keys:
-//  - "task_estimate:<taskId>" -> { value, updatedAt }
+//  - "task_estimate:<taskId>" -> { minutes: number, updatedAt }
 //  - "task_history:<taskId>" -> [{ from, to, when }]
 //
-// Non-persistent across other clients (local only) — fits your current request.
+// Note: local only (not shared between clients).
 
 export type MoveEntry = { from?: string | null; to?: string | null; when: number }
 
 const EST_PREFIX = 'task_estimate:'
 const HIST_PREFIX = 'task_history:'
 
-export function getEstimate(taskId: string): { value: string; updatedAt: number } | null {
+export function getEstimate(taskId: string): { minutes: number; updatedAt: number } | null {
   try {
     const raw = localStorage.getItem(EST_PREFIX + taskId)
     if (!raw) return null
@@ -20,8 +20,9 @@ export function getEstimate(taskId: string): { value: string; updatedAt: number 
   }
 }
 
-export function setEstimate(taskId: string, value: string) {
-  const entry = { value: String(value || ''), updatedAt: Date.now() }
+// store minutes (integer)
+export function setEstimate(taskId: string, minutes: number) {
+  const entry = { minutes: Number(minutes || 0), updatedAt: Date.now() }
   try {
     localStorage.setItem(EST_PREFIX + taskId, JSON.stringify(entry))
   } catch (e) {
