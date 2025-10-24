@@ -126,7 +126,7 @@ export default function WeekView({
                                       {/* checkbox for quick complete */}
                                       <input type="checkbox" className="mt-2" onClick={(e) => { e.stopPropagation(); onComplete?.(task.id) }} />
                                       <div className="flex-1" onClick={() => onOpenTask?.(task)}>
-                                        <TaskCard task={task} token={undefined} selectable={false} onOpen={onOpenTask} wrapTitle />
+                                        <TaskCard task={task} token={undefined} selectable={false} onOpen={onOpenTask} wrapTitle showContextMenu={true} onHelp={onHelp} />
                                       </div>
                                     </div>
                                   </div>

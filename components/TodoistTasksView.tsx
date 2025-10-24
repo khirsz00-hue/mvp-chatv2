@@ -240,6 +240,101 @@ export default function TodoistTasksView({
     setOpenTask({ id: task.id, title: task.content, description: task.description })
   }
 
+  const handleMove = async (id: string, ymd: string) => {
+    if (!token) return
+    lastLocalAction.current = Date.now()
+    try {
+      await fetch('/api/todoist/postpone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, token, newDate: ymd }),
+      })
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: '✅ Przeniesiono zadanie' } }))
+      fetchTasks(refreshFilter)
+    } catch (err) {
+      console.error('move error', err)
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd przesunięcia' } }))
+    }
+  }
+
+  const handleComplete = async (id: string) => {
+    if (!token) return
+    lastLocalAction.current = Date.now()
+    try {
+      setTasks((prev) => prev.filter((t) => t.id !== id))
+      await fetch('/api/todoist/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, token }),
+      })
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: '✅ Ukończono zadanie' } }))
+      fetchTasks(refreshFilter)
+    } catch (err) {
+      console.error('complete error', err)
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd ukończenia' } }))
+      fetchTasks(refreshFilter)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!token) return
+    if (!confirm('Usunąć zadanie?')) return
+    lastLocalAction.current = Date.now()
+    try {
+      setTasks((prev) => prev.filter((t) => t.id !== id))
+      await fetch('/api/todoist/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, token }),
+      })
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: '🗑 Usunięto zadanie' } }))
+      fetchTasks(refreshFilter)
+    } catch (err) {
+      console.error('delete error', err)
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd usuwania' } }))
+      fetchTasks(refreshFilter)
+    }
+  }
+
+  const handleHelp = (task: any) => {
+    const detail = { task: { id: task.id, title: task.content, description: task.description } }
+    window.dispatchEvent(new CustomEvent('taskHelp', { detail }))
+  }
+
+  const handleAddTask = async () => {
+    if (!newTitle.trim()) {
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Podaj tytuł zadania' } }))
+      return
+    }
+    try {
+      const payload: any = { content: newTitle, token }
+      if (newDescription) payload.description = newDescription
+      if (newDate) payload.due_date = newDate
+      if (newProject && newProject !== 'all') payload.project_id = newProject
+      else if (addDateYmd) payload.due_date = addDateYmd
+
+      const res = await fetch('/api/todoist/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) throw new Error('Błąd dodawania zadania')
+      
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: '✅ Dodano zadanie' } }))
+      setShowAdd(false)
+      setNewTitle('')
+      setNewDescription('')
+      setNewDate('')
+      setNewProject('')
+      setAddDateYmd(null)
+      fetchTasks(refreshFilter)
+      onUpdate?.()
+    } catch (err) {
+      console.error('add task error', err)
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd dodawania zadania' } }))
+    }
+  }
+
   // month grouped rendering - badge inline near date
   const renderMonthGrouped = () => {
     const groups: Record<string, any[]> = {}
@@ -344,7 +439,25 @@ export default function TodoistTasksView({
         ) : filter === '30 days' ? (
           renderMonthGrouped()
         ) : (
-          <TodoistTasks token={token} filter={filter} onChangeFilter={setFilter} onUpdate={() => fetchTasks(refreshFilter)} onOpenTaskChat={(t: any) => setOpenTask({ id: t.id, title: t.content, description: t.description })} showHeaderFilters={false} selectedProject={selectedProject} showContextMenu={false} />
+          <TodoistTasks 
+            token={token} 
+            filter={filter} 
+            onChangeFilter={setFilter} 
+            onUpdate={() => fetchTasks(refreshFilter)} 
+            onOpenTaskChat={(t: any) => setOpenTask({ id: t.id, title: t.content, description: t.description })} 
+            showHeaderFilters={false} 
+            selectedProject={selectedProject} 
+            showContextMenu={false}
+            selectedTasks={selectedTasks}
+            onSelectChange={(id, checked) => {
+              setSelectedTasks((prev) => {
+                const copy = new Set(prev)
+                if (checked) copy.add(id)
+                else copy.delete(id)
+                return copy
+              })
+            }}
+          />
         )}
       </div>
 
@@ -356,6 +469,39 @@ export default function TodoistTasksView({
         {openTask && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4" onClick={() => setOpenTask(null)}>
           <motion.div initial={{ scale: 0.98, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.98, y: 10 }} className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-5" onClick={(e) => e.stopPropagation()}>
             <TaskDialog token={token} task={{ id: openTask.id, title: openTask.title }} initialTaskData={openTask.initialTaskData} initialIsLocal={openTask.initialIsLocal} onClose={() => { setOpenTask(null); fetchTasks(refreshFilter) }} />
+          </motion.div>
+        </motion.div>}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showAdd && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4" onClick={() => setShowAdd(false)}>
+          <motion.div initial={{ scale: 0.98, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.98, y: 10 }} className="bg-white rounded-lg shadow-xl w-full max-w-lg p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold">Dodaj nowe zadanie</h3>
+            <div>
+              <label className="text-sm text-gray-700 block mb-1">Tytuł *</label>
+              <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Tytuł zadania" className="w-full border rounded px-3 py-2" />
+            </div>
+            <div>
+              <label className="text-sm text-gray-700 block mb-1">Opis</label>
+              <textarea value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Opis zadania" className="w-full border rounded px-3 py-2 min-h-[80px]" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm text-gray-700 block mb-1">Data</label>
+                <input type="date" value={newDate || addDateYmd || ''} onChange={(e) => setNewDate(e.target.value)} className="w-full border rounded px-3 py-2" />
+              </div>
+              <div>
+                <label className="text-sm text-gray-700 block mb-1">Projekt</label>
+                <select value={newProject} onChange={(e) => setNewProject(e.target.value)} className="w-full border rounded px-3 py-2">
+                  <option value="">Domyślny</option>
+                  {projects.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowAdd(false)} className="px-4 py-2 bg-gray-100 rounded">Anuluj</button>
+              <button onClick={handleAddTask} className="px-4 py-2 bg-violet-600 text-white rounded">Dodaj</button>
+            </div>
           </motion.div>
         </motion.div>}
       </AnimatePresence>
