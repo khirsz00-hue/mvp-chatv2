@@ -60,9 +60,10 @@ export default function TaskCard({
 
   const handleMenuToggle = (e: React.MouseEvent) => {
     e.stopPropagation()
+    const MENU_WIDTH = 176 // px - width of context menu
     if (!openMenu && menuButtonRef.current) {
       const rect = menuButtonRef.current.getBoundingClientRect()
-      setMenuPosition({ top: rect.bottom + 4, left: rect.right - 176 }) // 176 = menu width
+      setMenuPosition({ top: rect.bottom + 4, left: rect.right - MENU_WIDTH })
     }
     setOpenMenu((s) => !s)
   }

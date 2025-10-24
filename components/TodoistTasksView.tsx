@@ -309,9 +309,10 @@ export default function TodoistTasksView({
     try {
       const payload: any = { content: newTitle, token }
       if (newDescription) payload.description = newDescription
+      // Use newDate if provided, otherwise fall back to addDateYmd
       if (newDate) payload.due = newDate
-      if (newProject && newProject !== 'all') payload.project_id = newProject
       else if (addDateYmd) payload.due = addDateYmd
+      if (newProject && newProject !== 'all') payload.project_id = newProject
 
       const res = await fetch('/api/todoist/add', {
         method: 'POST',
