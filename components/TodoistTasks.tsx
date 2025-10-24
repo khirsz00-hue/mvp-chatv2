@@ -72,7 +72,7 @@ export default function TodoistTasks({
     }
   }
 
-  useEffect(() => { loadTasks(); }, [filter, effectiveProject])
+  useEffect(() => { loadTasks(); }, [filter, effectiveProject, token])
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -94,39 +94,37 @@ export default function TodoistTasks({
     })
   }
 
+  // Bulk operations: include token in payload.payload.token
   const handleBulkExecute = async (action: 'delete'|'complete'|'postpone') => {
     if (!selectedTasks.size) return
-    if (action === 'postpone') {
-      setShowBulkDate(true)
-      return
-    }
+    if (action === 'postpone') { setShowBulkDate(true); return }
     const ids = Array.from(selectedTasks)
-    const payload: any = { action, ids, payload: {} }
+    const payload: any = { action, ids, payload: { token } }
     try {
       await fetch('/api/todoist/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       window.dispatchEvent(new Event('taskUpdated'))
       setSelectedTasks(new Set())
-      alert('Wykonano akcję zbiorczą')
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Wykonano akcję zbiorczą' } }))
     } catch (err) {
       console.error('bulk action err', err)
-      alert('Błąd akcji zbiorczej')
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd akcji zbiorczej' } }))
     }
   }
 
   const handleBulkPostponeConfirm = async () => {
-    if (!bulkDate) return alert('Wybierz datę')
+    if (!bulkDate) return window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Wybierz datę' } }))
     const ids = Array.from(selectedTasks)
-    const payload: any = { action: 'postpone', ids, payload: { newDate: bulkDate } }
+    const payload: any = { action: 'postpone', ids, payload: { newDate: bulkDate, token } }
     try {
       await fetch('/api/todoist/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       window.dispatchEvent(new Event('taskUpdated'))
       setSelectedTasks(new Set())
       setShowBulkDate(false)
       setBulkDate('')
-      alert('Przeniesiono zaznaczone zadania')
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Przeniesiono zaznaczone zadania' } }))
     } catch (err) {
       console.error('bulk postpone err', err)
-      alert('Błąd przenoszenia')
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd przenoszenia' } }))
     }
   }
 
@@ -168,9 +166,17 @@ export default function TodoistTasks({
               {tasks.map((t) => (
                 <motion.li key={t.id} whileHover={{ scale: 1.01 }} className="cursor-pointer transition rounded-lg hover:bg-gray-50 overflow-visible">
                   <div className="flex items-center gap-3">
-                    <input type="checkbox" checked={selectedTasks.has(t.id)} onChange={(e) => toggleSelect(t.id, e.target.checked)} className="ml-2" />
                     <div className="flex-1" onClick={() => onOpenTaskChat?.(t)}>
-                      <TaskCard task={t} token={token} onAction={() => loadTasks()} selectable selected={selectedTasks.has(t.id)} onSelectChange={(checked) => toggleSelect(t.id, checked)} showContextMenu={showContextMenu} onOpen={onOpenTaskChat} />
+                      <TaskCard
+                        task={t}
+                        token={token}
+                        onAction={() => loadTasks()}
+                        selectable
+                        selected={selectedTasks.has(t.id)}
+                        onSelectChange={(checked) => toggleSelect(t.id, checked)}
+                        showContextMenu={showContextMenu}
+                        onOpen={onOpenTaskChat}
+                      />
                     </div>
                   </div>
                 </motion.li>
@@ -180,7 +186,6 @@ export default function TodoistTasks({
         </AnimatePresence>
       </div>
 
-      {/* bulk action bar */}
       {selectedTasks.size > 0 && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white border rounded-md shadow-md px-4 py-2 flex items-center gap-3 z-50">
           <div className="text-sm font-medium">{selectedTasks.size} wybranych</div>
@@ -191,7 +196,6 @@ export default function TodoistTasks({
         </div>
       )}
 
-      {/* bulk postpone modal */}
       {showBulkDate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white p-4 rounded shadow max-w-sm w-full">
