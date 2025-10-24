@@ -36,6 +36,7 @@ export default function TodoistTasksView({
   const lastLocalAction = useRef<number>(0)
 
   const [openTask, setOpenTask] = useState<any | null>(null)
+  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set()) // shared selection
   const [showAdd, setShowAdd] = useState(false)
   const [addDateYmd, setAddDateYmd] = useState<string | null>(null)
   const [newTitle, setNewTitle] = useState('')
@@ -52,7 +53,6 @@ export default function TodoistTasksView({
     }
     window.addEventListener('appToast', handler)
 
-    // open TaskDialog when subtask requests it
     const openFromSub = (ev: any) => {
       const d = ev?.detail
       if (!d?.id) return
@@ -60,7 +60,6 @@ export default function TodoistTasksView({
     }
     window.addEventListener('openTaskFromSubtask', openFromSub)
 
-    // update local tasks list immediately when TaskDialog dispatches saved detail
     const onTaskSaved = (ev: any) => {
       const d = ev?.detail
       if (!d?.id) return
@@ -191,7 +190,6 @@ export default function TodoistTasksView({
     else if (filter === '30 days') { setTasks([]); fetchTasks('30 days') }
   }, [filter])
 
-  // Add Task modal
   const openAddForDate = (ymd?: string | null) => {
     setAddDateYmd(ymd ?? null)
     setNewDate(ymd ?? '')
@@ -212,7 +210,6 @@ export default function TodoistTasksView({
         const txt = json?.error || JSON.stringify(json) || 'Błąd serwera'
         throw new Error(String(txt))
       }
-      // if API returns created task, append immediately
       if (json?.task && Array.isArray(tasks)) {
         setTasks((prev) => [json.task, ...prev])
       } else {
@@ -270,7 +267,7 @@ export default function TodoistTasksView({
     setOpenTask({ id: taskObj.id, title: taskObj.content, description: taskObj.description })
   }
 
-  // month grouped rendering (kept mostly same)
+  // month grouped rendering - omitted for brevity in this snippet (keeps same behavior)
   const renderMonthGrouped = () => {
     const groups: Record<string, any[]> = {}
     for (const t of tasks) {
@@ -303,11 +300,13 @@ export default function TodoistTasksView({
                     <div className="p-3 bg-white rounded-lg border shadow-sm flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <TaskCard task={t} token={token} selectable onSelectChange={(checked) => {
-                          setTasks((prev) => {
-                            const copy = new Set(prev.map(x=>x.id))
-                            return prev // selection handled separately in month bulk UI; for simplicity leave tasks unchanged
+                          setSelectedTasks((prev) => {
+                            const copy = new Set(prev)
+                            if (checked) copy.add(t.id)
+                            else copy.delete(t.id)
+                            return copy
                           })
-                        }} selected={false} onOpen={(task) => setOpenTask({ id: task.id, title: task.content, description: task.description, project_id: task.project_id, project_name: task.project_name, _dueYmd: task._dueYmd, created_at: task.created_at })} />
+                        }} selected={selectedTasks.has(t.id)} onOpen={(task) => setOpenTask({ id: task.id, title: task.content, description: task.description, project_id: task.project_id, project_name: task.project_name, _dueYmd: task._dueYmd, created_at: task.created_at })} />
                       </div>
                     </div>
                   </li>
@@ -371,9 +370,6 @@ export default function TodoistTasksView({
         {toast && <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} transition={{ duration: 0.2 }} className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black/80 text-white px-4 py-2 rounded-md shadow-md">{toast}</motion.div>}
       </AnimatePresence>
 
-      {/* Add Task modal (unchanged) */}
-
-      {/* Task detail modal */}
       <AnimatePresence>
         {openTask && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4" onClick={() => setOpenTask(null)}>
           <motion.div initial={{ scale: 0.98, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.98, y: 10 }} className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-5" onClick={(e) => e.stopPropagation()}>
