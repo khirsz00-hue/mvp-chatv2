@@ -203,7 +203,7 @@ export default function TodoistTasksView({
       // optimistic UI
       setTasks((prev) => prev.filter((t) => !selectedTasks.has(t.id)))
       setSelectedTasks(new Set())
-      await fetch('/api/todoist/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'complete', ids }) })
+      await fetch('/api/todoist/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'complete', ids, token }) })
       window.dispatchEvent(new CustomEvent('appToast', { detail: { message: '✅ Zakończono wybrane' } }))
       fetchTasks(refreshFilter)
     } catch (err) {
@@ -220,7 +220,7 @@ export default function TodoistTasksView({
     try {
       setTasks((prev) => prev.filter((t) => !selectedTasks.has(t.id)))
       setSelectedTasks(new Set())
-      await fetch('/api/todoist/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', ids }) })
+      await fetch('/api/todoist/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', ids, token }) })
       window.dispatchEvent(new CustomEvent('appToast', { detail: { message: '🗑 Usunięto zaznaczone' } }))
       fetchTasks(refreshFilter)
     } catch (err) {
@@ -309,9 +309,9 @@ export default function TodoistTasksView({
     try {
       const payload: any = { content: newTitle, token }
       if (newDescription) payload.description = newDescription
-      if (newDate) payload.due_date = newDate
+      if (newDate) payload.due = newDate
       if (newProject && newProject !== 'all') payload.project_id = newProject
-      else if (addDateYmd) payload.due_date = addDateYmd
+      else if (addDateYmd) payload.due = addDateYmd
 
       const res = await fetch('/api/todoist/add', {
         method: 'POST',

@@ -44,10 +44,28 @@ export default function TaskCard({
 }) {
   const [openMenu, setOpenMenu] = useState(false)
   const [menuContainer, setMenuContainer] = useState<HTMLElement | null>(null)
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null)
+  const menuButtonRef = React.useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     setMenuContainer(document.body)
   }, [])
+
+  useEffect(() => {
+    if (!openMenu) return
+    const handleClickOutside = () => setOpenMenu(false)
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [openMenu])
+
+  const handleMenuToggle = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!openMenu && menuButtonRef.current) {
+      const rect = menuButtonRef.current.getBoundingClientRect()
+      setMenuPosition({ top: rect.bottom + 4, left: rect.right - 176 }) // 176 = menu width
+    }
+    setOpenMenu((s) => !s)
+  }
 
   const dueYmd = task._dueYmd ?? parseDueToLocalYMD(task.due)
   const estObj = getEstimate(task.id)
@@ -131,11 +149,11 @@ export default function TaskCard({
 
         {showContextMenu && (
           <div className="relative">
-            <button onClick={(e) => { e.stopPropagation(); setOpenMenu((s) => !s) }} className="p-1 rounded hover:bg-gray-100" aria-label="menu">
+            <button ref={menuButtonRef} onClick={handleMenuToggle} className="p-1 rounded hover:bg-gray-100" aria-label="menu">
               ⋮
             </button>
-            {openMenu && menuContainer && ReactDOM.createPortal(
-              <div className="fixed" style={{ right: 20, top: 80 }} onClick={(e) => e.stopPropagation()}>
+            {openMenu && menuContainer && menuPosition && ReactDOM.createPortal(
+              <div className="fixed" style={{ top: menuPosition.top, left: menuPosition.left }} onClick={(e) => e.stopPropagation()}>
                 {Menu}
               </div>,
               menuContainer
