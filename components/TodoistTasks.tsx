@@ -19,15 +19,12 @@ interface TodoistTasksProps {
 }
 
 export default function TodoistTasks({
-  token, filter, onChangeFilter, onUpdate, onOpenTaskChat, showHeaderFilters = true, selectedProject, showContextMenu = false,
+  token, filter, onChangeFilter, onUpdate, onOpenTaskChat, showHeaderFilters = true, selectedProject, showContextMenu = true,
 }: TodoistTasksProps) {
   const [tasks, setTasks] = useState<TaskType[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [localSelectedProject, setLocalSelectedProject] = useState<string>('all')
-  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
-  const [showBulkDate, setShowBulkDate] = useState(false)
-  const [bulkDate, setBulkDate] = useState<string>('')
   const lastUpdate = useRef<number>(0)
 
   const effectiveProject = selectedProject ?? localSelectedProject
@@ -36,10 +33,8 @@ export default function TodoistTasks({
     if (!token) return
     if (!silent) setLoading(true)
     try {
-      const [tasksRes, projectsRes] = await Promise.all([
-        fetch(`/api/todoist/tasks?token=${encodeURIComponent(token)}&filter=${encodeURIComponent(filter)}`).then((r) => r.json()).catch(() => ({ tasks: [] })),
-        fetch(`/api/todoist/projects?token=${encodeURIComponent(token)}`, { headers: { 'x-todoist-token': token } }).then((r) => r.json()).catch(() => ({ projects: [] })),
-      ])
+      const tasksRes = await fetch(`/api/todoist/tasks?token=${encodeURIComponent(token)}&filter=${encodeURIComponent(filter)}`).then((r) => r.json()).catch(() => ({ tasks: [] }))
+      const projectsRes = await fetch(`/api/todoist/projects?token=${encodeURIComponent(token)}`, { headers: { 'x-todoist-token': token } }).then((r) => r.json()).catch(() => ({ projects: [] }))
 
       const fetchedTasks = tasksRes.tasks || tasksRes || []
       const mapped = (fetchedTasks as any[]).map((t) => {
@@ -50,14 +45,7 @@ export default function TodoistTasks({
 
       const projectFiltered = effectiveProject === 'all' ? mapped : mapped.filter((t) => t.project_id === effectiveProject)
 
-      if (filter === 'today') {
-        const todayYmd = ymdFromDate(new Date())
-        const overdue = projectFiltered.filter((t) => (t._dueYmd ? t._dueYmd < todayYmd : false))
-        const todayTasks = projectFiltered.filter((t) => (t._dueYmd ? t._dueYmd === todayYmd : false))
-        setTasks([...overdue, ...todayTasks])
-      } else {
-        setTasks(projectFiltered)
-      }
+      setTasks(projectFiltered)
 
       if (Array.isArray(projectsRes)) setProjects(projectsRes)
       else if (projectsRes.projects) setProjects(projectsRes.projects)
@@ -85,83 +73,6 @@ export default function TodoistTasks({
     window.addEventListener('taskUpdated', handleUpdate)
     return () => window.removeEventListener('taskUpdated', handleUpdate)
   }, [token, filter, effectiveProject])
-
-  const toggleSelect = (id: string, checked: boolean) => {
-    setSelectedTasks((prev) => {
-      const copy = new Set(prev)
-      if (checked) copy.add(id)
-      else copy.delete(id)
-      return copy
-    })
-  }
-
-  const executePerIdFallback = async (action: 'delete'|'complete'|'postpone', ids: string[], payloadExtra?: any) => {
-    for (const id of ids) {
-      try {
-        if (action === 'delete') {
-          await fetch('/api/todoist/delete', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-todoist-token': token }, body: JSON.stringify({ id, token }) })
-        } else if (action === 'complete') {
-          await fetch('/api/todoist/complete', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-todoist-token': token }, body: JSON.stringify({ id, token }) })
-        } else if (action === 'postpone') {
-          await fetch('/api/todoist/postpone', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-todoist-token': token }, body: JSON.stringify({ id, token, newDate: payloadExtra?.newDate }) })
-        }
-      } catch (err) {
-        console.error('per-id fallback error for', id, err)
-      }
-    }
-  }
-
-  const handleBulkExecute = async (action: 'delete'|'complete'|'postpone') => {
-    if (!selectedTasks.size) return
-    if (action === 'postpone') { setShowBulkDate(true); return }
-    const ids = Array.from(selectedTasks)
-    const payload: any = { action, ids, payload: { token } }
-    try {
-      const res = await fetch('/api/todoist/batch', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-todoist-token': token }, body: JSON.stringify(payload) })
-      if (!res.ok) {
-        console.warn('batch endpoint failed, falling back to per-id calls', res.status)
-        await executePerIdFallback(action, ids)
-      } else {
-        const j = await res.json().catch(() => ({}))
-        window.dispatchEvent(new CustomEvent('appToast', { detail: { message: j?.message || 'Wykonano akcję zbiorczą' } }))
-      }
-      window.dispatchEvent(new Event('taskUpdated'))
-      setSelectedTasks(new Set())
-    } catch (err) {
-      console.error('bulk action err', err)
-      await executePerIdFallback(action, ids)
-      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Wykonano akcję (fallback per-id)' } }))
-      window.dispatchEvent(new Event('taskUpdated'))
-      setSelectedTasks(new Set())
-    }
-  }
-
-  const handleBulkPostponeConfirm = async () => {
-    if (!bulkDate) return window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Wybierz datę' } }))
-    const ids = Array.from(selectedTasks)
-    const payload: any = { action: 'postpone', ids, payload: { newDate: bulkDate, token } }
-    try {
-      const res = await fetch('/api/todoist/batch', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-todoist-token': token }, body: JSON.stringify(payload) })
-      if (!res.ok) {
-        console.warn('batch postpone failed, falling back per-id', res.status)
-        await executePerIdFallback('postpone', ids, { newDate: bulkDate })
-      }
-      const j = await res.json().catch(() => ({}))
-      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: j?.message || 'Przeniesiono zadania' } }))
-      window.dispatchEvent(new Event('taskUpdated'))
-      setSelectedTasks(new Set())
-      setShowBulkDate(false)
-      setBulkDate('')
-    } catch (err) {
-      console.error('bulk postpone err', err)
-      await executePerIdFallback('postpone', ids, { newDate: bulkDate })
-      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Przeniesiono zadania (fallback)' } }))
-      window.dispatchEvent(new Event('taskUpdated'))
-      setSelectedTasks(new Set())
-      setShowBulkDate(false)
-      setBulkDate('')
-    }
-  }
 
   if (loading) return <p className="text-sm text-neutral-500 mt-4 text-center">⏳ Wczytywanie zadań...</p>
 
@@ -206,11 +117,12 @@ export default function TodoistTasks({
                         task={t}
                         token={token}
                         onAction={() => loadTasks()}
+                        showContextMenu={true}
                         selectable
-                        selected={selectedTasks.has(t.id)}
-                        onSelectChange={(checked) => toggleSelect(t.id, checked)}
-                        showContextMenu={showContextMenu}
+                        selected={false}
+                        onSelectChange={(checked) => {}}
                         onOpen={onOpenTaskChat}
+                        wrapTitle={false}
                       />
                     </div>
                   </div>
@@ -220,29 +132,6 @@ export default function TodoistTasks({
           )}
         </AnimatePresence>
       </div>
-
-      {selectedTasks.size > 0 && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white border rounded-md shadow-md px-4 py-2 flex items-center gap-3 z-50">
-          <div className="text-sm font-medium">{selectedTasks.size} wybranych</div>
-          <button onClick={() => handleBulkExecute('postpone')} className="px-3 py-1 bg-blue-600 text-white rounded">Przenieś</button>
-          <button onClick={() => handleBulkExecute('complete')} className="px-3 py-1 bg-green-600 text-white rounded">Zakończ</button>
-          <button onClick={() => handleBulkExecute('delete')} className="px-3 py-1 bg-red-600 text-white rounded">Usuń</button>
-          <button onClick={() => setSelectedTasks(new Set())} className="px-2 py-1 text-sm">Anuluj</button>
-        </div>
-      )}
-
-      {showBulkDate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white p-4 rounded shadow max-w-sm w-full">
-            <h3 className="font-semibold mb-2">Przenieś zaznaczone zadania</h3>
-            <input type="date" value={bulkDate} onChange={(e) => setBulkDate(e.target.value)} className="w-full border p-2 rounded mb-3" />
-            <div className="flex justify-end gap-2">
-              <button className="px-3 py-2 rounded bg-gray-100" onClick={() => { setShowBulkDate(false); setBulkDate('') }}>Anuluj</button>
-              <button className="px-3 py-2 rounded bg-blue-600 text-white" onClick={handleBulkPostponeConfirm}>Przenieś</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
