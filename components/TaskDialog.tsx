@@ -4,6 +4,36 @@ import React, { useEffect, useState } from 'react'
 import { parseDueToLocalYMD } from '../utils/date'
 import { getEstimate, setEstimate, getHistory } from '../utils/localTaskStore'
 
+// Helper: parse "30m", "2h", "90" => minutes (integer)
+function parseEstimateToMinutes(input: string): number | null {
+  if (!input) return null
+  const s = String(input).trim().toLowerCase()
+  // formats: "30m", "2h", "1h30m", "90"
+  const hMatch = s.match(/(\d+(?:[\.,]\d+)?)h/)
+  const mMatch = s.match(/(\d+(?:[\.,]\d+)?)m/)
+  let minutes = 0
+  if (hMatch) {
+    minutes += Math.round(parseFloat(hMatch[1].replace(',', '.')) * 60)
+  }
+  if (mMatch) {
+    minutes += Math.round(parseFloat(mMatch[1].replace(',', '.')))
+  }
+  if (!hMatch && !mMatch) {
+    // numeric plain minutes
+    const n = parseInt(s.replace(/[^\d]/g, ''), 10)
+    if (!isNaN(n)) minutes = n
+  }
+  return minutes || null
+}
+
+function minutesToLabel(mins?: number | null) {
+  if (!mins && mins !== 0) return ''
+  if (mins < 60) return `${mins}m`
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  return m === 0 ? `${h}h` : `${h}h ${m}m`
+}
+
 export default function TaskDialog({
   task,
   initialTaskData,
@@ -24,14 +54,19 @@ export default function TaskDialog({
     created_at: initialTaskData?.created_at || null,
   })
   const [loading, setLoading] = useState(false)
-  const [estimate, setEstimateLocal] = useState<string>('')
+  const [estimateInput, setEstimateInput] = useState<string>('')
+  const [estimateMinutes, setEstimateMinutes] = useState<number | null>(null)
   const [history, setHistoryState] = useState<any[]>([])
+  const [projects, setProjects] = useState<any[]>([])
+  const [subtasks, setSubtasks] = useState<any[]>([])
+  const [newSub, setNewSub] = useState('')
 
   useEffect(() => {
     let mounted = true
     const load = async () => {
       try {
         setLoading(true)
+        // fetch task detail from backend (should return d.content, d.description, d.project_id, d.project_name, d.due, d.added_at)
         const res = await fetch(`/api/todoist/task?id=${encodeURIComponent(task.id)}`)
         const json = await res.json().catch(() => ({}))
         if (!mounted) return
@@ -57,19 +92,36 @@ export default function TaskDialog({
       }
     }
 
-    const loadLocalMeta = () => {
-      const est = getEstimate(task.id)
-      setEstimateLocal(est?.value ?? '')
-      const h = getHistory(task.id)
-      setHistoryState(h || [])
+    const loadMeta = async () => {
+      try {
+        // projects list for dropdown
+        const pj = await fetch(`/api/todoist/projects?token=${encodeURIComponent((window as any).__TODOIST_TOKEN__ || '')}`).then((r) => r.json()).catch(() => ({}))
+        // backend might return array or {projects:[]}
+        const pjList = Array.isArray(pj) ? pj : pj.projects || []
+        if (mounted) setProjects(pjList)
+
+        const est = getEstimate(task.id)
+        if (mounted) {
+          setEstimateMinutes(est?.minutes ?? null)
+          setEstimateInput(est ? minutesToLabel(est.minutes) : '')
+          setHistoryState(getHistory(task.id) || [])
+        }
+
+        // subtasks: try backend endpoint; if not available, empty
+        const st = await fetch(`/api/todoist/subtasks?parentId=${encodeURIComponent(task.id)}`).then((r) => r.json()).catch(() => ({}))
+        if (mounted) setSubtasks(st?.subtasks || [])
+      } catch (err) {
+        console.error('task dialog meta load err', err)
+      }
     }
 
     load()
-    loadLocalMeta()
+    loadMeta()
     return () => { mounted = false }
   }, [task.id])
 
   const showToast = (msg: string) => {
+    // dispatch appToast (handled by TodoistTasksView)
     window.dispatchEvent(new CustomEvent('appToast', { detail: { message: msg } }))
   }
 
@@ -79,10 +131,17 @@ export default function TaskDialog({
       const payload: any = { id: task.id }
       if (data.description !== undefined) payload.description = data.description
       if (data.due !== undefined) payload.due = data.due || null
-      if (data.project_id !== undefined) payload.project_id = data.project_id
-      await fetch('/api/todoist/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      // project: either project_id if selected or project_name - prefer id
+      if (data.project_id) payload.project_id = data.project_id
+      else if (data.project_name) payload.project_name = data.project_name
+      const res = await fetch('/api/todoist/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '')
+        throw new Error('Błąd API: ' + txt)
+      }
       window.dispatchEvent(new Event('taskUpdated'))
       showToast('Zapisano zmiany')
+      // refresh local history
       setHistoryState(getHistory(task.id))
       onClose?.()
     } catch (err) {
@@ -95,12 +154,47 @@ export default function TaskDialog({
 
   const handleEstimateSave = () => {
     try {
-      setEstimate(task.id, estimate)
-      showToast('Estymata zapisana lokalnie')
+      // parse input to minutes
+      const mins = parseEstimateToMinutes(estimateInput)
+      if (mins == null) {
+        showToast('Nieprawidłowy format estymaty')
+        return
+      }
+      setEstimate(task.id, mins)
+      setEstimateMinutes(mins)
+      showToast('Estymata zapisana (minuty)')
       window.dispatchEvent(new Event('taskUpdated'))
     } catch (err) {
       console.error('estimate save err', err)
       showToast('Błąd zapisu estymaty')
+    }
+  }
+
+  const handleAddSubtask = async () => {
+    if (!newSub.trim()) return
+    try {
+      const res = await fetch('/api/todoist/subtasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ parentId: task.id, content: newSub.trim() }) })
+      const j = await res.json().catch(() => ({}))
+      setSubtasks((s) => [...s, j.subtask])
+      setNewSub('')
+      showToast('Dodano subtask lokalnie')
+      window.dispatchEvent(new Event('taskUpdated'))
+    } catch (err) {
+      console.error('add subtask err', err)
+      showToast('Błąd dodawania subtaska')
+    }
+  }
+
+  const handleToggleSubtask = async (s: any) => {
+    try {
+      const res = await fetch('/api/todoist/subtasks', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ parentId: task.id, subtaskId: s.id, patch: { completed: !s.completed } }) })
+      const j = await res.json().catch(() => ({}))
+      setSubtasks((arr) => arr.map((x) => (x.id === s.id ? j.subtask : x)))
+      showToast('Zaktualizowano subtask')
+      window.dispatchEvent(new Event('taskUpdated'))
+    } catch (err) {
+      console.error('subtask toggle err', err)
+      showToast('Błąd')
     }
   }
 
@@ -117,8 +211,12 @@ export default function TaskDialog({
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-sm text-gray-700">Projekt (nazwa)</label>
-            <input value={data.project_name || data.project_id || ''} onChange={(e) => setData((p: any) => ({ ...p, project_name: e.target.value }))} className="w-full border p-2 rounded" />
+            <label className="text-sm text-gray-700">Projekt</label>
+            <select value={data.project_id || ''} onChange={(e) => setData((p: any) => ({ ...p, project_id: e.target.value }))} className="w-full border p-2 rounded">
+              <option value="">(Brak projektu)</option>
+              {projects.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            <div className="text-xs text-gray-400 mt-1">Możesz zmienić projekt</div>
           </div>
 
           <div>
@@ -129,26 +227,40 @@ export default function TaskDialog({
 
         <div className="grid grid-cols-2 gap-3 items-center">
           <div>
-            <label className="text-sm text-gray-700">Estymowany czas (lokalnie)</label>
-            <div className="flex gap-2">
-              <input value={estimate} onChange={(e) => setEstimateLocal(e.target.value)} className="w-full border p-2 rounded" placeholder="np. 30m / 2h" />
+            <label className="text-sm text-gray-700">Estymowany czas (minuty)</label>
+            <div className="flex gap-2 items-center">
+              <input value={estimateInput} onChange={(e) => setEstimateInput(e.target.value)} className="w-full border p-2 rounded" placeholder="np. 30m / 2h / 90" />
               <button onClick={handleEstimateSave} className="px-3 py-2 bg-violet-600 text-white rounded">Zapisz</button>
             </div>
+            {estimateMinutes !== null && <div className="text-xs text-gray-500 mt-1">Zapisano: {minutesToLabel(estimateMinutes)} ({estimateMinutes} min)</div>}
           </div>
 
           <div>
             <label className="text-sm text-gray-700">Utworzono</label>
             <div className="text-sm text-gray-500">
-              {data.created_at ? `${new Date(data.created_at).toLocaleString()} (${Math.floor((Date.now()-new Date(data.created_at).getTime())/86400000)} dni temu)` : '—'}
+              {data.created_at ? `${new Date(data.created_at).toLocaleString()} (${Math.floor((Date.now() - new Date(data.created_at).getTime()) / 86400000)} dni temu)` : '—'}
             </div>
           </div>
         </div>
 
         <div>
-          <label className="text-sm text-gray-700">Historia przeniesień (lokalnie)</label>
-          <ul className="text-xs text-gray-600 space-y-1 mt-2">
-            {history.length === 0 ? <li className="text-gray-400">Brak zapisanej historii</li> : history.map((h: any, i: number) => <li key={i}>{new Date(h.when).toLocaleString()} — {h.from || '—'} → {h.to || '—'}</li>)}
+          <label className="text-sm text-gray-700">Subtaski</label>
+          <ul className="space-y-2 mt-2">
+            {subtasks.length === 0 ? <div className="text-xs text-gray-400">Brak subtasków</div> : subtasks.map((s) => (
+              <li key={s.id} className="flex items-center gap-2">
+                <input type="checkbox" checked={!!s.completed} onChange={() => handleToggleSubtask(s)} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm truncate">{s.content}</div>
+                  <div className="text-xs text-gray-400">{s.createdAt ? new Date(s.createdAt).toLocaleString() : ''}</div>
+                </div>
+              </li>
+            ))}
           </ul>
+
+          <div className="mt-2 flex gap-2">
+            <input value={newSub} onChange={(e) => setNewSub(e.target.value)} placeholder="Nowy subtask..." className="flex-1 border p-2 rounded" />
+            <button onClick={handleAddSubtask} className="px-3 py-2 bg-green-600 text-white rounded">Dodaj</button>
+          </div>
         </div>
 
         <div className="flex justify-end gap-2">
