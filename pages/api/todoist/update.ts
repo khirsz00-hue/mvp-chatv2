@@ -1,8 +1,22 @@
-// Lightweight update endpoint that accepts POST and PUT.
-// By default it returns success (so frontend doesn't get 405).
-// Replace TODO with actual Todoist API call if you want to push updates to Todoist.
+// pages/api/todoist/update.ts
+// Accepts POST/PUT to update a task. For robustness in this environment we store
+// updates in an in-memory overrides map so subsequent GET /api/todoist/task returns updated fields.
+// If you want to actually propagate changes to Todoist, add a fetch request to the Todoist REST API
+// using payload.token or Authorization header (see TODO comments).
 
 import type { NextApiRequest, NextApiResponse } from 'next'
+
+type Override = {
+  id: string
+  content?: string
+  description?: string
+  project_id?: string
+  project_name?: string
+  due?: string | null
+  created_at?: string | number | null
+}
+
+const overrides = (global as any)._todoist_overrides ||= new Map<string, Override>()
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST' && req.method !== 'PUT') {
@@ -14,14 +28,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const id = payload?.id
   if (!id) return res.status(400).json({ error: 'id required' })
 
-  try {
-    // TODO: If you want server to update Todoist, do it here:
-    // fetch('https://api.todoist.com/rest/v2/tasks/{id}', {...}) using token from payload.token or Authorization header.
+  // If you want to proxy to Todoist, implement it here:
+  // TODO: if (payload.token) -> call Todoist REST to update task fields.
 
-    // For now respond with success so front-end can continue and re-fetch task if needed.
-    return res.status(200).json({ ok: true, id })
-  } catch (err) {
-    console.error('update api error', err)
-    return res.status(500).json({ error: String(err) })
+  // Merge into overrides
+  const existing = overrides.get(String(id)) || { id }
+  const updated: Override = {
+    ...existing,
+    ...payload,
   }
+  overrides.set(String(id), updated)
+
+  return res.status(200).json({ ok: true, id: String(id), updated })
 }
