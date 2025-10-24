@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react'
 import { parseDueToLocalYMD } from '../utils/date'
 import { getEstimate, setEstimate, getHistory, listSubtasksLocal, addSubtaskLocal, updateSubtaskLocal } from '../utils/localTaskStore'
 
-// helpers...
 function parseEstimateToMinutes(input: string): number | null {
   if (!input) return null
   const s = String(input).trim().toLowerCase()
@@ -57,7 +56,6 @@ const TaskDialog: React.FC<Props> = ({ task, token, initialTaskData, initialIsLo
     let mounted = true
 
     const load = async () => {
-      // If opened for a local subtask (we passed initialIsLocal), skip remote fetch to avoid 404s and use provided data.
       if (!initialIsLocal) {
         setLoading(true)
         try {
@@ -83,8 +81,6 @@ const TaskDialog: React.FC<Props> = ({ task, token, initialTaskData, initialIsLo
             }))
           } else {
             // keep initial data if fetch fails
-            const txt = await res.text().catch(() => '')
-            console.debug('task fetch not ok', txt || res.status)
           }
         } catch (err) {
           console.error('task dialog fetch err', err)
@@ -103,7 +99,6 @@ const TaskDialog: React.FC<Props> = ({ task, token, initialTaskData, initialIsLo
           const pjList = Array.isArray(pj) ? pj : pj.projects || []
           if (mounted) setProjects(pjList)
         }
-
         const est = getEstimate(task.id)
         if (mounted) {
           setEstimateMinutes(est?.minutes ?? null)
@@ -132,8 +127,7 @@ const TaskDialog: React.FC<Props> = ({ task, token, initialTaskData, initialIsLo
     load()
     loadMeta()
     return () => { mounted = false }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [task.id, token])
+  }, [task.id, token, initialIsLocal, initialTaskData])
 
   const showToast = (msg: string) => window.dispatchEvent(new CustomEvent('appToast', { detail: { message: msg } }))
 
@@ -275,7 +269,6 @@ const TaskDialog: React.FC<Props> = ({ task, token, initialTaskData, initialIsLo
 
   const openSubtaskDialog = (s: any, e?: React.MouseEvent) => {
     if (e) e.stopPropagation()
-    // include full initialTaskData and flag as local subtask (so TaskDialog won't attempt remote fetch)
     const detail = { id: s.id, title: s.content, initialTaskData: { description: s.content, created_at: s.createdAt, __local: true, parentId: s.parentId }, initialIsLocal: true }
     window.dispatchEvent(new CustomEvent('openTaskFromSubtask', { detail }))
   }
