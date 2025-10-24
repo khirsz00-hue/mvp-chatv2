@@ -1,48 +1,50 @@
-// Simple API route for subtasks. If Todoist backend is available, you can extend this handler
-// to proxy calls to Todoist REST using the provided token.
-// For now this implements an in-memory/local fallback persisted in-memory (ephemeral) and returns 404 only when method not allowed.
+// pages/api/todoist/batch.ts
+// Accepts POST { action, ids, payload } and applies changes in-memory
+// (postpone/delete/complete). Returns per-id results.
+// If you want server-side Todoist operations, proxy calls to Todoist using payload.token.
 
 import type { NextApiRequest, NextApiResponse } from 'next'
 
-type Subtask = { id: string; parentId: string; content: string; createdAt: number; completed?: boolean }
-const store = new Map<string, Subtask[]>()
+const overrides = (global as any)._todoist_overrides ||= new Map<string, any>()
+const deleted = (global as any)._todoist_deleted ||= new Set<string>()
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method === 'GET') {
-    const parentId = String(req.query.parentId || '')
-    if (!parentId) return res.status(400).json({ error: 'parentId required' })
-
-    // Try to proxy to real backend if needed - TODO: implement proxy to real Todoist if desired
-    // Fallback to local store
-    const arr = store.get(parentId) || []
-    return res.status(200).json({ subtasks: arr })
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', ['POST'])
+    return res.status(405).end('Method Not Allowed')
   }
 
-  if (req.method === 'POST') {
-    const { parentId, content } = req.body || {}
-    if (!parentId || !content) return res.status(400).json({ error: 'parentId and content required' })
+  const { action, ids, payload } = req.body || {}
+  if (!action || !Array.isArray(ids)) return res.status(400).json({ error: 'action and ids required' })
 
-    // Try to proxy to real backend if desired (not implemented)
-    // Fallback: store locally in memory
-    const arr = store.get(parentId) || []
-    const id = `st_${Date.now()}_${Math.floor(Math.random()*10000)}`
-    const s: Subtask = { id, parentId, content, createdAt: Date.now(), completed: false }
-    arr.push(s)
-    store.set(parentId, arr)
-    return res.status(201).json({ subtask: s })
+  const results: any[] = []
+
+  for (const id of ids) {
+    try {
+      if (action === 'delete') {
+        // mark deleted locally
+        deleted.add(String(id))
+        results.push({ id, ok: true, action: 'deleted' })
+      } else if (action === 'complete') {
+        // mark as completed locally by setting a flag in overrides
+        const ex = overrides.get(String(id)) || { id }
+        ex.completed = true
+        overrides.set(String(id), ex)
+        results.push({ id, ok: true, action: 'completed' })
+      } else if (action === 'postpone') {
+        const newDate = payload?.newDate
+        if (!newDate) { results.push({ id, ok: false, error: 'newDate required' }); continue }
+        const ex = overrides.get(String(id)) || { id }
+        ex.due = newDate
+        overrides.set(String(id), ex)
+        results.push({ id, ok: true, action: 'postponed', newDate })
+      } else {
+        results.push({ id, ok: false, error: 'unknown action' })
+      }
+    } catch (err) {
+      results.push({ id, ok: false, error: String(err) })
+    }
   }
 
-  if (req.method === 'PATCH') {
-    const { parentId, subtaskId, patch } = req.body || {}
-    if (!parentId || !subtaskId || !patch) return res.status(400).json({ error: 'parentId, subtaskId and patch required' })
-    const arr = store.get(parentId) || []
-    const idx = arr.findIndex((s) => s.id === subtaskId)
-    if (idx === -1) return res.status(404).json({ error: 'subtask not found' })
-    arr[idx] = { ...arr[idx], ...patch }
-    store.set(parentId, arr)
-    return res.status(200).json({ subtask: arr[idx] })
-  }
-
-  res.setHeader('Allow', ['GET', 'POST', 'PATCH'])
-  res.status(405).end('Method Not Allowed')
+  return res.status(200).json({ results, message: `Batch executed: ${action} on ${ids.length} items` })
 }
