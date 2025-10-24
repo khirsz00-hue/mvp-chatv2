@@ -66,10 +66,6 @@ export default function WeekView({
     if (typeof document !== 'undefined') document.body.classList.add('dragging-active')
   }
 
-  const handleDragUpdate = (update: any) => {
-    // nothing special for now
-  }
-
   const handleDragEnd = (result: any) => {
     try {
       const { destination, source, draggableId } = result
@@ -92,9 +88,7 @@ export default function WeekView({
       setColumns(newColumns)
 
       if (source.droppableId !== destination.droppableId) {
-        // optimistic: inform parent
         onMove?.(draggableId, destination.droppableId)
-        // append local history
         try { appendHistory(draggableId, source.droppableId, destination.droppableId) } catch {}
       }
     } catch (err) {
@@ -131,7 +125,7 @@ export default function WeekView({
         <h2 className="text-lg font-semibold text-gray-800 tracking-tight">{format(weekStart, 'd MMM', { locale: pl })} – {format(addDays(weekStart, 6), 'd MMM yyyy', { locale: pl })}</h2>
       </div>
 
-      <DragDropContext onDragStart={handleDragStart} onDragUpdate={handleDragUpdate} onDragEnd={handleDragEnd}>
+      <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-1 md:grid-cols-7 gap-3 px-2 md:px-3 pb-6 flex-1 overflow-x-auto w-full">
           {days.map((date) => {
             const key = format(date, 'yyyy-MM-dd')
@@ -158,11 +152,11 @@ export default function WeekView({
                             return (
                               <div ref={prov.innerRef} {...prov.draggableProps} {...prov.dragHandleProps} className="task-card-outer mb-2" style={{ ...prov.draggableProps.style }}>
                                 <div className={`task-card-inner flex items-start gap-2 p-3 rounded-lg shadow-sm border border-gray-100 cursor-grab ${isDragging ? 'z-50 bg-white' : 'bg-white'}`}>
-                                  <div className="flex-1" onClick={() => onOpenTask?.(task)}>
+                                  <div className="flex-1 min-w-0" onClick={() => onOpenTask?.(task)}>
                                     <div className="flex justify-between items-start gap-2">
-                                      <div>
-                                        <div className="text-sm font-medium text-gray-800 truncate">{task.content}</div>
-                                        <div className="text-xs text-gray-500 mt-1">{task.project_name || ''}</div>
+                                      <div className="min-w-0">
+                                        <div className="text-sm font-medium text-gray-800 truncate break-words">{task.content}</div>
+                                        <div className="text-xs text-gray-500 mt-1 truncate">{task.project_name || ''}</div>
                                       </div>
                                       <div className="flex items-center gap-2">
                                         <button title="Ukończ" onClick={() => handleCompleteClick(task.id)} className="p-1 rounded-full hover:bg-gray-100">
