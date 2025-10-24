@@ -23,6 +23,7 @@ export default function TaskCard({
   task,
   token,
   showContextMenu = true,
+  inlineActions = false,
   onAction,
   onHelp,
   selectable = false,
@@ -34,6 +35,7 @@ export default function TaskCard({
   task: TaskType
   token?: string
   showContextMenu?: boolean
+  inlineActions?: boolean
   onAction?: () => void
   onHelp?: (task: TaskType) => void
   selectable?: boolean
@@ -61,6 +63,7 @@ export default function TaskCard({
       onAction?.()
     } catch (err) {
       console.error('complete error', err)
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd ukończenia' } }))
     }
   }
 
@@ -73,6 +76,7 @@ export default function TaskCard({
       onAction?.()
     } catch (err) {
       console.error('delete error', err)
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd usuwania' } }))
     }
   }
 
@@ -86,13 +90,18 @@ export default function TaskCard({
       onAction?.()
     } catch (err) {
       console.error('move error', err)
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd przeniesienia' } }))
     }
   }
 
   const handleHelp = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation()
+    // Emit a consistent event used by NewChatSidebar
     const detail = { task: { id: task.id, title: task.content, description: task.description } }
     window.dispatchEvent(new CustomEvent('taskHelp', { detail }))
+    // Also emit aiOpen so any AI view can open immediately
+    window.dispatchEvent(new CustomEvent('aiInitial', { detail: { id: task.id, title: task.content, description: task.description } }))
+    window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Odpowiedź w toku...' } }))
     onHelp?.(task)
     setOpenMenu(false)
   }
@@ -128,7 +137,7 @@ export default function TaskCard({
           </div>
         </div>
 
-        {showContextMenu && (
+        {showContextMenu && !inlineActions && (
           <div className="relative">
             <button onClick={(e) => { e.stopPropagation(); setOpenMenu((s) => !s) }} className="p-1 rounded hover:bg-gray-100" aria-label="menu">
               ⋮
@@ -150,10 +159,20 @@ export default function TaskCard({
           {estLabel ? <span className="ml-2 text-xs bg-slate-100 px-2 py-0.5 rounded">Est: {estLabel}</span> : null}
         </div>
 
-        <div className="flex items-center gap-2">
-          <button onClick={(e) => { e.stopPropagation(); handleHelp() }} className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded">Pomóż mi</button>
-          <button onClick={(e) => { e.stopPropagation(); onOpen?.(task) }} className="px-2 py-1 text-xs bg-gray-100 rounded">Szczegóły</button>
-        </div>
+        {inlineActions ? (
+          <div className="flex items-center gap-2">
+            <button onClick={(e) => { e.stopPropagation(); handleHelp() }} className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded">Pomóż mi</button>
+            <button onClick={(e) => { e.stopPropagation(); handleComplete() }} className="px-2 py-1 text-xs bg-green-50 text-green-700 rounded">Ukończ</button>
+            <button onClick={(e) => { e.stopPropagation(); handleMove() }} className="px-2 py-1 text-xs bg-yellow-50 text-yellow-700 rounded">Przenieś</button>
+            <button onClick={(e) => { e.stopPropagation(); handleDelete() }} className="px-2 py-1 text-xs bg-red-50 text-red-700 rounded">Usuń</button>
+            <button onClick={(e) => { e.stopPropagation(); onOpen?.(task) }} className="px-2 py-1 text-xs bg-gray-100 rounded">Szczegóły</button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <button onClick={(e) => { e.stopPropagation(); handleHelp() }} className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded">Pomóż mi</button>
+            <button onClick={(e) => { e.stopPropagation(); onOpen?.(task) }} className="px-2 py-1 text-xs bg-gray-100 rounded">Szczegóły</button>
+          </div>
+        )}
       </div>
     </motion.div>
   )
