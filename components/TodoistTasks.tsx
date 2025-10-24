@@ -44,7 +44,8 @@ export default function TodoistTasks({
       const fetchedTasks = tasksRes.tasks || tasksRes || []
       const mapped = (fetchedTasks as any[]).map((t) => {
         const _dueYmd = parseDueToLocalYMD(t.due)
-        return { ...t, due: t.due, _dueYmd, description: t.description || t.note || '' } as TaskType
+        const created = t.added_at || t.date_added || t.created_at || null
+        return { ...t, due: t.due, _dueYmd, description: t.description || t.note || '', created_at: created } as TaskType
       })
 
       const projectFiltered = effectiveProject === 'all' ? mapped : mapped.filter((t) => t.project_id === effectiveProject)
@@ -94,20 +95,44 @@ export default function TodoistTasks({
     })
   }
 
+  const executePerIdFallback = async (action: 'delete'|'complete'|'postpone', ids: string[], payloadExtra?: any) => {
+    for (const id of ids) {
+      try {
+        if (action === 'delete') {
+          await fetch('/api/todoist/delete', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-todoist-token': token }, body: JSON.stringify({ id, token }) })
+        } else if (action === 'complete') {
+          await fetch('/api/todoist/complete', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-todoist-token': token }, body: JSON.stringify({ id, token }) })
+        } else if (action === 'postpone') {
+          await fetch('/api/todoist/postpone', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-todoist-token': token }, body: JSON.stringify({ id, token, newDate: payloadExtra?.newDate }) })
+        }
+      } catch (err) {
+        console.error('per-id fallback error for', id, err)
+      }
+    }
+  }
+
   const handleBulkExecute = async (action: 'delete'|'complete'|'postpone') => {
     if (!selectedTasks.size) return
     if (action === 'postpone') { setShowBulkDate(true); return }
     const ids = Array.from(selectedTasks)
     const payload: any = { action, ids, payload: { token } }
     try {
-      const res = await fetch('/api/todoist/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-      const json = await res.json().catch(() => ({}))
+      const res = await fetch('/api/todoist/batch', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-todoist-token': token }, body: JSON.stringify(payload) })
+      if (!res.ok) {
+        console.warn('batch endpoint failed, falling back to per-id calls', res.status)
+        await executePerIdFallback(action, ids)
+      } else {
+        const j = await res.json().catch(() => ({}))
+        window.dispatchEvent(new CustomEvent('appToast', { detail: { message: j?.message || 'Wykonano akcję zbiorczą' } }))
+      }
       window.dispatchEvent(new Event('taskUpdated'))
       setSelectedTasks(new Set())
-      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: json?.message || 'Wykonano akcję' } }))
     } catch (err) {
       console.error('bulk action err', err)
-      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd akcji zbiorczej' } }))
+      await executePerIdFallback(action, ids)
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Wykonano akcję (fallback per-id)' } }))
+      window.dispatchEvent(new Event('taskUpdated'))
+      setSelectedTasks(new Set())
     }
   }
 
@@ -116,16 +141,25 @@ export default function TodoistTasks({
     const ids = Array.from(selectedTasks)
     const payload: any = { action: 'postpone', ids, payload: { newDate: bulkDate, token } }
     try {
-      const res = await fetch('/api/todoist/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-      const json = await res.json().catch(() => ({}))
+      const res = await fetch('/api/todoist/batch', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-todoist-token': token }, body: JSON.stringify(payload) })
+      if (!res.ok) {
+        console.warn('batch postpone failed, falling back per-id', res.status)
+        await executePerIdFallback('postpone', ids, { newDate: bulkDate })
+      }
+      const j = await res.json().catch(() => ({}))
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: j?.message || 'Przeniesiono zadania' } }))
       window.dispatchEvent(new Event('taskUpdated'))
       setSelectedTasks(new Set())
       setShowBulkDate(false)
       setBulkDate('')
-      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: json?.message || 'Przeniesiono zadania' } }))
     } catch (err) {
       console.error('bulk postpone err', err)
-      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd przenoszenia' } }))
+      await executePerIdFallback('postpone', ids, { newDate: bulkDate })
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Przeniesiono zadania (fallback)' } }))
+      window.dispatchEvent(new Event('taskUpdated'))
+      setSelectedTasks(new Set())
+      setShowBulkDate(false)
+      setBulkDate('')
     }
   }
 
