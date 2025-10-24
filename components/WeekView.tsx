@@ -108,7 +108,6 @@ export default function WeekView({
                         {dayTasks.map((task: any, idx: number) => (
                           <Draggable draggableId={String(task.id)} index={idx} key={task.id}>
                             {(prov: any, snap: any) => {
-                              // ensure draggable fills column width to prevent layout jumps
                               const style = { ...prov.draggableProps.style, width: '100%' }
                               return (
                                 <motion.div
@@ -123,7 +122,6 @@ export default function WeekView({
                                 >
                                   <div className={`p-2 rounded-lg shadow-sm border bg-white ${snap.isDragging ? 'z-50 scale-105' : ''}`}>
                                     <div className="flex items-start gap-3">
-                                      {/* checkbox for quick complete */}
                                       <input type="checkbox" className="mt-2" onClick={(e) => { e.stopPropagation(); onComplete?.(task.id) }} />
                                       <div className="flex-1" onClick={() => onOpenTask?.(task)}>
                                         <TaskCard task={task} token={undefined} selectable={false} onOpen={onOpenTask} wrapTitle />
