@@ -4,40 +4,67 @@ import React, { useEffect, useRef, useState } from 'react'
 
 type Message = { id: string; role: 'user' | 'assistant' | 'system'; text: string; ts?: number }
 
-export default function TodoistAIView({ initialTaskId }: { initialTaskId?: string }) {
+export default function TodoistAIView({
+  token,
+  assistant,
+  initialTaskId,
+}: {
+  token?: string
+  assistant?: string
+  initialTaskId?: string
+}) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
-  const pendingRef = useRef(new Set<string>()) // to prevent duplicate user echoes
+  const pendingRef = useRef(new Set<string>()) // prevent duplicate user echoes
   const containerRef = useRef<HTMLDivElement | null>(null)
+
+  const sessionStorageKey = (sessionId: string) => `ai_sent__${assistant || 'assistant'}__${sessionId}`
 
   useEffect(() => {
     const onInitial = (ev: any) => {
       const d = ev?.detail
       if (!d?.id) return
-      // build initial user prompt from task
-      const msgId = `init-${d.id}`
+      const sessionId = d.id
+      const msgId = `init-${sessionId}`
+      // sessionStorage guard (prevents duplicates across components)
+      try {
+        if (sessionStorage.getItem(sessionStorageKey(sessionId))) return
+        sessionStorage.setItem(sessionStorageKey(sessionId), '1')
+      } catch {}
+
+      // build initial user prompt
+      const text = `Pomóż mi z zadaniem: "${d.title || ''}". Opis: ${d.description || ''}`.trim()
       if (pendingRef.current.has(msgId)) return
       pendingRef.current.add(msgId)
-      const text = `Pomóż mi z zadaniem: "${d.title || ''}". Opis: ${d.description || ''}`.trim()
-      // push user message once
+      // append user message locally
       setMessages((m) => [...m, { id: msgId, role: 'user', text, ts: Date.now() }])
-      // call AI endpoint (example: /api/ai/chat) - here we simulate via local fetch
-      fetch('/api/ai/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: text, taskId: d.id }) })
+
+      // call backend AI
+      fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ message: text, assistant: assistant || 'Todoist Helper', sessionId }),
+      })
         .then((r) => r.json())
         .then((j) => {
-          if (j?.reply) {
-            setMessages((m) => [...m, { id: `${msgId}-resp`, role: 'assistant', text: j.reply, ts: Date.now() }])
-            scrollToBottom()
-          }
+          const reply = j?.reply || j?.content || 'Brak odpowiedzi od AI.'
+          setMessages((m) => [...m, { id: `${msgId}-resp`, role: 'assistant', text: reply, ts: Date.now() }])
+          scrollToBottom()
         })
         .catch((e) => {
           console.error('ai error', e)
         })
+        .finally(() => {
+          pendingRef.current.delete(msgId)
+        })
     }
+
     const onOpenFromSub = (ev: any) => {
       const d = ev?.detail
       if (!d?.id) return
-      // treat like initial
       onInitial({ detail: { id: d.id, title: d.title, description: '' } })
     }
 
@@ -47,7 +74,17 @@ export default function TodoistAIView({ initialTaskId }: { initialTaskId?: strin
       window.removeEventListener('aiInitial', onInitial)
       window.removeEventListener('openTaskFromSubtask', onOpenFromSub)
     }
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assistant, token])
+
+  useEffect(() => {
+    // optional: if an initialTaskId prop is provided, emit an aiInitial-like action
+    if (initialTaskId) {
+      const ev = new CustomEvent('aiInitial', { detail: { id: initialTaskId, title: '', description: '' } })
+      window.dispatchEvent(ev)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTaskId])
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -58,19 +95,24 @@ export default function TodoistAIView({ initialTaskId }: { initialTaskId?: strin
   const sendMessage = async () => {
     if (!input.trim()) return
     const id = `u-${Date.now()}`
-    // prevent double echo: add to pending then only append once
     if (pendingRef.current.has(id)) return
     pendingRef.current.add(id)
     setMessages((m) => [...m, { id, role: 'user', text: input, ts: Date.now() }])
-    const payload = { prompt: input }
+    const payload = { prompt: input, assistant: assistant || 'Assistant' }
     setInput('')
     try {
-      const res = await fetch('/api/ai/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      })
       const j = await res.json().catch(() => ({}))
-      if (j?.reply) {
-        setMessages((m) => [...m, { id: `${id}-r`, role: 'assistant', text: j.reply, ts: Date.now() }])
-        scrollToBottom()
-      }
+      const reply = j?.reply || j?.content || 'Brak odpowiedzi od AI.'
+      setMessages((m) => [...m, { id: `${id}-r`, role: 'assistant', text: reply, ts: Date.now() }])
+      scrollToBottom()
     } catch (e) {
       console.error('send ai error', e)
     } finally {
