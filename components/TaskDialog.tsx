@@ -152,8 +152,14 @@ const TaskDialog: React.FC<Props> = ({ task, token, initialTaskData, mode = 'tas
         throw new Error(txt || `Błąd API (${res.status})`)
       }
       await res.json().catch(() => ({}))
+
+      // Notify other components — include updated fields so parent can update its local list immediately
+      const detail = { id: task.id, description: payload.description, project_id: payload.project_id, project_name: payload.project_name, due: payload.due }
+      window.dispatchEvent(new CustomEvent('taskSaved', { detail }))
+
       window.dispatchEvent(new Event('taskUpdated'))
       showToast('Zapisano zmiany')
+
       // re-fetch to update dialog fields if possible
       try {
         const refetchUrl = `/api/todoist/task?id=${encodeURIComponent(task.id)}${token ? `&token=${encodeURIComponent(token)}` : ''}`
@@ -263,6 +269,12 @@ const TaskDialog: React.FC<Props> = ({ task, token, initialTaskData, mode = 'tas
     }
   }
 
+  const openSubtaskDialog = (s: any, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
+    // Notify parent to open a TaskDialog for this subtask id (parent will attempt to fetch details)
+    window.dispatchEvent(new CustomEvent('openTaskFromSubtask', { detail: { id: s.id, title: s.content } }))
+  }
+
   return (
     <div className="max-w-2xl w-full bg-white rounded-lg p-5 shadow-lg">
       <div className="flex items-center justify-between mb-3">
@@ -312,12 +324,12 @@ const TaskDialog: React.FC<Props> = ({ task, token, initialTaskData, mode = 'tas
           <label className="text-sm text-gray-700">Subtaski</label>
           <ul className="space-y-2 mt-2">
             {subtasks.length === 0 ? <div className="text-xs text-gray-400">Brak subtasków</div> : subtasks.map((s) => (
-              <li key={s.id} className="flex items-center gap-2">
-                <input type="checkbox" checked={!!s.completed} onChange={() => handleToggleSubtask(s)} />
-                <div className="flex-1 min-w-0">
+              <li key={s.id} className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                <input type="checkbox" checked={!!s.completed} onChange={(e) => { e.stopPropagation(); handleToggleSubtask(s) }} />
+                <button onClick={(e) => openSubtaskDialog(s, e)} className="flex-1 text-left min-w-0">
                   <div className="text-sm truncate">{s.content}</div>
                   <div className="text-xs text-gray-400">{s.createdAt ? new Date(s.createdAt).toLocaleString() : ''}</div>
-                </div>
+                </button>
               </li>
             ))}
           </ul>
