@@ -55,6 +55,7 @@ export default function WeekView({
     if (!destination) return
     if (source.droppableId === destination.droppableId && source.index === destination.index) return
 
+    // update local columns for immediate feedback
     const src = Array.from(columns[source.droppableId] || [])
     const [moved] = src.splice(source.index, 1)
     const dst = Array.from(columns[destination.droppableId] || [])
@@ -122,9 +123,11 @@ export default function WeekView({
                                 >
                                   <div className={`p-2 rounded-lg shadow-sm border bg-white ${snap.isDragging ? 'z-50 scale-105' : ''}`}>
                                     <div className="flex items-start gap-3">
+                                      {/* only checkbox for quick complete in week view */}
                                       <input type="checkbox" className="mt-2" onClick={(e) => { e.stopPropagation(); onComplete?.(task.id) }} />
                                       <div className="flex-1" onClick={() => onOpenTask?.(task)}>
-                                        <TaskCard task={task} token={undefined} selectable={false} onOpen={onOpenTask} wrapTitle />
+                                        {/* Week view uses context menu only (no inline actions) */}
+                                        <TaskCard task={task} token={undefined} selectable={false} showContextMenu wrapTitle />
                                       </div>
                                     </div>
                                   </div>
