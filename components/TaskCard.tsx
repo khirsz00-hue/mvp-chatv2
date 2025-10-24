@@ -46,7 +46,7 @@ export default function TaskCard({
   const [menuContainer, setMenuContainer] = useState<HTMLElement | null>(null)
 
   useEffect(() => {
-    setMenuContainer(document.body)
+    setMenuContainer(typeof document !== 'undefined' ? document.body : null)
   }, [])
 
   const dueYmd = task._dueYmd ?? parseDueToLocalYMD(task.due)
@@ -97,7 +97,6 @@ export default function TaskCard({
     setOpenMenu(false)
   }
 
-  // Menu rendered in portal to avoid overflow clipping
   const Menu = (
     <div className="w-44 bg-white border rounded-md shadow-lg z-50">
       <button onClick={(e) => { e.stopPropagation(); handleHelp(e) }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm">Pomóż mi</button>
