@@ -53,13 +53,19 @@ export default function TodoistTasksView({
     }
     window.addEventListener('appToast', handler)
 
+    // open TaskDialog when subtask requests it (accept initialTaskData for local subtasks)
     const openFromSub = (ev: any) => {
       const d = ev?.detail
       if (!d?.id) return
-      setOpenTask({ id: d.id, title: d.title || 'Subtask' })
+      if (d.initialTaskData) {
+        setOpenTask({ id: d.id, title: d.title || 'Subtask', initialTaskData: d.initialTaskData, initialIsLocal: !!d.initialIsLocal })
+      } else {
+        setOpenTask({ id: d.id, title: d.title || 'Subtask' })
+      }
     }
     window.addEventListener('openTaskFromSubtask', openFromSub)
 
+    // update local tasks list immediately when TaskDialog dispatches saved detail
     const onTaskSaved = (ev: any) => {
       const d = ev?.detail
       if (!d?.id) return
@@ -267,7 +273,7 @@ export default function TodoistTasksView({
     setOpenTask({ id: taskObj.id, title: taskObj.content, description: taskObj.description })
   }
 
-  // month grouped rendering - omitted for brevity in this snippet (keeps same behavior)
+  // month grouped rendering - badge inline near date
   const renderMonthGrouped = () => {
     const groups: Record<string, any[]> = {}
     for (const t of tasks) {
@@ -287,8 +293,8 @@ export default function TodoistTasksView({
                 <div className="text-sm font-semibold text-gray-600">{k === 'no-date' ? 'Brak terminu' : k}</div>
                 <div>
                   {k !== 'no-date' && (
-                    <div className={`text-xs px-2 py-0.5 rounded ${daysTo !== null && daysTo <= 0 ? 'bg-yellow-50 text-yellow-700' : 'bg-blue-50 text-blue-700'}`}>
-                      {daysTo !== null ? (daysTo === 0 ? 'dzisiaj' : `za ${daysTo}d`) : ''}
+                    <div className={`inline-flex items-center gap-2 text-xs px-2 py-0.5 rounded ${daysTo !== null && daysTo <= 0 ? 'bg-yellow-50 text-yellow-700' : 'bg-blue-50 text-blue-700'}`}>
+                      <span>{daysTo !== null ? (daysTo === 0 ? 'dzisiaj' : `za ${daysTo}d`) : ''}</span>
                     </div>
                   )}
                 </div>
@@ -362,7 +368,7 @@ export default function TodoistTasksView({
         ) : filter === '30 days' ? (
           renderMonthGrouped()
         ) : (
-          <TodoistTasks token={token} filter={filter} onChangeFilter={setFilter} onUpdate={() => fetchTasks(refreshFilter)} onOpenTaskChat={(t: any) => setOpenTask({ id: t.id, title: t.content, description: t.description })} showHeaderFilters={false} selectedProject={selectedProject} showContextMenu={false} />
+          <TodoistTasks token={token} filter={filter} onChangeFilter={setFilter} onUpdate={() => fetchTasks(refreshFilter)} onOpenTaskChat={(t: any) => setOpenTask({ id: t.id, title: t.content, description: t.description })} showHeaderFilters={false} selectedProject={selectedProject} showContextMenu={true} />
         )}
       </div>
 
@@ -373,7 +379,7 @@ export default function TodoistTasksView({
       <AnimatePresence>
         {openTask && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4" onClick={() => setOpenTask(null)}>
           <motion.div initial={{ scale: 0.98, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.98, y: 10 }} className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-5" onClick={(e) => e.stopPropagation()}>
-            <TaskDialog token={token} task={{ id: openTask.id, title: openTask.title }} initialTaskData={{ description: openTask.description, project_name: openTask.project_name, project_id: openTask.project_id, due: openTask._dueYmd, created_at: openTask.created_at }} onClose={() => { setOpenTask(null); fetchTasks(refreshFilter) }} />
+            <TaskDialog token={token} task={{ id: openTask.id, title: openTask.title }} initialTaskData={openTask.initialTaskData} initialIsLocal={openTask.initialIsLocal} onClose={() => { setOpenTask(null); fetchTasks(refreshFilter) }} />
           </motion.div>
         </motion.div>}
       </AnimatePresence>
