@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { format, addDays, startOfWeek, startOfDay } from 'date-fns'
 import { pl } from 'date-fns/locale'
-import { DragDropContext, Droppable, Draggable, DroppableProvided, DroppableStateSnapshot, DraggableProvided, DraggableStateSnapshot } from 'react-beautiful-dnd'
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'
 import TaskCard from './TaskCard'
 import { Plus } from 'lucide-react'
 import { parseDueToLocalYMD } from '../utils/date'
@@ -37,7 +37,7 @@ export default function WeekView({
   useEffect(() => {
     // group tasks by date (yyyy-MM-dd)
     const grouped: Record<string, any[]> = {}
-    days.forEach((d) => grouped[format(d, 'yyyy-MM-dd')] = [])
+    days.forEach((d) => (grouped[format(d, 'yyyy-MM-dd')] = []))
     const firstKey = format(days[0], 'yyyy-MM-dd')
     for (const t of tasks) {
       const key = t._dueYmd ?? (t.due?.date ?? (typeof t.due === 'string' ? t.due : null))
@@ -62,18 +62,22 @@ export default function WeekView({
 
     if (source.droppableId !== destination.droppableId) {
       onMove?.(draggableId, destination.droppableId)
-      try { appendHistory(draggableId, source.droppableId, destination.droppableId) } catch {}
+      try {
+        appendHistory(draggableId, source.droppableId, destination.droppableId)
+      } catch {}
     }
   }
 
-  if (!columns || Object.values(columns).every(c => c.length === 0)) {
+  if (!columns || Object.values(columns).every((c) => c.length === 0)) {
     return <div className="flex items-center justify-center h-full text-gray-400 text-sm italic">Brak zadań w tym tygodniu.</div>
   }
 
   return (
     <div className="flex flex-col h-full bg-gray-50 w-full">
       <div className="text-center py-3 border-b border-gray-200 bg-white mb-3">
-        <h2 className="text-lg font-semibold text-gray-800">{format(weekStart, 'd MMM', { locale: pl })} – {format(addDays(weekStart, 6), 'd MMM yyyy', { locale: pl })}</h2>
+        <h2 className="text-lg font-semibold text-gray-800">
+          {format(weekStart, 'd MMM', { locale: pl })} – {format(addDays(weekStart, 6), 'd MMM yyyy', { locale: pl })}
+        </h2>
       </div>
 
       <DragDropContext onDragEnd={handleDragEnd}>
@@ -84,7 +88,7 @@ export default function WeekView({
             const isToday = key === format(today, 'yyyy-MM-dd')
             return (
               <Droppable droppableId={key} key={key}>
-                {(provided: DroppableProvided, snapshot: DroppableStateSnapshot) => (
+                {(provided: any, snapshot: any) => (
                   <div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
@@ -94,7 +98,14 @@ export default function WeekView({
                       <div className="flex items-center justify-between">
                         <div>{format(date, 'EEE d', { locale: pl })}</div>
                         <div>
-                          <button onClick={(e) => { e.stopPropagation(); onAddForDate?.(key) }} title="Dodaj" className="p-1 rounded hover:bg-gray-100">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onAddForDate?.(key)
+                            }}
+                            title="Dodaj"
+                            className="p-1 rounded hover:bg-gray-100"
+                          >
                             <Plus size={14} />
                           </button>
                         </div>
@@ -104,7 +115,7 @@ export default function WeekView({
                     <div className="space-y-2">
                       {dayTasks.map((task, idx) => (
                         <Draggable draggableId={String(task.id)} index={idx} key={task.id}>
-                          {(prov: DraggableProvided, snap: DraggableStateSnapshot) => (
+                          {(prov: any, snap: any) => (
                             <div ref={prov.innerRef} {...prov.draggableProps} {...prov.dragHandleProps} style={{ ...prov.draggableProps.style }}>
                               <div className={`p-2 rounded-lg shadow-sm border bg-white cursor-grab ${snap.isDragging ? 'z-50' : ''}`}>
                                 <div onClick={() => onOpenTask?.(task)}>
@@ -112,9 +123,25 @@ export default function WeekView({
                                 </div>
 
                                 <div className="mt-2 flex items-center gap-2 justify-end">
-                                  <button onClick={(e) => { e.stopPropagation(); onComplete?.(task.id) }} className="text-xs px-2 py-1 bg-green-50 rounded">Ukończ</button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      onComplete?.(task.id)
+                                    }}
+                                    className="text-xs px-2 py-1 bg-green-50 rounded"
+                                  >
+                                    Ukończ
+                                  </button>
                                   <div className="relative">
-                                    <button onClick={(e) => { e.stopPropagation(); onHelp?.(task) }} className="text-xs px-2 py-1 bg-gray-50 rounded">Pomóż mi</button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        onHelp?.(task)
+                                      }}
+                                      className="text-xs px-2 py-1 bg-gray-50 rounded"
+                                    >
+                                      Pomóż mi
+                                    </button>
                                   </div>
                                 </div>
                               </div>
