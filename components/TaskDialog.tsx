@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react'
 import { parseDueToLocalYMD } from '../utils/date'
 import { getEstimate, setEstimate, getHistory, listSubtasksLocal, addSubtaskLocal, updateSubtaskLocal } from '../utils/localTaskStore'
 
-// helpers to parse/format estimates
 function parseEstimateToMinutes(input: string): number | null {
   if (!input) return null
   const s = String(input).trim().toLowerCase()
@@ -106,7 +105,6 @@ const TaskDialog: React.FC<Props> = ({ task, token, initialTaskData, mode = 'tas
           setHistoryState(getHistory(task.id) || [])
         }
 
-        // subtasks: try backend; fallback to local
         try {
           const stRes = await fetch(`/api/todoist/subtasks?parentId=${encodeURIComponent(task.id)}`)
           if (stRes.ok) {
@@ -127,6 +125,17 @@ const TaskDialog: React.FC<Props> = ({ task, token, initialTaskData, mode = 'tas
 
     load()
     loadMeta()
+
+    // send initial AI context once per task (sessionStorage guard)
+    try {
+      const key = `ai_sent_${task.id}`
+      if (!sessionStorage.getItem(key)) {
+        // emit event — AI component should listen for 'aiInitial' to trigger initial assistant prompt
+        window.dispatchEvent(new CustomEvent('aiInitial', { detail: { id: task.id, title: data.title || task.title || '', description: data.description || '', due: data.due || '' } }))
+        sessionStorage.setItem(key, '1')
+      }
+    } catch (e) {}
+
     return () => { mounted = false }
   }, [task.id, token])
 
@@ -142,7 +151,6 @@ const TaskDialog: React.FC<Props> = ({ task, token, initialTaskData, mode = 'tas
       else if (data.project_name) payload.project_name = data.project_name
       if (token) payload.token = token
 
-      // try POST, then fallback to PUT if method not allowed
       let res = await fetch('/api/todoist/update', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { 'x-todoist-token': token, Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(payload) })
       if (res.status === 405) {
         res = await fetch('/api/todoist/update', { method: 'PUT', headers: { 'Content-Type': 'application/json', ...(token ? { 'x-todoist-token': token, Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(payload) })
@@ -153,14 +161,12 @@ const TaskDialog: React.FC<Props> = ({ task, token, initialTaskData, mode = 'tas
       }
       await res.json().catch(() => ({}))
 
-      // Notify other components — include updated fields so parent can update its local list immediately
       const detail = { id: task.id, description: payload.description, project_id: payload.project_id, project_name: payload.project_name, due: payload.due }
       window.dispatchEvent(new CustomEvent('taskSaved', { detail }))
 
       window.dispatchEvent(new Event('taskUpdated'))
       showToast('Zapisano zmiany')
 
-      // re-fetch to update dialog fields if possible
       try {
         const refetchUrl = `/api/todoist/task?id=${encodeURIComponent(task.id)}${token ? `&token=${encodeURIComponent(token)}` : ''}`
         const r2 = await fetch(refetchUrl)
@@ -271,7 +277,6 @@ const TaskDialog: React.FC<Props> = ({ task, token, initialTaskData, mode = 'tas
 
   const openSubtaskDialog = (s: any, e?: React.MouseEvent) => {
     if (e) e.stopPropagation()
-    // Notify parent to open a TaskDialog for this subtask id (parent will attempt to fetch details)
     window.dispatchEvent(new CustomEvent('openTaskFromSubtask', { detail: { id: s.id, title: s.content } }))
   }
 
