@@ -22,7 +22,7 @@ interface TodoistTasksProps {
 }
 
 export default function TodoistTasks({
-  token, filter, onChangeFilter, onUpdate, onOpenTaskChat, showHeaderFilters = true, selectedProject, showContextMenu = true, selectable = true, selectedTasks, onSelectChange,
+  token, filter, onChangeFilter, onUpdate, onOpenTaskChat, showHeaderFilters = true, selectedProject, showContextMenu = false, selectable = true, selectedTasks, onSelectChange,
 }: TodoistTasksProps) {
   const [tasks, setTasks] = useState<TaskType[]>([])
   const [projects, setProjects] = useState<Project[]>([])
@@ -121,6 +121,7 @@ export default function TodoistTasks({
                         token={token}
                         onAction={() => loadTasks()}
                         showContextMenu={showContextMenu}
+                        inlineActions={!showContextMenu} // inline actions for list views
                         selectable={selectable}
                         selected={selectedTasks ? selectedTasks.has(t.id) : false}
                         onSelectChange={(checked) => onSelectChange?.(t.id, checked)}
