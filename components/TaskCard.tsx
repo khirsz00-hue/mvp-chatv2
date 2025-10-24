@@ -37,7 +37,8 @@ export default function TaskCard({
   onOpen?: (task: TaskType) => void
 }) {
   const dueYmd = task._dueYmd ?? parseDueToLocalYMD(task.due)
-  const est = getEstimate(task.id)?.value
+  const estObj = getEstimate(task.id)
+  const estLabel = estObj ? (estObj.minutes < 60 ? `${estObj.minutes}m` : `${Math.floor(estObj.minutes/60)}h${estObj.minutes%60 ? ` ${estObj.minutes%60}m` : ''}`) : ''
 
   const handleComplete = async () => {
     try {
@@ -60,36 +61,37 @@ export default function TaskCard({
     }
   }
 
+  const handleHelp = () => {
+    const detail = { task: { id: task.id, title: task.content, description: task.description } }
+    window.dispatchEvent(new CustomEvent('taskHelp', { detail }))
+    onHelp?.(task)
+  }
+
   return (
-    <div className="p-3 bg-white rounded-lg border flex flex-col gap-3 shadow-sm">
+    <div className="p-3 bg-white rounded-lg border flex flex-col gap-3 shadow-sm min-w-0">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 w-full min-w-0">
           {selectable && (
             <input type="checkbox" checked={selected} onChange={(e) => onSelectChange?.(e.target.checked)} className="mt-1" aria-label="Wybierz zadanie" />
           )}
 
-          <div className="min-w-0 grow" onClick={() => onOpen?.(task)}>
-            <div className="font-medium text-gray-800 truncate">{task.content}</div>
-            {task.description ? <div className="text-xs text-gray-500 mt-1 line-clamp-2">{task.description}</div> : null}
-            {task.project_name ? <div className="text-xs text-gray-400 mt-1">{task.project_name}</div> : null}
+          <div className="min-w-0 grow" onClick={() => onOpen?.(task)} style={{ cursor: 'pointer' }}>
+            <div className="font-medium text-gray-800 truncate break-words">{task.content}</div>
+            {task.description ? <div className="text-xs text-gray-500 mt-1 line-clamp-2 break-words">{task.description}</div> : null}
+            {task.project_name ? <div className="text-xs text-gray-400 mt-1 truncate">{task.project_name}</div> : null}
           </div>
         </div>
-
-        {showContextMenu && (
-          <div className="text-xs text-gray-400 ml-2">
-            <button className="px-2 py-1">⋮</button>
-          </div>
-        )}
       </div>
 
       <div className="flex items-center justify-between">
         <div className="text-xs text-gray-500 flex items-center gap-3">
           <span>{dueYmd ? `Due: ${dueYmd}` : ''}</span>
           {typeof task.priority !== 'undefined' ? <span className="ml-2">• Priorytet: {task.priority}</span> : null}
-          {est ? <span className="ml-2 text-xs bg-slate-100 px-2 py-0.5 rounded">Est: {est}</span> : null}
+          {estLabel ? <span className="ml-2 text-xs bg-slate-100 px-2 py-0.5 rounded">Est: {estLabel}</span> : null}
         </div>
 
         <div className="flex items-center gap-2">
+          <button onClick={handleHelp} className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded">Pomóż mi</button>
           <button onClick={() => onOpen?.(task)} className="px-2 py-1 text-xs bg-gray-100 rounded">Szczegóły</button>
           <button onClick={handleComplete} className="px-2 py-1 text-xs bg-green-100 rounded">Ukończ</button>
           <button onClick={handleDelete} className="px-2 py-1 text-xs bg-red-100 rounded">Usuń</button>
