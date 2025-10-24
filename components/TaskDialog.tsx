@@ -333,7 +333,7 @@ const TaskDialog: React.FC<Props> = ({ task, token, initialTaskData, initialIsLo
                 <input type="checkbox" checked={!!s.completed} onChange={(e) => { e.stopPropagation(); handleToggleSubtask(s) }} />
                 <button onClick={(e) => openSubtaskDialog(s, e)} className="flex-1 text-left min-w-0">
                   <div className="text-sm truncate">{s.content}</div>
-                  <div className="text-xs text-gray-400">{s.createdAt ? new Date(s.createdAt).toLocaleString() : ''}</div>
+                  <div className="text-xs text-gray-400">{s.createdAt ? new Date(s.createdAt).toLocaleDateString() : ''}</div>
                 </button>
               </li>
             ))}
