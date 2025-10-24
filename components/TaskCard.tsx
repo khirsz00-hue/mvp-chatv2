@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import ReactDOM from 'react-dom'
 import { motion } from 'framer-motion'
 import { parseDueToLocalYMD } from '../utils/date'
 import { getEstimate } from '../utils/localTaskStore'
@@ -42,6 +43,12 @@ export default function TaskCard({
   wrapTitle?: boolean
 }) {
   const [openMenu, setOpenMenu] = useState(false)
+  const [menuContainer, setMenuContainer] = useState<HTMLElement | null>(null)
+
+  useEffect(() => {
+    setMenuContainer(document.body)
+  }, [])
+
   const dueYmd = task._dueYmd ?? parseDueToLocalYMD(task.due)
   const estObj = getEstimate(task.id)
   const estLabel = estObj ? (estObj.minutes < 60 ? `${estObj.minutes}m` : `${Math.floor(estObj.minutes / 60)}h${estObj.minutes % 60 ? ` ${estObj.minutes % 60}m` : ''}`) : ''
@@ -90,6 +97,16 @@ export default function TaskCard({
     setOpenMenu(false)
   }
 
+  // Menu rendered in portal to avoid overflow clipping
+  const Menu = (
+    <div className="w-44 bg-white border rounded-md shadow-lg z-50">
+      <button onClick={(e) => { e.stopPropagation(); handleHelp(e) }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm">Pomóż mi</button>
+      <button onClick={(e) => { e.stopPropagation(); handleComplete(e) }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm">Ukończ</button>
+      <button onClick={(e) => { e.stopPropagation(); handleMove(e) }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm">Przenieś</button>
+      <button onClick={(e) => { e.stopPropagation(); handleDelete(e) }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm text-red-600">Usuń</button>
+    </div>
+  )
+
   return (
     <motion.div whileHover={{ scale: 1.01 }} className="p-3 bg-white rounded-lg border flex flex-col gap-3 shadow-sm min-w-0">
       <div className="flex items-start justify-between gap-3">
@@ -117,13 +134,11 @@ export default function TaskCard({
             <button onClick={(e) => { e.stopPropagation(); setOpenMenu((s) => !s) }} className="p-1 rounded hover:bg-gray-100" aria-label="menu">
               ⋮
             </button>
-            {openMenu && (
-              <div onClick={(e) => e.stopPropagation()} className="absolute right-0 mt-2 w-40 bg-white border rounded-md shadow-lg z-50">
-                <button onClick={(e) => { e.stopPropagation(); handleHelp(e) }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm">Pomóż mi</button>
-                <button onClick={(e) => { e.stopPropagation(); handleComplete(e) }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm">Ukończ</button>
-                <button onClick={(e) => { e.stopPropagation(); handleMove(e) }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm">Przenieś</button>
-                <button onClick={(e) => { e.stopPropagation(); handleDelete(e) }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm text-red-600">Usuń</button>
-              </div>
+            {openMenu && menuContainer && ReactDOM.createPortal(
+              <div className="fixed" style={{ right: 20, top: 80 }} onClick={(e) => e.stopPropagation()}>
+                {Menu}
+              </div>,
+              menuContainer
             )}
           </div>
         )}
