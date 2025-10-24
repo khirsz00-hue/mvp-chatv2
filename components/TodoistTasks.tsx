@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import TaskCard, { TaskType } from './TaskCard'
 import { motion, AnimatePresence } from 'framer-motion'
-import { parseDueToLocalYMD, ymdFromDate } from '../utils/date'
+import { parseDueToLocalYMD } from '../utils/date'
 
 interface Project { id: string; name: string }
 
