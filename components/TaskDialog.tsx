@@ -79,8 +79,6 @@ const TaskDialog: React.FC<Props> = ({ task, token, initialTaskData, initialIsLo
               due: dueVal || p.due || '',
               created_at: d.added_at || d.date_added || d.created_at || p.created_at || null,
             }))
-          } else {
-            // keep initial data if fetch fails
           }
         } catch (err) {
           console.error('task dialog fetch err', err)
@@ -207,8 +205,6 @@ const TaskDialog: React.FC<Props> = ({ task, token, initialTaskData, initialIsLo
           const st = await fetch(`/api/todoist/subtasks?parentId=${encodeURIComponent(task.id)}`).then((r) => r.json()).catch(() => ({}))
           setSubtasks(st?.subtasks || listSubtasksLocal(task.id))
           succeeded = true
-        } else {
-          console.warn('subtask backend not ok', res.status)
         }
       } catch (e) {
         console.warn('subtask backend error', e)
