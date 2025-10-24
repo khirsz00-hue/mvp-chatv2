@@ -15,7 +15,7 @@ export default function TodoistAIView({
 }) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
-  const pendingRef = useRef(new Set<string>()) // prevent duplicate user echoes
+  const pendingRef = useRef(new Set<string>())
   const containerRef = useRef<HTMLDivElement | null>(null)
 
   const sessionStorageKey = (sessionId: string) => `ai_sent__${assistant || 'assistant'}__${sessionId}`
@@ -26,21 +26,24 @@ export default function TodoistAIView({
       if (!d?.id) return
       const sessionId = d.id
       const msgId = `init-${sessionId}`
-
       try {
-        if (sessionStorage.getItem(sessionStorageKey(sessionId))) return
-        sessionStorage.setItem(sessionStorageKey(sessionId), '1')
+        if (sessionStorage.getItem(sessionStorageKey(sessionId))) {
+          // already sent — but still ensure UI shows messages stored in conversation
+        } else {
+          sessionStorage.setItem(sessionStorageKey(sessionId), '1')
+        }
       } catch {}
-
       const text = `Pomóż mi z zadaniem: "${d.title || ''}". Opis: ${d.description || ''}`.trim()
       if (pendingRef.current.has(msgId)) return
       pendingRef.current.add(msgId)
 
+      // push user message + assistant placeholder
       setMessages((m) => [...m, { id: msgId, role: 'user', text, ts: Date.now() }])
       const placeholderId = `${msgId}-pending`
       setMessages((m) => [...m, { id: placeholderId, role: 'assistant', text: 'Odpowiedź w toku...', ts: Date.now() }])
       window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Odpowiedź w toku...' } }))
       scrollToBottom()
+      // wait for aiReplySaved to replace placeholder
     }
 
     const onReplySaved = (ev: any) => {
@@ -64,26 +67,17 @@ export default function TodoistAIView({
       scrollToBottom()
     }
 
-    const onOpenFromSub = (ev: any) => {
-      const d = ev?.detail
-      if (!d?.id) return
-      onInitial({ detail: { id: d.id, title: d.title, description: d.description } })
-    }
-
     window.addEventListener('aiInitial', onInitial)
     window.addEventListener('aiReplySaved', onReplySaved)
-    window.addEventListener('openTaskFromSubtask', onOpenFromSub)
     return () => {
       window.removeEventListener('aiInitial', onInitial)
       window.removeEventListener('aiReplySaved', onReplySaved)
-      window.removeEventListener('openTaskFromSubtask', onOpenFromSub)
     }
   }, [assistant, token])
 
   useEffect(() => {
     if (initialTaskId) {
-      const ev = new CustomEvent('aiInitial', { detail: { id: initialTaskId, title: '', description: '' } })
-      window.dispatchEvent(ev)
+      window.dispatchEvent(new CustomEvent('aiInitial', { detail: { id: initialTaskId, title: '', description: '' } }))
     }
   }, [initialTaskId])
 
