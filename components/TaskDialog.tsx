@@ -1,357 +1,151 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import { format, addDays, startOfWeek, startOfDay } from 'date-fns'
+import { pl } from 'date-fns/locale'
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'
+import TaskCard from './TaskCard'
+import { Plus } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { parseDueToLocalYMD } from '../utils/date'
-import { getEstimate, setEstimate, getHistory, listSubtasksLocal, addSubtaskLocal, updateSubtaskLocal } from '../utils/localTaskStore'
+import { appendHistory } from '../utils/localTaskStore'
 
-function parseEstimateToMinutes(input: string): number | null {
-  if (!input) return null
-  const s = String(input).trim().toLowerCase()
-  const hMatch = s.match(/(\d+(?:[\.,]\d+)?)h/)
-  const mMatch = s.match(/(\d+(?:[\.,]\d+)?)m/)
-  let minutes = 0
-  if (hMatch) minutes += Math.round(parseFloat(hMatch[1].replace(',', '.')) * 60)
-  if (mMatch) minutes += Math.round(parseFloat(mMatch[1].replace(',', '.')))
-  if (!hMatch && !mMatch) {
-    const n = parseInt(s.replace(/[^\d]/g, ''), 10)
-    if (!isNaN(n)) minutes = n
-  }
-  return minutes || null
-}
-function minutesToLabel(mins?: number | null) {
-  if (!mins && mins !== 0) return ''
-  if (mins < 60) return `${mins}m`
-  const h = Math.floor(mins / 60)
-  const m = mins % 60
-  return m === 0 ? `${h}h` : `${h}h ${m}m`
+interface WeekViewProps {
+  tasks: any[]
+  onComplete?: (id: string) => void
+  onMove?: (id: string, newDateYmd: string) => void
+  onDelete?: (id: string) => void
+  onHelp?: (task: any) => void
+  onOpenTask?: (task: any) => void
+  onAddForDate?: (ymd: string) => void
 }
 
-type Props = {
-  task: { id: string; title?: string }
-  token?: string
-  initialTaskData?: { description?: string; project_name?: string; project_id?: string; due?: any; created_at?: any }
-  mode?: 'task' | 'other'
-  onClose?: () => void
-}
+export default function WeekView({
+  tasks = [],
+  onComplete,
+  onMove,
+  onDelete,
+  onHelp,
+  onOpenTask,
+  onAddForDate,
+}: WeekViewProps) {
+  const today = startOfDay(new Date())
+  const weekStart = startOfWeek(today, { weekStartsOn: 1 })
+  const days = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i))
 
-const TaskDialog: React.FC<Props> = ({ task, token, initialTaskData, mode = 'task', onClose }) => {
-  const [data, setData] = useState<any>({
-    title: task.title || '',
-    description: initialTaskData?.description || '',
-    project_id: initialTaskData?.project_id || initialTaskData?.project_name || '',
-    project_name: initialTaskData?.project_name || '',
-    due: initialTaskData?.due || '',
-    created_at: initialTaskData?.created_at || null,
-  })
-  const [loading, setLoading] = useState(false)
-  const [estimateInput, setEstimateInput] = useState<string>('')
-  const [estimateMinutes, setEstimateMinutes] = useState<number | null>(null)
-  const [history, setHistoryState] = useState<any[]>([])
-  const [projects, setProjects] = useState<any[]>([])
-  const [subtasks, setSubtasks] = useState<any[]>([])
-  const [newSub, setNewSub] = useState('')
+  const [columns, setColumns] = useState<Record<string, any[]>>({})
 
   useEffect(() => {
-    let mounted = true
-    const load = async () => {
-      setLoading(true)
-      try {
-        const taskUrl = `/api/todoist/task?id=${encodeURIComponent(task.id)}${token ? `&token=${encodeURIComponent(token)}` : ''}`
-        const res = await fetch(taskUrl)
-        if (res.ok) {
-          const json = await res.json().catch(() => ({}))
-          if (!mounted) return
-          const d = json.task || json || {}
-          let dueVal = ''
-          if (d.due) {
-            if (typeof d.due === 'string') dueVal = d.due
-            else if (d.due.date) dueVal = d.due.date
-          }
-          setData((p: any) => ({
-            ...p,
-            title: d.content || p.title,
-            description: d.description || d.note || p.description || '',
-            project_id: d.project_id || p.project_id || '',
-            project_name: d.project_name || d.project || p.project_name || '',
-            due: dueVal || p.due || '',
-            created_at: d.added_at || d.date_added || d.created_at || p.created_at || null,
-          }))
-        } else {
-          const txt = await res.text().catch(() => '')
-          window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Nie można pobrać szczegółów zadania: ' + (txt || res.status) } }))
-        }
-      } catch (err) {
-        console.error('task dialog fetch err', err)
-        window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd ładowania zadania' } }))
-      } finally {
-        setLoading(false)
+    const grouped: Record<string, any[]> = {}
+    const keys = days.map((d) => format(d, 'yyyy-MM-dd'))
+    keys.forEach((k) => (grouped[k] = []))
+
+    tasks.forEach((t) => {
+      const due = t._dueYmd ?? (t.due?.date ?? (typeof t.due === 'string' ? t.due : null))
+      if (!due) {
+        grouped[keys[0]].push(t)
+        return
       }
-    }
-
-    const loadMeta = async () => {
-      try {
-        const pjUrl = `/api/todoist/projects?token=${encodeURIComponent(token ?? '')}`
-        const pjRes = await fetch(pjUrl).catch(() => null)
-        if (pjRes?.ok) {
-          const pj = await pjRes.json().catch(() => ({}))
-          const pjList = Array.isArray(pj) ? pj : pj.projects || []
-          if (mounted) setProjects(pjList)
-        }
-
-        const est = getEstimate(task.id)
-        if (mounted) {
-          setEstimateMinutes(est?.minutes ?? null)
-          setEstimateInput(est ? minutesToLabel(est.minutes) : '')
-          setHistoryState(getHistory(task.id) || [])
-        }
-
-        try {
-          const stRes = await fetch(`/api/todoist/subtasks?parentId=${encodeURIComponent(task.id)}`)
-          if (stRes.ok) {
-            const st = await stRes.json().catch(() => ({}))
-            if (mounted) setSubtasks(st?.subtasks || [])
-          } else {
-            const local = listSubtasksLocal(task.id)
-            if (mounted) setSubtasks(local)
-          }
-        } catch {
-          const local = listSubtasksLocal(task.id)
-          if (mounted) setSubtasks(local)
-        }
-      } catch (err) {
-        console.error('task dialog meta load err', err)
+      if (keys.includes(due)) grouped[due].push(t)
+      else {
+        // skip tasks outside this week for WeekView
       }
-    }
+    })
+    setColumns(grouped)
+  }, [tasks, days])
 
-    load()
-    loadMeta()
+  const handleDragEnd = (result: any) => {
+    const { source, destination, draggableId } = result
+    if (!destination) return
+    if (source.droppableId === destination.droppableId && source.index === destination.index) return
 
-    // send initial AI context once per task (sessionStorage guard)
-    try {
-      const key = `ai_sent_${task.id}`
-      if (!sessionStorage.getItem(key)) {
-        // emit event — AI component should listen for 'aiInitial' to trigger initial assistant prompt
-        window.dispatchEvent(new CustomEvent('aiInitial', { detail: { id: task.id, title: data.title || task.title || '', description: data.description || '', due: data.due || '' } }))
-        sessionStorage.setItem(key, '1')
-      }
-    } catch (e) {}
+    const src = Array.from(columns[source.droppableId] || [])
+    const [moved] = src.splice(source.index, 1)
+    const dst = Array.from(columns[destination.droppableId] || [])
+    dst.splice(destination.index, 0, moved)
+    const newCols = { ...columns, [source.droppableId]: src, [destination.droppableId]: dst }
+    setColumns(newCols)
 
-    return () => { mounted = false }
-  }, [task.id, token])
-
-  const showToast = (msg: string) => window.dispatchEvent(new CustomEvent('appToast', { detail: { message: msg } }))
-
-  const handleSave = async () => {
-    setLoading(true)
-    try {
-      const payload: any = { id: task.id }
-      if (data.description !== undefined) payload.description = data.description
-      if (data.due !== undefined) payload.due = data.due || null
-      if (data.project_id) payload.project_id = data.project_id
-      else if (data.project_name) payload.project_name = data.project_name
-      if (token) payload.token = token
-
-      let res = await fetch('/api/todoist/update', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { 'x-todoist-token': token, Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(payload) })
-      if (res.status === 405) {
-        res = await fetch('/api/todoist/update', { method: 'PUT', headers: { 'Content-Type': 'application/json', ...(token ? { 'x-todoist-token': token, Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(payload) })
-      }
-      if (!res.ok) {
-        const txt = await res.text().catch(() => '')
-        throw new Error(txt || `Błąd API (${res.status})`)
-      }
-      await res.json().catch(() => ({}))
-
-      const detail = { id: task.id, description: payload.description, project_id: payload.project_id, project_name: payload.project_name, due: payload.due }
-      window.dispatchEvent(new CustomEvent('taskSaved', { detail }))
-
-      window.dispatchEvent(new Event('taskUpdated'))
-      showToast('Zapisano zmiany')
-
-      try {
-        const refetchUrl = `/api/todoist/task?id=${encodeURIComponent(task.id)}${token ? `&token=${encodeURIComponent(token)}` : ''}`
-        const r2 = await fetch(refetchUrl)
-        if (r2.ok) {
-          const json = await r2.json().catch(() => ({}))
-          const d = json.task || json || {}
-          let dueVal = ''
-          if (d.due) {
-            if (typeof d.due === 'string') dueVal = d.due
-            else if (d.due.date) dueVal = d.due.date
-          }
-          setData((p:any) => ({ ...p, description: d.description || d.note || p.description || '', project_id: d.project_id || p.project_id || '', project_name: d.project_name || p.project_name || '', due: dueVal || p.due || '', created_at: d.added_at || d.date_added || d.created_at || p.created_at || null }))
-        }
-      } catch {}
-      setHistoryState(getHistory(task.id))
-      onClose?.()
-    } catch (err: any) {
-      console.error('task update error', err)
-      showToast('Błąd zapisu: ' + (err?.message || ''))
-    } finally {
-      setLoading(false)
+    if (source.droppableId !== destination.droppableId) {
+      onMove?.(draggableId, destination.droppableId)
+      try { appendHistory(draggableId, source.droppableId, destination.droppableId) } catch {}
     }
   }
 
-  const handleEstimateSave = () => {
-    try {
-      const mins = parseEstimateToMinutes(estimateInput)
-      if (mins == null) { showToast('Nieprawidłowy format estymaty'); return }
-      setEstimate(task.id, mins)
-      setEstimateMinutes(mins)
-      showToast('Estymata zapisana (minuty)')
-      window.dispatchEvent(new Event('taskUpdated'))
-    } catch (err) {
-      console.error('estimate save err', err)
-      showToast('Błąd zapisu estymaty')
-    }
-  }
-
-  const handleAddSubtask = async () => {
-    if (!newSub.trim()) return
-    try {
-      let succeeded = false
-      try {
-        const res = await fetch('/api/todoist/subtasks', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { 'x-todoist-token': token } : {}) }, body: JSON.stringify({ parentId: task.id, content: newSub.trim() }) })
-        if (res.ok) {
-          const st = await fetch(`/api/todoist/subtasks?parentId=${encodeURIComponent(task.id)}`).then((r) => r.json()).catch(() => ({}))
-          setSubtasks(st?.subtasks || listSubtasksLocal(task.id))
-          succeeded = true
-        } else {
-          console.warn('subtask backend not ok', res.status)
-        }
-      } catch (e) {
-        console.warn('subtask backend error', e)
-      }
-
-      if (!succeeded) {
-        const local = addSubtaskLocal(task.id, newSub.trim())
-        if (local) {
-          setSubtasks(listSubtasksLocal(task.id))
-          showToast('Dodano subtask lokalnie')
-          window.dispatchEvent(new Event('taskUpdated'))
-        } else {
-          throw new Error('Nie udało się dodać subtaska')
-        }
-      } else {
-        showToast('Dodano subtask')
-        window.dispatchEvent(new Event('taskUpdated'))
-      }
-      setNewSub('')
-    } catch (err) {
-      console.error('add subtask err', err)
-      showToast('Błąd dodawania subtaska')
-    }
-  }
-
-  const handleToggleSubtask = async (s: any) => {
-    try {
-      let succeeded = false
-      try {
-        const res = await fetch('/api/todoist/subtasks', { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(token ? { 'x-todoist-token': token } : {}) }, body: JSON.stringify({ parentId: task.id, subtaskId: s.id, patch: { completed: !s.completed } }) })
-        if (res.ok) {
-          const st = await fetch(`/api/todoist/subtasks?parentId=${encodeURIComponent(task.id)}`).then((r) => r.json()).catch(() => ({}))
-          setSubtasks(st?.subtasks || listSubtasksLocal(task.id))
-          succeeded = true
-        }
-      } catch (e) {
-        console.warn('subtask toggle backend error', e)
-      }
-
-      if (!succeeded) {
-        const updated = updateSubtaskLocal(task.id, s.id, { completed: !s.completed })
-        if (updated) {
-          setSubtasks(listSubtasksLocal(task.id))
-          showToast('Zaktualizowano subtask lokalnie')
-          window.dispatchEvent(new Event('taskUpdated'))
-        } else {
-          throw new Error('Nie udało się zaktualizować subtaska')
-        }
-      } else {
-        showToast('Zaktualizowano subtask')
-        window.dispatchEvent(new Event('taskUpdated'))
-      }
-    } catch (err) {
-      console.error('subtask toggle err', err)
-      showToast('Błąd')
-    }
-  }
-
-  const openSubtaskDialog = (s: any, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation()
-    window.dispatchEvent(new CustomEvent('openTaskFromSubtask', { detail: { id: s.id, title: s.content } }))
+  if (!columns || Object.values(columns).every((c) => c.length === 0)) {
+    return <div className="flex items-center justify-center h-full text-gray-400 text-sm italic">Brak zadań w tym tygodniu.</div>
   }
 
   return (
-    <div className="max-w-2xl w-full bg-white rounded-lg p-5 shadow-lg">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-semibold">{data.title || 'Szczegóły zadania'}</h3>
-        <button onClick={() => onClose?.()} className="text-sm text-gray-500">Zamknij</button>
+    <div className="flex flex-col h-full bg-gray-50 w-full">
+      <div className="text-center py-3 border-b border-gray-200 bg-white mb-3">
+        <h2 className="text-lg font-semibold text-gray-800">{format(weekStart, 'd MMM', { locale: pl })} – {format(addDays(weekStart, 6), 'd MMM yyyy', { locale: pl })}</h2>
       </div>
 
-      <div className="space-y-3">
-        <label className="text-sm text-gray-700">Opis</label>
-        <textarea value={data.description || ''} onChange={(e) => setData((p: any) => ({ ...p, description: e.target.value }))} className="w-full border p-2 rounded min-h-[120px]" />
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-7 gap-3 px-2 md:px-3 pb-6 flex-1 w-full min-h-[300px]">
+          {days.map((date) => {
+            const key = format(date, 'yyyy-MM-dd')
+            const dayTasks = columns[key] || []
+            const isToday = key === format(today, 'yyyy-MM-dd')
+            return (
+              <Droppable droppableId={key} key={key}>
+                {(provided: any, snapshot: any) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className={`min-h-[200px] border rounded-md p-2 bg-white/90 flex flex-col ${snapshot.isDraggingOver ? 'ring-2 ring-blue-200' : ''}`}
+                  >
+                    <div className={`mb-2 ${isToday ? 'font-semibold text-blue-700' : 'text-gray-600'}`}>
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm">{format(date, 'EEE d', { locale: pl })}</div>
+                        <div>
+                          <button onClick={(e) => { e.stopPropagation(); onAddForDate?.(key) }} title="Dodaj" className="p-1 rounded hover:bg-gray-100">
+                            <Plus size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-sm text-gray-700">Projekt</label>
-            <select value={data.project_id || ''} onChange={(e) => setData((p: any) => ({ ...p, project_id: e.target.value }))} className="w-full border p-2 rounded">
-              <option value="">(Brak projektu)</option>
-              {projects.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-            <div className="text-xs text-gray-400 mt-1">Możesz zmienić projekt</div>
-          </div>
-
-          <div>
-            <label className="text-sm text-gray-700">Deadline</label>
-            <input type="date" value={data.due ? (typeof data.due === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data.due) ? data.due : parseDueToLocalYMD(data.due) ?? '') : ''} onChange={(e) => setData((p: any) => ({ ...p, due: e.target.value }))} className="w-full border p-2 rounded" />
-          </div>
+                    <div className="flex-1 overflow-auto space-y-2">
+                      <AnimatePresence>
+                        {dayTasks.map((task: any, idx: number) => (
+                          <Draggable draggableId={String(task.id)} index={idx} key={task.id}>
+                            {(prov: any, snap: any) => (
+                              <motion.div
+                                ref={prov.innerRef}
+                                {...prov.draggableProps}
+                                {...prov.dragHandleProps}
+                                initial={{ opacity: 0, y: 6 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -6 }}
+                                transition={{ duration: 0.12 }}
+                                style={{ ...prov.draggableProps.style }}
+                                className=""
+                              >
+                                <div className={`p-2 rounded-lg shadow-sm border bg-white ${snap.isDragging ? 'z-50' : ''}`}>
+                                  <div onClick={() => onOpenTask?.(task)}>
+                                    <TaskCard task={task} token={undefined} selectable={false} onOpen={onOpenTask} wrapTitle />
+                                  </div>
+                                  <div className="mt-2 flex items-center gap-2 justify-end">
+                                    <button onClick={(e) => { e.stopPropagation(); onComplete?.(task.id) }} className="text-xs px-2 py-1 bg-green-50 rounded">Ukończ</button>
+                                    <button onClick={(e) => { e.stopPropagation(); onHelp?.(task) }} className="text-xs px-2 py-1 bg-gray-50 rounded">Pomóż mi</button>
+                                  </div>
+                                </div>
+                              </motion.div>
+                            )}
+                          </Draggable>
+                        ))}
+                      </AnimatePresence>
+                      {provided.placeholder}
+                    </div>
+                  </div>
+                )}
+              </Droppable>
+            )
+          })}
         </div>
-
-        <div className="grid grid-cols-2 gap-3 items-center">
-          <div>
-            <label className="text-sm text-gray-700">Estymowany czas (minuty)</label>
-            <div className="flex gap-2 items-center">
-              <input value={estimateInput} onChange={(e) => setEstimateInput(e.target.value)} className="w-full border p-2 rounded" placeholder="np. 30m / 2h / 90" />
-              <button onClick={handleEstimateSave} className="px-3 py-2 bg-violet-600 text-white rounded">Zapisz</button>
-            </div>
-            {estimateMinutes !== null && <div className="text-xs text-gray-500 mt-1">Zapisano: {minutesToLabel(estimateMinutes)} ({estimateMinutes} min)</div>}
-          </div>
-
-          <div>
-            <label className="text-sm text-gray-700">Utworzono</label>
-            <div className="text-sm text-gray-500">
-              {data.created_at ? `${new Date(data.created_at).toLocaleString()} (${Math.floor((Date.now() - new Date(data.created_at).getTime()) / 86400000)} dni temu)` : '—'}
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <label className="text-sm text-gray-700">Subtaski</label>
-          <ul className="space-y-2 mt-2">
-            {subtasks.length === 0 ? <div className="text-xs text-gray-400">Brak subtasków</div> : subtasks.map((s) => (
-              <li key={s.id} className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                <input type="checkbox" checked={!!s.completed} onChange={(e) => { e.stopPropagation(); handleToggleSubtask(s) }} />
-                <button onClick={(e) => openSubtaskDialog(s, e)} className="flex-1 text-left min-w-0">
-                  <div className="text-sm truncate">{s.content}</div>
-                  <div className="text-xs text-gray-400">{s.createdAt ? new Date(s.createdAt).toLocaleString() : ''}</div>
-                </button>
-              </li>
-            ))}
-          </ul>
-
-          <div className="mt-2 flex gap-2">
-            <input value={newSub} onChange={(e) => setNewSub(e.target.value)} placeholder="Nowy subtask..." className="flex-1 border p-2 rounded" />
-            <button onClick={handleAddSubtask} className="px-3 py-2 bg-green-600 text-white rounded">Dodaj</button>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2">
-          <button className="px-3 py-2 rounded bg-gray-100" onClick={() => onClose?.()}>Anuluj</button>
-          <button className="px-4 py-2 rounded bg-violet-600 text-white" onClick={handleSave} disabled={loading}>{loading ? 'Zapisywanie...' : 'Zapisz'}</button>
-        </div>
-      </div>
+      </DragDropContext>
     </div>
   )
 }
-
-export default TaskDialog
