@@ -4,19 +4,15 @@ import React, { useEffect, useState } from 'react'
 import { parseDueToLocalYMD } from '../utils/date'
 import { getEstimate, setEstimate, getHistory } from '../utils/localTaskStore'
 
-// parse estimate helpers (same as before)
+// helpers to parse/format estimates
 function parseEstimateToMinutes(input: string): number | null {
   if (!input) return null
   const s = String(input).trim().toLowerCase()
   const hMatch = s.match(/(\d+(?:[\.,]\d+)?)h/)
   const mMatch = s.match(/(\d+(?:[\.,]\d+)?)m/)
   let minutes = 0
-  if (hMatch) {
-    minutes += Math.round(parseFloat(hMatch[1].replace(',', '.')) * 60)
-  }
-  if (mMatch) {
-    minutes += Math.round(parseFloat(mMatch[1].replace(',', '.')))
-  }
+  if (hMatch) minutes += Math.round(parseFloat(hMatch[1].replace(',', '.')) * 60)
+  if (mMatch) minutes += Math.round(parseFloat(mMatch[1].replace(',', '.')))
   if (!hMatch && !mMatch) {
     const n = parseInt(s.replace(/[^\d]/g, ''), 10)
     if (!isNaN(n)) minutes = n
@@ -63,9 +59,9 @@ export default function TaskDialog({
   useEffect(() => {
     let mounted = true
     const load = async () => {
+      setLoading(true)
       try {
-        setLoading(true)
-        // include token if present
+        // include token if provided (some backends expect it as query)
         const taskUrl = `/api/todoist/task?id=${encodeURIComponent(task.id)}${token ? `&token=${encodeURIComponent(token)}` : ''}`
         const res = await fetch(taskUrl)
         const json = await res.json().catch(() => ({}))
@@ -87,6 +83,7 @@ export default function TaskDialog({
         }))
       } catch (err) {
         console.error('task dialog fetch err', err)
+        window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd ładowania zadania' } }))
       } finally {
         setLoading(false)
       }
@@ -94,7 +91,7 @@ export default function TaskDialog({
 
     const loadMeta = async () => {
       try {
-        // projects
+        // projects list (pass token if present)
         const pjUrl = `/api/todoist/projects?token=${encodeURIComponent(token ?? '')}`
         const pj = await fetch(pjUrl).then((r) => r.json()).catch(() => ({}))
         const pjList = Array.isArray(pj) ? pj : pj.projects || []
@@ -130,14 +127,20 @@ export default function TaskDialog({
       if (data.due !== undefined) payload.due = data.due || null
       if (data.project_id) payload.project_id = data.project_id
       else if (data.project_name) payload.project_name = data.project_name
-      if (token) payload.token = token
-      const res = await fetch('/api/todoist/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      if (token) {
+        payload.token = token
+      }
+      const res = await fetch('/api/todoist/update', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(payload) })
       if (!res.ok) {
         const txt = await res.text().catch(() => '')
-        throw new Error(txt || 'Błąd API')
+        const msg = txt || `Błąd API (${res.status})`
+        throw new Error(msg)
       }
+      const json = await res.json().catch(() => ({}))
+      // success — refresh parent lists via event
       window.dispatchEvent(new Event('taskUpdated'))
       showToast('Zapisano zmiany')
+      // re-fetch subtasks/history/estimate if needed
       setHistoryState(getHistory(task.id))
       onClose?.()
     } catch (err: any) {
@@ -167,7 +170,9 @@ export default function TaskDialog({
     try {
       const res = await fetch('/api/todoist/subtasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ parentId: task.id, content: newSub.trim() }) })
       const j = await res.json().catch(() => ({}))
-      if (j?.subtask) setSubtasks((s) => [...s, j.subtask])
+      // re-fetch subtasks to guarantee consistency
+      const st = await fetch(`/api/todoist/subtasks?parentId=${encodeURIComponent(task.id)}`).then((r) => r.json()).catch(() => ({}))
+      setSubtasks(st?.subtasks || [])
       setNewSub('')
       showToast('Dodano subtask')
       window.dispatchEvent(new Event('taskUpdated'))
@@ -181,7 +186,8 @@ export default function TaskDialog({
     try {
       const res = await fetch('/api/todoist/subtasks', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ parentId: task.id, subtaskId: s.id, patch: { completed: !s.completed } }) })
       const j = await res.json().catch(() => ({}))
-      if (j?.subtask) setSubtasks((arr) => arr.map((x) => (x.id === s.id ? j.subtask : x)))
+      const st = await fetch(`/api/todoist/subtasks?parentId=${encodeURIComponent(task.id)}`).then((r) => r.json()).catch(() => ({}))
+      setSubtasks(st?.subtasks || [])
       showToast('Zaktualizowano subtask')
       window.dispatchEvent(new Event('taskUpdated'))
     } catch (err) {
