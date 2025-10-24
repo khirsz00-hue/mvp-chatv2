@@ -1,14 +1,17 @@
-// Simple client-side store for per-task metadata (estimates in minutes, move history).
+// Simple client-side store for per-task metadata (estimates in minutes, move history, subtasks).
 // Uses localStorage under keys:
-//  - "task_estimate:<taskId>" -> { minutes: number, updatedAt }
+//  - "task_estimate:<taskId>" -> { minutes, updatedAt }
 //  - "task_history:<taskId>" -> [{ from, to, when }]
+//  - "task_subtasks:<parentId>" -> [{ id, parentId, content, createdAt, completed }]
 //
 // Note: local only (not shared between clients).
 
 export type MoveEntry = { from?: string | null; to?: string | null; when: number }
+export type LocalSubtask = { id: string; parentId: string; content: string; createdAt: number; completed?: boolean }
 
 const EST_PREFIX = 'task_estimate:'
 const HIST_PREFIX = 'task_history:'
+const ST_PREFIX = 'task_subtasks:'
 
 export function getEstimate(taskId: string): { minutes: number; updatedAt: number } | null {
   try {
@@ -20,7 +23,6 @@ export function getEstimate(taskId: string): { minutes: number; updatedAt: numbe
   }
 }
 
-// store minutes (integer)
 export function setEstimate(taskId: string, minutes: number) {
   const entry = { minutes: Number(minutes || 0), updatedAt: Date.now() }
   try {
@@ -58,4 +60,43 @@ export function clearHistory(taskId: string) {
   try {
     localStorage.removeItem(HIST_PREFIX + taskId)
   } catch {}
+}
+
+/* Subtasks local fallback */
+export function listSubtasksLocal(parentId: string): LocalSubtask[] {
+  try {
+    const raw = localStorage.getItem(ST_PREFIX + parentId)
+    if (!raw) return []
+    return JSON.parse(raw) as LocalSubtask[]
+  } catch {
+    return []
+  }
+}
+
+export function addSubtaskLocal(parentId: string, content: string) {
+  try {
+    const arr = listSubtasksLocal(parentId)
+    const id = `local_st_${Date.now()}_${Math.floor(Math.random() * 10000)}`
+    const s: LocalSubtask = { id, parentId, content, createdAt: Date.now(), completed: false }
+    arr.push(s)
+    localStorage.setItem(ST_PREFIX + parentId, JSON.stringify(arr))
+    return s
+  } catch (e) {
+    console.error('addSubtaskLocal error', e)
+    return null
+  }
+}
+
+export function updateSubtaskLocal(parentId: string, subtaskId: string, patch: Partial<LocalSubtask>) {
+  try {
+    const arr = listSubtasksLocal(parentId)
+    const idx = arr.findIndex((s) => s.id === subtaskId)
+    if (idx === -1) return null
+    arr[idx] = { ...arr[idx], ...patch }
+    localStorage.setItem(ST_PREFIX + parentId, JSON.stringify(arr))
+    return arr[idx]
+  } catch (e) {
+    console.error('updateSubtaskLocal error', e)
+    return null
+  }
 }
