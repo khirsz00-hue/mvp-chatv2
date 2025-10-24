@@ -44,6 +44,19 @@ export default function TodoistTasksView({
 
   const refreshFilter: FilterType = viewMode === 'week' ? '7 days' : filter
 
+  // global appToast listener to show toasts from components
+  useEffect(() => {
+    const handler = (e: any) => {
+      const msg = e?.detail?.message
+      if (msg) {
+        setToast(msg)
+        setTimeout(() => setToast(null), 2500)
+      }
+    }
+    window.addEventListener('appToast', handler)
+    return () => window.removeEventListener('appToast', handler)
+  }, [])
+
   useEffect(() => {
     if (!token) return
     let mounted = true
@@ -160,7 +173,7 @@ export default function TodoistTasksView({
     else if (filter === '30 days') { setTasks([]); fetchTasks('30 days') }
   }, [filter])
 
-  // add task modal flow
+  // Create task modal
   const openAddForDate = (ymd?: string | null) => {
     setAddDateYmd(ymd ?? null)
     setNewDate(ymd ?? '')
@@ -176,7 +189,11 @@ export default function TodoistTasksView({
       if (newProject) payload.project_id = newProject
       if (newDescription) payload.description = newDescription.trim()
       const res = await fetch('/api/todoist/add', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(payload) })
-      if (!res.ok) throw new Error('Błąd serwera')
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '')
+        throw new Error('Błąd serwera: ' + txt)
+      }
+      // set created_at locally so dialog can show immediately after opening
       setShowAdd(false)
       setNewTitle(''); setNewDate(''); setNewProject(''); setNewDescription('')
       setToast('🆕 Dodano zadanie')
@@ -237,6 +254,39 @@ export default function TodoistTasksView({
     setOpenTask({ id: taskObj.id, title: taskObj.content, description: taskObj.description })
   }
 
+  const renderMonthGrouped = () => {
+    // group by _dueYmd (or 'no-date'), sorted ascending
+    const groups: Record<string, any[]> = {}
+    for (const t of tasks) {
+      const k = t._dueYmd || 'no-date'
+      groups[k] = groups[k] || []
+      groups[k].push(t)
+    }
+    const keys = Object.keys(groups).filter(k => k !== 'no-date').sort().concat(Object.keys(groups).includes('no-date') ? ['no-date'] : [])
+    return (
+      <div className="space-y-4">
+        {keys.map((k) => (
+          <div key={k}>
+            <div className="text-sm font-semibold text-gray-600 mb-2">{k === 'no-date' ? 'Brak terminu' : k}</div>
+            <ul className="space-y-2">
+              {groups[k].map((t) => (
+                <li key={t.id}>
+                  <div className="p-3 bg-white rounded-lg border shadow-sm flex items-start justify-between">
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{t.content}</div>
+                      <div className="text-xs text-gray-500 mt-1">{t.project_name || ''}</div>
+                    </div>
+                    <div className="ml-2 text-xs text-gray-500">Due: {t._dueYmd || '—'}</div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col h-full bg-gray-50 rounded-b-xl overflow-hidden relative w-full">
       {!hideHeader && (
@@ -278,8 +328,7 @@ export default function TodoistTasksView({
         {viewMode === 'week' ? (
           <WeekView tasks={tasks} onMove={(id, ymd) => handleMove(id, ymd)} onComplete={(id) => handleComplete(id)} onDelete={(id) => handleDelete(id)} onHelp={(t) => handleHelp(t)} onOpenTask={(t) => setOpenTask(t)} onAddForDate={(ymd) => openAddForDate(ymd)} />
         ) : filter === '30 days' ? (
-          // render grouped month
-          <div className="space-y-4">{/* grouped rendering as before */}</div>
+          renderMonthGrouped()
         ) : (
           <TodoistTasks token={token} filter={filter} onChangeFilter={setFilter} onUpdate={() => fetchTasks(refreshFilter)} onOpenTaskChat={(t: any) => setOpenTask({ id: t.id, title: t.content, description: t.description })} showHeaderFilters={false} selectedProject={selectedProject} showContextMenu={false} />
         )}
@@ -319,7 +368,7 @@ export default function TodoistTasksView({
       <AnimatePresence>
         {openTask && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4" onClick={() => setOpenTask(null)}>
           <motion.div initial={{ scale: 0.98, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.98, y: 10 }} className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-5" onClick={(e) => e.stopPropagation()}>
-            <TaskDialog task={{ id: openTask.id, title: openTask.title }} initialTaskData={{ description: openTask.description }} onClose={() => setOpenTask(null)} />
+            <TaskDialog task={{ id: openTask.id, title: openTask.title }} initialTaskData={{ description: openTask.description, project_name: openTask.project_name, project_id: openTask.project_id, due: openTask._dueYmd }} onClose={() => setOpenTask(null)} />
           </motion.div>
         </motion.div>}
       </AnimatePresence>
