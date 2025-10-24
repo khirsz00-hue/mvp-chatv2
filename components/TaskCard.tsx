@@ -151,10 +151,15 @@ export default function TaskCard({
           {estLabel ? <span className="ml-2 text-xs bg-slate-100 px-2 py-0.5 rounded">Est: {estLabel}</span> : null}
         </div>
 
-        <div className="flex items-center gap-2">
-          <button onClick={(e) => { e.stopPropagation(); handleHelp() }} className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded">Pomóż mi</button>
-          <button onClick={(e) => { e.stopPropagation(); onOpen?.(task) }} className="px-2 py-1 text-xs bg-gray-100 rounded">Szczegóły</button>
-        </div>
+        {!showContextMenu && (
+          <div className="flex items-center gap-2">
+            <button onClick={(e) => { e.stopPropagation(); handleHelp() }} className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded hover:bg-blue-100">Pomóż mi</button>
+            <button onClick={(e) => { e.stopPropagation(); handleComplete(e) }} className="px-2 py-1 text-xs bg-green-50 text-green-700 rounded hover:bg-green-100">Ukończ</button>
+            <button onClick={(e) => { e.stopPropagation(); handleMove(e) }} className="px-2 py-1 text-xs bg-yellow-50 text-yellow-700 rounded hover:bg-yellow-100">Przenieś</button>
+            <button onClick={(e) => { e.stopPropagation(); handleDelete(e) }} className="px-2 py-1 text-xs bg-red-50 text-red-700 rounded hover:bg-red-100">Usuń</button>
+            <button onClick={(e) => { e.stopPropagation(); onOpen?.(task) }} className="px-2 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200">Szczegóły</button>
+          </div>
+        )}
       </div>
     </motion.div>
   )
