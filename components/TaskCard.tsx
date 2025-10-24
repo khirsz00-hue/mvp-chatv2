@@ -25,6 +25,7 @@ export default function TaskCard({
   selected = false,
   onSelectChange,
   onOpen,
+  wrapTitle = false, // NEW: allow wrapping for WeekView
 }: {
   task: TaskType
   token?: string
@@ -35,6 +36,7 @@ export default function TaskCard({
   selected?: boolean
   onSelectChange?: (checked: boolean) => void
   onOpen?: (task: TaskType) => void
+  wrapTitle?: boolean
 }) {
   const dueYmd = task._dueYmd ?? parseDueToLocalYMD(task.due)
   const estObj = getEstimate(task.id) // { minutes, updatedAt } | null
@@ -65,7 +67,8 @@ export default function TaskCard({
     }
   }
 
-  const handleHelp = () => {
+  const handleHelp = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
     const detail = { task: { id: task.id, title: task.content, description: task.description } }
     window.dispatchEvent(new CustomEvent('taskHelp', { detail }))
     onHelp?.(task)
@@ -76,11 +79,18 @@ export default function TaskCard({
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 w-full min-w-0">
           {selectable && (
-            <input type="checkbox" checked={selected} onChange={(e) => onSelectChange?.(e.target.checked)} className="mt-1" aria-label="Wybierz zadanie" />
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={(e) => onSelectChange?.(e.target.checked)}
+              className="mt-1"
+              aria-label="Wybierz zadanie"
+              onClick={(e) => e.stopPropagation()}
+            />
           )}
 
           <div className="min-w-0 grow" onClick={() => onOpen?.(task)} style={{ cursor: 'pointer' }}>
-            <div className="font-medium text-gray-800 truncate break-words">{task.content}</div>
+            <div className={`font-medium text-gray-800 ${wrapTitle ? 'whitespace-normal break-words' : 'truncate'}`}>{task.content}</div>
             {task.description ? <div className="text-xs text-gray-500 mt-1 line-clamp-2 break-words">{task.description}</div> : null}
             {task.project_name ? <div className="text-xs text-gray-400 mt-1 truncate">{task.project_name}</div> : null}
           </div>
@@ -96,9 +106,9 @@ export default function TaskCard({
 
         <div className="flex items-center gap-2">
           <button onClick={handleHelp} className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded">Pomóż mi</button>
-          <button onClick={() => onOpen?.(task)} className="px-2 py-1 text-xs bg-gray-100 rounded">Szczegóły</button>
-          <button onClick={handleComplete} className="px-2 py-1 text-xs bg-green-100 rounded">Ukończ</button>
-          <button onClick={handleDelete} className="px-2 py-1 text-xs bg-red-100 rounded">Usuń</button>
+          <button onClick={(e) => { e.stopPropagation(); onOpen?.(task) }} className="px-2 py-1 text-xs bg-gray-100 rounded">Szczegóły</button>
+          <button onClick={(e) => { e.stopPropagation(); handleComplete() }} className="px-2 py-1 text-xs bg-green-100 rounded">Ukończ</button>
+          <button onClick={(e) => { e.stopPropagation(); handleDelete() }} className="px-2 py-1 text-xs bg-red-100 rounded">Usuń</button>
         </div>
       </div>
     </div>
