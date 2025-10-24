@@ -13,6 +13,7 @@ export type TaskType = {
   _dueYmd?: string | null
   priority?: number
   project_name?: string
+  created_at?: string | number | null
 }
 
 export default function TaskCard({
