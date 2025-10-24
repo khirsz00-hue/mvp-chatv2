@@ -26,52 +26,63 @@ export default function TodoistAIView({
       if (!d?.id) return
       const sessionId = d.id
       const msgId = `init-${sessionId}`
-      // sessionStorage guard (prevents duplicates across components)
+
+      // prevent duplicates via sessionStorage
       try {
         if (sessionStorage.getItem(sessionStorageKey(sessionId))) return
         sessionStorage.setItem(sessionStorageKey(sessionId), '1')
       } catch {}
 
-      // build initial user prompt
+      // Build prompt and append user + pending assistant placeholder
       const text = `Pomóż mi z zadaniem: "${d.title || ''}". Opis: ${d.description || ''}`.trim()
       if (pendingRef.current.has(msgId)) return
       pendingRef.current.add(msgId)
-      // append user message locally
-      setMessages((m) => [...m, { id: msgId, role: 'user', text, ts: Date.now() }])
 
-      // call backend AI
-      fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ message: text, assistant: assistant || 'Todoist Helper', sessionId }),
+      // append user message
+      setMessages((m) => [...m, { id: msgId, role: 'user', text, ts: Date.now() }])
+      // append assistant placeholder
+      const placeholderId = `${msgId}-pending`
+      setMessages((m) => [...m, { id: placeholderId, role: 'assistant', text: 'Odpowiedź w toku...', ts: Date.now() }])
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Odpowiedź w toku...' } }))
+      scrollToBottom()
+      // we do not call backend here in AI view because NewChatSidebar already sent the request.
+      // we'll wait for aiReplySaved event to replace placeholder with real reply.
+    }
+
+    const onReplySaved = (ev: any) => {
+      const d = ev?.detail
+      if (!d?.sessionId) return
+      const sessionId = d.sessionId
+      const reply = d.reply || ''
+      const msgId = `init-${sessionId}`
+      const placeholderId = `${msgId}-pending`
+      setMessages((prev) => {
+        // if placeholder exists, replace it; otherwise append assistant reply
+        const found = prev.findIndex((m) => m.id === placeholderId)
+        if (found !== -1) {
+          const copy = [...prev]
+          copy[found] = { id: `${msgId}-resp`, role: 'assistant', text: reply, ts: Date.now() }
+          return copy
+        }
+        return [...prev, { id: `${msgId}-resp`, role: 'assistant', text: reply, ts: Date.now() }]
       })
-        .then((r) => r.json())
-        .then((j) => {
-          const reply = j?.reply || j?.content || 'Brak odpowiedzi od AI.'
-          setMessages((m) => [...m, { id: `${msgId}-resp`, role: 'assistant', text: reply, ts: Date.now() }])
-          scrollToBottom()
-        })
-        .catch((e) => {
-          console.error('ai error', e)
-        })
-        .finally(() => {
-          pendingRef.current.delete(msgId)
-        })
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Odpowiedź otrzymana' } }))
+      pendingRef.current.delete(msgId)
+      scrollToBottom()
     }
 
     const onOpenFromSub = (ev: any) => {
       const d = ev?.detail
       if (!d?.id) return
-      onInitial({ detail: { id: d.id, title: d.title, description: '' } })
+      onInitial({ detail: { id: d.id, title: d.title, description: d.description } })
     }
 
     window.addEventListener('aiInitial', onInitial)
+    window.addEventListener('aiReplySaved', onReplySaved)
     window.addEventListener('openTaskFromSubtask', onOpenFromSub)
     return () => {
       window.removeEventListener('aiInitial', onInitial)
+      window.removeEventListener('aiReplySaved', onReplySaved)
       window.removeEventListener('openTaskFromSubtask', onOpenFromSub)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -98,6 +109,9 @@ export default function TodoistAIView({
     if (pendingRef.current.has(id)) return
     pendingRef.current.add(id)
     setMessages((m) => [...m, { id, role: 'user', text: input, ts: Date.now() }])
+    const placeholderId = `${id}-pending`
+    setMessages((m) => [...m, { id: placeholderId, role: 'assistant', text: 'Odpowiedź w toku...', ts: Date.now() }])
+    scrollToBottom()
     const payload = { prompt: input, assistant: assistant || 'Assistant' }
     setInput('')
     try {
@@ -111,10 +125,20 @@ export default function TodoistAIView({
       })
       const j = await res.json().catch(() => ({}))
       const reply = j?.reply || j?.content || 'Brak odpowiedzi od AI.'
-      setMessages((m) => [...m, { id: `${id}-r`, role: 'assistant', text: reply, ts: Date.now() }])
+      setMessages((m) => {
+        const found = m.findIndex((x) => x.id === placeholderId)
+        if (found !== -1) {
+          const copy = [...m]
+          copy[found] = { id: `${id}-r`, role: 'assistant', text: reply, ts: Date.now() }
+          return copy
+        }
+        return [...m, { id: `${id}-r`, role: 'assistant', text: reply, ts: Date.now() }]
+      })
       scrollToBottom()
     } catch (e) {
       console.error('send ai error', e)
+      // replace placeholder with error
+      setMessages((m) => m.map((mm) => mm.id === placeholderId ? { ...mm, text: 'Błąd: nie otrzymano odpowiedzi' } : mm))
     } finally {
       pendingRef.current.delete(id)
     }
