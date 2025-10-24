@@ -34,6 +34,19 @@ export default function NewChatSidebar({
     window.addEventListener('storage', onUpdate)
     window.addEventListener('chatUpdated', onUpdate)
 
+    const markAiSent = (sessionId: string) => {
+      try {
+        sessionStorage.setItem(`ai_sent__${assistant}__${sessionId}`, '1')
+      } catch {}
+    }
+    const isAiSent = (sessionId: string) => {
+      try {
+        return !!sessionStorage.getItem(`ai_sent__${assistant}__${sessionId}`)
+      } catch {
+        return false
+      }
+    }
+
     const handleTaskHelp = async (e: any) => {
       try {
         const detail = e.detail
@@ -44,31 +57,44 @@ export default function NewChatSidebar({
         upsertSession(sessionsKeyFor('Todoist Helper' as AssistantKey), entry)
         setTimeout(() => loadList(), 100)
 
+        // Load existing conversation
         const conv = loadConversation(sk) || []
         const userPrompt = `Pomóż mi z zadaniem: "${t.title}".\n\nOpis: ${t.description || ''}`.trim()
+
+        // Check if we've already sent the same last user message (avoid duplicates)
         let needToSend = true
         if (conv && conv.length) {
           const lastUser = [...conv].reverse().find((m) => m.role === 'user')
           if (lastUser && lastUser.content === userPrompt) needToSend = false
         }
 
+        // Also check sessionStorage guard so other listeners (aiInitial etc.) won't duplicate
+        if (isAiSent(t.id)) needToSend = false
+
         if (needToSend) {
+          // Add user message locally first
           const userMsg = { role: 'user' as const, content: userPrompt, timestamp: Date.now() }
           const newConv = conv.concat(userMsg)
           saveConversation(sk, newConv)
+
+          // Mark as sent (to prevent other components from duplicating)
+          markAiSent(t.id)
+
+          // send to backend
           try {
             const res = await fetch('/api/chat', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ message: userPrompt, assistant: 'Todoist Helper', sessionId: t.id, task: t }),
             })
-            const data = await res.json()
+            const data = await res.json().catch(() => ({}))
             const reply = data?.reply || data?.content || 'Brak odpowiedzi od AI.'
             const aiMsg = { role: 'assistant' as const, content: reply, timestamp: Date.now() }
             const finalConv = newConv.concat(aiMsg)
             saveConversation(sk, finalConv)
           } catch (err) {
             console.error('taskHelp api error', err)
+            // keep user message in conversation even if AI fails; user can retry in modal
           }
         }
 
@@ -130,15 +156,24 @@ export default function NewChatSidebar({
     }
   }
 
+  // Ensure toggle button is always reachable even when collapsed: render an absolute toggle
   return (
-    <aside className={`flex flex-col transition-all bg-gray-50 border-r border-gray-200 ${collapsed ? 'w-16' : 'w-80'}`}>
+    <aside className={`relative flex flex-col transition-all bg-gray-50 border-r border-gray-200 ${collapsed ? 'w-16' : 'w-80'}`}>
+      {/* persistent toggle button (always visible) */}
+      <button
+        onClick={() => setCollapsed((s) => !s)}
+        title={collapsed ? 'Rozwiń' : 'Zwiń'}
+        className="absolute -right-4 top-4 w-8 h-8 bg-violet-600 text-white rounded-full shadow z-50 flex items-center justify-center"
+        aria-label={collapsed ? 'Otwórz' : 'Zwiń'}
+        style={{ transform: 'translateX(50%)' }}
+      >
+        {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+      </button>
+
       <div className="flex items-center justify-between px-3 py-2 border-b bg-white">
         <div className="text-sm font-semibold text-gray-700">{collapsed ? 'Hist' : `Historia — ${assistant}`}</div>
         <div className="flex items-center gap-2">
           <button onClick={loadList} title="Odśwież" className="p-1 rounded hover:bg-gray-100"><RefreshCw size={16} /></button>
-          <button onClick={() => setCollapsed((s) => !s)} title={collapsed ? 'Rozwiń' : 'Zwiń'} className="p-1 rounded hover:bg-gray-100">
-            {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-          </button>
         </div>
       </div>
 
