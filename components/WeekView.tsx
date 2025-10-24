@@ -3,9 +3,9 @@
 import React, { useEffect, useState } from 'react'
 import { format, addDays, startOfWeek, startOfDay } from 'date-fns'
 import { pl } from 'date-fns/locale'
-import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'
+import { DragDropContext, Droppable, Draggable, DroppableProvided, DroppableStateSnapshot, DraggableProvided, DraggableStateSnapshot } from 'react-beautiful-dnd'
 import TaskCard from './TaskCard'
-import { Plus, CheckCircle2, MoreVertical } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { parseDueToLocalYMD } from '../utils/date'
 import { appendHistory } from '../utils/localTaskStore'
 
@@ -27,7 +27,7 @@ export default function WeekView({
   onHelp,
   onOpenTask,
   onAddForDate,
-}: WeekViewProps) {
+}: WeekViewProps): JSX.Element {
   const today = startOfDay(new Date())
   const weekStart = startOfWeek(today, { weekStartsOn: 1 })
   const days = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i))
@@ -84,8 +84,12 @@ export default function WeekView({
             const isToday = key === format(today, 'yyyy-MM-dd')
             return (
               <Droppable droppableId={key} key={key}>
-                {(provided, snapshot) => (
-                  <div ref={provided.innerRef} {...provided.droppableProps} className={`min-h-[200px] border rounded-md p-2 bg-white/90 ${snapshot.isDraggingOver ? 'ring-2 ring-blue-200' : ''}`}>
+                {(provided: DroppableProvided, snapshot: DroppableStateSnapshot) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className={`min-h-[200px] border rounded-md p-2 bg-white/90 ${snapshot.isDraggingOver ? 'ring-2 ring-blue-200' : ''}`}
+                  >
                     <div className={`mb-2 ${isToday ? 'font-semibold text-blue-700' : 'text-gray-600'}`}>
                       <div className="flex items-center justify-between">
                         <div>{format(date, 'EEE d', { locale: pl })}</div>
@@ -100,7 +104,7 @@ export default function WeekView({
                     <div className="space-y-2">
                       {dayTasks.map((task, idx) => (
                         <Draggable draggableId={String(task.id)} index={idx} key={task.id}>
-                          {(prov, snap) => (
+                          {(prov: DraggableProvided, snap: DraggableStateSnapshot) => (
                             <div ref={prov.innerRef} {...prov.draggableProps} {...prov.dragHandleProps} style={{ ...prov.draggableProps.style }}>
                               <div className={`p-2 rounded-lg shadow-sm border bg-white cursor-grab ${snap.isDragging ? 'z-50' : ''}`}>
                                 <div onClick={() => onOpenTask?.(task)}>
