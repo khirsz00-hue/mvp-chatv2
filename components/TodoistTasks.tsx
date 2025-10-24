@@ -26,6 +26,8 @@ export default function TodoistTasks({
   const [localSelectedProject, setLocalSelectedProject] = useState<string>('all')
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
+  const [showBulkDate, setShowBulkDate] = useState(false)
+  const [bulkDate, setBulkDate] = useState<string>('')
   const lastUpdate = useRef<number>(0)
 
   const effectiveProject = selectedProject ?? localSelectedProject
@@ -92,15 +94,14 @@ export default function TodoistTasks({
     })
   }
 
-  const handleBulk = async (action: 'delete'|'complete'|'postpone') => {
+  const handleBulkExecute = async (action: 'delete'|'complete'|'postpone') => {
     if (!selectedTasks.size) return
+    if (action === 'postpone') {
+      setShowBulkDate(true)
+      return
+    }
     const ids = Array.from(selectedTasks)
     const payload: any = { action, ids, payload: {} }
-    if (action === 'postpone') {
-      const newDate = prompt('Podaj nową datę (YYYY-MM-DD) dla zaznaczonych zadań:')
-      if (!newDate) return
-      payload.payload.newDate = newDate
-    }
     try {
       await fetch('/api/todoist/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       window.dispatchEvent(new Event('taskUpdated'))
@@ -109,6 +110,23 @@ export default function TodoistTasks({
     } catch (err) {
       console.error('bulk action err', err)
       alert('Błąd akcji zbiorczej')
+    }
+  }
+
+  const handleBulkPostponeConfirm = async () => {
+    if (!bulkDate) return alert('Wybierz datę')
+    const ids = Array.from(selectedTasks)
+    const payload: any = { action: 'postpone', ids, payload: { newDate: bulkDate } }
+    try {
+      await fetch('/api/todoist/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      window.dispatchEvent(new Event('taskUpdated'))
+      setSelectedTasks(new Set())
+      setShowBulkDate(false)
+      setBulkDate('')
+      alert('Przeniesiono zaznaczone zadania')
+    } catch (err) {
+      console.error('bulk postpone err', err)
+      alert('Błąd przenoszenia')
     }
   }
 
@@ -141,7 +159,7 @@ export default function TodoistTasks({
         </div>
       )}
 
-      <div className="relative overflow-visible pb-20">
+      <div className="relative overflow-visible pb-28">
         <AnimatePresence mode="popLayout">
           {tasks.length === 0 ? (
             <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-sm text-neutral-500 mt-4 text-center">Brak zadań dla tego filtru.</motion.p>
@@ -162,13 +180,28 @@ export default function TodoistTasks({
         </AnimatePresence>
       </div>
 
+      {/* bulk action bar */}
       {selectedTasks.size > 0 && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white border rounded-md shadow-md px-4 py-2 flex items-center gap-3 z-50">
           <div className="text-sm font-medium">{selectedTasks.size} wybranych</div>
-          <button onClick={() => handleBulk('postpone')} className="px-3 py-1 bg-blue-600 text-white rounded">Przenieś</button>
-          <button onClick={() => handleBulk('complete')} className="px-3 py-1 bg-green-600 text-white rounded">Zakończ</button>
-          <button onClick={() => handleBulk('delete')} className="px-3 py-1 bg-red-600 text-white rounded">Usuń</button>
+          <button onClick={() => handleBulkExecute('postpone')} className="px-3 py-1 bg-blue-600 text-white rounded">Przenieś</button>
+          <button onClick={() => handleBulkExecute('complete')} className="px-3 py-1 bg-green-600 text-white rounded">Zakończ</button>
+          <button onClick={() => handleBulkExecute('delete')} className="px-3 py-1 bg-red-600 text-white rounded">Usuń</button>
           <button onClick={() => setSelectedTasks(new Set())} className="px-2 py-1 text-sm">Anuluj</button>
+        </div>
+      )}
+
+      {/* bulk postpone modal */}
+      {showBulkDate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white p-4 rounded shadow max-w-sm w-full">
+            <h3 className="font-semibold mb-2">Przenieś zaznaczone zadania</h3>
+            <input type="date" value={bulkDate} onChange={(e) => setBulkDate(e.target.value)} className="w-full border p-2 rounded mb-3" />
+            <div className="flex justify-end gap-2">
+              <button className="px-3 py-2 rounded bg-gray-100" onClick={() => { setShowBulkDate(false); setBulkDate('') }}>Anuluj</button>
+              <button className="px-3 py-2 rounded bg-blue-600 text-white" onClick={handleBulkPostponeConfirm}>Przenieś</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
