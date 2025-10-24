@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react'
 import ChatModal from './ChatModal'
 import type { AssistantKey, SessionEntry } from '../utils/chatStorage'
 import { loadSessions, sessionsKeyFor, scanSessionsFallback, storageKeyFor, upsertSession, loadConversation, saveConversation } from '../utils/chatStorage'
-import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 
 export default function NewChatSidebar({
   assistant,
@@ -57,30 +57,31 @@ export default function NewChatSidebar({
         upsertSession(sessionsKeyFor('Todoist Helper' as AssistantKey), entry)
         setTimeout(() => loadList(), 100)
 
-        // Load existing conversation
-        const conv = loadConversation(sk) || []
+        // Build user prompt
         const userPrompt = `Pomóż mi z zadaniem: "${t.title}".\n\nOpis: ${t.description || ''}`.trim()
 
-        // Check if we've already sent the same last user message (avoid duplicates)
+        // Avoid duplicates based on stored conversation and sessionStorage guard
+        const conv = loadConversation(sk) || []
         let needToSend = true
         if (conv && conv.length) {
           const lastUser = [...conv].reverse().find((m) => m.role === 'user')
           if (lastUser && lastUser.content === userPrompt) needToSend = false
         }
-
-        // Also check sessionStorage guard so other listeners (aiInitial etc.) won't duplicate
         if (isAiSent(t.id)) needToSend = false
 
         if (needToSend) {
-          // Add user message locally first
+          // Save user message locally immediately
           const userMsg = { role: 'user' as const, content: userPrompt, timestamp: Date.now() }
           const newConv = conv.concat(userMsg)
           saveConversation(sk, newConv)
-
-          // Mark as sent (to prevent other components from duplicating)
+          // Mark sent (so other listeners won't duplicate)
           markAiSent(t.id)
 
-          // send to backend
+          // Notify UI that answer is pending
+          window.dispatchEvent(new CustomEvent('aiInitial', { detail: { id: t.id, title: t.title, description: t.description } }))
+          window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Odpowiedź w toku...' } }))
+
+          // Send to backend
           try {
             const res = await fetch('/api/chat', {
               method: 'POST',
@@ -92,10 +93,17 @@ export default function NewChatSidebar({
             const aiMsg = { role: 'assistant' as const, content: reply, timestamp: Date.now() }
             const finalConv = newConv.concat(aiMsg)
             saveConversation(sk, finalConv)
+
+            // notify any AI view to pick up reply and replace placeholders
+            window.dispatchEvent(new CustomEvent('aiReplySaved', { detail: { sessionId: t.id, reply } }))
+            window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Odpowiedź otrzymana' } }))
           } catch (err) {
             console.error('taskHelp api error', err)
-            // keep user message in conversation even if AI fails; user can retry in modal
+            window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd wysyłania żądania do AI' } }))
           }
+        } else {
+          // If not sending, still open the chat for user to view
+          window.dispatchEvent(new CustomEvent('aiInitial', { detail: { id: t.id, title: t.title, description: t.description } }))
         }
 
         setActiveSession(entry)
@@ -156,10 +164,8 @@ export default function NewChatSidebar({
     }
   }
 
-  // Ensure toggle button is always reachable even when collapsed: render an absolute toggle
   return (
     <aside className={`relative flex flex-col transition-all bg-gray-50 border-r border-gray-200 ${collapsed ? 'w-16' : 'w-80'}`}>
-      {/* persistent toggle button (always visible) */}
       <button
         onClick={() => setCollapsed((s) => !s)}
         title={collapsed ? 'Rozwiń' : 'Zwiń'}
@@ -167,7 +173,7 @@ export default function NewChatSidebar({
         aria-label={collapsed ? 'Otwórz' : 'Zwiń'}
         style={{ transform: 'translateX(50%)' }}
       >
-        {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+        {collapsed ? '»' : '«'}
       </button>
 
       <div className="flex items-center justify-between px-3 py-2 border-b bg-white">
