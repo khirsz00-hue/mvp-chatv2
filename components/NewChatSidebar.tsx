@@ -57,6 +57,11 @@ export default function NewChatSidebar({
         upsertSession(sessionsKeyFor('Todoist Helper' as AssistantKey), entry)
         setTimeout(() => loadList(), 100)
 
+        // always open modal immediately so the user sees the chat UI
+        setActiveSession(entry)
+        setModalOpen(true)
+        if (onAssistantChange) onAssistantChange('Todoist Helper' as AssistantKey)
+
         const userPrompt = `Pomóż mi z zadaniem: "${t.title}".\n\nOpis: ${t.description || ''}`.trim()
         const conv = loadConversation(sk) || []
         let needToSend = true
@@ -72,10 +77,8 @@ export default function NewChatSidebar({
           saveConversation(sk, newConv)
           markAiSent(t.id)
 
-          // open modal + placeholder via events
-          window.dispatchEvent(new CustomEvent('aiInitial', { detail: { id: t.id, title: t.title, description: t.description } }))
           window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Odpowiedź w toku...' } }))
-
+          // send request
           try {
             const res = await fetch('/api/chat', {
               method: 'POST',
@@ -95,12 +98,9 @@ export default function NewChatSidebar({
             window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd wysyłania żądania do AI' } }))
           }
         } else {
-          window.dispatchEvent(new CustomEvent('aiInitial', { detail: { id: t.id, title: t.title, description: t.description } }))
+          // still notify AI view to show existing conversation
+          window.dispatchEvent(new CustomEvent('aiReplySaved', { detail: { sessionId: t.id, reply: null } }))
         }
-
-        setActiveSession(entry)
-        setModalOpen(true)
-        if (onAssistantChange) onAssistantChange('Todoist Helper' as AssistantKey)
       } catch (err) {
         console.error('handleTaskHelp error', err)
       }
