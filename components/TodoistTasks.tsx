@@ -94,17 +94,17 @@ export default function TodoistTasks({
     })
   }
 
-  // Bulk operations: include token in payload.payload.token
   const handleBulkExecute = async (action: 'delete'|'complete'|'postpone') => {
     if (!selectedTasks.size) return
     if (action === 'postpone') { setShowBulkDate(true); return }
     const ids = Array.from(selectedTasks)
     const payload: any = { action, ids, payload: { token } }
     try {
-      await fetch('/api/todoist/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      const res = await fetch('/api/todoist/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      const json = await res.json().catch(() => ({}))
       window.dispatchEvent(new Event('taskUpdated'))
       setSelectedTasks(new Set())
-      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Wykonano akcję zbiorczą' } }))
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: json?.message || 'Wykonano akcję' } }))
     } catch (err) {
       console.error('bulk action err', err)
       window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd akcji zbiorczej' } }))
@@ -116,12 +116,13 @@ export default function TodoistTasks({
     const ids = Array.from(selectedTasks)
     const payload: any = { action: 'postpone', ids, payload: { newDate: bulkDate, token } }
     try {
-      await fetch('/api/todoist/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      const res = await fetch('/api/todoist/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      const json = await res.json().catch(() => ({}))
       window.dispatchEvent(new Event('taskUpdated'))
       setSelectedTasks(new Set())
       setShowBulkDate(false)
       setBulkDate('')
-      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Przeniesiono zaznaczone zadania' } }))
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: json?.message || 'Przeniesiono zadania' } }))
     } catch (err) {
       console.error('bulk postpone err', err)
       window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd przenoszenia' } }))
