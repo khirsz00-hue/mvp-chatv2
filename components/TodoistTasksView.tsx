@@ -235,7 +235,6 @@ export default function TodoistTasksView({
     } catch (err) { console.error(err); fetchTasks(refreshFilter) }
   }
 
-  // This is the missing handler that caused the TS error; defined here so JSX can reference it.
   const handleMove = async (id: string, newDateYmd: string) => {
     if (!token) return
     try {
@@ -264,10 +263,11 @@ export default function TodoistTasksView({
   }
 
   const handleHelp = (taskObj: any) => {
-    window.dispatchEvent(new CustomEvent('appToast', { detail: { message: '🤖 Poproszono o pomoc' } }))
+    // open local dialog (task details) and dispatch events used by chat/sidebar
     setOpenTask({ id: taskObj.id, title: taskObj.content, description: taskObj.description })
-    // also dispatch taskHelp so NewChatSidebar triggers the AI flow (if present)
     window.dispatchEvent(new CustomEvent('taskHelp', { detail: { task: taskObj } }))
+    window.dispatchEvent(new CustomEvent('aiInitial', { detail: { id: taskObj.id, title: taskObj.content, description: taskObj.description } }))
+    window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Odpowiedź w toku...' } }))
   }
 
   const handleAddForDate = (ymd?: string | null) => {
@@ -276,7 +276,7 @@ export default function TodoistTasksView({
     setShowAdd(true)
   }
 
-  // Bulk actions (list views only)
+  // Bulk actions
   const bulkComplete = async () => {
     if (!token) return
     const ids = Array.from(selectedTasks)
@@ -315,7 +315,6 @@ export default function TodoistTasksView({
     setOpenTask({ id: task.id, title: task.content, description: task.description })
   }
 
-  // month grouped rendering - badge inline near date
   const renderMonthGrouped = () => {
     const groups: Record<string, any[]> = {}
     for (const t of tasks) {
@@ -354,7 +353,7 @@ export default function TodoistTasksView({
                             else copy.delete(t.id)
                             return copy
                           })
-                        }} selected={selectedTasks.has(t.id)} onOpen={handleOpenTask} wrapTitle={false} showContextMenu={false} />
+                        }} selected={selectedTasks.has(t.id)} onOpen={handleOpenTask} wrapTitle={false} inlineActions={true} showContextMenu={false} />
                       </div>
                     </div>
                   </li>
@@ -402,7 +401,7 @@ export default function TodoistTasksView({
             </div>
           </div>
 
-          {/* Bulk actions for list-like views */}
+          {/* Bulk actions for list-like views (placed under header) */}
           { (filter !== '7 days') && selectedTasks.size > 0 && (
             <div className="mt-3 flex items-center gap-2">
               <div className="text-sm text-gray-700">Zaznaczono: {selectedTasks.size}</div>
