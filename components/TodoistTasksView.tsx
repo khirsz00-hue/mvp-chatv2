@@ -5,9 +5,10 @@ import { AnimatePresence, motion } from 'framer-motion'
 import TodoistTasks from './TodoistTasks'
 import WeekView from './WeekView'
 import TaskDialog from './TaskDialog'
+import TaskCard from './TaskCard'
 import { parseDueToLocalYMD, ymdFromDate } from '../utils/date'
 import { addDays, startOfWeek, startOfMonth, endOfMonth } from 'date-fns'
-import { appendHistory } from '../utils/localTaskStore'
+import { appendHistory, getHistory } from '../utils/localTaskStore'
 
 type FilterType = 'today' | 'tomorrow' | 'overdue' | '7 days' | '30 days'
 
@@ -42,9 +43,13 @@ export default function TodoistTasksView({
   const [newProject, setNewProject] = useState<string>('')
   const [newDescription, setNewDescription] = useState<string>('')
 
+  // month selection state for bulk
+  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set())
+  const [bulkDate, setBulkDate] = useState<string>('')
+  const [showBulkModal, setShowBulkModal] = useState(false)
+
   const refreshFilter: FilterType = viewMode === 'week' ? '7 days' : filter
 
-  // global appToast listener to show toasts from components
   useEffect(() => {
     const handler = (e: any) => {
       const msg = e?.detail?.message
@@ -173,6 +178,33 @@ export default function TodoistTasksView({
     else if (filter === '30 days') { setTasks([]); fetchTasks('30 days') }
   }, [filter])
 
+  // month helpers for grouping UI
+  const toggleSelect = (id: string, checked: boolean) => {
+    setSelectedTasks((prev) => {
+      const copy = new Set(prev)
+      if (checked) copy.add(id)
+      else copy.delete(id)
+      return copy
+    })
+  }
+
+  const handleMonthBulkMove = async () => {
+    if (!selectedTasks.size || !bulkDate) return window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Wybierz zadania i datę' } }))
+    const ids = Array.from(selectedTasks)
+    const payload: any = { action: 'postpone', ids, payload: { newDate: bulkDate, token } }
+    try {
+      await fetch('/api/todoist/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      window.dispatchEvent(new Event('taskUpdated'))
+      setSelectedTasks(new Set())
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Przeniesiono zadania' } }))
+      setShowAdd(false)
+      fetchTasks(refreshFilter)
+    } catch (err) {
+      console.error('month bulk move err', err)
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd przenoszenia' } }))
+    }
+  }
+
   // Create task modal
   const openAddForDate = (ymd?: string | null) => {
     setAddDateYmd(ymd ?? null)
@@ -181,28 +213,26 @@ export default function TodoistTasksView({
   }
 
   const handleCreateTask = async () => {
-    if (!token) return alert('Brak tokena')
-    if (!newTitle.trim()) return alert('Podaj nazwę zadania')
+    if (!token) return window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Brak tokena' } }))
+    if (!newTitle.trim()) return window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Podaj nazwę zadania' } }))
     try {
-      const payload: any = { content: newTitle.trim() }
+      const payload: any = { content: newTitle.trim(), token }
       if (newDate) payload.due = newDate
       if (newProject) payload.project_id = newProject
       if (newDescription) payload.description = newDescription.trim()
-      const res = await fetch('/api/todoist/add', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(payload) })
+      const res = await fetch('/api/todoist/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       if (!res.ok) {
         const txt = await res.text().catch(() => '')
-        throw new Error('Błąd serwera: ' + txt)
+        throw new Error(txt || 'Błąd serwera')
       }
-      // set created_at locally so dialog can show immediately after opening
       setShowAdd(false)
       setNewTitle(''); setNewDate(''); setNewProject(''); setNewDescription('')
-      setToast('🆕 Dodano zadanie')
-      setTimeout(() => setToast(null), 1500)
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: '🆕 Dodano zadanie' } }))
       fetchTasks(refreshFilter)
       onUpdate?.()
     } catch (err: any) {
       console.error('create task error', err)
-      alert('Błąd dodawania zadania: ' + (err?.message || 'nieznany błąd'))
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd dodawania zadania' } }))
     }
   }
 
@@ -212,8 +242,7 @@ export default function TodoistTasksView({
       setTasks((prev) => prev.filter((t) => t.id !== id))
       lastLocalAction.current = Date.now()
       await fetch('/api/todoist/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, token }) })
-      setToast('✅ Ukończono zadanie')
-      setTimeout(() => setToast(null), 1500)
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: '✅ Ukończono zadanie' } }))
       if (viewMode !== 'week') fetchTasks(refreshFilter)
       onUpdate?.()
     } catch (err) { console.error(err); fetchTasks(refreshFilter) }
@@ -228,8 +257,7 @@ export default function TodoistTasksView({
       lastLocalAction.current = Date.now()
       await fetch('/api/todoist/postpone', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, token, newDate: newDateYmd }) })
       appendHistory(id, prevDate, newDateYmd)
-      setToast('📅 Przeniesiono zadanie')
-      setTimeout(() => setToast(null), 1500)
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: '📅 Przeniesiono zadanie' } }))
       if (viewMode !== 'week') setTimeout(() => fetchTasks(refreshFilter), 700)
       onUpdate?.()
     } catch (err) { console.error(err); fetchTasks(refreshFilter) }
@@ -241,21 +269,19 @@ export default function TodoistTasksView({
       setTasks((prev) => prev.filter((t) => t.id !== id))
       lastLocalAction.current = Date.now()
       await fetch('/api/todoist/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, token }) })
-      setToast('🗑 Usunięto zadanie')
-      setTimeout(() => setToast(null), 1500)
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: '🗑 Usunięto zadanie' } }))
       if (viewMode !== 'week') fetchTasks(refreshFilter)
       onUpdate?.()
     } catch (err) { console.error(err); fetchTasks(refreshFilter) }
   }
 
   const handleHelp = (taskObj: any) => {
-    setToast('🤖 Poproszono o pomoc dla zadania')
-    setTimeout(() => setToast(null), 2000)
+    window.dispatchEvent(new CustomEvent('appToast', { detail: { message: '🤖 Poproszono o pomoc' } }))
     setOpenTask({ id: taskObj.id, title: taskObj.content, description: taskObj.description })
   }
 
+  // month grouped rendering with checkboxes and day-badges
   const renderMonthGrouped = () => {
-    // group by _dueYmd (or 'no-date'), sorted ascending
     const groups: Record<string, any[]> = {}
     for (const t of tasks) {
       const k = t._dueYmd || 'no-date'
@@ -263,26 +289,38 @@ export default function TodoistTasksView({
       groups[k].push(t)
     }
     const keys = Object.keys(groups).filter(k => k !== 'no-date').sort().concat(Object.keys(groups).includes('no-date') ? ['no-date'] : [])
+    const today = new Date()
     return (
       <div className="space-y-4">
-        {keys.map((k) => (
-          <div key={k}>
-            <div className="text-sm font-semibold text-gray-600 mb-2">{k === 'no-date' ? 'Brak terminu' : k}</div>
-            <ul className="space-y-2">
-              {groups[k].map((t) => (
-                <li key={t.id}>
-                  <div className="p-3 bg-white rounded-lg border shadow-sm flex items-start justify-between">
-                    <div className="min-w-0">
-                      <div className="font-medium truncate">{t.content}</div>
-                      <div className="text-xs text-gray-500 mt-1">{t.project_name || ''}</div>
+        {keys.map((k) => {
+          const daysTo = k === 'no-date' ? null : Math.ceil((new Date(k).getTime() - today.getTime()) / 86400000)
+          return (
+            <div key={k}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-sm font-semibold text-gray-600">{k === 'no-date' ? 'Brak terminu' : k}</div>
+                <div>
+                  {k !== 'no-date' && (
+                    <div className={`text-xs px-2 py-0.5 rounded ${daysTo !== null && daysTo <= 0 ? 'bg-red-100 text-red-700' : 'bg-green-50 text-green-700'}`}>
+                      {daysTo !== null ? (daysTo === 0 ? 'dzisiaj' : `za ${daysTo}d`) : ''}
                     </div>
-                    <div className="ml-2 text-xs text-gray-500">Due: {t._dueYmd || '—'}</div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+                  )}
+                </div>
+              </div>
+
+              <ul className="space-y-2">
+                {groups[k].map((t) => (
+                  <li key={t.id}>
+                    <div className="p-3 bg-white rounded-lg border shadow-sm flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <TaskCard task={t} token={token} selectable onSelectChange={(checked) => toggleSelect(t.id, checked)} selected={selectedTasks.has(t.id)} onOpen={(task) => setOpenTask({ id: task.id, title: task.content, description: task.description })} />
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )
+        })}
       </div>
     )
   }
@@ -364,11 +402,25 @@ export default function TodoistTasksView({
         )}
       </AnimatePresence>
 
+      {/* month bulk modal */}
+      {showBulkModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white p-4 rounded shadow max-w-sm w-full">
+            <h3 className="font-semibold mb-2">Przenieś zaznaczone zadania</h3>
+            <input type="date" value={bulkDate} onChange={(e) => setBulkDate(e.target.value)} className="w-full border p-2 rounded mb-3" />
+            <div className="flex justify-end gap-2">
+              <button className="px-3 py-2 rounded bg-gray-100" onClick={() => setShowBulkModal(false)}>Anuluj</button>
+              <button className="px-3 py-2 rounded bg-blue-600 text-white" onClick={handleMonthBulkMove}>Przenieś</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Task detail modal */}
       <AnimatePresence>
         {openTask && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4" onClick={() => setOpenTask(null)}>
           <motion.div initial={{ scale: 0.98, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.98, y: 10 }} className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-5" onClick={(e) => e.stopPropagation()}>
-            <TaskDialog task={{ id: openTask.id, title: openTask.title }} initialTaskData={{ description: openTask.description, project_name: openTask.project_name, project_id: openTask.project_id, due: openTask._dueYmd }} onClose={() => setOpenTask(null)} />
+            <TaskDialog token={token} task={{ id: openTask.id, title: openTask.title }} initialTaskData={{ description: openTask.description, project_name: openTask.project_name, project_id: openTask.project_id, due: openTask._dueYmd, created_at: openTask.created_at }} onClose={() => setOpenTask(null)} />
           </motion.div>
         </motion.div>}
       </AnimatePresence>
