@@ -7,7 +7,6 @@ import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'
 import TaskCard from './TaskCard'
 import { Plus } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { parseDueToLocalYMD } from '../utils/date'
 import { appendHistory } from '../utils/localTaskStore'
 
 interface WeekViewProps {
@@ -47,9 +46,6 @@ export default function WeekView({
         return
       }
       if (keys.includes(due)) grouped[due].push(t)
-      else {
-        // skip tasks outside this week for WeekView
-      }
     })
     setColumns(grouped)
   }, [tasks, days])
@@ -94,7 +90,7 @@ export default function WeekView({
                   <div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
-                    className={`min-h-[200px] border rounded-md p-2 bg-white/90 flex flex-col ${snapshot.isDraggingOver ? 'ring-2 ring-blue-200' : ''}`}
+                    className={`min-h-[200px] border rounded-md p-2 bg-white/90 flex flex-col transition-shadow duration-150 ${snapshot.isDraggingOver ? 'ring-2 ring-blue-200 bg-blue-50' : ''}`}
                   >
                     <div className={`mb-2 ${isToday ? 'font-semibold text-blue-700' : 'text-gray-600'}`}>
                       <div className="flex items-center justify-between">
@@ -116,20 +112,18 @@ export default function WeekView({
                                 ref={prov.innerRef}
                                 {...prov.draggableProps}
                                 {...prov.dragHandleProps}
-                                initial={{ opacity: 0, y: 6 }}
+                                initial={{ opacity: 0, y: 8 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -6 }}
+                                exit={{ opacity: 0, y: -8 }}
                                 transition={{ duration: 0.12 }}
                                 style={{ ...prov.draggableProps.style }}
-                                className=""
                               >
-                                <div className={`p-2 rounded-lg shadow-sm border bg-white ${snap.isDragging ? 'z-50' : ''}`}>
-                                  <div onClick={() => onOpenTask?.(task)}>
-                                    <TaskCard task={task} token={undefined} selectable={false} onOpen={onOpenTask} wrapTitle />
-                                  </div>
-                                  <div className="mt-2 flex items-center gap-2 justify-end">
-                                    <button onClick={(e) => { e.stopPropagation(); onComplete?.(task.id) }} className="text-xs px-2 py-1 bg-green-50 rounded">Ukończ</button>
-                                    <button onClick={(e) => { e.stopPropagation(); onHelp?.(task) }} className="text-xs px-2 py-1 bg-gray-50 rounded">Pomóż mi</button>
+                                <div className={`p-2 rounded-lg shadow-sm border bg-white ${snap.isDragging ? 'z-50 scale-102' : ''}`}>
+                                  <div className="flex items-start gap-3">
+                                    <input type="checkbox" className="mt-2" onClick={(e) => { e.stopPropagation(); onComplete?.(task.id) }} />
+                                    <div className="flex-1" onClick={() => onOpenTask?.(task)}>
+                                      <TaskCard task={task} token={undefined} selectable={false} onOpen={onOpenTask} wrapTitle />
+                                    </div>
                                   </div>
                                 </div>
                               </motion.div>
