@@ -16,7 +16,7 @@ interface WeekViewProps {
   onDelete?: (id: string) => void
   onHelp?: (task: any) => void
   onOpenTask?: (task: any) => void
-  onAddForDate?: (ymd: string) => void // open add task modal prefilled with date
+  onAddForDate?: (ymd: string) => void
 }
 
 export default function WeekView({
@@ -36,7 +36,6 @@ export default function WeekView({
   const [loading, setLoading] = useState(true)
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null)
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null)
-  const datePickers = useRef<Record<string, HTMLInputElement | null>>({})
 
   useEffect(() => {
     if (!tasks || tasks.length === 0) {
@@ -138,7 +137,7 @@ export default function WeekView({
                     <div className="week-column-header relative p-2">
                       <div className={`inline-block ${isToday ? 'font-semibold week-day-today' : ''}`}>{format(date, 'EEE d', { locale: pl })}</div>
                       <div className="absolute right-2 top-1">
-                        <button onClick={() => onAddForDate?.(key)} title="Dodaj zadanie na ten dzień" className="p-1 rounded bg-white shadow-sm hover:bg-gray-100">
+                        <button onClick={(e) => { e.stopPropagation(); onAddForDate?.(key) }} title="Dodaj zadanie na ten dzień" className="p-1 rounded bg-white shadow-sm hover:bg-gray-100">
                           <Plus size={14} />
                         </button>
                       </div>
@@ -155,22 +154,22 @@ export default function WeekView({
                                   <div className="flex-1 min-w-0" onClick={() => onOpenTask?.(task)}>
                                     <div className="flex justify-between items-start gap-2">
                                       <div className="min-w-0">
-                                        <div className="text-sm font-medium text-gray-800 truncate break-words">{task.content}</div>
-                                        <div className="text-xs text-gray-500 mt-1 truncate">{task.project_name || ''}</div>
+                                        <TaskCard task={task} token={undefined} selectable={false} showContextMenu={false} onOpen={onOpenTask} wrapTitle />
+                                        {/* TaskCard is used inside here; wrapTitle prop ensures lines wrap */}
                                       </div>
                                       <div className="flex items-center gap-2">
-                                        <button title="Ukończ" onClick={() => handleCompleteClick(task.id)} className="p-1 rounded-full hover:bg-gray-100">
+                                        <button title="Ukończ" onClick={(e) => { e.stopPropagation(); handleCompleteClick(task.id) }} className="p-1 rounded-full hover:bg-gray-100">
                                           <CheckCircle2 size={18} className="text-green-600" />
                                         </button>
 
                                         <div className="relative">
-                                          <button onClick={() => setOpenMenuFor(openMenuFor === task.id ? null : task.id)} className="p-1 rounded hover:bg-gray-100" title="Więcej">
+                                          <button onClick={(e) => { e.stopPropagation(); setOpenMenuFor(openMenuFor === task.id ? null : task.id) }} className="p-1 rounded hover:bg-gray-100" title="Więcej">
                                             <MoreVertical size={16} />
                                           </button>
                                           {openMenuFor === task.id && (
                                             <div className="absolute right-0 mt-2 w-44 bg-white border border-gray-200 rounded-md shadow-lg z-50">
-                                              <button onClick={() => { setOpenMenuFor(null); onHelp?.(task) }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm">Pomóż mi</button>
-                                              <button onClick={() => { setOpenMenuFor(null); handleDeleteClick(task.id) }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm text-red-600">Usuń</button>
+                                              <button onClick={(e) => { e.stopPropagation(); setOpenMenuFor(null); onHelp?.(task) }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm">Pomóż mi</button>
+                                              <button onClick={(e) => { e.stopPropagation(); setOpenMenuFor(null); handleDeleteClick(task.id) }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm text-red-600">Usuń</button>
                                             </div>
                                           )}
                                         </div>
