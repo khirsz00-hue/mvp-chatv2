@@ -43,14 +43,12 @@ export default function WeekView({
     tasks.forEach((t) => {
       const due = t._dueYmd ?? (t.due?.date ?? (typeof t.due === 'string' ? t.due : null))
       if (!due) {
-        // assign to first day if no date
         grouped[keys[0]].push(t)
         return
       }
       if (keys.includes(due)) grouped[due].push(t)
       else {
-        // if due outside week, ignore for week view (keeps previous behavior), or optionally push to first/last col
-        // we'll skip adding to keep week filtered.
+        // skip tasks outside this week for WeekView
       }
     })
     setColumns(grouped)
@@ -92,8 +90,12 @@ export default function WeekView({
             const isToday = key === format(today, 'yyyy-MM-dd')
             return (
               <Droppable droppableId={key} key={key}>
-                {(provided, snapshot) => (
-                  <div ref={provided.innerRef} {...provided.droppableProps} className={`min-h-[200px] border rounded-md p-2 bg-white/90 flex flex-col ${snapshot.isDraggingOver ? 'ring-2 ring-blue-200' : ''}`}>
+                {(provided: any, snapshot: any) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className={`min-h-[200px] border rounded-md p-2 bg-white/90 flex flex-col ${snapshot.isDraggingOver ? 'ring-2 ring-blue-200' : ''}`}
+                  >
                     <div className={`mb-2 ${isToday ? 'font-semibold text-blue-700' : 'text-gray-600'}`}>
                       <div className="flex items-center justify-between">
                         <div className="text-sm">{format(date, 'EEE d', { locale: pl })}</div>
@@ -109,7 +111,7 @@ export default function WeekView({
                       <AnimatePresence>
                         {dayTasks.map((task: any, idx: number) => (
                           <Draggable draggableId={String(task.id)} index={idx} key={task.id}>
-                            {(prov, snap) => (
+                            {(prov: any, snap: any) => (
                               <motion.div
                                 ref={prov.innerRef}
                                 {...prov.draggableProps}
