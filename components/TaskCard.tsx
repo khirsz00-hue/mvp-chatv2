@@ -37,8 +37,12 @@ export default function TaskCard({
   onOpen?: (task: TaskType) => void
 }) {
   const dueYmd = task._dueYmd ?? parseDueToLocalYMD(task.due)
-  const estObj = getEstimate(task.id)
-  const estLabel = estObj ? (estObj.minutes < 60 ? `${estObj.minutes}m` : `${Math.floor(estObj.minutes/60)}h${estObj.minutes%60 ? ` ${estObj.minutes%60}m` : ''}`) : ''
+  const estObj = getEstimate(task.id) // { minutes, updatedAt } | null
+  const estLabel = estObj
+    ? estObj.minutes < 60
+      ? `${estObj.minutes}m`
+      : `${Math.floor(estObj.minutes / 60)}h${estObj.minutes % 60 ? ` ${estObj.minutes % 60}m` : ''}`
+    : ''
 
   const handleComplete = async () => {
     try {
