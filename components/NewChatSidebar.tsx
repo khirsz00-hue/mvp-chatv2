@@ -57,10 +57,7 @@ export default function NewChatSidebar({
         upsertSession(sessionsKeyFor('Todoist Helper' as AssistantKey), entry)
         setTimeout(() => loadList(), 100)
 
-        // Build user prompt
         const userPrompt = `Pomóż mi z zadaniem: "${t.title}".\n\nOpis: ${t.description || ''}`.trim()
-
-        // Avoid duplicates based on stored conversation and sessionStorage guard
         const conv = loadConversation(sk) || []
         let needToSend = true
         if (conv && conv.length) {
@@ -70,18 +67,15 @@ export default function NewChatSidebar({
         if (isAiSent(t.id)) needToSend = false
 
         if (needToSend) {
-          // Save user message locally immediately
           const userMsg = { role: 'user' as const, content: userPrompt, timestamp: Date.now() }
           const newConv = conv.concat(userMsg)
           saveConversation(sk, newConv)
-          // Mark sent (so other listeners won't duplicate)
           markAiSent(t.id)
 
-          // Notify UI that answer is pending
+          // open modal + placeholder via events
           window.dispatchEvent(new CustomEvent('aiInitial', { detail: { id: t.id, title: t.title, description: t.description } }))
           window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Odpowiedź w toku...' } }))
 
-          // Send to backend
           try {
             const res = await fetch('/api/chat', {
               method: 'POST',
@@ -94,7 +88,6 @@ export default function NewChatSidebar({
             const finalConv = newConv.concat(aiMsg)
             saveConversation(sk, finalConv)
 
-            // notify any AI view to pick up reply and replace placeholders
             window.dispatchEvent(new CustomEvent('aiReplySaved', { detail: { sessionId: t.id, reply } }))
             window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Odpowiedź otrzymana' } }))
           } catch (err) {
@@ -102,7 +95,6 @@ export default function NewChatSidebar({
             window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd wysyłania żądania do AI' } }))
           }
         } else {
-          // If not sending, still open the chat for user to view
           window.dispatchEvent(new CustomEvent('aiInitial', { detail: { id: t.id, title: t.title, description: t.description } }))
         }
 
@@ -121,7 +113,6 @@ export default function NewChatSidebar({
       window.removeEventListener('chatUpdated', onUpdate)
       window.removeEventListener('taskHelp', handleTaskHelp)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assistant])
 
   const startNew = () => {
