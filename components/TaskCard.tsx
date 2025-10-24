@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import { parseDueToLocalYMD } from '../utils/date'
 import { getEstimate } from '../utils/localTaskStore'
 
@@ -19,14 +19,14 @@ export type TaskType = {
 export default function TaskCard({
   task,
   token,
-  showContextMenu = false,
+  showContextMenu = true,
   onAction,
   onHelp,
   selectable = false,
   selected = false,
   onSelectChange,
   onOpen,
-  wrapTitle = false, // NEW: allow wrapping for WeekView
+  wrapTitle = false,
 }: {
   task: TaskType
   token?: string
@@ -39,13 +39,10 @@ export default function TaskCard({
   onOpen?: (task: TaskType) => void
   wrapTitle?: boolean
 }) {
+  const [openMenu, setOpenMenu] = useState(false)
   const dueYmd = task._dueYmd ?? parseDueToLocalYMD(task.due)
-  const estObj = getEstimate(task.id) // { minutes, updatedAt } | null
-  const estLabel = estObj
-    ? estObj.minutes < 60
-      ? `${estObj.minutes}m`
-      : `${Math.floor(estObj.minutes / 60)}h${estObj.minutes % 60 ? ` ${estObj.minutes % 60}m` : ''}`
-    : ''
+  const estObj = getEstimate(task.id)
+  const estLabel = estObj ? (estObj.minutes < 60 ? `${estObj.minutes}m` : `${Math.floor(estObj.minutes / 60)}h${estObj.minutes % 60 ? ` ${estObj.minutes % 60}m` : ''}`) : ''
 
   const handleComplete = async () => {
     try {
@@ -75,19 +72,20 @@ export default function TaskCard({
     onHelp?.(task)
   }
 
+  const handleMove = () => {
+    const newDate = prompt('Podaj nową datę (YYYY-MM-DD):')
+    if (!newDate) return
+    fetch('/api/todoist/postpone', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: task.id, token, newDate }) })
+      .then(() => { window.dispatchEvent(new Event('taskUpdated')); onAction?.() })
+      .catch((e) => console.error(e))
+  }
+
   return (
     <div className="p-3 bg-white rounded-lg border flex flex-col gap-3 shadow-sm min-w-0">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 w-full min-w-0">
           {selectable && (
-            <input
-              type="checkbox"
-              checked={selected}
-              onChange={(e) => onSelectChange?.(e.target.checked)}
-              className="mt-1"
-              aria-label="Wybierz zadanie"
-              onClick={(e) => e.stopPropagation()}
-            />
+            <input type="checkbox" checked={selected} onChange={(e) => onSelectChange?.(e.target.checked)} className="mt-1" aria-label="Wybierz zadanie" onClick={(e) => e.stopPropagation()} />
           )}
 
           <div className="min-w-0 grow" onClick={() => onOpen?.(task)} style={{ cursor: 'pointer' }}>
@@ -96,6 +94,22 @@ export default function TaskCard({
             {task.project_name ? <div className="text-xs text-gray-400 mt-1 truncate">{task.project_name}</div> : null}
           </div>
         </div>
+
+        {showContextMenu && (
+          <div className="relative">
+            <button onClick={(e) => { e.stopPropagation(); setOpenMenu((s) => !s) }} className="p-1 rounded hover:bg-gray-100" aria-label="menu">
+              ⋮
+            </button>
+            {openMenu && (
+              <div onClick={(e) => e.stopPropagation()} className="absolute right-0 mt-2 w-36 bg-white border rounded-md shadow-lg z-50">
+                <button onClick={(e) => { e.stopPropagation(); setOpenMenu(false); handleHelp() }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm">Pomóż mi</button>
+                <button onClick={(e) => { e.stopPropagation(); setOpenMenu(false); handleComplete() }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm">Ukończ</button>
+                <button onClick={(e) => { e.stopPropagation(); setOpenMenu(false); handleMove() }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm">Przenieś</button>
+                <button onClick={(e) => { e.stopPropagation(); setOpenMenu(false); handleDelete() }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm text-red-600">Usuń</button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex items-center justify-between">
@@ -108,8 +122,6 @@ export default function TaskCard({
         <div className="flex items-center gap-2">
           <button onClick={handleHelp} className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded">Pomóż mi</button>
           <button onClick={(e) => { e.stopPropagation(); onOpen?.(task) }} className="px-2 py-1 text-xs bg-gray-100 rounded">Szczegóły</button>
-          <button onClick={(e) => { e.stopPropagation(); handleComplete() }} className="px-2 py-1 text-xs bg-green-100 rounded">Ukończ</button>
-          <button onClick={(e) => { e.stopPropagation(); handleDelete() }} className="px-2 py-1 text-xs bg-red-100 rounded">Usuń</button>
         </div>
       </div>
     </div>
