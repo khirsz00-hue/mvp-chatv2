@@ -166,8 +166,16 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
     setTasks((prev) => prev.map((t) => ids.includes(t.id) ? { ...t, _completing: true } : t))
     try {
       await fetch('/api/todoist/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'complete', ids }) })
-      setTimeout(() => { setTasks((prev) => prev.filter((t) => !ids.includes(t.id))); setSelectedTasks(new Set()); window.dispatchEvent(new CustomEvent('appToast', { detail: { message: '✅ Zakończono wybrane' } })) }, 200)
-    } catch (err) { console.error(err); window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd bulk complete' } })); fetchTasks(refreshFilter) }
+      setTimeout(() => {
+        setTasks((prev) => prev.filter((t) => !ids.includes(t.id)))
+        setSelectedTasks(new Set())
+        window.dispatchEvent(new CustomEvent('appToast', { detail: { message: '✅ Zakończono wybrane' } }))
+      }, 200)
+    } catch (err) {
+      console.error(err)
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd bulk complete' } }))
+      fetchTasks(refreshFilter)
+    }
   }
 
   const bulkDelete = async () => {
@@ -177,8 +185,16 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
     setTasks((prev) => prev.map((t) => ids.includes(t.id) ? { ...t, _deleting: true } : t))
     try {
       await fetch('/api/todoist/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', ids }) })
-      setTimeout(() => { setTasks((prev) => prev.filter((t) => !ids.includes(t.id))); setSelectedTasks(new Set()); window.dispatchEvent(new CustomEvent('appToast', { detail: { message: '🗑 Usunięto zaznaczone' } })) }, 200)
-    } catch (err) { console.error(err); window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd bulk delete' } })); fetchTasks(refreshFilter) }
+      setTimeout(() => {
+        setTasks((prev) => prev.filter((t) => !ids.includes(t.id)))
+        setSelectedTasks(new Set())
+        window.dispatchEvent(new CustomEvent('appToast', { detail: { message: '🗑 Usunięto zaznaczone' } }))
+      }, 200)
+    } catch (err) {
+      console.error(err)
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd bulk delete' } }))
+      fetchTasks(refreshFilter)
+    }
   }
 
   return (
@@ -223,29 +239,39 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
       <BulkBar />
 
       {/* single move modal */}
-      {openMoveSingle.open && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40" onClick={() => setOpenMoveSingle({ open: false })}>
-        <div className="bg-white p-4 rounded shadow" onClick={(e) => e.stopPropagation()}>
-          <h4 className="font-semibold mb-2">Przenieś zadanie</h4>
-          <input type="date" defaultValue={new Date().toISOString().slice(0,10)} id="move-single-date" className="border p-2 rounded mb-3" />
-          <div className="flex gap-2 justify-end">
-            <button className="px-3 py-1 bg-gray-100 rounded" onClick={() => setOpenMoveSingle({ open: false })}>Anuluj</button>
-            <button className="px-3 py-1 bg-violet-600 text-white rounded" onClick={() => {
-              const d = (document.getElementById('move-single-date') as HTMLInputElement).value
-              if (!d) return
-              if (openMoveSingle.id) handleMove([openMoveSingle.id], d)
-            }}>Przenieś</button>
+      {openMoveSingle.open && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40" onClick={() => setOpenMoveSingle({ open: false })}>
+          <div className="bg-white p-4 rounded shadow" onClick={(e) => e.stopPropagation()}>
+            <h4 className="font-semibold mb-2">Przenieś zadanie</h4>
+            <input type="date" defaultValue={new Date().toISOString().slice(0,10)} id="move-single-date" className="border p-2 rounded mb-3" />
+            <div className="flex gap-2 justify-end">
+              <button className="px-3 py-1 bg-gray-100 rounded" onClick={() => setOpenMoveSingle({ open: false })}>Anuluj</button>
+              <button className="px-3 py-1 bg-violet-600 text-white rounded" onClick={() => {
+                const d = (document.getElementById('move-single-date') as HTMLInputElement).value
+                if (!d) return
+                if (openMoveSingle.id) handleMove([openMoveSingle.id], d)
+              }}>Przenieś</button>
+            </div>
           </div>
         </div>
-      </div>}
-
-      <AnimatePresence>{toast && <motion.div initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:10 }} className="fixed top-6 right-6 z-60 bg-black text-white px-4 py-2 rounded">{toast}</motion.div>}</AnimatePresence>
+      )}
 
       <AnimatePresence>
-        {openTask && <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40" onClick={() => setOpenTask(null)}>
-          <div onClick={(e) => e.stopPropagation()} className="bg-white p-5 rounded max-w-3xl w-full">
-            <TaskDialog token={token} task={{ id: openTask.id, title: openTask.title }} initialTaskData={openTask.initialTaskData} initialIsLocal={openTask.initialIsLocal} onClose={() => { setOpenTask(null); fetchTasks(refreshFilter) }} />
-          </div>
-        </motion.div>}
+        {toast && (
+          <motion.div initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:10 }} className="fixed top-6 right-6 z-60 bg-black text-white px-4 py-2 rounded">
+            {toast}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {openTask && (
+          <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40" onClick={() => setOpenTask(null)}>
+            <div onClick={(e) => e.stopPropagation()} className="bg-white p-5 rounded max-w-3xl w-full">
+              <TaskDialog token={token} task={{ id: openTask.id, title: openTask.title }} initialTaskData={openTask.initialTaskData} initialIsLocal={openTask.initialIsLocal} onClose={() => { setOpenTask(null); fetchTasks(refreshFilter) }} />
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   )
