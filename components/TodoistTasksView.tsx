@@ -6,7 +6,7 @@ import TodoistTasks from './TodoistTasks'
 import WeekView from './WeekView'
 import TaskDialog from './TaskDialog'
 import TaskCard from './TaskCard'
-import { parseDueToLocalYMD, ymdFromDate } from '../utils/date'
+import { parseDueToLocalYMD } from '../utils/date'
 import { addDays, startOfWeek, startOfMonth, endOfMonth } from 'date-fns'
 import { appendHistory } from '../utils/localTaskStore'
 
@@ -17,70 +17,30 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
   const [selectedProject, setSelectedProject] = useState<string>('all')
   const [toast, setToast] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'list' | 'week'>(() => (typeof window !== 'undefined' && localStorage.getItem('todoist_filter') === '7 days' ? 'week' : 'list'))
-  const lastEvent = useRef<number>(0)
   const lastLocalAction = useRef<number>(0)
 
   const [openTask, setOpenTask] = useState<any | null>(null)
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set())
-  const [moveModal, setMoveModal] = useState<{ open: boolean; targetIds: string[]; initial?: string | null }>({ open: false, targetIds: [], initial: null })
   const [openMoveSingle, setOpenMoveSingle] = useState<{ open: boolean; id?: string }>({ open: false })
-  const [openTaskDialogForSub, setOpenTaskDialogForSub] = useState<any | null>(null)
 
   const refreshFilter = viewMode === 'week' ? '7 days' : filter
 
   useEffect(() => {
-    const toastHandler = (e: any) => { const m = e?.detail?.message; if (m) setToast(m); setTimeout(() => setToast(null), 2200) }
+    const toastHandler = (e: any) => { const m = e?.detail?.message; if (m) { setToast(m); setTimeout(() => setToast(null), 2200) } }
     window.addEventListener('appToast', toastHandler)
 
-    const openFromSub = (ev: any) => {
-      const d = ev?.detail
-      if (!d?.id) return
-      if (d.initialTaskData) setOpenTaskDialogForSub({ id: d.id, initialTaskData: d.initialTaskData, initialIsLocal: !!d.initialIsLocal })
-      else setOpenTaskDialogForSub({ id: d.id })
-    }
-    window.addEventListener('openTaskFromSubtask', openFromSub)
-
-    // central handlers for TaskCard emitted events
-    const onTaskHelp = (ev: any) => {
-      const d = ev?.detail
-      if (!d?.task && !d?.id) return
-      const task = d.task || tasks.find((t) => t.id === d.id)
-      if (!task) return
-      // open details modal and dispatch help sequence
-      setOpenTask({ id: task.id, title: task.content, description: task.description })
-      window.dispatchEvent(new CustomEvent('taskHelp', { detail: { task } }))
-    }
-    const onTaskComplete = (ev: any) => {
-      const id = ev?.detail?.id
-      if (!id) return
-      handleComplete(id)
-    }
-    const onTaskDelete = (ev: any) => {
-      const id = ev?.detail?.id
-      if (!id) return
-      handleDelete(id)
-    }
     const onOpenMovePicker = (ev: any) => {
       const d = ev?.detail
       if (!d?.id) return
-      // open single move modal
       setOpenMoveSingle({ open: true, id: d.id })
     }
 
-    window.addEventListener('taskHelp', onTaskHelp)
-    window.addEventListener('taskComplete', onTaskComplete)
-    window.addEventListener('taskDelete', onTaskDelete)
     window.addEventListener('openMovePicker', onOpenMovePicker)
-
     return () => {
       window.removeEventListener('appToast', toastHandler)
-      window.removeEventListener('openTaskFromSubtask', openFromSub)
-      window.removeEventListener('taskHelp', onTaskHelp)
-      window.removeEventListener('taskComplete', onTaskComplete)
-      window.removeEventListener('taskDelete', onTaskDelete)
       window.removeEventListener('openMovePicker', onOpenMovePicker)
     }
-  }, [tasks])
+  }, [])
 
   useEffect(() => {
     if (!token) return
@@ -128,7 +88,7 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
   const handleCreateTask = async (payload?: any) => {
     if (!token) return window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Brak tokena' } }))
     try {
-      const p = payload ?? { content: newTitle, token }
+      const p = payload ?? { content: 'Nowe zadanie', token }
       const res = await fetch('/api/todoist/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(json?.error || 'Błąd')
@@ -139,14 +99,14 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
 
   const handleComplete = async (id: string) => {
     if (!token) return
+    // optimistic per-item animation flag
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, _completing: true } : t)))
     try {
       await fetch('/api/todoist/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, token }) })
-      // nice animation: mark removed after small delay
       setTimeout(() => {
         setTasks((prev) => prev.filter((t) => t.id !== id))
         window.dispatchEvent(new CustomEvent('appToast', { detail: { message: '✅ Ukończono zadanie' } }))
-      }, 250)
+      }, 220)
     } catch (err) {
       console.error(err)
       window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd ukończenia' } }))
@@ -170,11 +130,9 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
 
   const handleMove = async (ids: string[], newDateYmd: string) => {
     if (!token) return
-    // optimistic update
     setTasks((prev) => prev.map((t) => (ids.includes(t.id) ? { ...t, _movingTo: newDateYmd } : t)))
     try {
       await fetch('/api/todoist/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'move', ids, newDate: newDateYmd }) })
-      // finalize
       setTimeout(() => {
         setTasks((prev) => prev.map((t) => (ids.includes(t.id) ? { ...t, _dueYmd: newDateYmd } : t)))
         window.dispatchEvent(new CustomEvent('appToast', { detail: { message: '📅 Przeniesiono zadania' } }))
@@ -185,21 +143,19 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
       window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd przeniesienia' } }))
       fetchTasks(refreshFilter)
     } finally {
-      setMoveModal({ open: false, targetIds: [], initial: null })
       setOpenMoveSingle({ open: false })
     }
   }
 
-  // UI: bottom bulk bar (fixed)
   const BulkBar = () => {
     const count = selectedTasks.size
     if (count === 0 || filter === '7 days') return null
     return (
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] bg-white border rounded-lg shadow-lg px-4 py-2 flex items-center gap-3">
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] bg-white border rounded-lg shadow-lg px-4 py-2 flex items-center gap-3">
         <div className="text-sm text-gray-700">Zaznaczono: {count}</div>
-        <button onClick={() => handleMove(Array.from(selectedTasks), new Date().toISOString().slice(0, 10))} className="px-3 py-1 bg-yellow-500 text-white rounded text-sm">Przenieś</button>
-        <button onClick={() => { bulkComplete() }} className="px-3 py-1 bg-green-600 text-white rounded text-sm">Ukończ</button>
-        <button onClick={() => { bulkDelete() }} className="px-3 py-1 bg-red-600 text-white rounded text-sm">Usuń</button>
+        <button onClick={() => setOpenMoveSingle({ open: true })} className="px-3 py-1 bg-yellow-500 text-white rounded text-sm">Przenieś</button>
+        <button onClick={() => bulkComplete()} className="px-3 py-1 bg-green-600 text-white rounded text-sm">Ukończ</button>
+        <button onClick={() => bulkDelete()} className="px-3 py-1 bg-red-600 text-white rounded text-sm">Usuń</button>
       </div>
     )
   }
@@ -225,27 +181,8 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
     } catch (err) { console.error(err); window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd bulk delete' } })); fetchTasks(refreshFilter) }
   }
 
-  // UI move modal (simple)
-  const MoveModal = ({ ids, open, onClose }: any) => {
-    const [date, setDate] = useState<string>(new Date().toISOString().slice(0, 10))
-    if (!open) return null
-    return (
-      <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40" onClick={onClose}>
-        <div className="bg-white p-4 rounded shadow" onClick={(e) => e.stopPropagation()}>
-          <h4 className="font-semibold mb-2">Przenieś zadania ({ids.length})</h4>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="border p-2 rounded mb-3" />
-          <div className="flex gap-2 justify-end">
-            <button onClick={onClose} className="px-3 py-1 bg-gray-100 rounded">Anuluj</button>
-            <button onClick={() => handleMove(ids, date)} className="px-3 py-1 bg-violet-600 text-white rounded">Przenieś</button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="flex flex-col h-full">
-      {/* header + filters */}
       <div className="bg-white p-3 border-b">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -269,9 +206,9 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
 
       <div className="flex-1 overflow-auto p-3">
         {viewMode === 'week' ? (
-          <WeekView tasks={tasks} onMove={(id, ymd) => handleMove([id], ymd)} onComplete={handleComplete} onDelete={handleDelete} onHelp={handleHelp} onOpenTask={(t:any) => setOpenTask(t)} onAddForDate={(ymd:any) => { setOpenTask({ id: '', title: '', description: '', _dueYmd: ymd }); }} />
+          <WeekView tasks={tasks} onMove={(id, ymd) => handleMove([id], ymd)} onComplete={handleComplete} onDelete={handleDelete} onHelp={(t:any) => { setOpenTask({ id: t.id, title: t.content, description: t.description }); window.dispatchEvent(new CustomEvent('taskHelp', { detail: { task: t } })) }} onOpenTask={(t:any) => setOpenTask(t)} onAddForDate={(ymd:any) => { setOpenTask({ id: '', title: '', description: '', _dueYmd: ymd }); }} />
         ) : filter === '30 days' ? (
-          <div>{/* month grouped rendering similar to earlier code */}</div>
+          <div>{/* month grouped rendering placeholder */}</div>
         ) : (
           <TodoistTasks token={token} filter={filter} onChangeFilter={(f:any) => setFilter(f)} onUpdate={() => fetchTasks(refreshFilter)} onOpenTaskChat={(t:any) => setOpenTask({ id: t.id, title: t.content, description: t.description })} showHeaderFilters={false} selectedProject={selectedProject} showContextMenu={false} selectable selectedTasks={selectedTasks} onSelectChange={(id:string, checked:boolean) => {
             setSelectedTasks((prev) => {
@@ -283,31 +220,30 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
         )}
       </div>
 
-      {/* bottom bulk bar */}
       <BulkBar />
 
-      {/* move modal for multiple tasks */}
-      <MoveModal ids={Array.from(selectedTasks)} open={moveModal.open} onClose={() => setMoveModal({ open: false, targetIds: [], initial: null })} />
-      {/* move modal for single */}
-      <MoveModal ids={openMoveSingle.id ? [openMoveSingle.id] : []} open={openMoveSingle.open} onClose={() => setOpenMoveSingle({ open: false })} />
+      {/* single move modal */}
+      {openMoveSingle.open && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40" onClick={() => setOpenMoveSingle({ open: false })}>
+        <div className="bg-white p-4 rounded shadow" onClick={(e) => e.stopPropagation()}>
+          <h4 className="font-semibold mb-2">Przenieś zadanie</h4>
+          <input type="date" defaultValue={new Date().toISOString().slice(0,10)} id="move-single-date" className="border p-2 rounded mb-3" />
+          <div className="flex gap-2 justify-end">
+            <button className="px-3 py-1 bg-gray-100 rounded" onClick={() => setOpenMoveSingle({ open: false })}>Anuluj</button>
+            <button className="px-3 py-1 bg-violet-600 text-white rounded" onClick={() => {
+              const d = (document.getElementById('move-single-date') as HTMLInputElement).value
+              if (!d) return
+              if (openMoveSingle.id) handleMove([openMoveSingle.id], d)
+            }}>Przenieś</button>
+          </div>
+        </div>
+      </div>}
 
-      {/* toast */}
       <AnimatePresence>{toast && <motion.div initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:10 }} className="fixed top-6 right-6 z-60 bg-black text-white px-4 py-2 rounded">{toast}</motion.div>}</AnimatePresence>
 
-      {/* task dialog */}
       <AnimatePresence>
         {openTask && <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40" onClick={() => setOpenTask(null)}>
           <div onClick={(e) => e.stopPropagation()} className="bg-white p-5 rounded max-w-3xl w-full">
             <TaskDialog token={token} task={{ id: openTask.id, title: openTask.title }} initialTaskData={openTask.initialTaskData} initialIsLocal={openTask.initialIsLocal} onClose={() => { setOpenTask(null); fetchTasks(refreshFilter) }} />
-          </div>
-        </motion.div>}
-      </AnimatePresence>
-
-      {/* subtask dialog handler */}
-      <AnimatePresence>
-        {openTaskDialogForSub && <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40" onClick={() => setOpenTaskDialogForSub(null)}>
-          <div onClick={(e) => e.stopPropagation()} className="bg-white p-5 rounded max-w-2xl w-full">
-            <TaskDialog token={token} task={{ id: openTaskDialogForSub.id, title: openTaskDialogForSub.title }} initialTaskData={openTaskDialogForSub.initialTaskData} initialIsLocal={openTaskDialogForSub.initialIsLocal} onClose={() => setOpenTaskDialogForSub(null)} />
           </div>
         </motion.div>}
       </AnimatePresence>
