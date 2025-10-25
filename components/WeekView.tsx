@@ -33,6 +33,7 @@ export default function WeekView({
   const days = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i))
 
   const [columns, setColumns] = useState<Record<string, any[]>>({})
+  // Minimal additions for responsive carousel behavior:
   const viewportRef = useRef<HTMLDivElement | null>(null)
   const [visibleDays, setVisibleDays] = useState<number>(7)
   const [isDragging, setIsDragging] = useState(false)
@@ -48,37 +49,10 @@ export default function WeekView({
         grouped[keys[0]].push(t)
         return
       }
-      const d = typeof due === 'string' ? due : null
-      if (d && keys.includes(d)) grouped[d].push(t)
-      else grouped[keys[0]].push(t)
+      if (keys.includes(due)) grouped[due].push(t)
     })
     setColumns(grouped)
   }, [tasks, days])
-
-  // Responsywne obliczenie ile dni ma być widoczne
-  function calcVisibleDays(width: number) {
-    if (width >= 1200) return 7
-    if (width >= 1000) return 6
-    if (width >= 800) return 5
-    if (width >= 600) return 3
-    return 1
-  }
-
-  useEffect(() => {
-    function onResize() {
-      setVisibleDays(calcVisibleDays(window.innerWidth))
-    }
-    onResize()
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
-
-  // Blokowanie przewijania poziomego podczas drag aby uniknąć konfliktów
-  useEffect(() => {
-    const el = viewportRef.current
-    if (!el) return
-    el.style.overflowX = isDragging ? 'hidden' : 'auto'
-  }, [isDragging])
 
   const handleDragEnd = (result: any) => {
     setIsDragging(false)
@@ -96,13 +70,40 @@ export default function WeekView({
 
     if (source.droppableId !== destination.droppableId) {
       onMove?.(draggableId, destination.droppableId)
-      try {
-        appendHistory(draggableId, source.droppableId, destination.droppableId)
-      } catch {}
+      try { appendHistory(draggableId, source.droppableId, destination.droppableId) } catch {}
     }
   }
 
-  // Przewijanie karuzelowe o widoczną "stronę"
+  // Responsive: compute visibleDays based on viewport width (minimal, safe logic)
+  function calcVisibleDays(width: number) {
+    if (width >= 1200) return 7
+    if (width >= 1000) return 6
+    if (width >= 800) return 5
+    if (width >= 600) return 3
+    return 1
+  }
+
+  useEffect(() => {
+    function onResize() {
+      setVisibleDays(calcVisibleDays(window.innerWidth))
+    }
+    onResize()
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  // Prevent horizontal scroll during drag to avoid conflicts with DnD
+  useEffect(() => {
+    const el = viewportRef.current
+    if (!el) return
+    el.style.overflowX = isDragging ? 'hidden' : 'auto'
+  }, [isDragging])
+
+  if (!columns || Object.values(columns).every((c) => c.length === 0)) {
+    return <div className="flex items-center justify-center h-full text-gray-400 text-sm italic">Brak zadań w tym tygodniu.</div>
+  }
+
+  // Helper to scroll by one "page" (viewport width)
   const scrollNext = () => {
     const el = viewportRef.current
     if (!el) return
@@ -112,10 +113,6 @@ export default function WeekView({
     const el = viewportRef.current
     if (!el) return
     el.scrollBy({ left: -el.clientWidth, behavior: 'smooth' })
-  }
-
-  if (!columns || Object.values(columns).every((c) => c.length === 0)) {
-    return <div className="flex items-center justify-center h-full text-gray-400 text-sm italic">Brak zadań w tym tygodniu.</div>
   }
 
   return (
@@ -129,7 +126,7 @@ export default function WeekView({
         onDragStart={() => setIsDragging(true)}
       >
         <div className="relative">
-          {/* Kontrolki przewijania */}
+          {/* Carousel controls */}
           <div className="absolute right-3 top-2 z-20 flex gap-2">
             <button
               aria-label="Poprzednie"
@@ -147,10 +144,13 @@ export default function WeekView({
             </button>
           </div>
 
-          {/* Viewport: poziome przewijanie, kolumny jako flex items */}
+          {/* REPLACED: grid -> horizontal scrollable flex viewport.
+              Minimal change: keep same inner structure for each day but
+              make day columns have width = 100/visibleDays % to simulate carousel. */}
           <div
             ref={viewportRef}
             className="flex gap-3 px-2 md:px-3 pb-6 flex-1 w-full min-h-[300px] overflow-x-auto snap-x snap-mandatory touch-pan-y"
+            style={{ WebkitOverflowScrolling: 'touch' }}
           >
             {days.map((date) => {
               const key = format(date, 'yyyy-MM-dd')
@@ -162,7 +162,7 @@ export default function WeekView({
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
-                      // flex: 0 0 X% => ile kolumn ma być widocznych na raz
+                      // Each column takes a fraction of the viewport based on visibleDays:
                       style={{
                         flex: `0 0 ${100 / visibleDays}%`,
                         minWidth: `${100 / visibleDays}%`,
@@ -199,8 +199,10 @@ export default function WeekView({
                                   >
                                     <div className={`p-2 rounded-lg shadow-sm border bg-white ${snap.isDragging ? 'z-50 scale-105' : ''}`}>
                                       <div className="flex items-start gap-3">
+                                        {/* only checkbox for quick complete in week view */}
                                         <input type="checkbox" className="mt-2" onClick={(e) => { e.stopPropagation(); onComplete?.(task.id) }} />
                                         <div className="flex-1" onClick={() => onOpenTask?.(task)}>
+                                          {/* Week view uses context menu only (no inline actions) */}
                                           <TaskCard task={task} token={undefined} selectable={false} showContextMenu wrapTitle />
                                         </div>
                                       </div>
