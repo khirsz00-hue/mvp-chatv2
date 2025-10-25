@@ -40,6 +40,7 @@ export default function NewChatSidebar({
       const entry: SessionEntry = { id: t.id, title: t.title || t.id, timestamp: Date.now(), last: '' }
       upsertSession(sessionsKeyFor('Todoist Helper' as AssistantKey), entry)
       setTimeout(() => loadList(), 100)
+
       // open modal immediately
       setActiveSession(entry)
       setModalOpen(true)
@@ -59,7 +60,6 @@ export default function NewChatSidebar({
         const userMsg = { role: 'user' as const, content: userPrompt, timestamp: Date.now() }
         saveConversation(sk, conv.concat(userMsg))
         markSent(t.id)
-        // notify AI view to show user message + placeholder
         window.dispatchEvent(new CustomEvent('aiInitial', { detail: { id: t.id, title: t.title, description: t.description } }))
         window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Odpowiedź w toku...' } }))
 
@@ -80,7 +80,6 @@ export default function NewChatSidebar({
           window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd AI' } }))
         }
       } else {
-        // show existing conversation (no-op: AI view can load from storage if needed)
         window.dispatchEvent(new CustomEvent('aiReplySaved', { detail: { sessionId: t.id, reply: null } }))
       }
     }
@@ -91,7 +90,6 @@ export default function NewChatSidebar({
       window.removeEventListener('chatUpdated', onUpdate)
       window.removeEventListener('taskHelp', handleTaskHelp)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assistant])
 
   const startNew = () => {
