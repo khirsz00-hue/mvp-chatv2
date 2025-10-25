@@ -1,7 +1,6 @@
 'use client'
 
 import React from 'react'
-import ReactDOM from 'react-dom'
 import { parseDueToLocalYMD } from '../utils/date'
 import { getEstimate } from '../utils/localTaskStore'
 
@@ -52,13 +51,12 @@ export default function TaskCard({
           )}
 
           <div className="min-w-0 grow" onClick={() => onOpen?.(task)} style={{ cursor: 'pointer' }}>
-            <div className="font-medium text-gray-800 truncate">{task.content}</div>
+            <div className="font-medium text-gray-800 truncate" title={task.content}>{task.content}</div>
             {task.description ? <div className="text-xs text-gray-500 mt-1 line-clamp-2">{task.description}</div> : null}
             {task.project_name ? <div className="text-xs text-gray-400 mt-1 truncate">{task.project_name}</div> : null}
           </div>
         </div>
 
-        {/* Context menu for week view only (use portal), inline actions for list views */}
         {!inlineActions && showContextMenu && (
           <div className="relative">
             <button className="p-1 rounded hover:bg-gray-100" onClick={(e) => { e.stopPropagation(); emit('openContextFor', { id: task.id }) }}>⋮</button>
@@ -80,9 +78,7 @@ export default function TaskCard({
             <button className="px-2 py-1 text-xs bg-red-50 text-red-700 rounded" onClick={(e) => { e.stopPropagation(); emit('taskDelete', { id: task.id }) }}>Usuń</button>
             <button className="px-2 py-1 text-xs bg-gray-100 rounded" onClick={(e) => { e.stopPropagation(); onOpen?.(task) }}>Szczegóły</button>
           </div>
-        ) : (
-          <div className="text-xs text-gray-400"> </div>
-        )}
+        ) : <div className="text-xs text-gray-400">&nbsp;</div>}
       </div>
     </div>
   )
