@@ -1,8 +1,7 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React from 'react'
 import ReactDOM from 'react-dom'
-import { motion } from 'framer-motion'
 import { parseDueToLocalYMD } from '../utils/date'
 import { getEstimate } from '../utils/localTaskStore'
 
@@ -24,130 +23,45 @@ export default function TaskCard({
   token,
   showContextMenu = true,
   inlineActions = false,
-  onAction,
-  onHelp,
   selectable = false,
   selected = false,
   onSelectChange,
   onOpen,
-  wrapTitle = false,
 }: {
   task: TaskType
   token?: string
   showContextMenu?: boolean
   inlineActions?: boolean
-  onAction?: () => void
-  onHelp?: (task: TaskType) => void
   selectable?: boolean
   selected?: boolean
   onSelectChange?: (checked: boolean) => void
   onOpen?: (task: TaskType) => void
-  wrapTitle?: boolean
 }) {
-  const [openMenu, setOpenMenu] = useState(false)
-  const [menuContainer, setMenuContainer] = useState<HTMLElement | null>(null)
-
-  useEffect(() => {
-    setMenuContainer(typeof document !== 'undefined' ? document.body : null)
-  }, [])
-
   const dueYmd = task._dueYmd ?? parseDueToLocalYMD(task.due)
   const estObj = getEstimate(task.id)
   const estLabel = estObj ? (estObj.minutes < 60 ? `${estObj.minutes}m` : `${Math.floor(estObj.minutes / 60)}h${estObj.minutes % 60 ? ` ${estObj.minutes % 60}m` : ''}`) : ''
 
-  const handleComplete = async (e?: React.MouseEvent) => {
-    if (e) e.stopPropagation()
-    try {
-      await fetch('/api/todoist/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: task.id, token }) })
-      window.dispatchEvent(new Event('taskUpdated'))
-      onAction?.()
-    } catch (err) {
-      console.error('complete error', err)
-      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd ukończenia' } }))
-    }
-  }
-
-  const handleDelete = async (e?: React.MouseEvent) => {
-    if (e) e.stopPropagation()
-    if (!confirm('Usunąć zadanie?')) return
-    try {
-      await fetch('/api/todoist/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: task.id, token }) })
-      window.dispatchEvent(new Event('taskUpdated'))
-      onAction?.()
-    } catch (err) {
-      console.error('delete error', err)
-      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd usuwania' } }))
-    }
-  }
-
-  const handleMove = async (e?: React.MouseEvent) => {
-    if (e) e.stopPropagation()
-    const newDate = prompt('Podaj nową datę (YYYY-MM-DD):')
-    if (!newDate) return
-    try {
-      await fetch('/api/todoist/postpone', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: task.id, token, newDate }) })
-      window.dispatchEvent(new Event('taskUpdated'))
-      onAction?.()
-    } catch (err) {
-      console.error('move error', err)
-      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd przeniesienia' } }))
-    }
-  }
-
-  const handleHelp = (e?: React.MouseEvent) => {
-    if (e) e.stopPropagation()
-    // Emit a consistent event used by NewChatSidebar
-    const detail = { task: { id: task.id, title: task.content, description: task.description } }
-    window.dispatchEvent(new CustomEvent('taskHelp', { detail }))
-    // Also emit aiOpen so any AI view can open immediately
-    window.dispatchEvent(new CustomEvent('aiInitial', { detail: { id: task.id, title: task.content, description: task.description } }))
-    window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Odpowiedź w toku...' } }))
-    onHelp?.(task)
-    setOpenMenu(false)
-  }
-
-  const Menu = (
-    <div className="w-44 bg-white border rounded-md shadow-lg z-50">
-      <button onClick={(e) => { e.stopPropagation(); handleHelp(e) }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm">Pomóż mi</button>
-      <button onClick={(e) => { e.stopPropagation(); handleComplete(e) }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm">Ukończ</button>
-      <button onClick={(e) => { e.stopPropagation(); handleMove(e) }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm">Przenieś</button>
-      <button onClick={(e) => { e.stopPropagation(); handleDelete(e) }} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm text-red-600">Usuń</button>
-    </div>
-  )
+  const emit = (name: string, detail?: any) => window.dispatchEvent(new CustomEvent(name, { detail }))
 
   return (
-    <motion.div whileHover={{ scale: 1.01 }} className="p-3 bg-white rounded-lg border flex flex-col gap-3 shadow-sm min-w-0">
+    <div className="p-3 bg-white rounded-lg border flex flex-col gap-3 shadow-sm min-w-0">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 w-full min-w-0">
           {selectable && (
-            <input
-              type="checkbox"
-              checked={selected}
-              onChange={(e) => onSelectChange?.(e.target.checked)}
-              className="mt-1"
-              aria-label="Wybierz zadanie"
-              onClick={(e) => e.stopPropagation()}
-            />
+            <input type="checkbox" checked={selected} onChange={(e) => onSelectChange?.(e.target.checked)} className="mt-1" onClick={(e) => e.stopPropagation()} />
           )}
 
           <div className="min-w-0 grow" onClick={() => onOpen?.(task)} style={{ cursor: 'pointer' }}>
-            <div className={`font-medium text-gray-800 ${wrapTitle ? 'whitespace-normal break-words' : 'truncate'}`}>{task.content}</div>
-            {task.description ? <div className="text-xs text-gray-500 mt-1 line-clamp-2 break-words">{task.description}</div> : null}
+            <div className="font-medium text-gray-800 truncate">{task.content}</div>
+            {task.description ? <div className="text-xs text-gray-500 mt-1 line-clamp-2">{task.description}</div> : null}
             {task.project_name ? <div className="text-xs text-gray-400 mt-1 truncate">{task.project_name}</div> : null}
           </div>
         </div>
 
-        {showContextMenu && !inlineActions && (
+        {/* Context menu for week view only (use portal), inline actions for list views */}
+        {!inlineActions && showContextMenu && (
           <div className="relative">
-            <button onClick={(e) => { e.stopPropagation(); setOpenMenu((s) => !s) }} className="p-1 rounded hover:bg-gray-100" aria-label="menu">
-              ⋮
-            </button>
-            {openMenu && menuContainer && ReactDOM.createPortal(
-              <div className="fixed" style={{ right: 20, top: 80 }} onClick={(e) => e.stopPropagation()}>
-                {Menu}
-              </div>,
-              menuContainer
-            )}
+            <button className="p-1 rounded hover:bg-gray-100" onClick={(e) => { e.stopPropagation(); emit('openContextFor', { id: task.id }) }}>⋮</button>
           </div>
         )}
       </div>
@@ -155,25 +69,21 @@ export default function TaskCard({
       <div className="flex items-center justify-between">
         <div className="text-xs text-gray-500 flex items-center gap-3">
           <span>{dueYmd ? `Due: ${dueYmd}` : ''}</span>
-          {typeof task.priority !== 'undefined' ? <span className="ml-2">• Priorytet: {task.priority}</span> : null}
           {estLabel ? <span className="ml-2 text-xs bg-slate-100 px-2 py-0.5 rounded">Est: {estLabel}</span> : null}
         </div>
 
         {inlineActions ? (
           <div className="flex items-center gap-2">
-            <button onClick={(e) => { e.stopPropagation(); handleHelp() }} className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded">Pomóż mi</button>
-            <button onClick={(e) => { e.stopPropagation(); handleComplete() }} className="px-2 py-1 text-xs bg-green-50 text-green-700 rounded">Ukończ</button>
-            <button onClick={(e) => { e.stopPropagation(); handleMove() }} className="px-2 py-1 text-xs bg-yellow-50 text-yellow-700 rounded">Przenieś</button>
-            <button onClick={(e) => { e.stopPropagation(); handleDelete() }} className="px-2 py-1 text-xs bg-red-50 text-red-700 rounded">Usuń</button>
-            <button onClick={(e) => { e.stopPropagation(); onOpen?.(task) }} className="px-2 py-1 text-xs bg-gray-100 rounded">Szczegóły</button>
+            <button className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded" onClick={(e) => { e.stopPropagation(); emit('taskHelp', { task }) }}>Pomóż mi</button>
+            <button className="px-2 py-1 text-xs bg-green-50 text-green-700 rounded" onClick={(e) => { e.stopPropagation(); emit('taskComplete', { id: task.id }) }}>Ukończ</button>
+            <button className="px-2 py-1 text-xs bg-yellow-50 text-yellow-700 rounded" onClick={(e) => { e.stopPropagation(); emit('openMovePicker', { id: task.id, current: task._dueYmd }) }}>Przenieś</button>
+            <button className="px-2 py-1 text-xs bg-red-50 text-red-700 rounded" onClick={(e) => { e.stopPropagation(); emit('taskDelete', { id: task.id }) }}>Usuń</button>
+            <button className="px-2 py-1 text-xs bg-gray-100 rounded" onClick={(e) => { e.stopPropagation(); onOpen?.(task) }}>Szczegóły</button>
           </div>
         ) : (
-          <div className="flex items-center gap-2">
-            <button onClick={(e) => { e.stopPropagation(); handleHelp() }} className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded">Pomóż mi</button>
-            <button onClick={(e) => { e.stopPropagation(); onOpen?.(task) }} className="px-2 py-1 text-xs bg-gray-100 rounded">Szczegóły</button>
-          </div>
+          <div className="text-xs text-gray-400"> </div>
         )}
       </div>
-    </motion.div>
+    </div>
   )
 }
