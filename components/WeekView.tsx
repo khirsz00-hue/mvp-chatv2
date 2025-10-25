@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { format, addDays, startOfWeek, startOfDay } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'
@@ -33,6 +33,9 @@ export default function WeekView({
   const days = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i))
 
   const [columns, setColumns] = useState<Record<string, any[]>>({})
+  const viewportRef = useRef<HTMLDivElement | null>(null)
+  const [visibleDays, setVisibleDays] = useState<number>(7)
+  const [isDragging, setIsDragging] = useState(false)
 
   useEffect(() => {
     const grouped: Record<string, any[]> = {}
@@ -45,12 +48,40 @@ export default function WeekView({
         grouped[keys[0]].push(t)
         return
       }
-      if (keys.includes(due)) grouped[due].push(t)
+      const d = typeof due === 'string' ? due : null
+      if (d && keys.includes(d)) grouped[d].push(t)
+      else grouped[keys[0]].push(t)
     })
     setColumns(grouped)
   }, [tasks, days])
 
+  // Responsywne obliczenie ile dni ma być widoczne
+  function calcVisibleDays(width: number) {
+    if (width >= 1200) return 7
+    if (width >= 1000) return 6
+    if (width >= 800) return 5
+    if (width >= 600) return 3
+    return 1
+  }
+
+  useEffect(() => {
+    function onResize() {
+      setVisibleDays(calcVisibleDays(window.innerWidth))
+    }
+    onResize()
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  // Blokowanie przewijania poziomego podczas drag aby uniknąć konfliktów
+  useEffect(() => {
+    const el = viewportRef.current
+    if (!el) return
+    el.style.overflowX = isDragging ? 'hidden' : 'auto'
+  }, [isDragging])
+
   const handleDragEnd = (result: any) => {
+    setIsDragging(false)
     const { source, destination, draggableId } = result
     if (!destination) return
     if (source.droppableId === destination.droppableId && source.index === destination.index) return
@@ -65,8 +96,22 @@ export default function WeekView({
 
     if (source.droppableId !== destination.droppableId) {
       onMove?.(draggableId, destination.droppableId)
-      try { appendHistory(draggableId, source.droppableId, destination.droppableId) } catch {}
+      try {
+        appendHistory(draggableId, source.droppableId, destination.droppableId)
+      } catch {}
     }
+  }
+
+  // Przewijanie karuzelowe o widoczną "stronę"
+  const scrollNext = () => {
+    const el = viewportRef.current
+    if (!el) return
+    el.scrollBy({ left: el.clientWidth, behavior: 'smooth' })
+  }
+  const scrollPrev = () => {
+    const el = viewportRef.current
+    if (!el) return
+    el.scrollBy({ left: -el.clientWidth, behavior: 'smooth' })
   }
 
   if (!columns || Object.values(columns).every((c) => c.length === 0)) {
@@ -79,71 +124,102 @@ export default function WeekView({
         <h2 className="text-lg font-semibold text-gray-800">{format(weekStart, 'd MMM', { locale: pl })} – {format(addDays(weekStart, 6), 'd MMM yyyy', { locale: pl })}</h2>
       </div>
 
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-7 gap-3 px-2 md:px-3 pb-6 flex-1 w-full min-h-[300px]">
-          {days.map((date) => {
-            const key = format(date, 'yyyy-MM-dd')
-            const dayTasks = columns[key] || []
-            const isToday = key === format(today, 'yyyy-MM-dd')
-            return (
-              <Droppable droppableId={key} key={key}>
-                {(provided: any, snapshot: any) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    className={`min-h-[200px] border rounded-md p-2 bg-white/90 flex flex-col transition-shadow duration-150 ${snapshot.isDraggingOver ? 'ring-2 ring-blue-200 bg-blue-50' : ''}`}
-                  >
-                    <div className={`mb-2 ${isToday ? 'font-semibold text-blue-700' : 'text-gray-600'}`}>
-                      <div className="flex items-center justify-between">
-                        <div className="text-sm">{format(date, 'EEE d', { locale: pl })}</div>
-                        <div>
-                          <button onClick={(e) => { e.stopPropagation(); onAddForDate?.(key) }} title="Dodaj" className="p-1 rounded hover:bg-gray-100">
-                            <Plus size={14} />
-                          </button>
+      <DragDropContext
+        onDragEnd={handleDragEnd}
+        onDragStart={() => setIsDragging(true)}
+      >
+        <div className="relative">
+          {/* Kontrolki przewijania */}
+          <div className="absolute right-3 top-2 z-20 flex gap-2">
+            <button
+              aria-label="Poprzednie"
+              onClick={scrollPrev}
+              className="bg-white border rounded px-2 py-1 shadow-sm hover:bg-gray-50"
+            >
+              ‹
+            </button>
+            <button
+              aria-label="Następne"
+              onClick={scrollNext}
+              className="bg-white border rounded px-2 py-1 shadow-sm hover:bg-gray-50"
+            >
+              ›
+            </button>
+          </div>
+
+          {/* Viewport: poziome przewijanie, kolumny jako flex items */}
+          <div
+            ref={viewportRef}
+            className="flex gap-3 px-2 md:px-3 pb-6 flex-1 w-full min-h-[300px] overflow-x-auto snap-x snap-mandatory touch-pan-y"
+          >
+            {days.map((date) => {
+              const key = format(date, 'yyyy-MM-dd')
+              const dayTasks = columns[key] || []
+              const isToday = key === format(today, 'yyyy-MM-dd')
+              return (
+                <Droppable droppableId={key} key={key}>
+                  {(provided: any, snapshot: any) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      // flex: 0 0 X% => ile kolumn ma być widocznych na raz
+                      style={{
+                        flex: `0 0 ${100 / visibleDays}%`,
+                        minWidth: `${100 / visibleDays}%`,
+                      }}
+                      className={`min-h-[200px] border rounded-md p-2 bg-white/90 flex flex-col transition-shadow duration-150 snap-start ${snapshot.isDraggingOver ? 'ring-2 ring-blue-200 bg-blue-50' : ''}`}
+                    >
+                      <div className={`mb-2 ${isToday ? 'font-semibold text-blue-700' : 'text-gray-600'}`}>
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm">{format(date, 'EEE d', { locale: pl })}</div>
+                          <div>
+                            <button onClick={(e) => { e.stopPropagation(); onAddForDate?.(key) }} title="Dodaj" className="p-1 rounded hover:bg-gray-100">
+                              <Plus size={14} />
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="flex-1 overflow-auto space-y-2">
-                      <AnimatePresence>
-                        {dayTasks.map((task: any, idx: number) => (
-                          <Draggable draggableId={String(task.id)} index={idx} key={task.id}>
-                            {(prov: any, snap: any) => {
-                              const style = { ...prov.draggableProps.style, width: '100%' }
-                              return (
-                                <motion.div
-                                  ref={prov.innerRef}
-                                  {...prov.draggableProps}
-                                  {...prov.dragHandleProps}
-                                  initial={{ opacity: 0, y: 8 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  exit={{ opacity: 0, y: -8 }}
-                                  transition={{ duration: 0.12 }}
-                                  style={style}
-                                >
-                                  <div className={`p-2 rounded-lg shadow-sm border bg-white ${snap.isDragging ? 'z-50 scale-105' : ''}`}>
-                                    <div className="flex items-start gap-3">
-                                      {/* only checkbox for quick complete in week view */}
-                                      <input type="checkbox" className="mt-2" onClick={(e) => { e.stopPropagation(); onComplete?.(task.id) }} />
-                                      <div className="flex-1" onClick={() => onOpenTask?.(task)}>
-                                        {/* Week view uses context menu only (no inline actions) */}
-                                        <TaskCard task={task} token={undefined} selectable={false} showContextMenu wrapTitle />
+                      <div className="flex-1 overflow-auto space-y-2">
+                        <AnimatePresence>
+                          {dayTasks.map((task: any, idx: number) => (
+                            <Draggable draggableId={String(task.id)} index={idx} key={task.id}>
+                              {(prov: any, snap: any) => {
+                                const style = { ...prov.draggableProps.style, width: '100%' }
+                                return (
+                                  <motion.div
+                                    ref={prov.innerRef}
+                                    {...prov.draggableProps}
+                                    {...prov.dragHandleProps}
+                                    initial={{ opacity: 0, y: 8 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -8 }}
+                                    transition={{ duration: 0.12 }}
+                                    style={style}
+                                  >
+                                    <div className={`p-2 rounded-lg shadow-sm border bg-white ${snap.isDragging ? 'z-50 scale-105' : ''}`}>
+                                      <div className="flex items-start gap-3">
+                                        <input type="checkbox" className="mt-2" onClick={(e) => { e.stopPropagation(); onComplete?.(task.id) }} />
+                                        <div className="flex-1" onClick={() => onOpenTask?.(task)}>
+                                          <TaskCard task={task} token={undefined} selectable={false} showContextMenu wrapTitle />
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
-                                </motion.div>
-                              )
-                            }}
-                          </Draggable>
-                        ))}
-                      </AnimatePresence>
-                      {provided.placeholder}
+                                  </motion.div>
+                                )
+                              }}
+                            </Draggable>
+                          ))}
+                        </AnimatePresence>
+
+                        {provided.placeholder}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </Droppable>
-            )
-          })}
+                  )}
+                </Droppable>
+              )
+            })}
+          </div>
         </div>
       </DragDropContext>
     </div>
