@@ -50,6 +50,7 @@ export default function WeekView({
         return
       }
       if (keys.includes(due)) grouped[due].push(t)
+      else grouped[keys[0]].push(t)
     })
     setColumns(grouped)
   }, [tasks, days])
@@ -70,7 +71,9 @@ export default function WeekView({
 
     if (source.droppableId !== destination.droppableId) {
       onMove?.(draggableId, destination.droppableId)
-      try { appendHistory(draggableId, source.droppableId, destination.droppableId) } catch {}
+      try {
+        appendHistory(draggableId, source.droppableId, destination.droppableId)
+      } catch {}
     }
   }
 
@@ -118,13 +121,12 @@ export default function WeekView({
   return (
     <div className="flex flex-col h-full bg-gray-50 w-full">
       <div className="text-center py-3 border-b border-gray-200 bg-white mb-3">
-        <h2 className="text-lg font-semibold text-gray-800">{format(weekStart, 'd MMM', { locale: pl })} – {format(addDays(weekStart, 6), 'd MMM yyyy', { locale: pl })}</h2>
+        <h2 className="text-lg font-semibold text-gray-800">
+          {format(weekStart, 'd MMM', { locale: pl })} – {format(addDays(weekStart, 6), 'd MMM yyyy', { locale: pl })}
+        </h2>
       </div>
 
-      <DragDropContext
-        onDragEnd={handleDragEnd}
-        onDragStart={() => setIsDragging(true)}
-      >
+      <DragDropContext onDragEnd={handleDragEnd} onDragStart={() => setIsDragging(true)}>
         <div className="relative">
           {/* Carousel controls */}
           <div className="absolute right-3 top-2 z-20 flex gap-2">
@@ -144,9 +146,7 @@ export default function WeekView({
             </button>
           </div>
 
-          {/* REPLACED: grid -> horizontal scrollable flex viewport.
-              Minimal change: keep same inner structure for each day but
-              make day columns have width = 100/visibleDays % to simulate carousel. */}
+          {/* Horizontal scrollable viewport */}
           <div
             ref={viewportRef}
             className="flex gap-3 px-2 md:px-3 pb-6 flex-1 w-full min-h-[300px] overflow-x-auto snap-x snap-mandatory touch-pan-y"
@@ -162,7 +162,6 @@ export default function WeekView({
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
-                      // Each column takes a fraction of the viewport based on visibleDays:
                       style={{
                         flex: `0 0 ${100 / visibleDays}%`,
                         minWidth: `${100 / visibleDays}%`,
@@ -199,10 +198,8 @@ export default function WeekView({
                                   >
                                     <div className={`p-2 rounded-lg shadow-sm border bg-white ${snap.isDragging ? 'z-50 scale-105' : ''}`}>
                                       <div className="flex items-start gap-3">
-                                        {/* only checkbox for quick complete in week view */}
                                         <input type="checkbox" className="mt-2" onClick={(e) => { e.stopPropagation(); onComplete?.(task.id) }} />
                                         <div className="flex-1" onClick={() => onOpenTask?.(task)}>
-                                          {/* Week view uses context menu only (no inline actions) */}
                                           <TaskCard task={task} token={undefined} selectable={false} showContextMenu wrapTitle />
                                         </div>
                                       </div>
