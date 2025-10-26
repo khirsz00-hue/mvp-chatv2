@@ -1,57 +1,65 @@
 'use client'
-import { useEffect, useState } from 'react'
+
+import React, { useEffect, useState } from 'react'
 
 export default function KnowledgeEditor() {
-  const [assistant, setAssistant] = useState('todoist')
-  const [prompt, setPrompt] = useState('')
+  const [assistant, setAssistant] = useState<string>('todoist')
   const [files, setFiles] = useState<string[]>([])
-  const [activeFile, setActiveFile] = useState('')
-  const [content, setContent] = useState('')
+  const [activeFile, setActiveFile] = useState<string>('')
+  const [content, setContent] = useState<string>('')
+  const [prompt, setPrompt] = useState<string>('')
 
-  useEffect(() => { loadPrompt() }, [assistant])
-  const loadPrompt = async () => {
-    const res = await fetch(`/api/admin/prompt?assistant=${assistant}`)
-    const data = await res.json()
-    setPrompt(data.content || '')
+  useEffect(() => {
     loadFiles()
+  }, [assistant])
+
+  async function loadFiles() {
+    try {
+      const res = await fetch(`/api/admin/knowledge?assistant=${encodeURIComponent(assistant)}`)
+      const data = await res.json()
+      setFiles(data.files || [])
+    } catch (err) {
+      console.error('loadFiles error', err)
+      setFiles([])
+    }
   }
 
-  const savePrompt = async () => {
-    await fetch('/api/admin/prompt', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ assistant, content: prompt })
-    })
-    alert('Prompt zapisany ✅')
+  async function openFile(file: string) {
+    try {
+      const res = await fetch(`/api/admin/knowledge?assistant=${encodeURIComponent(assistant)}&file=${encodeURIComponent(file)}`)
+      const data = await res.json()
+      setActiveFile(file)
+      setContent(data.content || '')
+    } catch (err) {
+      console.error('openFile error', err)
+    }
   }
 
-  const loadFiles = async () => {
-    const res = await fetch(`/api/admin/knowledge?assistant=${assistant}`)
-    const data = await res.json()
-    setFiles(data.files || [])
+  async function saveFile() {
+    try {
+      await fetch(`/api/admin/knowledge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assistant, file: activeFile, content }),
+      })
+      alert('Plik zapisany 📄')
+    } catch (err) {
+      console.error('saveFile error', err)
+      alert('Błąd zapisu')
+    }
   }
 
-  const openFile = async (file: string) => {
-    const res = await fetch(`/api/admin/knowledge?assistant=${assistant}&file=${file}`)
-    const data = await res.json()
-    setActiveFile(file)
-    setContent(data.content || '')
-  }
-
-  const saveFile = async () => {
-    await fetch(`/api/admin/knowledge`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ assistant, file: activeFile, content })
-    })
-    alert('Plik zapisany 📄')
+  async function savePrompt() {
+    // simple handler - store prompt in localStorage (or send to API)
+    localStorage.setItem(`prompt_${assistant}`, prompt)
+    alert('Prompt saved locally')
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4">
       <h1 className="text-2xl font-semibold">🧠 Edytor promptów i wiedzy</h1>
 
-      <div className="flex gap-4">
+      <div className="flex gap-4 items-center">
         <select className="input w-48" value={assistant} onChange={(e) => setAssistant(e.target.value)}>
           <option value="todoist">Todoist Helper</option>
           <option value="six_hats">Six Thinking Hats</option>
@@ -63,7 +71,7 @@ export default function KnowledgeEditor() {
       <textarea
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
-        className="input h-40 font-mono text-sm"
+        className="input h-40 font-mono text-sm w-full"
         placeholder="Treść promptu..."
       />
 
@@ -93,7 +101,7 @@ export default function KnowledgeEditor() {
               <textarea
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                className="input h-64 font-mono text-sm"
+                className="input h-64 font-mono text-sm w-full"
               />
               <button className="btn btn-primary text-sm mt-2" onClick={saveFile}>
                 💾 Zapisz plik
