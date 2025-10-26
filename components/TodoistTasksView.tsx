@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import TodoistTasks from './TodoistTasks'
 import WeekView from './WeekView'
@@ -11,12 +11,19 @@ import { addDays, startOfWeek, startOfMonth, endOfMonth } from 'date-fns'
 import { appendHistory } from '../utils/localTaskStore'
 
 export default function TodoistTasksView({ token, onUpdate, hideHeader = false }: any) {
-  const [filter, setFilter] = useState<'today' | 'tomorrow' | 'overdue' | '7 days' | '30 days'>(() => (typeof window !== 'undefined' ? (localStorage.getItem('todoist_filter') as any) || 'today' : 'today'))
+  const [filter, setFilter] = useState<'today' | 'tomorrow' | 'overdue' | '7 days' | '30 days'>(() => {
+    if (typeof window === 'undefined') return 'today'
+    return (localStorage.getItem('todoist_filter') as any) || 'today'
+  })
+
   const [tasks, setTasks] = useState<any[]>([])
   const [projects, setProjects] = useState<any[]>([])
   const [selectedProject, setSelectedProject] = useState<string>('all')
   const [toast, setToast] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'list' | 'week'>(() => (typeof window !== 'undefined' && localStorage.getItem('todoist_filter') === '7 days' ? 'week' : 'list'))
+  const [viewMode, setViewMode] = useState<'list' | 'week'>(() => {
+    if (typeof window === 'undefined') return 'list'
+    return localStorage.getItem('todoist_filter') === '7 days' ? 'week' : 'list'
+  })
   const lastLocalAction = useRef<number>(0)
 
   const [openTask, setOpenTask] = useState<any | null>(null)
@@ -26,7 +33,13 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
   const refreshFilter = viewMode === 'week' ? '7 days' : filter
 
   useEffect(() => {
-    const toastHandler = (e: any) => { const m = e?.detail?.message; if (m) { setToast(m); setTimeout(() => setToast(null), 2200) } }
+    const toastHandler = (e: any) => {
+      const m = e?.detail?.message
+      if (m) {
+        setToast(m)
+        setTimeout(() => setToast(null), 2200)
+      }
+    }
     window.addEventListener('appToast', toastHandler)
 
     const onOpenMovePicker = (ev: any) => {
@@ -53,10 +66,14 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
         if (Array.isArray(data)) setProjects(data)
         else if (data.projects) setProjects(data.projects)
         else setProjects([])
-      } catch (err) { if (mounted) setProjects([]) }
+      } catch (err) {
+        if (mounted) setProjects([])
+      }
     }
     fetchProjects()
-    return () => { mounted = false }
+    return () => {
+      mounted = false
+    }
   }, [token])
 
   const fetchTasks = async (override?: any) => {
@@ -73,35 +90,57 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
       const data = await res.json()
       let fetched = data.tasks || []
       if (selectedProject !== 'all') fetched = fetched.filter((t: any) => t.project_id === selectedProject)
-      const mapped = fetched.map((t: any) => ({ ...t, _dueYmd: parseDueToLocalYMD(t.due), created_at: t.added_at || t.date_added || t.created_at || null }))
+      const mapped = fetched.map((t: any) => ({
+        ...t,
+        _dueYmd: parseDueToLocalYMD(t.due),
+        created_at: t.added_at || t.date_added || t.created_at || null,
+      }))
       setTasks(mapped)
-    } catch (err) { console.error(err) }
+      onUpdate?.(mapped)
+    } catch (err) {
+      console.error(err)
+    }
   }
 
   useEffect(() => {
     if (!token) return
     fetchTasks(refreshFilter)
-    const poll = setInterval(() => { if (viewMode !== 'week') fetchTasks(refreshFilter) }, 45000)
+    const poll = setInterval(() => {
+      if (viewMode !== 'week') fetchTasks(refreshFilter)
+    }, 45000)
     return () => clearInterval(poll)
   }, [token, filter, selectedProject, viewMode])
 
   const handleCreateTask = async (payload?: any) => {
-    if (!token) return window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Brak tokena' } }))
+    if (!token) {
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Brak tokena' } }))
+      return
+    }
     try {
       const p = payload ?? { content: 'Nowe zadanie', token }
-      const res = await fetch('/api/todoist/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) })
+      const res = await fetch('/api/todoist/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(p),
+      })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(json?.error || 'Błąd')
       if (json?.task) setTasks((prev) => [json.task, ...prev])
       window.dispatchEvent(new CustomEvent('appToast', { detail: { message: '🆕 Dodano zadanie' } }))
-    } catch (err: any) { window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd dodawania: ' + (err?.message || '') } })) }
+    } catch (err: any) {
+      window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd dodawania: ' + (err?.message || '') } }))
+    }
   }
 
   const handleComplete = async (id: string) => {
     if (!token) return
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, _completing: true } : t)))
     try {
-      await fetch('/api/todoist/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, token }) })
+      await fetch('/api/todoist/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, token }),
+      })
       setTimeout(() => {
         setTasks((prev) => prev.filter((t) => t.id !== id))
         window.dispatchEvent(new CustomEvent('appToast', { detail: { message: '✅ Ukończono zadanie' } }))
@@ -118,8 +157,15 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
     if (!confirm('Usunąć zadanie?')) return
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, _deleting: true } : t)))
     try {
-      await fetch('/api/todoist/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, token }) })
-      setTimeout(() => { setTasks((prev) => prev.filter((t) => t.id !== id)); window.dispatchEvent(new CustomEvent('appToast', { detail: { message: '🗑 Usunięto zadanie' } })) }, 200)
+      await fetch('/api/todoist/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, token }),
+      })
+      setTimeout(() => {
+        setTasks((prev) => prev.filter((t) => t.id !== id))
+        window.dispatchEvent(new CustomEvent('appToast', { detail: { message: '🗑 Usunięto zadanie' } }))
+      }, 200)
     } catch (err) {
       console.error(err)
       window.dispatchEvent(new CustomEvent('appToast', { detail: { message: 'Błąd usuwania' } }))
@@ -131,7 +177,11 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
     if (!token) return
     setTasks((prev) => prev.map((t) => (ids.includes(t.id) ? { ...t, _movingTo: newDateYmd } : t)))
     try {
-      await fetch('/api/todoist/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'move', ids, newDate: newDateYmd }) })
+      await fetch('/api/todoist/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'move', ids, newDate: newDateYmd }),
+      })
       setTimeout(() => {
         setTasks((prev) => prev.map((t) => (ids.includes(t.id) ? { ...t, _dueYmd: newDateYmd } : t)))
         window.dispatchEvent(new CustomEvent('appToast', { detail: { message: '📅 Przeniesiono zadania' } }))
@@ -162,9 +212,13 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
   const bulkComplete = async () => {
     const ids = Array.from(selectedTasks)
     if (!ids.length || !token) return
-    setTasks((prev) => prev.map((t) => ids.includes(t.id) ? { ...t, _completing: true } : t))
+    setTasks((prev) => prev.map((t) => (ids.includes(t.id) ? { ...t, _completing: true } : t)))
     try {
-      await fetch('/api/todoist/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'complete', ids }) })
+      await fetch('/api/todoist/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'complete', ids }),
+      })
       setTimeout(() => {
         setTasks((prev) => prev.filter((t) => !ids.includes(t.id)))
         setSelectedTasks(new Set())
@@ -181,9 +235,13 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
     const ids = Array.from(selectedTasks)
     if (!ids.length || !token) return
     if (!confirm('Usunąć zaznaczone zadania?')) return
-    setTasks((prev) => prev.map((t) => ids.includes(t.id) ? { ...t, _deleting: true } : t))
+    setTasks((prev) => prev.map((t) => (ids.includes(t.id) ? { ...t, _deleting: true } : t)))
     try {
-      await fetch('/api/todoist/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', ids }) })
+      await fetch('/api/todoist/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', ids }),
+      })
       setTimeout(() => {
         setTasks((prev) => prev.filter((t) => !ids.includes(t.id)))
         setSelectedTasks(new Set())
@@ -203,7 +261,7 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
           <div className="flex items-center gap-3">
             <div className="inline-flex items-center px-3 py-1 rounded bg-green-50 text-green-700">📋 Lista zadań</div>
             <div className="ml-2">
-              {['today','tomorrow','7 days','30 days','overdue'].map((k) => (
+              {['today', 'tomorrow', '7 days', '30 days', 'overdue'].map((k) => (
                 <button
                   key={k}
                   onClick={() => setFilter(k as any)}
@@ -229,15 +287,15 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
         {viewMode === 'week' ? (
           <WeekView
             tasks={tasks}
-            onMove={(id, ymd) => handleMove([id], ymd)}
-            onComplete={handleComplete}
-            onDelete={handleDelete}
+            onMove={(id: string, ymd: string) => handleMove([id], ymd)}
+            onComplete={(id: string) => handleComplete(id)}
+            onDelete={(id: string) => handleDelete(id)}
             onHelp={(t: any) => {
               setOpenTask({ id: t.id, title: t.content, description: t.description })
               window.dispatchEvent(new CustomEvent('taskHelp', { detail: { task: t } }))
             }}
             onOpenTask={(t: any) => setOpenTask(t)}
-            onAddForDate={(ymd: any) => { setOpenTask({ id: '', title: '', description: '', _dueYmd: ymd }) }}
+            onAddForDate={(ymd: any) => setOpenTask({ id: '', title: '', description: '', _dueYmd: ymd })}
           />
         ) : filter === '30 days' ? (
           <div>{/* month grouped rendering placeholder */}</div>
@@ -266,12 +324,11 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
 
       <BulkBar />
 
-      {/* single move modal */}
       {openMoveSingle.open && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40" onClick={() => setOpenMoveSingle({ open: false })}>
           <div className="bg-white p-4 rounded shadow" onClick={(e) => e.stopPropagation()}>
             <h4 className="font-semibold mb-2">Przenieś zadanie</h4>
-            <input type="date" defaultValue={new Date().toISOString().slice(0,10)} id="move-single-date" className="border p-2 rounded mb-3" />
+            <input type="date" defaultValue={new Date().toISOString().slice(0, 10)} id="move-single-date" className="border p-2 rounded mb-3" />
             <div className="flex gap-2 justify-end">
               <button className="px-3 py-1 bg-gray-100 rounded" onClick={() => setOpenMoveSingle({ open: false })}>Anuluj</button>
               <button className="px-3 py-1 bg-violet-600 text-white rounded" onClick={() => {
@@ -286,7 +343,7 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
 
       <AnimatePresence>
         {toast && (
-          <motion.div initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:10 }} className="fixed top-6 right-6 z-60 bg-black text-white px-4 py-2 rounded">
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="fixed top-6 right-6 z-60 bg-black text-white px-4 py-2 rounded">
             {toast}
           </motion.div>
         )}
@@ -294,7 +351,7 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
 
       <AnimatePresence>
         {openTask && (
-          <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40" onClick={() => setOpenTask(null)}>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40" onClick={() => setOpenTask(null)}>
             <div onClick={(e) => e.stopPropagation()} className="bg-white p-5 rounded max-w-3xl w-full">
               <TaskDialog token={token} task={{ id: openTask.id, title: openTask.title }} initialTaskData={openTask.initialTaskData} initialIsLocal={openTask.initialIsLocal} onClose={() => { setOpenTask(null); fetchTasks(refreshFilter) }} />
             </div>
