@@ -14,13 +14,14 @@ function safeLocalStorage(): Storage | null {
   return window.localStorage
 }
 
+// Estimates
 export function getEstimate(taskId: string): { minutes: number; updatedAt: number } | null {
   const ls = safeLocalStorage()
   if (!ls) return null
   try {
     const raw = ls.getItem(EST_PREFIX + taskId)
     if (!raw) return null
-    return JSON.parse(raw)
+    return JSON.parse(raw) as { minutes: number; updatedAt: number }
   } catch {
     return null
   }
@@ -38,6 +39,7 @@ export function setEstimate(taskId: string, minutes: number) {
   return entry
 }
 
+// History (move events)
 export function getHistory(taskId: string): MoveEntry[] {
   const ls = safeLocalStorage()
   if (!ls) return []
@@ -73,7 +75,7 @@ export function clearHistory(taskId: string) {
   } catch {}
 }
 
-/* Subtasks local fallback */
+// Subtasks local fallback
 export function listSubtasksLocal(parentId: string): LocalSubtask[] {
   const ls = safeLocalStorage()
   if (!ls) return []
