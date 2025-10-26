@@ -99,7 +99,6 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
 
   const handleComplete = async (id: string) => {
     if (!token) return
-    // optimistic per-item animation flag
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, _completing: true } : t)))
     try {
       await fetch('/api/todoist/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, token }) })
@@ -205,7 +204,13 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
             <div className="inline-flex items-center px-3 py-1 rounded bg-green-50 text-green-700">📋 Lista zadań</div>
             <div className="ml-2">
               {['today','tomorrow','7 days','30 days','overdue'].map((k) => (
-                <button key={k} onClick={() => setFilter(k as any)} className={`ml-2 ${filter === k ? 'font-semibold text-violet-600' : 'text-gray-600'}`}>{k === '7 days' ? 'Tydzień' : k === '30 days' ? 'Miesiąc' : k.charAt(0).toUpperCase() + k.slice(1)}</button>
+                <button
+                  key={k}
+                  onClick={() => setFilter(k as any)}
+                  className={`ml-2 ${filter === k ? 'font-semibold text-violet-600' : 'text-gray-600'}`}
+                >
+                  {k === '7 days' ? 'Tydzień' : k === '30 days' ? 'Miesiąc' : k.charAt(0).toUpperCase() + k.slice(1)}
+                </button>
               ))}
             </div>
           </div>
@@ -222,17 +227,40 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
 
       <div className="flex-1 overflow-auto p-3">
         {viewMode === 'week' ? (
-          <WeekView tasks={tasks} onMove={(id, ymd) => handleMove([id], ymd)} onComplete={handleComplete} onDelete={handleDelete} onHelp={(t:any) => { setOpenTask({ id: t.id, title: t.content, description: t.description }); window.dispatchEvent(new CustomEvent('taskHelp', { detail: { task: t } })) }} onOpenTask={(t:any) => setOpenTask(t)} onAddForDate={(ymd:any) => { setOpenTask({ id: '', title: '', description: '', _dueYmd: ymd }); }} />
+          <WeekView
+            tasks={tasks}
+            onMove={(id, ymd) => handleMove([id], ymd)}
+            onComplete={handleComplete}
+            onDelete={handleDelete}
+            onHelp={(t: any) => {
+              setOpenTask({ id: t.id, title: t.content, description: t.description })
+              window.dispatchEvent(new CustomEvent('taskHelp', { detail: { task: t } }))
+            }}
+            onOpenTask={(t: any) => setOpenTask(t)}
+            onAddForDate={(ymd: any) => { setOpenTask({ id: '', title: '', description: '', _dueYmd: ymd }) }}
+          />
         ) : filter === '30 days' ? (
           <div>{/* month grouped rendering placeholder */}</div>
         ) : (
-          <TodoistTasks token={token} filter={filter} onChangeFilter={(f:any) => setFilter(f)} onUpdate={() => fetchTasks(refreshFilter)} onOpenTaskChat={(t:any) => setOpenTask({ id: t.id, title: t.content, description: t.description })} showHeaderFilters={false} selectedProject={selectedProject} showContextMenu={false} selectable selectedTasks={selectedTasks} onSelectChange={(id:string, checked:boolean) => {
-            setSelectedTasks((prev) => {
-              const copy = new Set(prev)
-              if (checked) copy.add(id) else copy.delete(id)
-              return copy
-            })
-          }} />
+          <TodoistTasks
+            token={token}
+            filter={filter}
+            onChangeFilter={(f: any) => setFilter(f)}
+            onUpdate={() => fetchTasks(refreshFilter)}
+            onOpenTaskChat={(t: any) => setOpenTask({ id: t.id, title: t.content, description: t.description })}
+            showHeaderFilters={false}
+            selectedProject={selectedProject}
+            showContextMenu={false}
+            selectable
+            selectedTasks={selectedTasks}
+            onSelectChange={(id: string, checked: boolean) => {
+              setSelectedTasks((prev) => {
+                const copy = new Set(prev)
+                if (checked) copy.add(id) else copy.delete(id)
+                return copy
+              })
+            }}
+          />
         )}
       </div>
 
