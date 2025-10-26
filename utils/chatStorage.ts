@@ -7,18 +7,14 @@ export type ChatMessage = { role: 'user' | 'assistant'; content: string; timesta
 export type SessionEntry = { id: string; title: string; timestamp: number; last?: string; meta?: any }
 
 // Returns the canonical storage key for a given assistant and optional session id.
-// - For Todoist Helper we typically use task-scoped keys: `chat_task_<id>`
-// - For AI Planner and 6 Hats we use assistant-prefixed keys: `chat_planner_<id>` or `chat_6hats_<id>`
 export function storageKeyFor(assistant: AssistantKey, sessionId?: string) {
   if (assistant === 'Todoist Helper') {
-    // If sessionId looks like a task id, store under chat_task_<id> so Task components can reuse it.
     if (sessionId) return `chat_task_${sessionId}`
-    return 'chat_todoist' // assistant-level fallback
+    return 'chat_todoist'
   }
   if (assistant === 'AI Planner') {
     return sessionId ? `chat_planner_${sessionId}` : 'chat_planner'
   }
-  // 6 Hats
   return sessionId ? `chat_6hats_${sessionId}` : 'chat_6hats'
 }
 
@@ -45,7 +41,6 @@ export function saveConversation(key: string, conv: ChatMessage[]) {
   if (typeof window === 'undefined') return
   try {
     localStorage.setItem(key, JSON.stringify(conv))
-    // also emit storage event for internal listeners
     window.dispatchEvent(new Event('chatUpdated'))
   } catch {}
 }
@@ -69,7 +64,6 @@ export function saveSessions(key: string, sessions: SessionEntry[]) {
   } catch {}
 }
 
-// Upsert session into assistant's sessions list (keeps newest first, caps at 100)
 export function upsertSession(key: string, session: SessionEntry) {
   const current = loadSessions(key)
   const idx = current.findIndex((s) => s.id === session.id)
@@ -78,14 +72,12 @@ export function upsertSession(key: string, session: SessionEntry) {
   saveSessions(key, current.slice(0, 100))
 }
 
-// Helper: scan localStorage for any keys relevant to an assistant (fallback for migration)
 export function scanSessionsFallback(assistant: AssistantKey): SessionEntry[] {
   if (typeof window === 'undefined') return []
   const out: SessionEntry[] = []
   try {
     const keys = Object.keys(localStorage)
     for (const k of keys) {
-      // Todoist Helper: include chat_task_*
       if (assistant === 'Todoist Helper') {
         if (k.startsWith('chat_task_')) {
           const id = k.replace('chat_task_', '')
