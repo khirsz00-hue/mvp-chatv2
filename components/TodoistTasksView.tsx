@@ -7,7 +7,6 @@ import WeekView from './WeekView'
 import TaskDialog from './TaskDialog'
 import TaskCard from './TaskCard'
 import { parseDueToLocalYMD } from '../utils/date'
-import { addDays, startOfWeek, startOfMonth, endOfMonth } from 'date-fns'
 import { appendHistory } from '../utils/localTaskStore'
 
 export default function TodoistTasksView({ token, onUpdate, hideHeader = false }: any) {
@@ -40,7 +39,6 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
         setTimeout(() => setToast(null), 2200)
       }
     }
-    window.addEventListener('appToast', toastHandler)
 
     const onOpenMovePicker = (ev: any) => {
       const d = ev?.detail
@@ -48,7 +46,9 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
       setOpenMoveSingle({ open: true, id: d.id })
     }
 
+    window.addEventListener('appToast', toastHandler)
     window.addEventListener('openMovePicker', onOpenMovePicker)
+
     return () => {
       window.removeEventListener('appToast', toastHandler)
       window.removeEventListener('openMovePicker', onOpenMovePicker)
@@ -66,7 +66,7 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
         if (Array.isArray(data)) setProjects(data)
         else if (data.projects) setProjects(data.projects)
         else setProjects([])
-      } catch (err) {
+      } catch {
         if (mounted) setProjects([])
       }
     }
@@ -86,15 +86,18 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
       else if (effective === '7 days') q = '7 days'
       else if (effective === '30 days') q = '30 days'
       else if (effective === 'overdue') q = 'overdue'
+
       const res = await fetch(`/api/todoist/tasks?token=${encodeURIComponent(token)}&filter=${encodeURIComponent(q)}`)
       const data = await res.json()
       let fetched = data.tasks || []
       if (selectedProject !== 'all') fetched = fetched.filter((t: any) => t.project_id === selectedProject)
+
       const mapped = fetched.map((t: any) => ({
         ...t,
         _dueYmd: parseDueToLocalYMD(t.due),
         created_at: t.added_at || t.date_added || t.created_at || null,
       }))
+
       setTasks(mapped)
       onUpdate?.(mapped)
     } catch (err) {
@@ -207,7 +210,7 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
         <button onClick={() => bulkDelete()} className="px-3 py-1 bg-red-600 text-white rounded text-sm">Usuń</button>
       </div>
     )
-  }
+  } // ← brakujący nawias domykający tu
 
   const bulkComplete = async () => {
     const ids = Array.from(selectedTasks)
@@ -314,7 +317,8 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
             onSelectChange={(id: string, checked: boolean) => {
               setSelectedTasks((prev) => {
                 const copy = new Set(prev)
-                if (checked) copy.add(id) else copy.delete(id)
+                if (checked) copy.add(id)
+                else copy.delete(id)
                 return copy
               })
             }}
@@ -351,13 +355,4 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
 
       <AnimatePresence>
         {openTask && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40" onClick={() => setOpenTask(null)}>
-            <div onClick={(e) => e.stopPropagation()} className="bg-white p-5 rounded max-w-3xl w-full">
-              <TaskDialog token={token} task={{ id: openTask.id, title: openTask.title }} initialTaskData={openTask.initialTaskData} initialIsLocal={openTask.initialIsLocal} onClose={() => { setOpenTask(null); fetchTasks(refreshFilter) }} />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  )
-}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
