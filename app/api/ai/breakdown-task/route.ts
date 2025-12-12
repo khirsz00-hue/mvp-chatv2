@@ -1,0 +1,53 @@
+import { NextResponse } from 'next/server'
+import OpenAI from 'openai'
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+})
+
+export async function POST(req: Request) {
+  try {
+    const { taskContent } = await req.json()
+    
+    if (!taskContent) {
+      return NextResponse.json({ error: 'Missing taskContent' }, { status: 400 })
+    }
+    
+    const prompt = `Rozłóż to zadanie na konkretne, wykonalne kroki: "${taskContent}"
+
+Dla każdego kroku podaj:
+- Tytuł (krótki, max 50 znaków)
+- Opis (1-2 zdania, konkretne instrukcje)
+- Estymowany czas w minutach
+
+Zwróć odpowiedź w formacie JSON:
+{
+  "steps": [
+    {
+      "title": "...",
+      "description": "...",
+      "estimatedMinutes": 30
+    }
+  ]
+}
+
+Maksymalnie 5-7 kroków. Bądź praktyczny i konkretny.`
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: 'Jesteś asystentem ADHD specjalizującym się w dekompozycji zadań na małe, zarządzalne kroki.' },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.7,
+      response_format: { type: 'json_object' }
+    })
+    
+    const response = JSON.parse(completion.choices[0].message.content || '{}')
+    
+    return NextResponse.json(response)
+  } catch (err: any) {
+    console.error('Error in breakdown-task:', err)
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
+}

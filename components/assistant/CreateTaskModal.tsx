@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/Dialog'
 import Button from '@/components/ui/Button'
+import Badge from '@/components/ui/Badge'
 import Input from '@/components/ui/Input'
 import Textarea from '@/components/ui/Textarea'
-import { CalendarBlank, Clock, Tag, FolderOpen, Flag } from '@phosphor-icons/react'
+import { CalendarBlank, Clock, Tag, FolderOpen, Flag, Sparkle } from '@phosphor-icons/react'
 import { format, addDays } from 'date-fns'
 
 interface Project {
@@ -31,6 +32,15 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<{ title?: string; dueDate?: string }>({})
+  
+  // AI Suggestions state
+  const [aiSuggestions, setAiSuggestions] = useState<{
+    priority?: number
+    estimatedMinutes?: number
+    description?: string
+  } | null>(null)
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false)
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   
   const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
   
@@ -64,8 +74,75 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
       setEstimatedMinutes(0)
       setLabels('')
       setErrors({})
+      setAiSuggestions(null)
     }
   }, [open])
+  
+  // Fetch AI suggestions when title changes (with debounce)
+  useEffect(() => {
+    // Clear previous timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+    
+    // Reset suggestions if title is too short
+    if (title.length < 5) {
+      setAiSuggestions(null)
+      setLoadingSuggestions(false)
+      return
+    }
+    
+    // Set loading state
+    setLoadingSuggestions(true)
+    
+    // Debounce for 1 second
+    debounceTimerRef.current = setTimeout(async () => {
+      try {
+        const response = await fetch('/api/ai/suggest-task', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title })
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          setAiSuggestions(data)
+        }
+      } catch (err) {
+        console.error('Error fetching AI suggestions:', err)
+      } finally {
+        setLoadingSuggestions(false)
+      }
+    }, 1000)
+    
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+    }
+  }, [title])
+  
+  const applySuggestion = (field: 'priority' | 'estimatedMinutes' | 'description') => {
+    if (!aiSuggestions) return
+    
+    switch (field) {
+      case 'priority':
+        if (aiSuggestions.priority) {
+          setPriority(aiSuggestions.priority as 1 | 2 | 3 | 4)
+        }
+        break
+      case 'estimatedMinutes':
+        if (aiSuggestions.estimatedMinutes) {
+          setEstimatedMinutes(aiSuggestions.estimatedMinutes)
+        }
+        break
+      case 'description':
+        if (aiSuggestions.description) {
+          setDescription(aiSuggestions.description)
+        }
+        break
+    }
+  }
   
   const validate = () => {
     const newErrors:  { title?: string; dueDate?: string } = {}
@@ -170,6 +247,53 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
             />
             {errors.title && (
               <p className="text-red-500 text-sm mt-1">{errors.title}</p>
+            )}
+            
+            {/* AI Suggestions */}
+            {loadingSuggestions && (
+              <div className="mt-2 flex items-center gap-2 text-sm text-gray-500">
+                <div className="w-3 h-3 border-2 border-brand-purple border-t-transparent rounded-full animate-spin" />
+                <span>Generuję sugestie...</span>
+              </div>
+            )}
+            
+            {aiSuggestions && !loadingSuggestions && (
+              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start gap-2 mb-2">
+                  <Sparkle size={16} weight="fill" className="text-blue-600 mt-0.5" />
+                  <p className="text-sm text-blue-800 font-medium">AI Suggestions:</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {aiSuggestions.priority && (
+                    <Badge
+                      className="cursor-pointer hover:bg-blue-200 transition-colors gap-1"
+                      onClick={() => applySuggestion('priority')}
+                    >
+                      <Flag size={14} />
+                      P{aiSuggestions.priority} - {aiSuggestions.priority === 1 ? 'Wysoki priorytet' : aiSuggestions.priority === 2 ? 'Średni priorytet' : 'Niski priorytet'}
+                    </Badge>
+                  )}
+                  {aiSuggestions.estimatedMinutes && (
+                    <Badge
+                      className="cursor-pointer hover:bg-blue-200 transition-colors gap-1"
+                      onClick={() => applySuggestion('estimatedMinutes')}
+                    >
+                      <Clock size={14} />
+                      ⏱ {aiSuggestions.estimatedMinutes} min
+                    </Badge>
+                  )}
+                  {aiSuggestions.description && (
+                    <Badge
+                      className="cursor-pointer hover:bg-blue-200 transition-colors gap-1"
+                      onClick={() => applySuggestion('description')}
+                      title={aiSuggestions.description}
+                    >
+                      <Tag size={14} />
+                      📝 Opis
+                    </Badge>
+                  )}
+                </div>
+              </div>
             )}
           </div>
           
