@@ -12,6 +12,8 @@ export default function Home() {
     if (todoistToken) {
       // Zapisz token w localStorage
       localStorage.setItem('todoist_token', todoistToken)
+      // Ustaw preferowany widok na 'tasks' — wymusi przejście do TasksAssistant po reload
+      try { localStorage.setItem('active_assistant', 'tasks') } catch {}
       
       // Wyczyść URL (usuń token z adresu)
       const newUrl = window.location.origin + window.location.pathname

@@ -2,7 +2,7 @@
 
 import Header from './Header'
 import Sidebar, { AssistantId } from './Sidebar'
-import { ReactNode, useState } from 'react'
+import { ReactNode, useState, useEffect } from 'react'
 import { TasksAssistant } from '@/components/assistant/TasksAssistant'
 
 interface MainLayoutProps {
@@ -11,6 +11,16 @@ interface MainLayoutProps {
 
 export default function MainLayout({ children }: MainLayoutProps) {
   const [activeView, setActiveView] = useState<AssistantId>('tasks')
+
+  useEffect(() => {
+    // Odczytaj zapisaną preferencję widoku, jeśli istnieje
+    try {
+      const stored = localStorage.getItem('active_assistant') as AssistantId | null
+      if (stored && ['tasks', 'planning', 'journal', 'decisions', 'support'].includes(stored)) {
+        setActiveView(stored)
+      }
+    } catch {}
+  }, [])
   
   const renderAssistant = () => {
     switch (activeView) {
@@ -44,11 +54,16 @@ export default function MainLayout({ children }: MainLayoutProps) {
     }
   }
   
+  const handleNavigate = (view: AssistantId) => {
+    setActiveView(view)
+    try { localStorage.setItem('active_assistant', view) } catch {}
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50">
       <Header />
       <div className="flex">
-        <Sidebar activeView={activeView} onNavigate={setActiveView} />
+        <Sidebar activeView={activeView} onNavigate={handleNavigate} />
         <main className="flex-1 p-6">
           {children || renderAssistant()}
         </main>
