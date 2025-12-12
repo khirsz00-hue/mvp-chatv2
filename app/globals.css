@@ -24,6 +24,10 @@ body {
   .focus-ring-inset {
     @apply focus:outline-none focus:ring-2 focus:ring-inset focus:ring-brand-purple;
   }
+  
+  .text-muted-foreground {
+    @apply text-gray-500;
+  }
 }
 
 /* === Design System: Glassmorphism === */
