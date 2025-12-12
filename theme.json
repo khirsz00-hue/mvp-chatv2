@@ -1,0 +1,74 @@
+{
+  "name": "ADHD Buddy Theme",
+  "version": "1.0.0",
+  "description": "Design system migrated from adhd-buddy-asystent to mvp-chatv2",
+  "colors": {
+    "primary": "#8B5CF6",
+    "secondary": "#EC4899",
+    "success": "#10B981",
+    "neutral": {
+      "50": "#f9fafb",
+      "100": "#f3f4f6",
+      "200": "#e5e7eb",
+      "300": "#d1d5db",
+      "400": "#9ca3af",
+      "500": "#6b7280",
+      "600": "#4b5563",
+      "700": "#374151",
+      "800": "#1f2937",
+      "900": "#111827"
+    }
+  },
+  "typography": {
+    "fontFamily": {
+      "sans": ["Inter", "system-ui", "sans-serif"],
+      "mono": ["Monaco", "Courier New", "monospace"]
+    },
+    "fontSize": {
+      "xs": "0.75rem",
+      "sm": "0.875rem",
+      "base": "1rem",
+      "lg": "1.125rem",
+      "xl": "1.25rem",
+      "2xl": "1.5rem",
+      "3xl": "1.875rem",
+      "4xl": "2.25rem"
+    }
+  },
+  "shadows": {
+    "soft": "0 2px 8px rgba(0,0,0,0.05)",
+    "soft-lg": "0 4px 16px rgba(0,0,0,0.08)",
+    "glow": "0 0 20px rgba(139,92,246,0.3)",
+    "glow-lg": "0 0 30px rgba(139,92,246,0.4)"
+  },
+  "animations": {
+    "fade-in": "fadeIn 0.3s ease-out",
+    "slide-in-up": "slideInUp 0.4s ease-out",
+    "scale-in": "scaleIn 0.2s ease-out",
+    "shimmer": "shimmer 2s infinite"
+  },
+  "borderRadius": {
+    "sm": "0.125rem",
+    "md": "0.375rem",
+    "lg": "0.5rem",
+    "xl": "0.75rem",
+    "2xl": "1rem",
+    "3xl": "1.5rem",
+    "full": "9999px"
+  },
+  "spacing": {
+    "0": "0",
+    "1": "0.25rem",
+    "2": "0.5rem",
+    "3": "0.75rem",
+    "4": "1rem",
+    "5": "1.25rem",
+    "6": "1.5rem",
+    "8": "2rem",
+    "10": "2.5rem",
+    "12": "3rem",
+    "16": "4rem",
+    "20": "5rem",
+    "24": "6rem"
+  }
+}
