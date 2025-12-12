@@ -13,14 +13,14 @@ import { pl } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 
 interface Task {
-  id: string
+  id:  string
   content: string
-  description?: string
+  description?:  string
   project_id?:  string
   priority:  1 | 2 | 3 | 4
   due?:  { date: string } | string
   completed?: boolean
-  created_at?: string
+  created_at?:  string
 }
 
 interface SevenDaysBoardViewProps {
@@ -53,7 +53,7 @@ export function SevenDaysBoardView({
   const [movingTaskId, setMovingTaskId] = useState<string | null>(null)
 
   // Generate 7 days columns
-  const days:  DayColumn[] = Array.from({ length: 7 }, (_, i) => {
+  const days: DayColumn[] = Array.from({ length: 7 }, (_, i) => {
     const date = addDays(startOfDay(new Date()), i)
     const dateStr = format(date, 'yyyy-MM-dd')
     
@@ -101,7 +101,7 @@ export function SevenDaysBoardView({
     
     // Don't move if already in this column
     const task = tasks.find(t => t.id === taskId)
-    const currentDueStr = task?.due ?  (typeof task.due === 'string' ? task.due : task. due. date) : null
+    const currentDueStr = task?.due ?  (typeof task.due === 'string' ? task.due : task. due.date) : null
     if (currentDueStr === newDateStr) return
     
     setMovingTaskId(taskId)
@@ -122,7 +122,7 @@ export function SevenDaysBoardView({
       onDragEnd={handleDragEnd}
     >
       <div className="flex gap-4 overflow-x-auto pb-4">
-        {days.map(day => (
+        {days. map(day => (
           <DayColumnComponent
             key={day.id}
             day={day}
@@ -155,8 +155,8 @@ function DayColumnComponent({
   onAddForDate,
   movingTaskId
 }: {
-  day:  DayColumn
-  onComplete:  (id: string) => Promise<void>
+  day: DayColumn
+  onComplete: (id: string) => Promise<void>
   onDelete: (id:  string) => Promise<void>
   onDetails: (task: Task) => void
   onAddForDate?:  (date: string) => void
@@ -262,10 +262,10 @@ function SortableTaskCard({
     transform,
     transition,
     isDragging
-  } = useSortable({ id: task. id })
+  } = useSortable({ id: task.id })
 
   const style = {
-    transform: CSS.Transform. toString(transform),
+    transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : isMoving ? 0.7 : 1
   }
@@ -351,7 +351,7 @@ function MiniTaskCard({
         priorityColors[task.priority] || priorityColors[4],
         loading && 'opacity-50'
       )}
-      onClick={() => onDetails? .(task)}
+      onClick={() => onDetails?.(task)}
     >
       <div className="space-y-2">
         <h4 className="font-medium text-sm line-clamp-2 group-hover:text-brand-purple transition-colors">
@@ -360,14 +360,14 @@ function MiniTaskCard({
 
         {task.description && (
           <p className="text-xs text-gray-500 line-clamp-1">
-            {task. description}
+            {task.description}
           </p>
         )}
 
         <div className="flex items-center justify-between">
           {task.priority < 4 && (
             <Badge variant={task.priority === 1 ? 'destructive' : 'secondary'} className="text-xs">
-              {priorityLabels[task.priority]}
+              {priorityLabels[task. priority]}
             </Badge>
           )}
 
