@@ -142,7 +142,7 @@ export default function Chat({
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                         {m.tasks.map((t) => (
                           <div key={t.id} onClick={() => handleOpenTask(t)} className="cursor-pointer">
-                            <TaskCard task={{ id: t.id, content: t.content, due: t.due || undefined, priority: t.priority }} token={localStorage.getItem('todoist_token') || ''} onAction={() => {}} />
+                            <TaskCard task={{ id: t.id, content: t.content, due: t.due || undefined, priority: t.priority }} token={localStorage.getItem('todoist_token') || ''} />
                           </div>
                         ))}
                       </div>
