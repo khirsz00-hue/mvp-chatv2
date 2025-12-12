@@ -96,23 +96,26 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
     setLoadingSuggestions(true)
     
     // Debounce for 1 second
-    debounceTimerRef.current = setTimeout(async () => {
-      try {
-        const response = await fetch('/api/ai/suggest-task', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title })
-        })
-        
-        if (response.ok) {
-          const data = await response.json()
-          setAiSuggestions(data)
+    debounceTimerRef.current = setTimeout(() => {
+      // Fetch suggestions in async IIFE to handle errors properly
+      (async () => {
+        try {
+          const response = await fetch('/api/ai/suggest-task', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title })
+          })
+          
+          if (response.ok) {
+            const data = await response.json()
+            setAiSuggestions(data)
+          }
+        } catch (err) {
+          console.error('Error fetching AI suggestions:', err)
+        } finally {
+          setLoadingSuggestions(false)
         }
-      } catch (err) {
-        console.error('Error fetching AI suggestions:', err)
-      } finally {
-        setLoadingSuggestions(false)
-      }
+      })()
     }, 1000)
     
     return () => {

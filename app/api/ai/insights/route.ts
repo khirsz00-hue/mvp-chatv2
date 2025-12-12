@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
+import { getOpenAIClient } from '@/lib/openai'
 
 export async function POST(req: Request) {
   try {
@@ -31,9 +31,7 @@ Skup się na:
 - Sugestiach poprawy (np. priorytetyzacja)
 - Motywacji (pozytywne wzmocnienie)`
 
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY
-    })
+    const openai = getOpenAIClient()
     
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',

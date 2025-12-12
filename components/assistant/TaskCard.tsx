@@ -58,10 +58,16 @@ export function TaskCard({
     
     checkTimer()
     
-    // Listen for storage events to update when timer changes
-    window.addEventListener('storage', checkTimer)
-    return () => window.removeEventListener('storage', checkTimer)
-  }, [task.id])
+    // Listen for custom timer events (same tab) and storage events (other tabs)
+    const handleTimerChange = () => checkTimer()
+    window.addEventListener('timerStateChanged', handleTimerChange)
+    window.addEventListener('storage', handleTimerChange)
+    
+    return () => {
+      window.removeEventListener('timerStateChanged', handleTimerChange)
+      window.removeEventListener('storage', handleTimerChange)
+    }
+  }, [task.id, getActiveTimer])
   
   const priorityColors = {
     1: 'border-l-red-500 bg-red-50/50',

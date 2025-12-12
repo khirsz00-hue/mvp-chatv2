@@ -98,20 +98,30 @@ export function TaskTimer({ onClose }: TaskTimerProps) {
   }
   
   const pauseTimer = () => {
-    setTimerState(prev => ({
-      ...prev,
-      isPaused: true,
-      isRunning: false
-    }))
+    setTimerState(prev => {
+      const newState = {
+        ...prev,
+        isPaused: true,
+        isRunning: false
+      }
+      // Dispatch custom event for same-tab updates
+      window.dispatchEvent(new CustomEvent('timerStateChanged', { detail: newState }))
+      return newState
+    })
   }
   
   const resumeTimer = () => {
-    setTimerState(prev => ({
-      ...prev,
-      isPaused: false,
-      isRunning: true,
-      startTime: Date.now() - (prev.elapsedSeconds * 1000)
-    }))
+    setTimerState(prev => {
+      const newState = {
+        ...prev,
+        isPaused: false,
+        isRunning: true,
+        startTime: Date.now() - (prev.elapsedSeconds * 1000)
+      }
+      // Dispatch custom event for same-tab updates
+      window.dispatchEvent(new CustomEvent('timerStateChanged', { detail: newState }))
+      return newState
+    })
   }
   
   const stopTimer = () => {
@@ -129,14 +139,18 @@ export function TaskTimer({ onClose }: TaskTimerProps) {
       localStorage.setItem('timerSessions', JSON.stringify(sessions))
     }
     
-    setTimerState({
+    const newState = {
       taskId: null,
       taskTitle: null,
       startTime: null,
       elapsedSeconds: 0,
       isRunning: false,
       isPaused: false
-    })
+    }
+    setTimerState(newState)
+    
+    // Dispatch custom event for same-tab updates
+    window.dispatchEvent(new CustomEvent('timerStateChanged', { detail: newState }))
   }
   
   const formatTime = (seconds: number): string => {
@@ -246,8 +260,8 @@ export function useTaskTimer() {
       isPaused: false
     }
     localStorage.setItem('taskTimer', JSON.stringify(timerState))
-    // Trigger re-render of TaskTimer component
-    window.dispatchEvent(new Event('storage'))
+    // Dispatch custom event for same-tab updates
+    window.dispatchEvent(new CustomEvent('timerStateChanged', { detail: timerState }))
   }
   
   const getActiveTimer = (): { taskId: string | null; isActive: boolean } => {
