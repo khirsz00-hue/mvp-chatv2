@@ -200,7 +200,7 @@ export default function WeekView({
                                       <div className="flex items-start gap-3">
                                         <input type="checkbox" className="mt-2" onClick={(e) => { e.stopPropagation(); onComplete?.(task.id) }} />
                                         <div className="flex-1" onClick={() => onOpenTask?.(task)}>
-                                          <TaskCard task={task} token={undefined} selectable={false} showContextMenu wrapTitle />
+                                          <TaskCard task={task} token={undefined} selectable={false} showContextMenu onOpen={onOpenTask} />
                                         </div>
                                       </div>
                                     </div>

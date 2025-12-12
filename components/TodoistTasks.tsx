@@ -119,14 +119,12 @@ export default function TodoistTasks({
                       <TaskCard
                         task={t}
                         token={token}
-                        onAction={() => loadTasks()}
                         showContextMenu={showContextMenu}
                         inlineActions={!showContextMenu} // inline actions for list views
                         selectable={selectable}
                         selected={selectedTasks ? selectedTasks.has(t.id) : false}
                         onSelectChange={(checked) => onSelectChange?.(t.id, checked)}
                         onOpen={onOpenTaskChat}
-                        wrapTitle={false}
                       />
                     </div>
                   </div>
