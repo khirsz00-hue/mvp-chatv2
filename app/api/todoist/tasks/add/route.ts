@@ -14,7 +14,10 @@ export async function POST(req: Request) {
       else payload.due_string = due
     }
     if (description) payload.description = description
-    if (duration) payload.duration = duration
+    if (duration) {
+      payload.duration = duration
+      payload.duration_unit = 'minute'
+    }
 
     const res = await fetch('https://api.todoist.com/rest/v2/tasks', {
       method: 'POST',
