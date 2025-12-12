@@ -1,17 +1,16 @@
 'use client'
 
 import { useState } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
+import Button from '@/components/ui/Button'
+import Input from '@/components/ui/Input'
+import Textarea from '@/components/ui/Textarea'
 import { Clock } from '@phosphor-icons/react'
 
 interface CreateTaskModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onCreateTask:  (task: any) => Promise<void>
+  onCreateTask: (task: any) => Promise<void>
 }
 
 export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTaskModalProps) {
@@ -31,11 +30,11 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
     setLoading(true)
     try {
       await onCreateTask({
-        content:  title,
+        content: title,
         description:  description. trim() || undefined,
         due_date: dueDate || undefined,
         priority:  parseInt(priority),
-        estimationMinutes: estimation ?  parseInt(estimation) : undefined
+        estimationMinutes: estimation ? parseInt(estimation) : undefined
       })
       
       // Reset form
@@ -114,17 +113,17 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
             
             <div className="space-y-2">
               <label className="text-sm font-medium">Priorytet</label>
-              <Select value={priority} onValueChange={(v:  any) => setPriority(v)} disabled={loading}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">🔴 Wysoki (P1)</SelectItem>
-                  <SelectItem value="2">🟠 Średni (P2)</SelectItem>
-                  <SelectItem value="3">🔵 Niski (P3)</SelectItem>
-                  <SelectItem value="4">⚪ Brak (P4)</SelectItem>
-                </SelectContent>
-              </Select>
+              <select
+                value={priority}
+                onChange={(e) => setPriority(e.target.value as any)}
+                disabled={loading}
+                className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus-ring disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="1">🔴 Wysoki (P1)</option>
+                <option value="2">🟠 Średni (P2)</option>
+                <option value="3">🔵 Niski (P3)</option>
+                <option value="4">⚪ Brak (P4)</option>
+              </select>
             </div>
           </div>
           
@@ -160,7 +159,6 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
           <Button 
             onClick={handleSubmit} 
             disabled={! title.trim() || loading}
-            className="gap-2"
           >
             {loading ? 'Tworzenie...' : 'Utwórz zadanie'}
           </Button>
