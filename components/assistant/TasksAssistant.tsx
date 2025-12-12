@@ -39,7 +39,8 @@ export function TasksAssistant() {
   const fetchTasks = async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/todoist/tasks?token=${token}`)
+      // Fetch all tasks by passing filter=all (API will return unfiltered tasks)
+      const res = await fetch(`/api/todoist/tasks?token=${token}&filter=all`)
       if (!res.ok) throw new Error('Failed to fetch tasks')
       
       const data = await res.json()
