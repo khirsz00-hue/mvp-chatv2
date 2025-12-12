@@ -69,6 +69,7 @@ export function TaskDetailsModal({
   const [projects, setProjects] = useState<Project[]>([])
   const [notes, setNotes] = useState('')
   const [showAIBreakdown, setShowAIBreakdown] = useState(false)
+  const [isCreatingSubtasks, setIsCreatingSubtasks] = useState(false)
   
   const { startTimer } = useTaskTimer()
   
@@ -202,41 +203,42 @@ export function TaskDetailsModal({
     }
   }
   
-  const handleCreateSubtasks = async (subtasks: { title: string; description: string; estimatedMinutes: number }[]) => {
-    if (!task) return
-    
-    const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
-    if (!token) {
-      alert('Brak tokenu Todoist')
-      return
-    }
-    
+  const handleCreateSubtasks = async (subtasks: Array<{
+    content: string
+    description?: string
+    duration?: number
+    duration_unit?: string
+  }>) => {
     try {
-      // Create subtasks via Todoist API
+      setIsCreatingSubtasks(true)
+      
+      // Create each subtask via Todoist API
       for (const subtask of subtasks) {
-        const response = await fetch('/api/todoist/tasks/add', {
+        await fetch('/api/todoist/tasks', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            token,
-            content: subtask.title,
+            content: subtask.content,
             description: subtask.description,
+            project_id: task.project_id,
             parent_id: task.id,
-            duration: subtask.estimatedMinutes
+            priority: task.priority,
+            duration: subtask.duration,
+            duration_unit: subtask.duration_unit || 'minute'
           })
         })
-        
-        if (!response.ok) {
-          throw new Error(`Failed to create subtask: ${subtask.title}`)
-        }
       }
       
       alert(`Utworzono ${subtasks.length} podzadań!`)
-      // Refresh the task list
-      window.location.reload()
-    } catch (err: any) {
+      setShowAIBreakdown(false)
+      if (onUpdate) {
+        await onUpdate(task.id, {})
+      }
+    } catch (err) {
       console.error('Error creating subtasks:', err)
-      throw err
+      alert('Nie udało się utworzyć podzadań')
+    } finally {
+      setIsCreatingSubtasks(false)
     }
   }
   
@@ -606,7 +608,7 @@ export function TaskDetailsModal({
       {/* AI Task Breakdown Modal */}
       <AITaskBreakdownModal
         open={showAIBreakdown}
-        onOpenChange={setShowAIBreakdown}
+        onClose={() => setShowAIBreakdown(false)}
         task={task}
         onCreateSubtasks={handleCreateSubtasks}
       />
