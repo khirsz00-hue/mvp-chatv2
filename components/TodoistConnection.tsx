@@ -47,7 +47,7 @@ export default function TodoistConnection({ token, onDisconnect, assistant }: To
       return <TodoistTasksView token={token} onUpdate={() => window.dispatchEvent(new Event('taskUpdated'))} />
     }
     // AI Planner or 6 Hats render AI view (planner will ingest tasks/calendar)
-    return <TodoistAIView token={token} assistant={assistant} />
+    return <TodoistAIView assistant={assistant} />
   }
 
   return (
