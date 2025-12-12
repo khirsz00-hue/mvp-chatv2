@@ -51,28 +51,46 @@ export default function TodoistConnection({ token, onDisconnect, assistant }: To
   }
 
   return (
-    <div className="relative flex flex-col h-[calc(100vh-100px)] w-full bg-gray-50 border border-green-200 rounded-xl overflow-hidden">
-      <div className="flex justify-between items-center p-2 px-4 bg-white border-b shadow-sm">
+    <div className="relative flex flex-col h-[calc(100vh-180px)] w-full bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-soft-lg">
+      {/* Header with connection status */}
+      <div className="flex justify-between items-center p-4 px-6 bg-gradient-to-r from-success-50 to-brand-50 border-b border-success-100">
         <div className="flex items-center gap-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-gray-100 text-gray-800 border border-gray-200">
-            <span className="text-sm font-medium">{assistant}</span>
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white shadow-soft border border-success-200">
+            <div className="w-2 h-2 rounded-full bg-success-500 animate-pulse" />
+            <span className="text-sm font-semibold text-gray-900">{assistant}</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <span className="text-sm font-semibold text-green-700 whitespace-nowrap">🟢 Połączono z Todoist</span>
-          <button onClick={onDisconnect} className="text-xs px-3 py-1 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 transition">Odłącz</button>
+        <div className="flex items-center gap-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-success-100 text-success-700 text-sm font-medium">
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            Połączono z Todoist
+          </div>
+          <button 
+            onClick={onDisconnect} 
+            className="px-4 py-2 rounded-xl text-sm font-medium bg-white border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 transition-all duration-200 shadow-soft hover:shadow-soft-lg"
+          >
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Odłącz
+            </div>
+          </button>
         </div>
       </div>
 
-      <div className="flex-1 relative w-full overflow-hidden">
+      {/* Content area with smooth transitions */}
+      <div className="flex-1 relative w-full overflow-hidden bg-gradient-to-br from-gray-50 to-white">
         <AnimatePresence mode="wait">
           <motion.div
             key={assistant}
-            initial={{ opacity: 0, x: assistant === 'Todoist Helper' ? -40 : 40 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: assistant === 'Todoist Helper' ? 40 : -40 }}
-            transition={{ duration: 0.25 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
             className="absolute inset-0 w-full"
           >
             {renderView()}
@@ -80,6 +98,7 @@ export default function TodoistConnection({ token, onDisconnect, assistant }: To
         </AnimatePresence>
       </div>
 
+      {/* Task Dialog */}
       {openTask && (
         <TaskDialog task={{ id: openTask.id, title: openTask.title }} initialTaskData={{ description: openTask.description }} mode="task" onClose={() => setOpenTask(null)} />
       )}
