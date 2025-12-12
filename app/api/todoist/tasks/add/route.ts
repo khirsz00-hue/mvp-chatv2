@@ -3,16 +3,18 @@ import { NextResponse } from 'next/server'
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { content, token, due, project_id, description } = body
+    const { content, token, due, project_id, description, parent_id, duration } = body
     if (!content || !token) return NextResponse.json({ error: 'Brak content lub token' }, { status: 400 })
 
     const payload: any = { content }
     if (project_id) payload.project_id = project_id
+    if (parent_id) payload.parent_id = parent_id
     if (due) {
       if (/^\d{4}-\d{2}-\d{2}$/.test(due)) payload.due_date = due
       else payload.due_string = due
     }
     if (description) payload.description = description
+    if (duration) payload.duration = duration
 
     const res = await fetch('https://api.todoist.com/rest/v2/tasks', {
       method: 'POST',
