@@ -5,19 +5,20 @@ import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs'
-import { CalendarBlank, Clock, Plus } from '@phosphor-icons/react'
+import { CalendarBlank, Plus, CheckCircle, Trash, DotsThree } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { format, isToday, isTomorrow, isWithinInterval, addDays, parseISO, isPast } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { CreateTaskModal } from './CreateTaskModal'
+import { TaskDetailsModal } from './TaskDetailsModal'
 
 interface Task {
   id: string
   content: string
   description?:  string
-  project_id?:  string
-  priority:  1 | 2 | 3 | 4
-  due?:  { date: string } | string
+  project_id?: string
+  priority: 1 | 2 | 3 | 4
+  due?: { date: string } | string
   completed?: boolean
   created_at?:  string
 }
@@ -27,11 +28,13 @@ export function TasksAssistant() {
   const [loading, setLoading] = useState(false)
   const [filter, setFilter] = useState('today')
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [showDetailsModal, setShowDetailsModal] = useState(false)
   
   const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
   
   useEffect(() => {
-    if (! token) {
+    if (!token) {
       console.log('No Todoist token found')
       return
     }
@@ -42,11 +45,11 @@ export function TasksAssistant() {
   const fetchTasks = async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/todoist/tasks? token=${token}`)
+      const res = await fetch(`/api/todoist/tasks?token=${token}`)
       if (!res.ok) throw new Error('Failed to fetch tasks')
       
       const data = await res.json()
-      setTasks(data. tasks || data || [])
+      setTasks(data.tasks || data || [])
     } catch (err) {
       console.error('Error fetching tasks:', err)
     } finally {
@@ -69,12 +72,12 @@ export function TasksAssistant() {
         switch (filter) {
           case 'today':
             return isToday(dueDate)
-          case 'tomorrow':
+          case 'tomorrow': 
             return isTomorrow(dueDate)
           case 'week':
             return isWithinInterval(dueDate, { start: now, end: addDays(now, 7) })
-          case 'month': 
-            return isWithinInterval(dueDate, { start: now, end: addDays(now, 30) })
+          case 'month':
+            return isWithinInterval(dueDate, { start:  now, end: addDays(now, 30) })
           case 'overdue':
             return isPast(dueDate) && !isToday(dueDate)
           default:
@@ -100,15 +103,55 @@ export function TasksAssistant() {
       if (!res.ok) throw new Error('Failed to create task')
       
       const data = await res.json()
-      
-      // Dodaj do listy
-      setTasks(prev => [... prev, data.task || data])
+      setTasks(prev => [...prev, data.task || data])
       
       console.log('✅ Zadanie utworzone!')
     } catch (err) {
       console.error('Error creating task:', err)
       alert('Nie udało się utworzyć zadania')
     }
+  }
+  
+  const handleComplete = async (taskId: string) => {
+    try {
+      const res = await fetch('/api/todoist/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON. stringify({ id: taskId, token })
+      })
+      
+      if (!res.ok) throw new Error('Failed to complete task')
+      
+      setTasks(prev => prev.filter(t => t.id !== taskId))
+      console.log('✅ Zadanie ukończone!')
+    } catch (err) {
+      console.error('Error completing task:', err)
+      alert('Nie udało się ukończyć zadania')
+    }
+  }
+  
+  const handleDelete = async (taskId: string) => {
+    try {
+      const res = await fetch('/api/todoist/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON. stringify({ id: taskId, token })
+      })
+      
+      if (!res.ok) throw new Error('Failed to delete task')
+      
+      setTasks(prev => prev.filter(t => t.id !== taskId))
+      console.log('🗑️ Zadanie usunięte!')
+    } catch (err) {
+      console.error('Error deleting task:', err)
+      alert('Nie udało się usunąć zadania')
+    }
+  }
+  
+  const handleUpdate = async (taskId: string, updates: Partial<Task>) => {
+    setTasks(prev => prev.map(t => 
+      t.id === taskId ? { ...t, ...updates } : t
+    ))
   }
   
   const filteredTasks = filterTasks(tasks)
@@ -131,7 +174,7 @@ export function TasksAssistant() {
             <CalendarBlank size={32} className="text-brand-purple" />
           </div>
           <h2 className="text-xl font-semibold">Połącz się z Todoist</h2>
-          <p className="text-muted-foreground max-w-md mx-auto">
+          <p className="text-gray-600 max-w-md mx-auto">
             Aby zarządzać zadaniami, połącz swoje konto Todoist z aplikacją
           </p>
           <Button 
@@ -177,18 +220,25 @@ export function TasksAssistant() {
             <Card className="p-8 text-center">
               <div className="flex items-center justify-center gap-2">
                 <div className="w-4 h-4 border-2 border-brand-purple border-t-transparent rounded-full animate-spin" />
-                <span className="text-muted-foreground">Ładowanie zadań...</span>
+                <span className="text-gray-600">Ładowanie zadań...</span>
               </div>
             </Card>
           ) : filteredTasks.length === 0 ? (
             <Card className="p-8 text-center">
-              <p className="text-muted-foreground">
-                Brak zadań dla tego filtra
-              </p>
+              <p className="text-gray-600">Brak zadań dla tego filtra</p>
             </Card>
           ) : (
             filteredTasks.map(task => (
-              <TaskCard key={task.id} task={task} />
+              <TaskCard 
+                key={task. id} 
+                task={task}
+                onComplete={handleComplete}
+                onDelete={handleDelete}
+                onDetails={(task) => {
+                  setSelectedTask(task)
+                  setShowDetailsModal(true)
+                }}
+              />
             ))
           )}
         </TabsContent>
@@ -199,12 +249,30 @@ export function TasksAssistant() {
         onOpenChange={setShowCreateModal}
         onCreateTask={handleAddTask}
       />
+      
+      <TaskDetailsModal
+        open={showDetailsModal}
+        onOpenChange={setShowDetailsModal}
+        task={selectedTask}
+        onUpdate={handleUpdate}
+        onDelete={handleDelete}
+        onComplete={handleComplete}
+      />
     </div>
   )
 }
 
-// TaskCard - prosty komponent karty
-function TaskCard({ task }: { task: Task }) {
+function TaskCard({ 
+  task,
+  onComplete,
+  onDelete,
+  onDetails
+}: { 
+  task: Task
+  onComplete: (id: string) => void
+  onDelete:  (id: string) => void
+  onDetails: (task: Task) => void
+}) {
   const priorityColors = {
     1: 'border-l-red-500 bg-red-50/50',
     2: 'border-l-orange-500 bg-orange-50/50',
@@ -231,7 +299,7 @@ function TaskCard({ task }: { task: Task }) {
           <h3 className="font-medium text-lg">{task.content}</h3>
           
           {task.description && (
-            <p className="text-sm text-muted-foreground line-clamp-2">
+            <p className="text-sm text-gray-600 line-clamp-2">
               {task.description}
             </p>
           )}
@@ -253,6 +321,35 @@ function TaskCard({ task }: { task: Task }) {
               </Badge>
             )}
           </div>
+        </div>
+        
+        <div className="flex gap-2">
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            onClick={() => onDetails(task)}
+            title="Szczegóły"
+          >
+            <DotsThree size={18} weight="bold" />
+          </Button>
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            onClick={() => onComplete(task.id)}
+            title="Ukończ"
+            className="text-green-600 hover:text-green-700 hover:bg-green-50"
+          >
+            <CheckCircle size={18} />
+          </Button>
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            onClick={() => onDelete(task.id)}
+            title="Usuń"
+            className="text-red-600 hover: text-red-700 hover: bg-red-50"
+          >
+            <Trash size={18} />
+          </Button>
         </div>
       </div>
     </Card>
