@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
@@ -8,6 +8,7 @@ import { CalendarBlank, CheckCircle, Trash, DotsThree, Circle, CheckSquare } fro
 import { cn } from '@/lib/utils'
 import { format, parseISO } from 'date-fns'
 import { pl } from 'date-fns/locale'
+import { useTaskTimer } from './TaskTimer'
 
 interface Subtask {
   id: string
@@ -44,6 +45,23 @@ export function TaskCard({
 }: TaskCardProps) {
   const [loading, setLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [hasActiveTimer, setHasActiveTimer] = useState(false)
+  
+  const { getActiveTimer } = useTaskTimer()
+  
+  // Check if this task has an active timer
+  useEffect(() => {
+    const checkTimer = () => {
+      const activeTimer = getActiveTimer()
+      setHasActiveTimer(activeTimer.taskId === task.id && activeTimer.isActive)
+    }
+    
+    checkTimer()
+    
+    // Listen for storage events to update when timer changes
+    window.addEventListener('storage', checkTimer)
+    return () => window.removeEventListener('storage', checkTimer)
+  }, [task.id])
   
   const priorityColors = {
     1: 'border-l-red-500 bg-red-50/50',
@@ -152,6 +170,13 @@ export function TaskCard({
           
           {/* Footer badges */}
           <div className="flex gap-2 mt-3 flex-wrap">
+            {hasActiveTimer && (
+              <Badge className="gap-1 text-xs bg-red-500 text-white animate-pulse">
+                <div className="w-2 h-2 rounded-full bg-white" />
+                Live
+              </Badge>
+            )}
+            
             {dueStr && (
               <Badge variant="outline" className="gap-1 text-xs">
                 <CalendarBlank size={14} />

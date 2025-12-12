@@ -191,7 +191,7 @@ export function TaskTimer({ onClose }: TaskTimerProps) {
             <Button
               onClick={() => timerState.taskId && timerState.taskTitle && startTimer(timerState.taskId, timerState.taskTitle)}
               className="flex-1 gap-2"
-              variant="primary"
+              variant="default"
             >
               <Play size={16} weight="fill" />
               Start
@@ -202,7 +202,7 @@ export function TaskTimer({ onClose }: TaskTimerProps) {
             <Button
               onClick={pauseTimer}
               className="flex-1 gap-2"
-              variant="secondary"
+              variant="outline"
             >
               <Pause size={16} weight="fill" />
               Pause
@@ -213,7 +213,7 @@ export function TaskTimer({ onClose }: TaskTimerProps) {
             <Button
               onClick={resumeTimer}
               className="flex-1 gap-2"
-              variant="primary"
+              variant="default"
             >
               <Play size={16} weight="fill" />
               Resume

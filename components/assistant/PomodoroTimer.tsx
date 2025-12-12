@@ -351,7 +351,7 @@ export function PomodoroTimer({ open, onOpenChange, taskId, taskTitle }: Pomodor
               <Button
                 onClick={startTimer}
                 className="gap-2"
-                variant="primary"
+                variant="default"
                 size="lg"
               >
                 <Play size={20} weight="fill" />
@@ -361,7 +361,7 @@ export function PomodoroTimer({ open, onOpenChange, taskId, taskTitle }: Pomodor
               <Button
                 onClick={pauseTimer}
                 className="gap-2"
-                variant="secondary"
+                variant="outline"
                 size="lg"
               >
                 <Pause size={20} weight="fill" />
@@ -372,7 +372,7 @@ export function PomodoroTimer({ open, onOpenChange, taskId, taskTitle }: Pomodor
             <Button
               onClick={skipPhase}
               className="gap-2"
-              variant="secondary"
+              variant="outline"
               size="lg"
             >
               <SkipForward size={20} weight="fill" />

@@ -171,7 +171,7 @@ export function AIInsightsPanel({ tasks, completedTasks = [], className }: AIIns
               <p className="text-gray-500 text-sm mb-3">Brak insightów do wyświetlenia</p>
               <Button
                 size="sm"
-                variant="secondary"
+                variant="outline"
                 onClick={generateInsights}
                 className="gap-2"
               >

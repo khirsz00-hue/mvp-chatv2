@@ -161,7 +161,7 @@ export function AITaskBreakdownModal({
               <Button
                 onClick={generateBreakdown}
                 size="sm"
-                variant="secondary"
+                variant="outline"
                 className="mt-2"
               >
                 Spróbuj ponownie
@@ -260,7 +260,7 @@ export function AITaskBreakdownModal({
               </Button>
               <Button
                 onClick={handleCreate}
-                variant="primary"
+                variant="default"
                 disabled={selectedCount === 0}
                 className="gap-2"
               >
