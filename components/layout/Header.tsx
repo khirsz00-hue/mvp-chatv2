@@ -1,8 +1,7 @@
 'use client'
 
-import React from 'react'
 import Button from '../ui/Button'
-import { User, LogOut } from 'lucide-react'
+import { User, SignOut } from '@phosphor-icons/react'
 
 interface HeaderProps {
   user?: {
@@ -15,23 +14,24 @@ interface HeaderProps {
 
 export default function Header({ user, onSignIn, onSignOut }: HeaderProps) {
   return (
-    <header className="glass sticky top-0 z-50 border-b border-white/20 shadow-glow">
-      <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+    <header className="sticky top-0 z-50 glass shadow-glow border-b border-white/20">
+      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          {/* Logo with gradient */}
-          <div className="text-2xl font-bold bg-gradient-to-r from-brand-purple to-brand-pink bg-clip-text text-transparent">
-            AI Assistants PRO
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-purple to-brand-pink flex items-center justify-center">
+            <span className="text-white font-bold text-xl">AI</span>
           </div>
+          <h1 className="text-xl font-bold bg-gradient-to-r from-brand-purple to-brand-pink bg-clip-text text-transparent">
+            AI Assistants PRO
+          </h1>
         </div>
         
-        {/* User menu / Auth button */}
         <div className="flex items-center gap-4">
           {user ? (
             <div className="flex items-center gap-3">
-              <div className="hidden sm:flex items-center gap-2 text-sm">
-                <User className="w-4 h-4 text-gray-600" />
+              <div className="hidden md:flex items-center gap-2 text-sm">
+                <User size={16} className="text-gray-600" />
                 <span className="text-gray-700 font-medium">
-                  {user.name || user.email || 'User'}
+                  {user.name || user.email || 'Użytkownik'}
                 </span>
               </div>
               <Button
@@ -40,17 +40,19 @@ export default function Header({ user, onSignIn, onSignOut }: HeaderProps) {
                 onClick={onSignOut}
                 className="flex items-center gap-2"
               >
-                <LogOut className="w-4 h-4" />
-                <span className="hidden sm:inline">Sign Out</span>
+                <SignOut size={16} />
+                <span className="hidden md:inline">Wyloguj</span>
               </Button>
             </div>
           ) : (
-            <Button
-              variant="default"
+            <Button 
+              variant="ghost" 
               size="sm"
               onClick={onSignIn}
+              className="gap-2"
             >
-              Sign In
+              <User size={20} />
+              <span className="hidden md:inline">Użytkownik</span>
             </Button>
           )}
         </div>

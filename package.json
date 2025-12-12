@@ -9,20 +9,23 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
     "@supabase/supabase-js": "^2.45.4",
+    "clsx": "^2.1.1",
+    "date-fns": "^3.6.0",
     "framer-motion": "^11.2.10",
     "lucide-react": "^0.460.0",
     "next": "14.2.5",
     "openai": "^4.57.0",
     "react": "18.3.1",
+    "react-beautiful-dnd": "^13.1.1",
     "react-dom": "18.3.1",
     "react-markdown": "^9.0.1",
-    "remark-gfm": "^4.0.0",
     "react-syntax-highlighter": "^15.5.0",
-    "zod": "^3.23.8",
-    "date-fns": "^3.6.0",
     "react-tooltip": "^5.26.4",
-    "react-beautiful-dnd": "^13.1.1"
+    "remark-gfm": "^4.0.0",
+    "tailwind-merge": "^3.4.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^20.11.30",
