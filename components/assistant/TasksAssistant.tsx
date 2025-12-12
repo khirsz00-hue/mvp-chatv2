@@ -5,12 +5,15 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Card from '@/components/ui/Card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs'
-import { Plus, List, Kanban, CalendarBlank, SortAscending } from '@phosphor-icons/react'
+import { Plus, List, Kanban, CalendarBlank, SortAscending, Timer as TimerIcon } from '@phosphor-icons/react'
 import { startOfDay, addDays, parseISO, isSameDay, isBefore, isWithinInterval } from 'date-fns'
 import { CreateTaskModal } from './CreateTaskModal'
 import { TaskDetailsModal } from './TaskDetailsModal'
 import { TaskCard } from './TaskCard'
 import { SevenDaysBoardView } from './SevenDaysBoardView'
+import { TaskTimer } from './TaskTimer'
+import { PomodoroTimer } from './PomodoroTimer'
+import { AIInsightsPanel } from './AIInsightsPanel'
 
 interface Task {
   id: string
@@ -47,6 +50,7 @@ export function TasksAssistant() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
+  const [showPomodoro, setShowPomodoro] = useState(false)
   
   const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
   
@@ -459,6 +463,15 @@ export function TasksAssistant() {
           </Badge>
           
           <Button 
+            onClick={() => setShowPomodoro(true)} 
+            variant="outline"
+            className="gap-2"
+            title="Pomodoro Timer"
+          >
+            🍅
+          </Button>
+          
+          <Button 
             onClick={() => setShowCreateModal(true)} 
             className="gap-2"
           >
@@ -467,6 +480,9 @@ export function TasksAssistant() {
           </Button>
         </div>
       </div>
+      
+      {/* AI Insights Panel */}
+      <AIInsightsPanel tasks={tasks} />
       
       {/* Filters */}
       {view === 'list' && (
@@ -557,6 +573,16 @@ export function TasksAssistant() {
         onComplete={handleComplete}
         onDuplicate={handleDuplicate}
       />
+      
+      <PomodoroTimer
+        open={showPomodoro}
+        onOpenChange={setShowPomodoro}
+        taskId={selectedTask?.id}
+        taskTitle={selectedTask?.content}
+      />
+      
+      {/* Task Timer (floating widget) */}
+      <TaskTimer />
     </div>
   )
 }

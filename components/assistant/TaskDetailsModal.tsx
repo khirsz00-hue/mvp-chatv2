@@ -7,9 +7,11 @@ import Input from '@/components/ui/Input'
 import Textarea from '@/components/ui/Textarea'
 import Badge from '@/components/ui/Badge'
 import Separator from '@/components/ui/Separator'
-import { CheckCircle, Trash, Pencil, CalendarBlank, Flag, FolderOpen, Clock, Copy, CheckSquare } from '@phosphor-icons/react'
+import { CheckCircle, Trash, Pencil, CalendarBlank, Flag, FolderOpen, Clock, Copy, CheckSquare, Timer, Brain } from '@phosphor-icons/react'
 import { format, parseISO } from 'date-fns'
 import { pl } from 'date-fns/locale'
+import { AITaskBreakdownModal } from './AITaskBreakdownModal'
+import { useTaskTimer } from './TaskTimer'
 
 interface Subtask {
   id: string
@@ -66,6 +68,9 @@ export function TaskDetailsModal({
   const [loading, setLoading] = useState(false)
   const [projects, setProjects] = useState<Project[]>([])
   const [notes, setNotes] = useState('')
+  const [showAIBreakdown, setShowAIBreakdown] = useState(false)
+  
+  const { startTimer } = useTaskTimer()
   
   const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
   
@@ -194,6 +199,52 @@ export function TaskDetailsModal({
       alert('Nie udało się zduplikować zadania')
     } finally {
       setLoading(false)
+    }
+  }
+  
+  const handleCreateSubtasks = async (subtasks: { title: string; description: string; estimatedMinutes: number }[]) => {
+    if (!task) return
+    
+    const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
+    if (!token) {
+      alert('Brak tokenu Todoist')
+      return
+    }
+    
+    try {
+      // Create subtasks via Todoist API
+      for (const subtask of subtasks) {
+        const response = await fetch('/api/todoist/tasks/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token,
+            content: subtask.title,
+            description: subtask.description,
+            parent_id: task.id,
+            duration: subtask.estimatedMinutes
+          })
+        })
+        
+        if (!response.ok) {
+          throw new Error(`Failed to create subtask: ${subtask.title}`)
+        }
+      }
+      
+      alert(`Utworzono ${subtasks.length} podzadań!`)
+      // Refresh the task list
+      window.location.reload()
+    } catch (err: any) {
+      console.error('Error creating subtasks:', err)
+      throw err
+    }
+  }
+  
+  const handleStartTimer = () => {
+    if (task) {
+      startTimer(task.id, task.content)
+      // Show confirmation
+      alert('Timer started!')
     }
   }
   
@@ -474,6 +525,33 @@ export function TaskDetailsModal({
           
           <Separator />
           
+          {/* AI & Timer Actions */}
+          {!isEditing && (
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                onClick={() => setShowAIBreakdown(true)}
+                variant="outline"
+                className="gap-2"
+                disabled={loading}
+              >
+                <Brain size={18} weight="fill" />
+                AI Breakdown
+              </Button>
+              
+              <Button 
+                onClick={handleStartTimer}
+                variant="outline"
+                className="gap-2"
+                disabled={loading}
+              >
+                <Timer size={18} weight="fill" />
+                Start Timer
+              </Button>
+            </div>
+          )}
+          
+          <Separator />
+          
           {/* Action Buttons */}
           <div className="flex justify-between items-center gap-3">
             <Button 
@@ -524,6 +602,14 @@ export function TaskDetailsModal({
           </div>
         </div>
       </DialogContent>
+      
+      {/* AI Task Breakdown Modal */}
+      <AITaskBreakdownModal
+        open={showAIBreakdown}
+        onOpenChange={setShowAIBreakdown}
+        task={task}
+        onCreateSubtasks={handleCreateSubtasks}
+      />
     </Dialog>
   )
 }
