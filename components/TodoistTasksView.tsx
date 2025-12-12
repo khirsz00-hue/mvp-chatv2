@@ -210,7 +210,7 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
         <button onClick={() => bulkDelete()} className="px-3 py-1 bg-red-600 text-white rounded text-sm">Usuń</button>
       </div>
     )
-  } // ← brakujący nawias domykający tu
+  }
 
   const bulkComplete = async () => {
     const ids = Array.from(selectedTasks)
@@ -355,4 +355,13 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
 
       <AnimatePresence>
         {openTask && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+          <TaskDialog
+            task={openTask}
+            mode="task"
+            onClose={() => setOpenTask(null)}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
