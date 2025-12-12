@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import Button from '../ui/Button'
 import { User, SignOut } from '@phosphor-icons/react'
 
@@ -14,8 +13,6 @@ interface HeaderProps {
 }
 
 export default function Header({ user, onSignIn, onSignOut }: HeaderProps) {
-  const [showUserMenu, setShowUserMenu] = useState(false)
-  
   return (
     <header className="sticky top-0 z-50 glass shadow-glow border-b border-white/20">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
@@ -51,7 +48,7 @@ export default function Header({ user, onSignIn, onSignOut }: HeaderProps) {
             <Button 
               variant="ghost" 
               size="sm"
-              onClick={() => setShowUserMenu(!showUserMenu)}
+              onClick={onSignIn}
               className="gap-2"
             >
               <User size={20} />

@@ -1,7 +1,7 @@
 'use client'
 
 import Header from './Header'
-import Sidebar from './Sidebar'
+import Sidebar, { AssistantId } from './Sidebar'
 import { ReactNode, useState } from 'react'
 
 interface MainLayoutProps {
@@ -9,7 +9,7 @@ interface MainLayoutProps {
 }
 
 export default function MainLayout({ children }: MainLayoutProps) {
-  const [activeView, setActiveView] = useState<'tasks' | 'planning' | 'journal' | 'decisions' | 'support'>('tasks')
+  const [activeView, setActiveView] = useState<AssistantId>('tasks')
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50">

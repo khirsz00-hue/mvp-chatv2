@@ -3,6 +3,9 @@
 import { ListChecks, CalendarBlank, Notebook, Brain, HandHeart } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 
+// Etap 2A: Updated assistant IDs to match specification
+// Previous: 'todoist', 'planner', 'journal', '6hats', 'chat'
+// Current: 'tasks', 'planning', 'journal', 'decisions', 'support'
 export type AssistantId = 'tasks' | 'planning' | 'journal' | 'decisions' | 'support'
 
 interface Assistant {
