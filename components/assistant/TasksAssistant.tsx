@@ -24,8 +24,13 @@ export function TasksAssistant() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(false)
   const [filter, setFilter] = useState('today')
+  const [token, setToken] = useState<string | null>(null)
   
-  const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
+  useEffect(() => {
+    // Get token from localStorage on client-side only to avoid hydration mismatch
+    const storedToken = localStorage.getItem('todoist_token')
+    setToken(storedToken)
+  }, [])
   
   useEffect(() => {
     if (!token) {
