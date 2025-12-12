@@ -43,9 +43,9 @@ export default function Chat({
   const [lastTasks, setLastTasks] = useState<any[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  // Only sync with externalMessages if they're provided
+  // Only sync with externalMessages if they're provided and not empty
   useEffect(() => {
-    if (externalMessages) {
+    if (externalMessages && externalMessages.length > 0) {
       setMessages(externalMessages)
     }
   }, [externalMessages])

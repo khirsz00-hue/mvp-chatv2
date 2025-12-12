@@ -34,11 +34,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
     }
   }, [])
 
-  // Check for user (could be extended with Supabase auth)
-  useEffect(() => {
-    // Placeholder for auth check
-    // In real implementation, this would check Supabase session
-  }, [])
+  // TODO: Check for user with Supabase auth
+  // useEffect(() => {
+  //   // Check Supabase session here
+  // }, [])
 
   const handleSignOut = () => {
     // Placeholder for sign out logic
@@ -85,7 +84,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         return (
           <div className="max-w-4xl mx-auto">
             <Chat
-              assistant="todoist"
+              assistant="global"
             />
           </div>
         )
@@ -118,13 +117,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
         )
       
       default:
-        return (
-          <TodoistTasksView
-            token={token}
-            onUpdate={() => {}}
-            hideHeader={false}
-          />
-        )
+        // Default to Todoist Helper if unknown assistant
+        setActiveAssistant('todoist')
+        return null
     }
   }
 
