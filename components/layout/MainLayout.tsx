@@ -86,7 +86,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
           <div className="max-w-4xl mx-auto">
             <Chat
               assistant="todoist"
-              hideHistory={false}
             />
           </div>
         )
