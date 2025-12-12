@@ -355,4 +355,14 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
 
       <AnimatePresence>
         {openTask && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[80]">
+            <TaskDialog
+              task={openTask}
+              onClose={() => setOpenTask(null)}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}

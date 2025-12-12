@@ -2,30 +2,80 @@
 @tailwind components;
 @tailwind utilities;
 
-/* === Global overrides / resets (keep these before custom styles) === */
-/* Ensure body uses tailwind defaults */
+/* === Design System: Global Resets === */
+html {
+  scroll-behavior: smooth;
+}
+
 html, body, #__next {
   height: 100%;
 }
 
 body {
-  @apply bg-gray-50 text-gray-800 antialiased;
+  @apply bg-gray-50 text-gray-800 antialiased font-sans;
 }
 
-/* FILTER BAR - nowy, prosty, elegancki */
+/* === Design System: Focus Ring Utilities === */
+@layer utilities {
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-brand-purple focus:ring-offset-2;
+  }
+  
+  .focus-ring-inset {
+    @apply focus:outline-none focus:ring-2 focus:ring-inset focus:ring-brand-purple;
+  }
+}
+
+/* === Design System: Glassmorphism === */
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.glass-dark {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-purple {
+  background: rgba(139, 92, 246, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+}
+
+/* === Design System: Shimmer Effect === */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* === Application Specific Styles === */
+
+/* Filter Bar */
 .filter-bar {
   @apply inline-flex items-center gap-2 ml-3;
 }
 .filter-pill {
-  @apply px-3 py-1.5 rounded-full text-sm text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition;
+  @apply px-3 py-1.5 rounded-full text-sm text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition focus-ring;
 }
 .filter-pill--active {
-  @apply bg-blue-600 text-white shadow-sm;
+  @apply bg-brand-purple text-white shadow-sm;
 }
 
-/* Week view / column niceties */
+/* Week View */
 .week-column {
-  @apply flex flex-col gap-2 rounded-xl p-3 border border-gray-200 shadow-sm min-w-0 w-full transition-all;
+  @apply flex flex-col gap-2 rounded-xl p-3 border border-gray-200 shadow-soft min-w-0 w-full transition-all;
 }
 @media (min-width: 768px) {
   .week-column {
@@ -39,39 +89,36 @@ body {
   @apply flex flex-col gap-2;
 }
 .week-day-today {
-  @apply text-blue-700 font-bold;
+  @apply text-brand-purple font-bold;
 }
 
-/* task card basic */
-.task-card-outer { @apply w-full; }
-.task-card-inner { @apply bg-white rounded-lg p-3 border border-gray-100 shadow-sm; }
+/* Task Card */
+.task-card-outer { 
+  @apply w-full; 
+}
+.task-card-inner { 
+  @apply bg-white rounded-lg p-3 border border-gray-100 shadow-soft; 
+}
 
-/* small button styles used in TaskCard / interactions */
+/* Task Action Buttons */
 .task-action {
-  @apply inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm transition;
+  @apply inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm transition focus-ring;
 }
-.task-action.postpone { @apply bg-blue-50 text-blue-700; }
-.task-action.complete { @apply bg-green-50 text-green-700; }
-.task-action.delete { @apply bg-red-50 text-red-700; }
-.task-action.help { @apply bg-violet-600 text-white; }
+.task-action.postpone { @apply bg-blue-50 text-blue-700 hover:bg-blue-100; }
+.task-action.complete { @apply bg-green-50 text-green-700 hover:bg-green-100; }
+.task-action.delete { @apply bg-red-50 text-red-700 hover:bg-red-100; }
+.task-action.help { @apply bg-brand-purple text-white hover:bg-brand-purple/90; }
 
-/* UI polish */
-.toast { @apply fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] bg-gray-900 text-white text-sm px-4 py-2 rounded-lg shadow-lg; }
-
-/* re-enable dragging helpers */
-.dragging-active { user-select: none !important; -webkit-user-select: none !important; }
-.react-beautiful-dnd-placeholder { min-height: 20px; }
-
-/* Task action pills (jeśli jeszcze nie ma) */
-.task-action {
-  @apply inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm transition;
+/* Toast Notifications */
+.toast { 
+  @apply fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] bg-gray-900 text-white text-sm px-4 py-2 rounded-lg shadow-glow-lg; 
 }
-.task-action.postpone { @apply bg-blue-50 text-blue-700; }
-.task-action.complete { @apply bg-green-50 text-green-700; }
-.task-action.delete { @apply bg-red-50 text-red-700; }
-.task-action.help { @apply bg-violet-600 text-white; }
 
-/* filter pills */
-.filter-bar { @apply inline-flex items-center gap-2; }
-.filter-pill { @apply px-3 py-1.5 rounded-full text-sm text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition; }
-.filter-pill--active { @apply bg-blue-600 text-white shadow-sm; }
+/* Drag and Drop Helpers */
+.dragging-active { 
+  user-select: none !important; 
+  -webkit-user-select: none !important; 
+}
+.react-beautiful-dnd-placeholder { 
+  min-height: 20px; 
+}
