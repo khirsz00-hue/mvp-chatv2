@@ -1,9 +1,44 @@
 # 🧠 AI Assistants PRO (Final SaaS Edition)
 
 Modularna platforma AI zbudowana w **Next.js 14 + Supabase + OpenAI + Tailwind + Framer Motion**  
-Zawiera dwóch inteligentnych asystentów:
-- ✅ **Todoist Helper** — integracja z Todoist, NLU, coaching zadań  
-- 🎩 **Six Thinking Hats** — analiza decyzji metodą 6 kapeluszy  
+
+## 🎯 Asystenci AI
+
+1. 📝 **Todoist Helper** - Zarządzaj zadaniami z AI (w pełni zaimplementowany)
+2. 📅 **AI Planner** - Inteligentne planowanie dnia (w przygotowaniu)
+3. 📔 **Journal** - Codzienny dziennik refleksji (w przygotowaniu)
+4. 🎩 **Six Thinking Hats** - Framework decyzyjny (w przygotowaniu)
+5. 💬 **Chat Support** - Coaching dla ADHD (w pełni zaimplementowany)
+
+---
+
+## 📐 Architektura Layoutu
+
+Aplikacja wykorzystuje nową strukturę layoutu z glassmorphism i nawigacją:
+
+### Komponenty Layout
+- **Header** (`components/layout/Header.tsx`) - Glassmorphism header z gradient logo
+- **Sidebar** (`components/layout/Sidebar.tsx`) - Nawigacja między asystentami z animacjami
+- **MainLayout** (`components/layout/MainLayout.tsx`) - Główny kontener integrujący header + sidebar + content
+
+### Struktura Nawigacji
+```
+┌─────────────────────────────────────────────────┐
+│  [Logo AI Assistants PRO]        [User Menu]   │  ← Header (glass)
+├──────────┬──────────────────────────────────────┤
+│          │                                      │
+│ 📝 Todoist│                                     │
+│ 📅 Planner│     Content Area                    │
+│ 📔 Journal│     (TodoistTasksView lub Chat)     │
+│ 🎩 6 Hats │                                     │
+│ 💬 Chat   │                                     │
+│          │                                      │
+│ Sidebar  │                                      │
+│ (glass)  │                                      │
+└──────────┴──────────────────────────────────────┘
+```
+
+Nawigacja wykorzystuje state-based routing bez przeładowania strony.
 
 ---
 

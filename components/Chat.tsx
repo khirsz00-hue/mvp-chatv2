@@ -31,19 +31,24 @@ interface ChatProps {
 
 export default function Chat({
   onSend,
-  messages: externalMessages = [],
+  messages: externalMessages,
   assistant = 'todoist',
   hideHistory = true,
   sessionId,
   contextTitle,
 }: ChatProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>(externalMessages)
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [lastTasks, setLastTasks] = useState<any[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => setMessages(externalMessages), [externalMessages])
+  // Only sync with externalMessages if they're provided and not empty
+  useEffect(() => {
+    if (externalMessages && externalMessages.length > 0) {
+      setMessages(externalMessages)
+    }
+  }, [externalMessages])
 
   const storageKey =
     sessionId
