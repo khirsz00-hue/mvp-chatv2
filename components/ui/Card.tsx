@@ -32,7 +32,7 @@ CardHeader.displayName = 'CardHeader'
 
 export interface CardTitleProps extends React.HTMLAttributes<HTMLHeadingElement> {}
 
-const CardTitle = React.forwardRef<HTMLParagraphElement, CardTitleProps>(
+const CardTitle = React.forwardRef<HTMLHeadingElement, CardTitleProps>(
   ({ className = '', ...props }, ref) => {
     return (
       <h3
