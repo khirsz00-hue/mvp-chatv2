@@ -161,7 +161,8 @@ export function TasksAssistant() {
       const clientId = process.env.NEXT_PUBLIC_TODOIST_CLIENT_ID
       const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
       const redirectUri = `${baseUrl}/api/todoist/callback`
-      const authUrl = `https://todoist.com/oauth/authorize?client_id=${clientId}&scope=data:read_write&state=mvp-chatv2`
+      // Ensure we pass the redirect_uri so Todoist redirects to our callback (not an old registered URI)
+      const authUrl = `https://todoist.com/oauth/authorize?client_id=${clientId}&scope=data:read_write&state=mvp-chatv2&redirect_uri=${encodeURIComponent(redirectUri)}`
       
       window.location.href = authUrl
     }
