@@ -454,6 +454,7 @@ export default function TodoistTasksView({ token, onUpdate, hideHeader = false }
             task={openTask}
             mode="task"
             onClose={() => setOpenTask(null)}
+            token={token}
           />
         )}
       </AnimatePresence>
