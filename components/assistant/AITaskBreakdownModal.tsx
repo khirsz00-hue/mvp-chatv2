@@ -20,26 +20,24 @@ import {
   User,
   ArrowLeft
 } from '@phosphor-icons/react'
-import { format, parseISO } from 'date-fns'
-import { pl } from 'date-fns/locale'
 
 interface Task {
   id: string
   content: string
   description?:  string
-  project_id?: string
-  priority: 1 | 2 | 3 | 4
+  project_id?:  string
+  priority:  1 | 2 | 3 | 4
   due?:  { date: string } | string
 }
 
 interface AITaskBreakdownModalProps {
   open: boolean
   onClose: () => void
-  task: Task
+  task:  Task
   onCreateSubtasks: (subtasks: Array<{
     content: string
     description?: string
-    duration?: number
+    duration?:  number
     duration_unit?: string
   }>) => Promise<void>
 }
@@ -94,7 +92,7 @@ export function AITaskBreakdownModal({
   
   // Initialize - fetch AI summary
   useEffect(() => {
-    if (open && !aiSummary) {
+    if (open && ! aiSummary) {
       generateAISummary()
     }
     
@@ -137,7 +135,7 @@ Bądź ciepły, wspierający i konkretny.`
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: [
-            { role: 'system', content:  'Jesteś wspierającym asystentem ADHD.' },
+            { role: 'system', content: 'Jesteś wspierającym asystentem ADHD.' },
             { role: 'user', content: prompt }
           ]
         })
@@ -175,7 +173,7 @@ Pytania MUSZĄ być:
 - Bezpośrednio związane z tym konkretnym zadaniem
 - Pomocne w dekompozycji na subtaski
 
-Przykłady DOBRYCH pytań dla "Napisać raport kwartalny": 
+Przykłady DOBRYCH pytań dla "Napisać raport kwartalny":
 - "Jakie sekcje powinien zawierać raport?  (np. wprowadzenie, dane, wnioski)"
 - "Czy masz już zebrane dane, czy trzeba je najpierw przygotować?"
 - "Dla kogo jest ten raport i jaki poziom szczegółowości jest oczekiwany?"
@@ -192,7 +190,7 @@ Zwróć JSON:
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body:  JSON.stringify({
           messages: [
             { role: 'system', content: 'Jesteś asystentem ADHD specjalizującym się w konkretnych pytaniach doprecyzowujących.' },
             { role: 'user', content: prompt }
@@ -218,7 +216,7 @@ Zwróć JSON:
       // Fallback questions
       setClarifyQuestions([
         'Jakie są najważniejsze elementy tego zadania?',
-        'Czy są jakieś konkretne wymagania lub ograniczenia?',
+        'Czy są jakieś konkretne wymagania lub ograniczenia? ',
         'W jakiej kolejności najlepiej to zrobić?'
       ])
     } finally {
@@ -257,7 +255,7 @@ ${task.description ? `Opis: "${task.description}"` : ''}
 
 Twoje zrozumienie:  ${aiSummary}
 
-Odpowiedzi użytkownika:
+Odpowiedzi użytkownika: 
 ${qaContext}
 
 Na podstawie tych informacji wygeneruj: 
@@ -269,7 +267,7 @@ Na podstawie tych informacji wygeneruj:
 5. **Uzasadnienie schedulingu** (1-2 zdania)
 6. **2-3 praktyczne tipy**
 
-Zwróć JSON: 
+Zwróć JSON:
 {
   "subtasks": [
     {"title": "Krok 1", "description": "Dokładny opis", "estimatedMinutes": 30}
@@ -284,7 +282,7 @@ Zwróć JSON:
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:  JSON.stringify({
+        body: JSON.stringify({
           messages: [
             { role: 'system', content: 'Jesteś asystentem ADHD specjalizującym się w dekompozycji zadań.' },
             { role: 'user', content: prompt }
@@ -317,7 +315,7 @@ Zwróć JSON:
       }
     } catch (err) {
       console.error('Error generating subtasks:', err)
-      alert('Nie udało się wygenerować subtasków. Spróbuj ponownie.')
+      alert('Nie udało się wygenerować subtasków.  Spróbuj ponownie.')
     } finally {
       setIsLoadingQuestions(false)
     }
@@ -328,7 +326,7 @@ Zwróć JSON:
     setViewMode('chat')
     const welcomeMsg:  Message = {
       role: 'assistant',
-      content: `Rozmawiajmy o zadaniu: **${task.content}**\n\n${aiSummary}\n\nO czym chcesz porozmawiać? Możesz zapytać o szczegóły, podzielić się swoimi pomysłami, lub zasięgnąć rady jak do tego podejść.`,
+      content: `Rozmawiajmy o zadaniu:  **${task.content}**\n\n${aiSummary}\n\nO czym chcesz porozmawiać?  Możesz zapytać o szczegóły, podzielić się swoimi pomysłami, lub zasięgnąć rady jak do tego podejść. `,
       timestamp: new Date().toISOString()
     }
     setMessages([welcomeMsg])
@@ -365,13 +363,13 @@ ${conversationHistory}
 
 Nowa wiadomość:  "${currentInput}"
 
-Prowadź naturalną rozmowę o tym zadaniu. Możesz:
+Prowadź naturalną rozmowę o tym zadaniu. Możesz: 
 - Odpowiadać na pytania
 - Sugerować różne podejścia
 - Dopytywać o szczegóły
 - Doradzać jak podejść do zadania
 
-Bądź konkretny, wspierający i naturalny. Odpowiedz w 2-4 zdaniach.`
+Bądź konkretny, wspierający i naturalny.  Odpowiedz w 2-4 zdaniach.`
 
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
@@ -408,21 +406,10 @@ Bądź konkretny, wspierający i naturalny. Odpowiedz w 2-4 zdaniach.`
     setViewMode('subtasks')
     
     try {
-      const prompt = `Jesteś asystentem AI wspierającym osoby z ADHD. 
-
-Zadanie: "${task. content}"
-${task.description ?  `Opis: "${task.description}"` : ''}
-
-Twoje zrozumienie: ${aiSummary}
-
-Wygeneruj plan działania z 4-7 subtaskami, estymacją czasu, schedulingiem i tipami. 
-
-Zwróć JSON jak wcześniej. `
-
       const res = await fetch('/api/ai/breakdown-task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body:  JSON.stringify({
           taskContent: task.content,
           taskDescription: task.description
         })
@@ -438,15 +425,15 @@ Zwróć JSON jak wcześniej. `
           title: st.title,
           description: st.description,
           estimatedMinutes: st.estimatedMinutes || 30,
-          selected:  true
+          selected: true
         }))
         
         setSubtasks(generatedSubtasks)
         setTotalEstimation(data.totalEstimation)
-        setBestDayOfWeek(data. bestDayOfWeek)
+        setBestDayOfWeek(data.bestDayOfWeek)
         setBestTimeOfDay(data.bestTimeOfDay)
         setSchedulingReasoning(data.schedulingReasoning || '')
-        setTips(data. tips || [])
+        setTips(data.tips || [])
       }
     } catch (err) {
       console.error('Error generating:', err)
@@ -464,7 +451,7 @@ Zwróć JSON jak wcześniej. `
   
   // Create Subtasks in Todoist
   const handleCreateSubtasks = async () => {
-    const selectedSubtasks = subtasks.filter(st => st. selected)
+    const selectedSubtasks = subtasks.filter(st => st.selected)
     
     if (selectedSubtasks.length === 0) {
       alert('Wybierz przynajmniej jeden subtask')
@@ -474,9 +461,9 @@ Zwróć JSON jak wcześniej. `
     setIsCreatingSubtasks(true)
     
     try {
-      const todoist Subtasks = selectedSubtasks.map(st => ({
-        content: st.title,
-        description: st.description,
+      const todoistSubtasks = selectedSubtasks. map(st => ({
+        content: st. title,
+        description: st. description,
         duration: st.estimatedMinutes,
         duration_unit: 'minute' as const
       }))
@@ -490,10 +477,6 @@ Zwróć JSON jak wcześniej. `
       setIsCreatingSubtasks(false)
     }
   }
-  
-  if (! open) return null
-
-    // ...  (poprzedni kod z części 1)
   
   const selectedSubtasksCount = subtasks.filter(st => st.selected).length
   
@@ -556,7 +539,7 @@ Zwróć JSON jak wcześniej. `
               {viewMode === 'init' && (
                 <div className="p-6 space-y-6">
                   {/* AI Summary Card */}
-                  {isLoadingSummary ?  (
+                  {isLoadingSummary ? (
                     <div className="p-6 border border-purple-200 rounded-xl bg-gradient-to-br from-purple-50 to-pink-50">
                       <div className="flex items-center gap-3">
                         <motion.div
@@ -650,16 +633,16 @@ Zwróć JSON jak wcześniej. `
               {/* QUESTIONS VIEW */}
               {viewMode === 'questions' && (
                 <div className="p-6 space-y-4">
-                  {isLoadingQuestions && clarifyQuestions.length === 0 ? (
+                  {isLoadingQuestions && clarifyQuestions.length === 0 ?  (
                     <div className="flex flex-col items-center justify-center py-12">
                       <motion.div
                         animate={{ rotate: 360 }}
-                        transition={{ duration: 2, repeat: Infinity, ease:  "linear" }}
+                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
                         className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center mb-4"
                       >
                         <Sparkle size={32} className="text-purple-600" weight="duotone" />
                       </motion.div>
-                      <h3 className="font-semibold text-lg">Przygotowuję pytania...</h3>
+                      <h3 className="font-semibold text-lg">Przygotowuję pytania... </h3>
                       <p className="text-sm text-gray-600">AI analizuje zadanie</p>
                     </div>
                   ) : (
@@ -695,7 +678,7 @@ Zwróć JSON jak wcześniej. `
                               animate={{ opacity:  1, x: 0 }}
                               transition={{ delay:  idx * 0.1 }}
                             >
-                              {isAnswered ?  (
+                              {isAnswered ? (
                                 // Answered Question
                                 <div className="bg-green-50/50 border-2 border-green-200 rounded-xl overflow-hidden">
                                   <button
@@ -743,7 +726,7 @@ Zwróć JSON jak wcześniej. `
                                           handleAnswerQuestion(textarea?. value || '')
                                         }}
                                         disabled={isLoadingQuestions}
-                                        className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition disabled: opacity-50 font-medium flex items-center justify-center gap-2"
+                                        className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition disabled:opacity-50 font-medium flex items-center justify-center gap-2"
                                       >
                                         {isLoadingQuestions ? (
                                           <motion.div
@@ -826,7 +809,7 @@ Zwróć JSON jak wcześniej. `
                       </div>
                       <button
                         onClick={() => setViewMode('init')}
-                        className="text-sm text-gray-600 hover: text-gray-900 flex items-center gap-2"
+                        className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-2"
                       >
                         <ArrowLeft size={16} />
                         Wróć
@@ -857,7 +840,7 @@ Zwróć JSON jak wcześniej. `
                           }`}>
                             <div className="text-sm whitespace-pre-wrap">
                               {msg.content. split('**').map((part, i) => 
-                                i % 2 === 0 ? part : <strong key={i}>{part}</strong>
+                                i % 2 === 0 ?  part : <strong key={i}>{part}</strong>
                               )}
                             </div>
                           </div>
@@ -882,11 +865,11 @@ Zwróć JSON jak wcześniej. `
                         </div>
                         <div className="bg-gray-100 p-3 rounded-xl">
                           <div className="flex gap-1">
-                            {[0, 1, 2]. map(i => (
+                            {[0, 1, 2].map(i => (
                               <motion.div
                                 key={i}
                                 className="w-2 h-2 rounded-full bg-purple-600"
-                                animate={{ y: [0, -8, 0], opacity: [0. 4, 1, 0.4] }}
+                                animate={{ y: [0, -8, 0], opacity: [0.4, 1, 0.4] }}
                                 transition={{ duration: 1, repeat: Infinity, delay: i * 0.15 }}
                               />
                             ))}
@@ -938,14 +921,14 @@ Zwróć JSON jak wcześniej. `
                 </div>
               )}
               
-                            {/* SUBTASKS VIEW */}
+              {/* SUBTASKS VIEW */}
               {viewMode === 'subtasks' && (
                 <div className="p-6 space-y-5">
                   {isLoadingQuestions ?  (
                     <div className="flex flex-col items-center justify-center py-16">
                       <motion.div
                         animate={{ rotate: 360 }}
-                        transition={{ duration: 2, repeat: Infinity, ease:  "linear" }}
+                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
                         className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center mb-6"
                       >
                         <Sparkle size={40} className="text-purple-600" weight="duotone" />
@@ -1033,7 +1016,6 @@ Zwróć JSON jak wcześniej. `
                               {/* Quick Schedule Button */}
                               <button
                                 onClick={() => {
-                                  // TODO: Implement auto-scheduling
                                   alert('Auto-scheduling będzie wkrótce dostępne!')
                                 }}
                                 className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-700 hover:to-pink-700 transition font-semibold shadow-lg flex items-center justify-center gap-2"
@@ -1062,7 +1044,7 @@ Zwróć JSON jak wcześniej. `
                               {tips.map((tip, idx) => (
                                 <motion.li
                                   key={idx}
-                                  initial={{ opacity:  0, x: -10 }}
+                                  initial={{ opacity: 0, x:  -10 }}
                                   animate={{ opacity: 1, x: 0 }}
                                   transition={{ delay: idx * 0.1 }}
                                   className="flex items-start gap-2 text-sm text-gray-700"
@@ -1073,7 +1055,7 @@ Zwróć JSON jak wcześniej. `
                               ))}
                             </ul>
                           </div>
-                        </motion. div>
+                        </motion.div>
                       )}
                       
                       {/* Subtasks Header */}
@@ -1085,18 +1067,18 @@ Zwróć JSON jak wcześniej. `
                         {totalEstimation && (
                           <div className="px-3 py-1 bg-gray-100 text-gray-900 rounded-lg text-sm font-medium flex items-center gap-1">
                             <Clock size={14} />
-                            Łącznie: ~{Math.floor(totalEstimation / 60)}h {totalEstimation % 60}min
+                            Łącznie:  ~{Math.floor(totalEstimation / 60)}h {totalEstimation % 60}min
                           </div>
                         )}
                       </div>
                       
                       {/* Subtasks List */}
                       <div className="space-y-3">
-                        {subtasks. map((subtask, idx) => (
+                        {subtasks.map((subtask, idx) => (
                           <motion.div
                             key={subtask.id}
-                            initial={{ opacity: 0, y:  20 }}
-                            animate={{ opacity: 1, y:  0 }}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: idx * 0.05 }}
                           >
                             <div className={`border-2 rounded-xl p-4 transition-all ${
@@ -1171,13 +1153,13 @@ Zwróć JSON jak wcześniej. `
                         <button
                           onClick={handleCreateSubtasks}
                           disabled={selectedSubtasksCount === 0 || isCreatingSubtasks}
-                          className="flex-1 px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-700 hover:to-pink-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-lg flex items-center justify-center gap-2"
+                          className="flex-1 px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover: from-purple-700 hover: to-pink-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-lg flex items-center justify-center gap-2"
                         >
                           {isCreatingSubtasks ? (
                             <>
                               <motion.div
                                 animate={{ rotate: 360 }}
-                                transition={{ duration: 1, repeat: Infinity, ease:  "linear" }}
+                                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                               >
                                 <Sparkle size={18} />
                               </motion.div>
@@ -1213,4 +1195,3 @@ Zwróć JSON jak wcześniej. `
     </AnimatePresence>
   )
 }
-
