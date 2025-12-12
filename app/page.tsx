@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { MainLayout } from '@/components/layout/MainLayout'
+import MainLayout from '@/components/layout/MainLayout'
 
 export default function Home() {
   useEffect(() => {
@@ -15,7 +15,7 @@ export default function Home() {
       
       // Wyczyść URL (usuń token z adresu)
       const newUrl = window.location.origin + window.location.pathname
-      window.history.replaceState({}, '', newUrl)
+      window.history. replaceState({}, '', newUrl)
       
       // Odśwież stronę żeby załadować nowy layout
       window.location.reload()
