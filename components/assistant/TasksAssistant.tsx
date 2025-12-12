@@ -15,10 +15,10 @@ import { SevenDaysBoardView } from './SevenDaysBoardView'
 interface Task {
   id: string
   content: string
-  description?: string
+  description?:  string
   project_id?:  string
-  priority: 1 | 2 | 3 | 4
-  due?: { date: string } | string
+  priority:  1 | 2 | 3 | 4
+  due?:  { date: string } | string
   completed?: boolean
   created_at?: string
   subtasks?: any[]
@@ -52,7 +52,7 @@ export function TasksAssistant() {
   
   // Fetch tasks
   useEffect(() => {
-    if (!token) return
+    if (! token) return
     fetchTasks()
     
     // Poll every 45 seconds
@@ -72,21 +72,32 @@ export function TasksAssistant() {
   const fetchTasks = async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/todoist/tasks? token=${token}`)
+      console.log('🔍 Fetching tasks with token:', token ?  'EXISTS' : 'MISSING')
+      
+      const res = await fetch(`/api/todoist/tasks?token=${token}`)
+      
+      console.log('📡 Response status:', res.status)
+      
       if (!res.ok) throw new Error('Failed to fetch tasks')
       
-      const data = await res.json()
+      const data = await res. json()
+      console.log('📦 Raw data from API:', data)
+      
       const fetchedTasks = data.tasks || data || []
+      console.log('📋 Fetched tasks count:', fetchedTasks.length)
       
       // Map tasks with parsed due dates
       const mapped = fetchedTasks.map((t: any) => ({
         ...t,
-        _dueYmd: typeof t.due === 'string' ? t.due : t.due?. date || null
+        _dueYmd: typeof t.due === 'string' ? t.due : t.due?.date || null
       }))
+      
+      console.log('✅ Mapped tasks:', mapped)
+      console.log('🎯 First task example:', mapped[0])
       
       setTasks(mapped)
     } catch (err) {
-      console.error('Error fetching tasks:', err)
+      console.error('❌ Error fetching tasks:', err)
     } finally {
       setLoading(false)
     }
@@ -106,44 +117,83 @@ export function TasksAssistant() {
   
   // Filter tasks by date
   const filterTasks = (tasks: Task[], filterType: FilterType) => {
+    console.log('🔍 FILTER DEBUG:', {
+      totalTasks: tasks.length,
+      filterType,
+      tasks:  tasks.map(t => ({
+        id: t.id,
+        content: t.content,
+        due: t.due,
+        completed: t.completed
+      }))
+    })
+    
     const now = startOfDay(new Date())
     
-    return tasks.filter(task => {
-      if (task.completed) return false
+    const filtered = tasks.filter(task => {
+      if (task.completed) {
+        console.log('⏭️ Skipping completed task:', task.content)
+        return false
+      }
       
       const dueStr = typeof task.due === 'string' ? task.due : task.due?.date
       
       if (filterType === 'all') return true
       
-      if (! dueStr) return false // No due date
+      if (! dueStr) {
+        console.log('⏭️ Skipping task without due date:', task.content)
+        return false
+      }
       
       try {
         const dueDate = startOfDay(parseISO(dueStr))
         
+        console.log('📅 Checking task:', {
+          content:  task.content,
+          dueStr,
+          dueDate,
+          now,
+          filterType
+        })
+        
         switch (filterType) {
           case 'today':
-            return isSameDay(dueDate, now)
+            const isToday = isSameDay(dueDate, now)
+            console.log('  → isToday:', isToday)
+            return isToday
           case 'tomorrow':
-            return isSameDay(dueDate, addDays(now, 1))
-          case 'week': 
-            return isWithinInterval(dueDate, { 
-              start: now, 
+            const isTomorrow = isSameDay(dueDate, addDays(now, 1))
+            console.log('  → isTomorrow:', isTomorrow)
+            return isTomorrow
+          case 'week':  
+            const isInWeek = isWithinInterval(dueDate, { 
+              start:  now, 
               end: addDays(now, 6) 
             })
-          case 'month': 
-            return isWithinInterval(dueDate, { 
+            console. log('  → isInWeek:', isInWeek)
+            return isInWeek
+          case 'month':  
+            const isInMonth = isWithinInterval(dueDate, { 
               start: now, 
-              end:  addDays(now, 29) 
+              end: addDays(now, 29) 
             })
+            console.log('  → isInMonth:', isInMonth)
+            return isInMonth
           case 'overdue':
-            return isBefore(dueDate, now)
+            const isOverdue = isBefore(dueDate, now)
+            console.log('  → isOverdue:', isOverdue)
+            return isOverdue
           default:
             return true
         }
-      } catch {
+      } catch (err) {
+        console.error('❌ Error parsing date for task:', task.content, err)
         return false
       }
     })
+    
+    console.log('✅ Filtered tasks result:', filtered. length, filtered)
+    return filtered
   }
   
   // Filter by project
@@ -165,7 +215,7 @@ export function TasksAssistant() {
       
       // sortBy === 'date'
       const aDate = typeof a.due === 'string' ? a.due : a.due?.date
-      const bDate = typeof b.due === 'string' ? b.due : b. due?.date
+      const bDate = typeof b.due === 'string' ?  b.due : b.due?. date
       
       if (! aDate) return 1
       if (!bDate) return -1
@@ -179,9 +229,13 @@ export function TasksAssistant() {
   filteredTasks = filterByProject(filteredTasks)
   const sortedTasks = sortTasks(filteredTasks)
   
+  console.log('🎯 FINAL SORTED TASKS:', sortedTasks)
+  
   // Handlers
   const handleAddTask = async (taskData: any) => {
     try {
+      console.log('➕ Creating task:', taskData)
+      
       const res = await fetch('/api/todoist/add', {
         method: 'POST',
         headers: { 
@@ -199,11 +253,15 @@ export function TasksAssistant() {
       const data = await res.json()
       const newTask = data.task || data
       
+      console.log('✅ Task created:', newTask)
+      
       setTasks(prev => [newTask, ...prev])
       
-      console.log('✅ Zadanie utworzone!')
+      // Refresh tasks to get updated list
+      setTimeout(() => fetchTasks(), 500)
+      
     } catch (err:  any) {
-      console.error('Error creating task:', err)
+      console.error('❌ Error creating task:', err)
       alert('Nie udało się utworzyć zadania:  ' + (err?. message || ''))
     }
   }
@@ -220,7 +278,7 @@ export function TasksAssistant() {
       
       setTasks(prev => prev.filter(t => t.id !== taskId))
       
-      console. log('✅ Zadanie ukończone!')
+      console.log('✅ Zadanie ukończone!')
     } catch (err) {
       console.error('Error completing task:', err)
       alert('Nie udało się ukończyć zadania')
@@ -232,7 +290,7 @@ export function TasksAssistant() {
       const res = await fetch('/api/todoist/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON. stringify({ id: taskId, token })
+        body: JSON.stringify({ id: taskId, token })
       })
       
       if (!res.ok) throw new Error('Failed to delete task')
@@ -246,11 +304,11 @@ export function TasksAssistant() {
     }
   }
   
-  const handleUpdate = async (taskId: string, updates: Partial<Task>) => {
+  const handleUpdate = async (taskId: string, updates:  Partial<Task>) => {
     try {
       const res = await fetch('/api/todoist/update', {
-        method:  'POST',
-        headers:  { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: taskId, token, ... updates })
       })
       
@@ -260,7 +318,7 @@ export function TasksAssistant() {
       const updatedTask = data.task || data
       
       setTasks(prev => prev.map(t => 
-        t.id === taskId ? { ...t, ...updatedTask } : t
+        t. id === taskId ? { ...t, ...updatedTask } : t
       ))
       
       console.log('💾 Zadanie zaktualizowane!')
@@ -306,7 +364,7 @@ export function TasksAssistant() {
       const clientId = process.env.NEXT_PUBLIC_TODOIST_CLIENT_ID
       const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
       const redirectUri = `${baseUrl}/api/todoist/callback`
-      const authUrl = `https://todoist.com/oauth/authorize?client_id=${clientId}&scope=data:read_write&state=mvp-chatv2`
+      const authUrl = `https://todoist.com/oauth/authorize? client_id=${clientId}&scope=data:read_write&state=mvp-chatv2`
       
       window.location.href = authUrl
     }
@@ -388,7 +446,7 @@ export function TasksAssistant() {
           <select 
             value={selectedProject} 
             onChange={(e) => setSelectedProject(e.target. value)}
-            className="px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple text-sm"
+            className="px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus: ring-brand-purple text-sm"
           >
             <option value="all">📁 Wszystkie projekty</option>
             {projects.map(p => (
@@ -397,7 +455,7 @@ export function TasksAssistant() {
           </select>
           
           <Badge variant="secondary" className="text-sm">
-            {sortedTasks.length} {sortedTasks.length === 1 ? 'zadanie' :  'zadań'}
+            {sortedTasks.length} {sortedTasks.length === 1 ? 'zadanie' : 'zadań'}
           </Badge>
           
           <Button 
