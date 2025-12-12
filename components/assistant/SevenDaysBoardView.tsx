@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { DndContext, closestCenter, DragEndEvent, DragOverlay, DragStartEvent } from '@dnd-kit/core'
+import { DndContext, closestCenter, DragEndEvent, DragOverlay, DragStartEvent, useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import Card from '@/components/ui/Card'
@@ -162,7 +162,7 @@ function DayColumnComponent({
   onAddForDate?:  (date: string) => void
   movingTaskId:  string | null
 }) {
-  const { setNodeRef, isOver } = useSortable({ id:  day.id })
+  const { setNodeRef, isOver } = useDroppable({ id:  day.id })
   
   const isToday = isSameDay(day.date, new Date())
   
