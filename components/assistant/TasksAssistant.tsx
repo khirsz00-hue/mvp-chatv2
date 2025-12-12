@@ -1,36 +1,34 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Card from '@/components/ui/Card'
-import Badge from '@/components/ui/Badge'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs'
-import { CalendarBlank, Clock } from '@phosphor-icons/react'
+import { Card } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { CalendarBlank, Clock, Plus } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { format, isToday, isTomorrow, isWithinInterval, addDays, parseISO, isPast, startOfDay } from 'date-fns'
 import { pl } from 'date-fns/locale'
+import { CreateTaskModal } from './CreateTaskModal'
 
 interface Task {
   id: string
   content: string
-  description?: string
-  project_id?: string
+  description?:  string
+  project_id?:  string
   priority: 1 | 2 | 3 | 4
-  due?: { date: string } | string
+  due?:  { date: string } | string
   completed?: boolean
-  created_at?: string
+  created_at?:  string
 }
 
 export function TasksAssistant() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(false)
   const [filter, setFilter] = useState('today')
-  const [token, setToken] = useState<string | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
   
-  useEffect(() => {
-    // Get token from localStorage on client-side only to avoid hydration mismatch
-    const storedToken = localStorage.getItem('todoist_token')
-    setToken(storedToken)
-  }, [])
+  const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
   
   useEffect(() => {
     if (!token) {
@@ -44,8 +42,7 @@ export function TasksAssistant() {
   const fetchTasks = async () => {
     setLoading(true)
     try {
-      // Fetch all tasks by passing filter=all (API will return unfiltered tasks)
-      const res = await fetch(`/api/todoist/tasks?token=${token}&filter=all`)
+      const res = await fetch(`/api/todoist/tasks? token=${token}`)
       if (!res.ok) throw new Error('Failed to fetch tasks')
       
       const data = await res.json()
@@ -72,7 +69,7 @@ export function TasksAssistant() {
         switch (filter) {
           case 'today':
             return isToday(dueDate)
-          case 'tomorrow':
+          case 'tomorrow': 
             return isTomorrow(dueDate)
           case 'week':
             return isWithinInterval(dueDate, { start: now, end: addDays(now, 7) })
@@ -89,16 +86,62 @@ export function TasksAssistant() {
     })
   }
   
+  const handleAddTask = async (taskData: any) => {
+    try {
+      const res = await fetch('/api/todoist/add', {
+        method: 'POST',
+        headers: { 
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(taskData)
+      })
+      
+      if (!res.ok) throw new Error('Failed to create task')
+      
+      const data = await res.json()
+      
+      // Dodaj do listy
+      setTasks(prev => [... prev, data. task || data])
+      
+      console.log('✅ Zadanie utworzone!')
+    } catch (err) {
+      console.error('Error creating task:', err)
+      alert('Nie udało się utworzyć zadania')
+    }
+  }
+  
   const filteredTasks = filterTasks(tasks)
   
-  if (!token) {
+  if (! token) {
+    const handleOAuthConnect = () => {
+      const clientId = process. env.NEXT_PUBLIC_TODOIST_CLIENT_ID
+      const baseUrl = typeof window !== 'undefined' ?  window.location.origin : ''
+      const redirectUri = `${baseUrl}/api/todoist/callback`
+      const authUrl = `https://todoist.com/oauth/authorize?client_id=${clientId}&scope=data:read_write&state=mvp-chatv2`
+      
+      window.location.href = authUrl
+    }
+    
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold">Zarządzanie Zadaniami</h1>
-        <Card className="p-8 text-center">
-          <p className="text-muted-foreground">
-            Zaloguj się do Todoist aby zobaczyć zadania
+        <Card className="p-8 text-center space-y-4">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-brand-purple/10 to-brand-pink/10 flex items-center justify-center mb-4">
+            <CalendarBlank size={32} className="text-brand-purple" />
+          </div>
+          <h2 className="text-xl font-semibold">Połącz się z Todoist</h2>
+          <p className="text-muted-foreground max-w-md mx-auto">
+            Aby zarządzać zadaniami, połącz swoje konto Todoist z aplikacją
           </p>
+          <Button 
+            onClick={handleOAuthConnect}
+            className="gap-2 mt-4"
+            size="lg"
+          >
+            <Plus size={20} />
+            Połącz z Todoist
+          </Button>
         </Card>
       </div>
     )
@@ -108,7 +151,16 @@ export function TasksAssistant() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Zarządzanie Zadaniami</h1>
-        <Badge variant="secondary">{tasks.length} zadań</Badge>
+        <div className="flex items-center gap-3">
+          <Badge variant="secondary">{tasks.length} zadań</Badge>
+          <Button 
+            onClick={() => setShowCreateModal(true)} 
+            className="gap-2"
+          >
+            <Plus size={20} />
+            Dodaj zadanie
+          </Button>
+        </div>
       </div>
       
       <Tabs value={filter} onValueChange={setFilter}>
@@ -141,6 +193,12 @@ export function TasksAssistant() {
           )}
         </TabsContent>
       </Tabs>
+      
+      <CreateTaskModal 
+        open={showCreateModal}
+        onOpenChange={setShowCreateModal}
+        onCreateTask={handleAddTask}
+      />
     </div>
   )
 }
