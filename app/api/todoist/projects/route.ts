@@ -9,6 +9,8 @@ export async function GET(req: Request) {
   }
 
   try {
+    console.log('🔍 Fetching projects from Todoist API')
+    
     const res = await fetch('https://api.todoist.com/rest/v2/projects', {
       headers: { Authorization: `Bearer ${token}` },
       cache: 'no-store',
@@ -16,10 +18,12 @@ export async function GET(req: Request) {
 
     if (!res.ok) {
       const err = await res.text()
+      console.error('❌ Błąd Todoist API:', err, 'Status:', res.status)
       return NextResponse.json({ error: `Błąd Todoist API: ${err}` }, { status: res.status })
     }
 
     const projects = await res.json()
+    console.log(`✅ Pobrano ${projects.length} projektów z Todoist`)
 
     const simplified = projects.map((p: any) => ({
       id: p.id,
@@ -27,8 +31,8 @@ export async function GET(req: Request) {
     }))
 
     return NextResponse.json({ projects: simplified })
-  } catch (error) {
-    console.error('❌ Błąd /api/todoist/projects:', error)
+  } catch (error: any) {
+    console.error('❌ Błąd /api/todoist/projects:', error?.message || error)
     return NextResponse.json({ error: 'Nie udało się pobrać projektów' }, { status: 500 })
   }
 }

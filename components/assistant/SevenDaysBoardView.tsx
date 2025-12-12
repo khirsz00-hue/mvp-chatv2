@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { DndContext, closestCenter, DragEndEvent, DragOverlay, DragStartEvent } from '@dnd-kit/core'
+import { DndContext, closestCenter, DragEndEvent, DragOverlay, DragStartEvent, useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import Card from '@/components/ui/Card'
@@ -13,14 +13,14 @@ import { pl } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 
 interface Task {
-  id:  string
+  id: string
   content: string
-  description?:  string
-  project_id?:  string
-  priority:  1 | 2 | 3 | 4
-  due?:  { date: string } | string
+  description?: string
+  project_id?: string
+  priority: 1 | 2 | 3 | 4
+  due?: { date: string } | string
   completed?: boolean
-  created_at?:  string
+  created_at?: string
 }
 
 interface SevenDaysBoardViewProps {
@@ -29,7 +29,7 @@ interface SevenDaysBoardViewProps {
   onComplete: (taskId: string) => Promise<void>
   onDelete: (taskId: string) => Promise<void>
   onDetails: (task: Task) => void
-  onAddForDate?:  (date: string) => void
+  onAddForDate?: (date: string) => void
 }
 
 interface DayColumn {
@@ -101,7 +101,7 @@ export function SevenDaysBoardView({
     
     // Don't move if already in this column
     const task = tasks.find(t => t.id === taskId)
-    const currentDueStr = task?.due ?  (typeof task.due === 'string' ? task.due : task. due.date) : null
+    const currentDueStr = task?.due ? (typeof task.due === 'string' ? task.due : task.due.date) : null
     if (currentDueStr === newDateStr) return
     
     setMovingTaskId(taskId)
@@ -122,7 +122,7 @@ export function SevenDaysBoardView({
       onDragEnd={handleDragEnd}
     >
       <div className="flex gap-4 overflow-x-auto pb-4">
-        {days. map(day => (
+        {days.map(day => (
           <DayColumnComponent
             key={day.id}
             day={day}
@@ -136,7 +136,7 @@ export function SevenDaysBoardView({
       </div>
 
       <DragOverlay>
-        {activeTask ?  (
+        {activeTask ? (
           <div className="opacity-80">
             <MiniTaskCard task={activeTask} />
           </div>
@@ -157,12 +157,12 @@ function DayColumnComponent({
 }: {
   day: DayColumn
   onComplete: (id: string) => Promise<void>
-  onDelete: (id:  string) => Promise<void>
+  onDelete: (id: string) => Promise<void>
   onDetails: (task: Task) => void
-  onAddForDate?:  (date: string) => void
-  movingTaskId:  string | null
+  onAddForDate?: (date: string) => void
+  movingTaskId: string | null
 }) {
-  const { setNodeRef, isOver } = useSortable({ id:  day.id })
+  const { setNodeRef, isOver } = useDroppable({ id: day.id })
   
   const isToday = isSameDay(day.date, new Date())
   
@@ -171,7 +171,7 @@ function DayColumnComponent({
       ref={setNodeRef}
       className={cn(
         'flex-shrink-0 w-80 bg-white rounded-xl border-2 shadow-sm transition-all',
-        isOver ?  'border-brand-purple bg-brand-purple/5 shadow-lg' : 'border-gray-200',
+        isOver ? 'border-brand-purple bg-brand-purple/5 shadow-lg' : 'border-gray-200',
         isToday && 'border-brand-pink shadow-md'
       )}
     >
@@ -251,7 +251,7 @@ function SortableTaskCard({
 }: {
   task: Task
   onComplete: (id: string) => Promise<void>
-  onDelete:  (id: string) => Promise<void>
+  onDelete: (id: string) => Promise<void>
   onDetails: (task: Task) => void
   isMoving: boolean
 }) {
@@ -299,7 +299,7 @@ function MiniTaskCard({
   onDetails
 }: {
   task: Task
-  onComplete?:  (id: string) => Promise<void>
+  onComplete?: (id: string) => Promise<void>
   onDelete?: (id: string) => Promise<void>
   onDetails?: (task: Task) => void
 }) {
@@ -321,7 +321,7 @@ function MiniTaskCard({
 
   const handleComplete = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (! onComplete) return
+    if (!onComplete) return
 
     setLoading(true)
     try {
@@ -334,7 +334,7 @@ function MiniTaskCard({
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation()
     if (!onDelete) return
-    if (! confirm('Usunąć zadanie?')) return
+    if (!confirm('Usunąć zadanie?')) return
 
     setLoading(true)
     try {
@@ -355,7 +355,7 @@ function MiniTaskCard({
     >
       <div className="space-y-2">
         <h4 className="font-medium text-sm line-clamp-2 group-hover:text-brand-purple transition-colors">
-          {task. content}
+          {task.content}
         </h4>
 
         {task.description && (
@@ -367,7 +367,7 @@ function MiniTaskCard({
         <div className="flex items-center justify-between">
           {task.priority < 4 && (
             <Badge variant={task.priority === 1 ? 'destructive' : 'secondary'} className="text-xs">
-              {priorityLabels[task. priority]}
+              {priorityLabels[task.priority]}
             </Badge>
           )}
 

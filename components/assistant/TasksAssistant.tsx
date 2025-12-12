@@ -5,6 +5,7 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Card from '@/components/ui/Card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs'
+import { useToast } from '@/components/ui/Toast'
 import { Plus, List, Kanban, CalendarBlank, SortAscending, Timer as TimerIcon } from '@phosphor-icons/react'
 import { startOfDay, addDays, parseISO, isSameDay, isBefore, isWithinInterval } from 'date-fns'
 import { CreateTaskModal } from './CreateTaskModal'
@@ -40,6 +41,7 @@ type ViewType = 'list' | 'board'
 type SortType = 'date' | 'priority' | 'name'
 
 export function TasksAssistant() {
+  const { showToast } = useToast()
   const [tasks, setTasks] = useState<Task[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(false)
@@ -109,13 +111,16 @@ export function TasksAssistant() {
   
   const fetchProjects = async () => {
     try {
-      const res = await fetch(`/api/todoist/projects? token=${token}`)
+      const res = await fetch(`/api/todoist/projects?token=${token}`)
       if (res.ok) {
         const data = await res.json()
         setProjects(data.projects || data || [])
+      } else {
+        showToast('Nie udało się pobrać projektów z Todoist', 'error')
       }
     } catch (err) {
       console.error('Error fetching projects:', err)
+      showToast('Błąd przy pobieraniu projektów', 'error')
     }
   }
   
@@ -251,7 +256,7 @@ export function TasksAssistant() {
       
       if (!res.ok) {
         const error = await res.json().catch(() => ({}))
-        throw new Error(error?. error || 'Failed to create task')
+        throw new Error(error?.error || 'Failed to create task')
       }
       
       const data = await res.json()
@@ -260,13 +265,14 @@ export function TasksAssistant() {
       console.log('✅ Task created:', newTask)
       
       setTasks(prev => [newTask, ...prev])
+      showToast('Zadanie zostało utworzone', 'success')
       
       // Refresh tasks to get updated list
       setTimeout(() => fetchTasks(), 500)
       
-    } catch (err:  any) {
+    } catch (err: any) {
       console.error('❌ Error creating task:', err)
-      alert('Nie udało się utworzyć zadania:  ' + (err?. message || ''))
+      showToast('Nie udało się utworzyć zadania: ' + (err?.message || ''), 'error')
     }
   }
   
@@ -275,17 +281,18 @@ export function TasksAssistant() {
       const res = await fetch('/api/todoist/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON. stringify({ id: taskId, token })
+        body: JSON.stringify({ id: taskId, token })
       })
       
       if (!res.ok) throw new Error('Failed to complete task')
       
       setTasks(prev => prev.filter(t => t.id !== taskId))
+      showToast('Zadanie ukończone!', 'success')
       
       console.log('✅ Zadanie ukończone!')
     } catch (err) {
       console.error('Error completing task:', err)
-      alert('Nie udało się ukończyć zadania')
+      showToast('Nie udało się ukończyć zadania', 'error')
     }
   }
   
@@ -300,20 +307,21 @@ export function TasksAssistant() {
       if (!res.ok) throw new Error('Failed to delete task')
       
       setTasks(prev => prev.filter(t => t.id !== taskId))
+      showToast('Zadanie usunięte', 'success')
       
       console.log('🗑️ Zadanie usunięte!')
     } catch (err) {
       console.error('Error deleting task:', err)
-      alert('Nie udało się usunąć zadania')
+      showToast('Nie udało się usunąć zadania', 'error')
     }
   }
   
-  const handleUpdate = async (taskId: string, updates:  Partial<Task>) => {
+  const handleUpdate = async (taskId: string, updates: Partial<Task>, showToastMsg: boolean = true) => {
     try {
       const res = await fetch('/api/todoist/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: taskId, token, ... updates })
+        body: JSON.stringify({ id: taskId, token, ...updates })
       })
       
       if (!res.ok) throw new Error('Failed to update task')
@@ -322,21 +330,30 @@ export function TasksAssistant() {
       const updatedTask = data.task || data
       
       setTasks(prev => prev.map(t => 
-        t. id === taskId ? { ...t, ...updatedTask } : t
+        t.id === taskId ? { ...t, ...updatedTask } : t
       ))
+      
+      if (showToastMsg) {
+        showToast('Zadanie zaktualizowane', 'success')
+      }
       
       console.log('💾 Zadanie zaktualizowane!')
     } catch (err) {
       console.error('Error updating task:', err)
-      alert('Nie udało się zaktualizować zadania')
+      if (showToastMsg) {
+        showToast('Nie udało się zaktualizować zadania', 'error')
+      }
+      throw err
     }
   }
   
   const handleMove = async (taskId: string, newDate: string) => {
     try {
-      await handleUpdate(taskId, { due:  newDate })
+      await handleUpdate(taskId, { due: newDate }, false)
+      showToast('Zadanie przeniesione', 'success')
     } catch (err) {
       console.error('Error moving task:', err)
+      showToast('Nie udało się przenieść zadania', 'error')
       throw err
     }
   }
@@ -354,10 +371,12 @@ export function TasksAssistant() {
       }
       
       await handleAddTask(taskData)
+      showToast('Zadanie zduplikowane', 'success')
       
       console.log('📋 Zadanie zduplikowane!')
     } catch (err) {
       console.error('Error duplicating task:', err)
+      showToast('Nie udało się zduplikować zadania', 'error')
       throw err
     }
   }
