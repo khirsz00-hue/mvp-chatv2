@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import Card from '@/components/ui/Card'
+import Badge from '@/components/ui/Badge'
+import Button from '@/components/ui/Button'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs'
 import { CalendarBlank, Clock, Plus } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
-import { format, isToday, isTomorrow, isWithinInterval, addDays, parseISO, isPast, startOfDay } from 'date-fns'
+import { format, isToday, isTomorrow, isWithinInterval, addDays, parseISO, isPast } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { CreateTaskModal } from './CreateTaskModal'
 
@@ -16,7 +16,7 @@ interface Task {
   content: string
   description?:  string
   project_id?:  string
-  priority: 1 | 2 | 3 | 4
+  priority:  1 | 2 | 3 | 4
   due?:  { date: string } | string
   completed?: boolean
   created_at?:  string
@@ -31,7 +31,7 @@ export function TasksAssistant() {
   const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
   
   useEffect(() => {
-    if (!token) {
+    if (! token) {
       console.log('No Todoist token found')
       return
     }
@@ -46,7 +46,7 @@ export function TasksAssistant() {
       if (!res.ok) throw new Error('Failed to fetch tasks')
       
       const data = await res.json()
-      setTasks(data.tasks || data || [])
+      setTasks(data. tasks || data || [])
     } catch (err) {
       console.error('Error fetching tasks:', err)
     } finally {
@@ -69,11 +69,11 @@ export function TasksAssistant() {
         switch (filter) {
           case 'today':
             return isToday(dueDate)
-          case 'tomorrow': 
+          case 'tomorrow':
             return isTomorrow(dueDate)
           case 'week':
             return isWithinInterval(dueDate, { start: now, end: addDays(now, 7) })
-          case 'month':
+          case 'month': 
             return isWithinInterval(dueDate, { start: now, end: addDays(now, 30) })
           case 'overdue':
             return isPast(dueDate) && !isToday(dueDate)
@@ -91,7 +91,7 @@ export function TasksAssistant() {
       const res = await fetch('/api/todoist/add', {
         method: 'POST',
         headers: { 
-          'Content-Type':  'application/json',
+          'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(taskData)
@@ -102,7 +102,7 @@ export function TasksAssistant() {
       const data = await res.json()
       
       // Dodaj do listy
-      setTasks(prev => [... prev, data. task || data])
+      setTasks(prev => [... prev, data.task || data])
       
       console.log('✅ Zadanie utworzone!')
     } catch (err) {
@@ -115,8 +115,8 @@ export function TasksAssistant() {
   
   if (! token) {
     const handleOAuthConnect = () => {
-      const clientId = process. env.NEXT_PUBLIC_TODOIST_CLIENT_ID
-      const baseUrl = typeof window !== 'undefined' ?  window.location.origin : ''
+      const clientId = process.env.NEXT_PUBLIC_TODOIST_CLIENT_ID
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
       const redirectUri = `${baseUrl}/api/todoist/callback`
       const authUrl = `https://todoist.com/oauth/authorize?client_id=${clientId}&scope=data:read_write&state=mvp-chatv2`
       
