@@ -1,5 +1,14 @@
 import { NextResponse } from 'next/server'
 
+interface TodoistUpdatePayload {
+  content?: string
+  description?: string
+  priority?: number
+  project_id?: string
+  labels?: string[]
+  due_string?: string
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json()
@@ -10,7 +19,7 @@ export async function POST(req: Request) {
     }
 
     // Build update payload for Todoist API
-    const updatePayload: any = {}
+    const updatePayload: TodoistUpdatePayload = {}
     
     if (updates.content !== undefined) updatePayload.content = updates.content
     if (updates.description !== undefined) updatePayload.description = updates.description

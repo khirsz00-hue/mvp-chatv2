@@ -157,12 +157,12 @@ function DayColumnComponent({
 }: {
   day: DayColumn
   onComplete: (id: string) => Promise<void>
-  onDelete: (id:  string) => Promise<void>
+  onDelete: (id: string) => Promise<void>
   onDetails: (task: Task) => void
-  onAddForDate?:  (date: string) => void
-  movingTaskId:  string | null
+  onAddForDate?: (date: string) => void
+  movingTaskId: string | null
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id:  day.id })
+  const { setNodeRef, isOver } = useDroppable({ id: day.id })
   
   const isToday = isSameDay(day.date, new Date())
   
@@ -251,7 +251,7 @@ function SortableTaskCard({
 }: {
   task: Task
   onComplete: (id: string) => Promise<void>
-  onDelete:  (id: string) => Promise<void>
+  onDelete: (id: string) => Promise<void>
   onDetails: (task: Task) => void
   isMoving: boolean
 }) {
@@ -299,7 +299,7 @@ function MiniTaskCard({
   onDetails
 }: {
   task: Task
-  onComplete?:  (id: string) => Promise<void>
+  onComplete?: (id: string) => Promise<void>
   onDelete?: (id: string) => Promise<void>
   onDetails?: (task: Task) => void
 }) {

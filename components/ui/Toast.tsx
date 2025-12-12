@@ -31,7 +31,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
 
   const showToast = (message: string, type: ToastType = 'info', duration: number = 3000) => {
-    const id = Math.random().toString(36).substring(7)
+    const id = `toast-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
     const newToast: Toast = { id, message, type, duration }
     
     setToasts(prev => [...prev, newToast])
