@@ -2,76 +2,201 @@
 @tailwind components;
 @tailwind utilities;
 
-/* === Global overrides / resets (keep these before custom styles) === */
-/* Ensure body uses tailwind defaults */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+/* === Global overrides / resets === */
 html, body, #__next {
   height: 100%;
 }
 
 body {
-  @apply bg-gray-50 text-gray-800 antialiased;
+  @apply bg-gradient-to-br from-gray-50 via-white to-gray-50 text-gray-900 antialiased;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
 }
 
-/* FILTER BAR - nowy, prosty, elegancki */
+* {
+  @apply scroll-smooth;
+}
+
+/* === Selection styling === */
+::selection {
+  @apply bg-brand-200 text-brand-900;
+}
+
+/* === Modern Button Styles === */
+.btn {
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-200;
+  @apply focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500;
+  @apply disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-primary {
+  @apply bg-gradient-to-r from-brand-600 to-brand-700 text-white shadow-soft;
+  @apply hover:shadow-glow hover:from-brand-700 hover:to-brand-800;
+  @apply active:scale-[0.98];
+}
+
+.btn-secondary {
+  @apply bg-white text-gray-700 border border-gray-200 shadow-soft;
+  @apply hover:bg-gray-50 hover:border-gray-300 hover:shadow-soft-lg;
+  @apply active:scale-[0.98];
+}
+
+.btn-ghost {
+  @apply bg-transparent text-gray-600 hover:bg-gray-100 hover:text-gray-900;
+  @apply active:scale-[0.98];
+}
+
+/* === Filter Pills === */
 .filter-bar {
-  @apply inline-flex items-center gap-2 ml-3;
-}
-.filter-pill {
-  @apply px-3 py-1.5 rounded-full text-sm text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition;
-}
-.filter-pill--active {
-  @apply bg-blue-600 text-white shadow-sm;
+  @apply inline-flex items-center gap-2;
 }
 
-/* Week view / column niceties */
-.week-column {
-  @apply flex flex-col gap-2 rounded-xl p-3 border border-gray-200 shadow-sm min-w-0 w-full transition-all;
+.filter-pill {
+  @apply px-4 py-2 rounded-full text-sm font-medium text-gray-600 bg-white border border-gray-200;
+  @apply hover:bg-gray-50 hover:border-gray-300 hover:shadow-soft transition-all duration-200;
+  @apply active:scale-[0.96];
 }
+
+.filter-pill--active {
+  @apply bg-gradient-to-r from-brand-600 to-brand-700 text-white border-transparent shadow-glow;
+}
+
+/* === Week View === */
+.week-column {
+  @apply flex flex-col gap-3 rounded-2xl p-4 bg-white border border-gray-100 shadow-soft min-w-0 w-full;
+  @apply transition-all duration-200 hover:shadow-soft-lg;
+}
+
 @media (min-width: 768px) {
   .week-column {
-    @apply min-w-[260px];
+    @apply min-w-[280px];
   }
 }
+
 .week-column-header {
-  @apply text-sm font-semibold text-gray-700 border-b border-gray-100 pb-1 mb-2 flex items-center justify-between;
+  @apply text-sm font-semibold text-gray-700 border-b border-gray-100 pb-3 mb-3 flex items-center justify-between;
 }
+
 .week-column-tasks {
-  @apply flex flex-col gap-2;
+  @apply flex flex-col gap-3;
 }
+
 .week-day-today {
-  @apply text-blue-700 font-bold;
+  @apply text-brand-700 font-bold;
 }
 
-/* task card basic */
-.task-card-outer { @apply w-full; }
-.task-card-inner { @apply bg-white rounded-lg p-3 border border-gray-100 shadow-sm; }
+/* === Task Card === */
+.task-card-outer { 
+  @apply w-full;
+}
 
-/* small button styles used in TaskCard / interactions */
+.task-card-inner { 
+  @apply bg-white rounded-xl p-4 border border-gray-100 shadow-soft;
+  @apply transition-all duration-200 hover:shadow-soft-lg hover:border-gray-200;
+}
+
+/* === Task Actions === */
 .task-action {
-  @apply inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm transition;
+  @apply inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200;
+  @apply active:scale-[0.96];
 }
-.task-action.postpone { @apply bg-blue-50 text-blue-700; }
-.task-action.complete { @apply bg-green-50 text-green-700; }
-.task-action.delete { @apply bg-red-50 text-red-700; }
-.task-action.help { @apply bg-violet-600 text-white; }
 
-/* UI polish */
-.toast { @apply fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] bg-gray-900 text-white text-sm px-4 py-2 rounded-lg shadow-lg; }
-
-/* re-enable dragging helpers */
-.dragging-active { user-select: none !important; -webkit-user-select: none !important; }
-.react-beautiful-dnd-placeholder { min-height: 20px; }
-
-/* Task action pills (jeśli jeszcze nie ma) */
-.task-action {
-  @apply inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm transition;
+.task-action.postpone { 
+  @apply bg-blue-50 text-blue-700 hover:bg-blue-100 hover:shadow-soft;
 }
-.task-action.postpone { @apply bg-blue-50 text-blue-700; }
-.task-action.complete { @apply bg-green-50 text-green-700; }
-.task-action.delete { @apply bg-red-50 text-red-700; }
-.task-action.help { @apply bg-violet-600 text-white; }
 
-/* filter pills */
-.filter-bar { @apply inline-flex items-center gap-2; }
-.filter-pill { @apply px-3 py-1.5 rounded-full text-sm text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition; }
-.filter-pill--active { @apply bg-blue-600 text-white shadow-sm; }
+.task-action.complete { 
+  @apply bg-success-50 text-success-700 hover:bg-success-100 hover:shadow-soft;
+}
+
+.task-action.delete { 
+  @apply bg-red-50 text-red-700 hover:bg-red-100 hover:shadow-soft;
+}
+
+.task-action.help { 
+  @apply bg-gradient-to-r from-brand-600 to-brand-700 text-white shadow-soft;
+  @apply hover:shadow-glow hover:from-brand-700 hover:to-brand-800;
+}
+
+/* === Toast Notifications === */
+.toast { 
+  @apply fixed bottom-8 left-1/2 -translate-x-1/2 z-[9999];
+  @apply bg-gray-900 text-white text-sm px-5 py-3 rounded-xl shadow-glow-lg;
+  @apply animate-slide-in-up;
+}
+
+/* === Drag & Drop === */
+.dragging-active { 
+  user-select: none !important; 
+  -webkit-user-select: none !important; 
+}
+
+.react-beautiful-dnd-placeholder { 
+  min-height: 20px; 
+}
+
+/* === Input Fields === */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="date"],
+textarea,
+select {
+  @apply px-4 py-2.5 rounded-xl border border-gray-200 bg-white;
+  @apply focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent;
+  @apply transition-all duration-200;
+  @apply placeholder:text-gray-400;
+}
+
+input[type="checkbox"] {
+  @apply w-4 h-4 rounded border-gray-300 text-brand-600;
+  @apply focus:ring-2 focus:ring-brand-500 focus:ring-offset-0;
+  @apply transition-all duration-200;
+}
+
+/* === Scrollbar Styling === */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-100 rounded-full;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 rounded-full hover:bg-gray-400;
+}
+
+/* === Card Styles === */
+.card {
+  @apply bg-white rounded-2xl border border-gray-100 shadow-soft;
+  @apply transition-all duration-200;
+}
+
+.card-hover {
+  @apply hover:shadow-soft-lg hover:border-gray-200;
+}
+
+/* === Badge Styles === */
+.badge {
+  @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium;
+}
+
+.badge-primary {
+  @apply bg-brand-100 text-brand-700;
+}
+
+.badge-success {
+  @apply bg-success-100 text-success-700;
+}
+
+.badge-warning {
+  @apply bg-yellow-100 text-yellow-700;
+}
+
+.badge-danger {
+  @apply bg-red-100 text-red-700;
+}
