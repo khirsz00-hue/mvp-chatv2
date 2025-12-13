@@ -67,7 +67,6 @@ export function TaskDetailsModal({
   const [isEditing, setIsEditing] = useState(false)
   const [loading, setLoading] = useState(false)
   const [projects, setProjects] = useState<Project[]>([])
-  const [notes, setNotes] = useState('')
   const [showAIBreakdown, setShowAIBreakdown] = useState(false)
   const [isCreatingSubtasks, setIsCreatingSubtasks] = useState(false)
   
@@ -106,10 +105,6 @@ export function TaskDetailsModal({
       setEditedPriority(task. priority || 4)
       setEditedProjectId(task.project_id || '')
       setEditedDuration(task.duration || 0)
-      
-      // Load notes from localStorage
-      const savedNotes = localStorage.getItem(`task_notes_${task.id}`)
-      setNotes(savedNotes || '')
     }
   }, [task])
   
@@ -143,13 +138,6 @@ export function TaskDetailsModal({
       
       await onUpdate(task.id, updates)
       
-      // Save notes locally
-      if (notes.trim()) {
-        localStorage.setItem(`task_notes_${task.id}`, notes)
-      } else {
-        localStorage.removeItem(`task_notes_${task.id}`)
-      }
-      
       setIsEditing(false)
     } catch (err) {
       console.error('Error updating task:', err)
@@ -165,7 +153,6 @@ export function TaskDetailsModal({
     setLoading(true)
     try {
       await onDelete(task.id)
-      localStorage.removeItem(`task_notes_${task.id}`)
       onOpenChange(false)
     } catch (err) {
       console.error('Error deleting task:', err)
@@ -245,7 +232,6 @@ export function TaskDetailsModal({
   const handleStartTimer = () => {
     if (task) {
       startTimer(task.id, task.content)
-      // Show confirmation
       alert('Timer started!')
     }
   }
@@ -275,21 +261,22 @@ export function TaskDetailsModal({
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-start justify-between gap-4">
             {isEditing ? (
               <Input 
                 value={editedTitle}
-                onChange={(e) => setEditedTitle(e.target. value)}
-                className="text-xl font-semibold"
+                onChange={(e) => setEditedTitle(e.target.value)}
+                className="text-xl font-semibold flex-1"
                 disabled={loading}
+                placeholder="Tytuł zadania..."
               />
             ) : (
-              <DialogTitle className="text-2xl flex-1">{task.content}</DialogTitle>
+              <DialogTitle className="text-2xl flex-1 leading-tight">{task.content}</DialogTitle>
             )}
             
-            <div className="flex gap-2 flex-shrink-0">
+            <div className="flex gap-1 flex-shrink-0">
               {! isEditing ? (
                 <>
                   <Button 
@@ -320,7 +307,7 @@ export function TaskDetailsModal({
                 onClick={handleDelete}
                 disabled={loading}
                 title="Usuń"
-                className="text-red-600 hover:bg-red-50"
+                className="text-red-600 hover:bg-red-50 hover:text-red-700"
               >
                 <Trash size={18} />
               </Button>
@@ -328,77 +315,63 @@ export function TaskDetailsModal({
           </div>
         </DialogHeader>
         
-        <div className="space-y-6 py-4">
+        <div className="space-y-5 py-4">
           {/* Meta badges */}
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap items-center">
             {dueStr && (
-              <Badge variant="outline" className="gap-1">
-                <CalendarBlank size={14} />
+              <Badge variant="outline" className="gap-1.5 px-3 py-1.5">
+                <CalendarBlank size={16} />
                 {format(parseISO(dueStr), 'dd MMMM yyyy', { locale:  pl })}
               </Badge>
             )}
             
-            {task.priority && (
-              <Badge variant={task.priority === 1 ? 'destructive' : 'secondary'} className="gap-1">
-                <Flag size={14} />
-                P{task.priority} - {priorityLabels[task. priority]}
+            {task.priority && task.priority < 4 && (
+              <Badge variant={task.priority === 1 ? 'destructive' : 'secondary'} className="gap-1.5 px-3 py-1.5">
+                <Flag size={16} />
+                P{task.priority} - {priorityLabels[task.priority]}
               </Badge>
             )}
             
             {currentProject && (
-              <Badge variant="outline" className="gap-1">
-                <FolderOpen size={14} />
+              <Badge variant="outline" className="gap-1.5 px-3 py-1.5">
+                <FolderOpen size={16} />
                 {currentProject.name}
               </Badge>
             )}
             
             {task.duration && task.duration > 0 && (
-              <Badge variant="outline" className="gap-1">
-                <Clock size={14} />
+              <Badge variant="outline" className="gap-1.5 px-3 py-1.5">
+                <Clock size={16} />
                 {task.duration} min
               </Badge>
             )}
           </div>
           
-          <Separator />
+          {!isEditing && <Separator />}
           
-          {/* Grid Layout:  Left (Details) + Right (Actions) */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left: Details */}
-            <div className="lg:col-span-2 space-y-6">
+          {/* View Mode */}
+          {!isEditing && (
+            <>
               {/* Description */}
               <div>
-                <h3 className="font-semibold mb-2 flex items-center gap-2">
-                  <span>Opis</span>
-                  {isEditing && <span className="text-xs text-gray-500">(edycja)</span>}
-                </h3>
-                {isEditing ? (
-                  <Textarea 
-                    value={editedDescription}
-                    onChange={(e) => setEditedDescription(e. target.value)}
-                    rows={6}
-                    placeholder="Dodaj opis zadania..."
-                    disabled={loading}
-                  />
-                ) : (
-                  <p className="text-gray-600 whitespace-pre-wrap">
-                    {task.description || 'Brak opisu'}
-                  </p>
-                )}
+                <h3 className="font-semibold text-sm text-gray-500 uppercase tracking-wide mb-3">Opis</h3>
+                <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">
+                  {task.description || 'Brak opisu'}
+                </p>
               </div>
               
               {/* Subtasks */}
               {subtasksTotal > 0 && (
                 <div>
-                  <h3 className="font-semibold mb-2 flex items-center gap-2">
+                  <h3 className="font-semibold text-sm text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
                     <CheckSquare size={18} />
                     Podzadania ({subtasksCompleted}/{subtasksTotal})
                   </h3>
                   
                   {/* Progress bar */}
-                  <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
+                  <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4">
                     <div 
-                      className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                      className="bg-green-600 h-2.5 rounded-full transition-all duration-300"
                       style={{ width: `${subtasksProgress}%` }}
                     />
                   </div>
@@ -408,15 +381,15 @@ export function TaskDetailsModal({
                     {task.subtasks?.map(subtask => (
                       <div 
                         key={subtask.id}
-                        className="flex items-center gap-2 p-2 rounded hover:bg-gray-50"
+                        className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
                       >
                         <CheckCircle 
-                          size={18} 
+                          size={20} 
                           weight={subtask.completed ? 'fill' : 'regular'}
-                          className={subtask.completed ? 'text-green-600' : 'text-gray-400'}
+                          className={subtask.completed ? 'text-green-600 flex-shrink-0' : 'text-gray-400 flex-shrink-0'}
                         />
-                        <span className={subtask.completed ? 'line-through text-gray-500' : ''}>
-                          {subtask. content}
+                        <span className={subtask.completed ? 'line-through text-gray-500' : 'text-gray-700'}>
+                          {subtask.content}
                         </span>
                       </div>
                     ))}
@@ -424,62 +397,107 @@ export function TaskDetailsModal({
                 </div>
               )}
               
-              {/* Notes */}
-              <div>
-                <h3 className="font-semibold mb-2">Notatki (lokalne)</h3>
-                <Textarea 
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={4}
-                  placeholder="Dodaj prywatne notatki..."
+              <Separator />
+              
+              {/* AI & Timer Actions */}
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  onClick={() => setShowAIBreakdown(true)}
+                  variant="outline"
+                  className="gap-2"
                   disabled={loading}
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Notatki są zapisywane tylko lokalnie w przeglądarce
-                </p>
-              </div>
-            </div>
-            
-            {/* Right: Edit Fields (when editing) */}
-            {isEditing && (
-              <div className="space-y-4">
-                <h3 className="font-semibold">Edycja szczegółów</h3>
+                >
+                  <Brain size={18} weight="fill" />
+                  AI Breakdown
+                </Button>
                 
-                {/* Due Date */}
+                <Button 
+                  onClick={handleStartTimer}
+                  variant="outline"
+                  className="gap-2"
+                  disabled={loading}
+                >
+                  <Timer size={18} weight="fill" />
+                  Start Timer
+                </Button>
+              </div>
+            </>
+          )}
+          
+          {/* Edit Mode */}
+          {isEditing && (
+            <>
+              <Separator />
+              <div className="space-y-5">
+                <h3 className="font-semibold text-lg">Edycja zadania</h3>
+                
+                {/* Description */}
                 <div>
-                  <label className="block text-sm font-medium mb-1 flex items-center gap-1">
-                    <CalendarBlank size={16} />
-                    Data
-                  </label>
-                  <Input
-                    type="date"
-                    value={editedDueDate}
-                    onChange={(e) => setEditedDueDate(e.target.value)}
+                  <label className="block text-sm font-medium mb-2 text-gray-700">Opis</label>
+                  <Textarea 
+                    value={editedDescription}
+                    onChange={(e) => setEditedDescription(e.target.value)}
+                    rows={5}
+                    placeholder="Dodaj opis zadania..."
                     disabled={loading}
+                    className="resize-none"
                   />
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {/* Due Date */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-gray-700 flex items-center gap-1.5">
+                      <CalendarBlank size={16} />
+                      Data
+                    </label>
+                    <Input
+                      type="date"
+                      value={editedDueDate}
+                      onChange={(e) => setEditedDueDate(e.target.value)}
+                      disabled={loading}
+                    />
+                  </div>
+                  
+                  {/* Duration */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-gray-700 flex items-center gap-1.5">
+                      <Clock size={16} />
+                      Czas (min)
+                    </label>
+                    <Input
+                      type="number"
+                      value={editedDuration || ''}
+                      onChange={(e) => setEditedDuration(parseInt(e.target.value) || 0)}
+                      min="0"
+                      step="5"
+                      disabled={loading}
+                      placeholder="0"
+                    />
+                  </div>
                 </div>
                 
                 {/* Priority */}
                 <div>
-                  <label className="block text-sm font-medium mb-1 flex items-center gap-1">
+                  <label className="block text-sm font-medium mb-2 text-gray-700 flex items-center gap-1.5">
                     <Flag size={16} />
                     Priorytet
                   </label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-4 gap-2">
                     {[1, 2, 3, 4].map(p => (
                       <button
                         key={p}
                         type="button"
                         onClick={() => setEditedPriority(p as 1 | 2 | 3 | 4)}
-                        className={`px-2 py-1.5 rounded border-2 text-sm transition ${
+                        className={`px-3 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
                           editedPriority === p
-                            ? 'border-brand-purple bg-brand-purple/10'
-                            : 'border-gray-200 hover:border-gray-300'
+                            ? 'border-brand-purple bg-brand-purple/10 shadow-sm'
+                            : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
                         }`}
                         disabled={loading}
                       >
-                        <div className="flex items-center gap-1">
-                          <div className={`w-2 h-2 rounded-full ${priorityColors[p as 1 | 2 | 3 | 4]}`} />
+                        <div className="flex items-center justify-center gap-2">
+                          <div className={`w-2.5 h-2.5 rounded-full ${priorityColors[p as 1 | 2 | 3 | 4]}`} />
                           P{p}
                         </div>
                       </button>
@@ -489,14 +507,14 @@ export function TaskDetailsModal({
                 
                 {/* Project */}
                 <div>
-                  <label className="block text-sm font-medium mb-1 flex items-center gap-1">
+                  <label className="block text-sm font-medium mb-2 text-gray-700 flex items-center gap-1.5">
                     <FolderOpen size={16} />
                     Projekt
                   </label>
                   <select
                     value={editedProjectId}
                     onChange={(e) => setEditedProjectId(e.target.value)}
-                    className="w-full px-2 py-1.5 border rounded text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent"
                     disabled={loading}
                   >
                     <option value="">Brak projektu</option>
@@ -505,69 +523,26 @@ export function TaskDetailsModal({
                     ))}
                   </select>
                 </div>
-                
-                {/* Duration */}
-                <div>
-                  <label className="block text-sm font-medium mb-1 flex items-center gap-1">
-                    <Clock size={16} />
-                    Czas (min)
-                  </label>
-                  <Input
-                    type="number"
-                    value={editedDuration || ''}
-                    onChange={(e) => setEditedDuration(parseInt(e.target.value) || 0)}
-                    min="0"
-                    step="5"
-                    disabled={loading}
-                  />
-                </div>
               </div>
-            )}
-          </div>
-          
-          <Separator />
-          
-          {/* AI & Timer Actions */}
-          {!isEditing && (
-            <div className="flex gap-2 flex-wrap">
-              <Button
-                onClick={() => setShowAIBreakdown(true)}
-                variant="outline"
-                className="gap-2"
-                disabled={loading}
-              >
-                <Brain size={18} weight="fill" />
-                AI Breakdown
-              </Button>
-              
-              <Button 
-                onClick={handleStartTimer}
-                variant="outline"
-                className="gap-2"
-                disabled={loading}
-              >
-                <Timer size={18} weight="fill" />
-                Start Timer
-              </Button>
-            </div>
+            </>
           )}
           
           <Separator />
           
           {/* Action Buttons */}
-          <div className="flex justify-between items-center gap-3">
+          <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
             <Button 
               onClick={handleComplete}
               variant="default"
-              className="gap-2 bg-green-600 hover:bg-green-700"
+              className="gap-2 bg-green-600 hover:bg-green-700 order-2 sm:order-1"
               disabled={loading}
             >
               <CheckCircle size={18} weight="bold" />
               Ukończ zadanie
             </Button>
             
-            {isEditing ?  (
-              <div className="flex gap-2">
+            {isEditing &&  (
+              <div className="flex gap-2 order-1 sm:order-2">
                 <Button 
                   variant="ghost" 
                   onClick={() => {
@@ -582,13 +557,14 @@ export function TaskDetailsModal({
                     setEditedDuration(task.duration || 0)
                   }}
                   disabled={loading}
+                  className="flex-1"
                 >
                   Anuluj
                 </Button>
                 <Button 
                   onClick={handleSave}
                   disabled={loading || !editedTitle.trim()}
-                  className="gap-2"
+                  className="gap-2 flex-1"
                 >
                   {loading ? (
                     <>
@@ -600,7 +576,7 @@ export function TaskDetailsModal({
                   )}
                 </Button>
               </div>
-            ) : null}
+            )}
           </div>
         </div>
       </DialogContent>

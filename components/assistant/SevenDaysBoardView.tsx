@@ -121,7 +121,8 @@ export function SevenDaysBoardView({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex gap-4 overflow-x-auto pb-4">
+      {/* Responsive grid layout - horizontal scroll on large screens, vertical stack on small screens */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:gap-4 gap-4 lg:overflow-x-auto pb-4">
         {days.map(day => (
           <DayColumnComponent
             key={day.id}
@@ -170,7 +171,7 @@ function DayColumnComponent({
     <div
       ref={setNodeRef}
       className={cn(
-        'flex-shrink-0 w-80 bg-white rounded-xl border-2 shadow-sm transition-all',
+        'w-full lg:flex-shrink-0 lg:w-80 bg-white rounded-xl border-2 shadow-sm transition-all',
         isOver ? 'border-brand-purple bg-brand-purple/5 shadow-lg' : 'border-gray-200',
         isToday && 'border-brand-pink shadow-md'
       )}
@@ -204,9 +205,9 @@ function DayColumnComponent({
       >
         <div className="p-3 space-y-2 min-h-[200px] max-h-[calc(100vh-300px)] overflow-y-auto">
           {day.tasks.length === 0 ? (
-            <div className="text-center py-8 text-gray-400">
-              <CalendarBlank size={32} className="mx-auto mb-2 opacity-50" />
-              <p className="text-sm">Brak zadań</p>
+            <div className="text-center py-12 text-gray-400">
+              <CalendarBlank size={40} className="mx-auto mb-3 opacity-40" />
+              <p className="text-sm font-medium">Brak zadań</p>
             </div>
           ) : (
             day.tasks.map(task => (
@@ -225,14 +226,14 @@ function DayColumnComponent({
 
       {/* Add Task Button */}
       {onAddForDate && (
-        <div className="p-3 border-t">
+        <div className="p-3 border-t bg-gray-50">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => onAddForDate(day.dateStr)}
-            className="w-full gap-2 text-gray-500 hover:text-brand-purple"
+            className="w-full gap-2 text-gray-600 hover:text-brand-purple hover:bg-brand-purple/5 font-medium"
           >
-            <Plus size={18} />
+            <Plus size={18} weight="bold" />
             Dodaj zadanie
           </Button>
         </div>
@@ -347,36 +348,36 @@ function MiniTaskCard({
   return (
     <Card
       className={cn(
-        'p-3 border-l-4 transition-all hover:shadow-md group cursor-pointer',
+        'p-3.5 border-l-4 transition-all hover:shadow-lg group cursor-pointer',
         priorityColors[task.priority] || priorityColors[4],
         loading && 'opacity-50'
       )}
       onClick={() => onDetails?.(task)}
     >
-      <div className="space-y-2">
-        <h4 className="font-medium text-sm line-clamp-2 group-hover:text-brand-purple transition-colors">
+      <div className="space-y-2.5">
+        <h4 className="font-semibold text-sm line-clamp-2 group-hover:text-brand-purple transition-colors leading-snug">
           {task.content}
         </h4>
 
         {task.description && (
-          <p className="text-xs text-gray-500 line-clamp-1">
+          <p className="text-xs text-gray-500 line-clamp-1 leading-relaxed">
             {task.description}
           </p>
         )}
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between pt-1">
           {task.priority < 4 && (
-            <Badge variant={task.priority === 1 ? 'destructive' : 'secondary'} className="text-xs">
+            <Badge variant={task.priority === 1 ? 'destructive' : 'secondary'} className="text-xs font-semibold">
               {priorityLabels[task.priority]}
             </Badge>
           )}
 
-          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
             {onComplete && (
               <button
                 onClick={handleComplete}
                 disabled={loading}
-                className="p-1 hover:bg-green-100 rounded text-green-600"
+                className="p-1.5 hover:bg-green-100 rounded-lg text-green-600 transition-colors"
                 title="Ukończ"
               >
                 <CheckCircle size={16} weight="bold" />
@@ -386,7 +387,7 @@ function MiniTaskCard({
               <button
                 onClick={handleDelete}
                 disabled={loading}
-                className="p-1 hover:bg-red-100 rounded text-red-600"
+                className="p-1.5 hover:bg-red-100 rounded-lg text-red-600 transition-colors"
                 title="Usuń"
               >
                 <Trash size={16} weight="bold" />
@@ -398,7 +399,7 @@ function MiniTaskCard({
                   e.stopPropagation()
                   onDetails(task)
                 }}
-                className="p-1 hover:bg-gray-100 rounded text-gray-600"
+                className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-600 transition-colors"
                 title="Szczegóły"
               >
                 <DotsThree size={16} weight="bold" />

@@ -14,7 +14,6 @@ import { TaskCard } from './TaskCard'
 import { SevenDaysBoardView } from './SevenDaysBoardView'
 import { TaskTimer } from './TaskTimer'
 import { PomodoroTimer } from './PomodoroTimer'
-import { AIInsightsPanel } from './AIInsightsPanel'
 
 interface Task {
   id: string
@@ -421,89 +420,113 @@ export function TasksAssistant() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Zarządzanie Zadaniami</h1>
-          <p className="text-gray-600 mt-1">Organizuj swoje zadania efektywnie</p>
-        </div>
-        
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* View switcher */}
-          <div className="inline-flex rounded-lg border p-1 bg-white">
-            <button 
-              onClick={() => setView('list')}
-              className={`px-3 py-2 rounded transition flex items-center gap-2 ${
-                view === 'list' 
-                  ? 'bg-brand-purple text-white' 
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-              title="Widok listy"
-            >
-              <List size={18} weight="bold" />
-              <span className="hidden sm:inline">Lista</span>
-            </button>
-            <button 
-              onClick={() => setView('board')}
-              className={`px-3 py-2 rounded transition flex items-center gap-2 ${
-                view === 'board' 
-                  ? 'bg-brand-purple text-white' 
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-              title="Widok tablicy"
-            >
-              <Kanban size={18} weight="bold" />
-              <span className="hidden sm:inline">Tablica</span>
-            </button>
+      <div className="flex flex-col gap-6">
+        {/* Title Section */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-pink bg-clip-text text-transparent">
+              Zarządzanie Zadaniami
+            </h1>
+            <p className="text-gray-600 mt-2 text-lg">Organizuj swoje zadania efektywnie</p>
           </div>
           
-          {/* Sort dropdown */}
-          <select 
-            value={sortBy} 
-            onChange={(e) => setSortBy(e.target. value as SortType)}
-            className="px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple text-sm"
-          >
-            <option value="date">📅 Data</option>
-            <option value="priority">🚩 Priorytet</option>
-            <option value="name">🔤 Nazwa</option>
-          </select>
-          
-          {/* Project filter */}
-          <select 
-            value={selectedProject} 
-            onChange={(e) => setSelectedProject(e.target. value)}
-            className="px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus: ring-brand-purple text-sm"
-          >
-            <option value="all">📁 Wszystkie projekty</option>
-            {projects.map(p => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-          
-          <Badge variant="secondary" className="text-sm">
-            {sortedTasks.length} {sortedTasks.length === 1 ? 'zadanie' : 'zadań'}
-          </Badge>
-          
-          <Button 
-            onClick={() => setShowPomodoro(true)} 
-            variant="outline"
-            className="gap-2"
-            title="Pomodoro Timer"
-          >
-            🍅
-          </Button>
-          
-          <Button 
-            onClick={() => setShowCreateModal(true)} 
-            className="gap-2"
-          >
-            <Plus size={20} weight="bold" />
-            <span className="hidden sm:inline">Dodaj zadanie</span>
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button 
+              onClick={() => setShowPomodoro(true)} 
+              variant="outline"
+              className="gap-2 hover:scale-105 transition-transform"
+              title="Pomodoro Timer"
+              size="lg"
+            >
+              <span className="text-xl">🍅</span>
+              <span className="hidden sm:inline">Pomodoro</span>
+            </Button>
+            
+            <Button 
+              onClick={() => setShowCreateModal(true)} 
+              className="gap-2 bg-gradient-to-r from-brand-purple to-brand-pink hover:shadow-lg transition-all hover:scale-105"
+              size="lg"
+            >
+              <Plus size={20} weight="bold" />
+              <span className="hidden sm:inline">Dodaj zadanie</span>
+            </Button>
+          </div>
+        </div>
+        
+        {/* Control Bar */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+            {/* View switcher */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-gray-700 hidden sm:inline">Widok:</span>
+              <div className="inline-flex rounded-xl border-2 border-gray-200 p-1 bg-gray-50">
+                <button 
+                  onClick={() => setView('list')}
+                  className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 font-medium ${
+                    view === 'list' 
+                      ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-md' 
+                      : 'text-gray-600 hover:bg-white hover:shadow-sm'
+                  }`}
+                  title="Widok listy"
+                >
+                  <List size={20} weight="bold" />
+                  <span className="hidden sm:inline">Lista</span>
+                </button>
+                <button 
+                  onClick={() => setView('board')}
+                  className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 font-medium ${
+                    view === 'board' 
+                      ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-md' 
+                      : 'text-gray-600 hover:bg-white hover:shadow-sm'
+                  }`}
+                  title="Widok tablicy"
+                >
+                  <Kanban size={20} weight="bold" />
+                  <span className="hidden sm:inline">Tablica</span>
+                </button>
+              </div>
+            </div>
+            
+            <div className="h-8 w-px bg-gray-300 hidden lg:block" />
+            
+            {/* Filters */}
+            <div className="flex items-center gap-3 flex-wrap flex-1">
+              <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                <SortAscending size={20} className="text-gray-500 hidden sm:inline" />
+                <select 
+                  value={sortBy} 
+                  onChange={(e) => setSortBy(e.target.value as SortType)}
+                  className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-sm font-medium hover:border-gray-300 transition-colors"
+                >
+                  <option value="date">📅 Sortuj: Data</option>
+                  <option value="priority">🚩 Sortuj: Priorytet</option>
+                  <option value="name">🔤 Sortuj: Nazwa</option>
+                </select>
+              </div>
+              
+              <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                <select 
+                  value={selectedProject} 
+                  onChange={(e) => setSelectedProject(e.target.value)}
+                  className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-sm font-medium hover:border-gray-300 transition-colors"
+                >
+                  <option value="all">📁 Wszystkie projekty</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            
+            <div className="h-8 w-px bg-gray-300 hidden lg:block" />
+            
+            {/* Task count badge */}
+            <Badge variant="secondary" className="text-sm px-4 py-2 font-semibold whitespace-nowrap">
+              {sortedTasks.length} {sortedTasks.length === 1 ? 'zadanie' : 'zadań'}
+            </Badge>
+          </div>
         </div>
       </div>
-      
-      {/* AI Insights Panel */}
-      <AIInsightsPanel tasks={tasks} />
       
       {/* Filters */}
       {view === 'list' && (
