@@ -628,7 +628,7 @@ Bądź ciepły, wspierający i konkretny.`
                       </div>
                     ) : (
                       <p className="text-sm text-purple-800 leading-relaxed">
-                        {aiUnderstanding || 'Kliknij "Doprecyzuj" aby AI przeanalizowało zadanie.'}
+                        {aiUnderstanding || 'AI przeanalizuje to zadanie, aby pomóc Ci lepiej je zrozumieć.'}
                       </p>
                     )}
                   </div>

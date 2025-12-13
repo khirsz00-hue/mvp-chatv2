@@ -42,6 +42,8 @@ interface TaskCardProps {
   onToggleSelection?: (taskId: string) => void
 }
 
+const DESCRIPTION_PREVIEW_LENGTH = 150
+
 export function TaskCard({ 
   task, 
   onComplete, 
@@ -304,10 +306,10 @@ export function TaskCard({
                       Jak AI rozumie zadanie
                     </div>
                     <div className="text-purple-100">
-                      {task.description?.substring(0, 150)}{task.description && task.description.length > 150 ? '...' : ''}
+                      {task.description?.substring(0, DESCRIPTION_PREVIEW_LENGTH)}{task.description && task.description.length > DESCRIPTION_PREVIEW_LENGTH ? '...' : ''}
                     </div>
                     <div className="text-xs text-purple-200 mt-2">
-                      💡 Kliknij &ldquo;Szczegóły&rdquo; aby zobaczyć pełną analizę AI
+                      💡 Kliknij na zadanie aby zobaczyć pełną analizę AI
                     </div>
                   </div>
                 )}
@@ -347,7 +349,12 @@ export function TaskCard({
             variant="ghost"
             onClick={(e) => {
               e.stopPropagation()
-              setMenuPosition({ x: e.clientX, y: e.clientY })
+              // Ensure menu stays within viewport
+              const menuWidth = 200 // Approximate menu width
+              const menuHeight = 150 // Approximate menu height
+              const x = Math.min(e.clientX, window.innerWidth - menuWidth)
+              const y = Math.min(e.clientY, window.innerHeight - menuHeight)
+              setMenuPosition({ x, y })
               setShowContextMenu(true)
             }}
             title="Więcej opcji"
