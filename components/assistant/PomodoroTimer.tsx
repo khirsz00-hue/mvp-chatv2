@@ -123,6 +123,24 @@ export function PomodoroTimer({ open, onOpenChange, taskId, taskTitle }: Pomodor
     if (currentState.phase === 'work') {
       newCycleCount++
       
+      // Save completed work session to history
+      if (currentState.taskId) {
+        try {
+          const sessions = JSON.parse(localStorage.getItem('pomodoroSessions') || '[]')
+          sessions.push({
+            taskId: currentState.taskId,
+            taskTitle: currentState.taskTitle,
+            startTime: new Date(Date.now() - (WORK_DURATION * 1000)).toISOString(),
+            endTime: new Date().toISOString(),
+            durationSeconds: WORK_DURATION,
+            phase: 'work'
+          })
+          localStorage.setItem('pomodoroSessions', JSON.stringify(sessions))
+        } catch (err) {
+          console.error('Error saving pomodoro session:', err)
+        }
+      }
+      
       // Update stats
       setStats(prev => ({
         ...prev,
