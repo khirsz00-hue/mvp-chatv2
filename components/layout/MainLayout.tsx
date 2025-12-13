@@ -5,6 +5,9 @@ import Sidebar, { AssistantId } from './Sidebar'
 import { ReactNode, useState, useEffect } from 'react'
 import { TasksAssistant } from '@/components/assistant/TasksAssistant'
 import { JournalAssistant } from '@/components/journal/JournalAssistant'
+import { supabase } from '@/lib/supabaseClient'
+import { useRouter } from 'next/navigation'
+import type { User } from '@supabase/supabase-js'
 
 interface MainLayoutProps {
   children?: ReactNode
@@ -12,8 +15,39 @@ interface MainLayoutProps {
 
 export default function MainLayout({ children }: MainLayoutProps) {
   const [activeView, setActiveView] = useState<AssistantId>('tasks')
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
 
   useEffect(() => {
+    // Check authentication
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        router.push('/login')
+        return
+      }
+      
+      setUser(user)
+      setLoading(false)
+    }
+
+    checkAuth()
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+          setUser(session.user)
+          setLoading(false)
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null)
+          router.push('/login')
+        }
+      }
+    )
+
     // Odczytaj zapisaną preferencję widoku, jeśli istnieje
     try {
       const stored = localStorage.getItem('active_assistant') as AssistantId | null
@@ -21,7 +55,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
         setActiveView(stored)
       }
     } catch {}
-  }, [])
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [router])
   
   const renderAssistant = () => {
     switch (activeView) {
@@ -61,9 +99,27 @@ export default function MainLayout({ children }: MainLayoutProps) {
     try { localStorage.setItem('active_assistant', view) } catch {}
   }
 
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Ładowanie...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 overflow-x-hidden">
-      <Header />
+      <Header 
+        user={user ? { email: user.email, name: user.user_metadata?.full_name } : null}
+        onSignOut={handleSignOut}
+      />
       <div className="flex">
         <Sidebar activeView={activeView} onNavigate={handleNavigate} />
         <main className="flex-1 p-6 overflow-x-hidden">
