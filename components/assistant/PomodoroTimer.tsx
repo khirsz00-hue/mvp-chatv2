@@ -128,6 +128,8 @@ export function PomodoroTimer({ open, onOpenChange, taskId, taskTitle }: Pomodor
       if (currentState.taskId) {
         try {
           const sessions = JSON.parse(localStorage.getItem('pomodoroSessions') || '[]')
+          // Use actual elapsed time if workSessionStartTime is tracked, otherwise fall back to WORK_DURATION
+          // Note: Fallback is used for sessions that started before this tracking was added
           const actualDuration = currentState.workSessionStartTime 
             ? Math.floor((Date.now() - currentState.workSessionStartTime) / 1000)
             : WORK_DURATION

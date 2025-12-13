@@ -622,6 +622,20 @@ Bądź wspierający i konkretny.
     }
   }, [task?.id, getActiveTimer])
 
+  // Get sessions for this task from localStorage (must be before early return)
+  const getSessions = useCallback((storageKey: string) => {
+    if (!task) return []
+    try {
+      const sessions = JSON.parse(localStorage.getItem(storageKey) || '[]')
+      return sessions.filter((s: { taskId: string }) => s.taskId === task.id)
+    } catch {
+      return []
+    }
+  }, [task])
+
+  const getTimerSessions = useCallback(() => getSessions('timerSessions'), [getSessions])
+  const getPomodoroSessions = useCallback(() => getSessions('pomodoroSessions'), [getSessions])
+
   if (!task) return null
 
   /* =======================
@@ -795,19 +809,6 @@ Bądź wspierający i konkretny.
   const totalSubtasksCount = subtasks.length
 
   const totalTimeWorked = task.duration || timerInfo.elapsedSeconds
-
-  // Get sessions for this task from localStorage
-  const getSessions = (storageKey: string) => {
-    try {
-      const sessions = JSON.parse(localStorage.getItem(storageKey) || '[]')
-      return sessions.filter((s: { taskId: string }) => s.taskId === task.id)
-    } catch {
-      return []
-    }
-  }
-
-  const getTimerSessions = () => getSessions('timerSessions')
-  const getPomodoroSessions = () => getSessions('pomodoroSessions')
 
   /* =======================
      RENDER
