@@ -160,8 +160,13 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
         break
       case 'project':
         if (aiSuggestions.suggestedProject) {
-          // Find project by name
-          const project = projects.find(p => p.name === aiSuggestions.suggestedProject)
+          // Find project by name (case-insensitive and flexible matching)
+          const suggestedName = aiSuggestions.suggestedProject.toLowerCase().trim()
+          const project = projects.find(p => 
+            p.name.toLowerCase().trim() === suggestedName ||
+            p.name.toLowerCase().includes(suggestedName) ||
+            suggestedName.includes(p.name.toLowerCase())
+          )
           if (project) {
             setProjectId(project.id)
           }

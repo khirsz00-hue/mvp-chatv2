@@ -227,12 +227,12 @@ export function SevenDaysBoardView({
     >
       {/* Carousel container with navigation arrows */}
       <div className="relative pb-4">
-        {/* Left scroll arrow - hidden on mobile */}
+        {/* Left scroll arrow - visible on all devices */}
         <button
           onClick={scrollLeft}
           disabled={!canScrollLeft}
           className={cn(
-            'hidden lg:flex absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 items-center justify-center bg-white rounded-full shadow-lg border-2 border-gray-200 transition-all hover:shadow-xl hover:scale-110',
+            'flex absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 items-center justify-center bg-white rounded-full shadow-lg border-2 border-gray-200 transition-all hover:shadow-xl hover:scale-110',
             !canScrollLeft && 'opacity-0 pointer-events-none'
           )}
           aria-label="Scroll left"
@@ -240,12 +240,12 @@ export function SevenDaysBoardView({
           <CaretLeft size={24} weight="bold" className="text-gray-700" />
         </button>
 
-        {/* Right scroll arrow - hidden on mobile */}
+        {/* Right scroll arrow - visible on all devices */}
         <button
           onClick={scrollRight}
           disabled={!canScrollRight}
           className={cn(
-            'hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 items-center justify-center bg-white rounded-full shadow-lg border-2 border-gray-200 transition-all hover:shadow-xl hover:scale-110',
+            'flex absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 items-center justify-center bg-white rounded-full shadow-lg border-2 border-gray-200 transition-all hover:shadow-xl hover:scale-110',
             !canScrollRight && 'opacity-0 pointer-events-none'
           )}
           aria-label="Scroll right"
@@ -253,16 +253,17 @@ export function SevenDaysBoardView({
           <CaretRight size={24} weight="bold" className="text-gray-700" />
         </button>
 
-        {/* Scrollable carousel container */}
+        {/* Scrollable carousel container - single row on all devices */}
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
-          className="overflow-x-auto scrollbar-hide"
+          className="overflow-x-auto scrollbar-hide snap-x snap-mandatory"
+          style={{ scrollBehavior: 'smooth' }}
         >
-          {/* Fixed 5-column grid on desktop, responsive on mobile */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 min-w-min lg:w-max">
+          {/* Single row flex layout for carousel behavior */}
+          <div className="flex gap-3 w-max">
             {days.map(day => (
-              <div key={day.id} className="lg:w-64">
+              <div key={day.id} className="w-64 sm:w-72 md:w-80 flex-shrink-0 snap-start">
                 <DayColumnComponent
                   day={day}
                   onComplete={onComplete}
