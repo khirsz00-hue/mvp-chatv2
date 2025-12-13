@@ -46,6 +46,8 @@ export function TasksAssistant() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(false)
   const [view, setView] = useState<ViewType>('list')
+  // Default filter: 'today' shows only tasks with due date = today
+  // Change to 'all' to include tasks without due dates by default
   const [filter, setFilter] = useState<FilterType>('today')
   const [sortBy, setSortBy] = useState<SortType>('date')
   const [selectedProject, setSelectedProject] = useState<string>('all')
