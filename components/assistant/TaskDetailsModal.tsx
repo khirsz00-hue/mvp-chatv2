@@ -88,6 +88,9 @@ const formatDateSafely = (dateStr: string): string => {
   }
 }
 
+/**
+ * Format seconds into HH:MM:SS for timer readouts.
+ */
 const formatStopwatch = (seconds: number): string => {
   const hrs = Math.floor(seconds / 3600)
   const mins = Math.floor((seconds % 3600) / 60)
@@ -438,14 +441,20 @@ Bądź wspierający i konkretny.
      ACTION HANDLERS
   ======================= */
 
-  const generateSubtaskId = () =>
-    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID()
-      : typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function'
-      ? `tmp-${Array.from(crypto.getRandomValues(new Uint32Array(4)))
-          .map(n => n.toString(16))
-          .join('-')}`
-      : `tmp-${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`
+  const generateSubtaskId = () => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID()
+    }
+    if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+      const values = crypto.getRandomValues(new Uint32Array(4))
+      return `tmp-${Array.from(values)
+        .map(n => n.toString(16))
+        .join('-')}`
+    }
+    return `tmp-${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random()
+      .toString(16)
+      .slice(2)}`
+  }
 
   const handleAddSubtask = async () => {
     if (!newSubtask.trim()) return
@@ -706,8 +715,8 @@ Bądź wspierający i konkretny.
           <div className="space-y-4">
             <Card className="p-4 md:p-5 shadow-sm">
               <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2 font-semibold">
-                  <Timer size={18} /> Timer &amp; Pomodoro
+                <div className="flex items-center gap-2 font-semibold">
+                  <Timer size={18} /> Timer & Pomodoro
                 </div>
                 <Badge variant={isTimerActiveForTask ? 'secondary' : 'outline'} className="gap-1">
                   {isTimerActiveForTask ? (timerInfo.isPomodoro ? 'Pomodoro' : 'Timer') : 'Brak timera'}
