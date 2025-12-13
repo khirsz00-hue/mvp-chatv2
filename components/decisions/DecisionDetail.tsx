@@ -1,9 +1,10 @@
 'use client'
 
 import React, { useState } from 'react'
-import { ArrowLeft, Plus, Trash, Sparkle } from '@phosphor-icons/react'
+import { ArrowLeft, Plus, Trash, Sparkle, Hat } from '@phosphor-icons/react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, Button, Badge, Input, Textarea } from '../ui'
 import AIAnalysisPanel from './AIAnalysisPanel'
+import SixHatsWorkflow from './SixHatsWorkflow'
 import type { DecisionWithOptions } from '@/lib/types/decisions'
 
 interface DecisionDetailProps {
@@ -19,6 +20,7 @@ export default function DecisionDetail({ decision, onBack, onUpdate, onDelete }:
   const [newOptionDescription, setNewOptionDescription] = useState('')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisResult, setAnalysisResult] = useState<any>(null)
+  const [showSixHats, setShowSixHats] = useState(false)
 
   const handleAddOption = async () => {
     if (!newOptionLabel.trim()) return
@@ -83,6 +85,25 @@ export default function DecisionDetail({ decision, onBack, onUpdate, onDelete }:
     archived: 'Archiwum',
   }
 
+  // Check if Six Hats analysis is in progress or completed
+  const hasSixHatsData = decision.current_hat !== undefined || (decision.hat_answers && decision.hat_answers.length > 0)
+
+  // Show Six Hats workflow if active
+  if (showSixHats || hasSixHatsData) {
+    return (
+      <SixHatsWorkflow
+        decision={decision}
+        onComplete={() => {
+          setShowSixHats(false)
+          onUpdate()
+        }}
+        onBack={() => {
+          setShowSixHats(false)
+        }}
+      />
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -112,6 +133,63 @@ export default function DecisionDetail({ decision, onBack, onUpdate, onDelete }:
             </div>
           )}
         </CardHeader>
+      </Card>
+
+      {/* Six Thinking Hats Analysis Card */}
+      <Card className="glass bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-brand-purple">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-brand-purple rounded-lg">
+                <Hat className="w-6 h-6 text-white" weight="duotone" />
+              </div>
+              <div>
+                <CardTitle className="text-xl">Metoda 6 Kapeluszy Myślowych</CardTitle>
+                <CardDescription>
+                  Kompleksowa analiza decyzji z różnych perspektyw
+                </CardDescription>
+              </div>
+            </div>
+            <Button
+              onClick={() => setShowSixHats(true)}
+              className="flex items-center gap-2 bg-brand-purple hover:bg-brand-purple/90"
+            >
+              <Hat weight="bold" />
+              Rozpocznij Analizę
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-gray-700 mb-4">
+            Przeanalizuj swoją decyzję z 6 różnych perspektyw:
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="bg-white/70 rounded-lg p-3 text-center">
+              <div className="text-3xl mb-1">🔵</div>
+              <p className="text-sm font-medium">Organizacja</p>
+            </div>
+            <div className="bg-white/70 rounded-lg p-3 text-center">
+              <div className="text-3xl mb-1">⚪</div>
+              <p className="text-sm font-medium">Fakty</p>
+            </div>
+            <div className="bg-white/70 rounded-lg p-3 text-center">
+              <div className="text-3xl mb-1">🔴</div>
+              <p className="text-sm font-medium">Emocje</p>
+            </div>
+            <div className="bg-white/70 rounded-lg p-3 text-center">
+              <div className="text-3xl mb-1">⚫</div>
+              <p className="text-sm font-medium">Ryzyka</p>
+            </div>
+            <div className="bg-white/70 rounded-lg p-3 text-center">
+              <div className="text-3xl mb-1">🟡</div>
+              <p className="text-sm font-medium">Korzyści</p>
+            </div>
+            <div className="bg-white/70 rounded-lg p-3 text-center">
+              <div className="text-3xl mb-1">🟢</div>
+              <p className="text-sm font-medium">Kreatywność</p>
+            </div>
+          </div>
+        </CardContent>
       </Card>
 
       {/* Options Section */}
