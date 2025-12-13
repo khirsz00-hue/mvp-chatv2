@@ -153,7 +153,8 @@ const normalizeSubtasks = (
     const fallbackTitle = hasTitle(raw) ? raw.title : ''
     const mainContent = typeof raw.content === 'string' ? raw.content : ''
     const id = String(raw.id ?? '').trim()
-    const content = (mainContent || fallbackTitle).toString()
+    // Ensure we always produce a string (fallbackTitle may be undefined)
+    const content = String(mainContent || fallbackTitle || '')
     if (id === '' || content.trim() === '') return acc
 
     acc.push({
