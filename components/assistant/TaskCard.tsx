@@ -305,7 +305,7 @@ export function TaskCard({
                       {task.description?.substring(0, 150)}{task.description && task.description.length > 150 ? '...' : ''}
                     </div>
                     <div className="text-xs text-purple-200 mt-2">
-                      💡 Kliknij "Szczegóły" aby zobaczyć pełną analizę AI
+                      💡 Kliknij &ldquo;Szczegóły&rdquo; aby zobaczyć pełną analizę AI
                     </div>
                   </div>
                 )}
