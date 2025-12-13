@@ -67,15 +67,11 @@ export function JournalArchive({ userId, onBack }: JournalArchiveProps) {
       if (archiveError) throw archiveError
 
       // Delete the original entry (if it still exists)
-      const { error: entryError } = await supabase
+      // Note: This may fail if the entry was already deleted, which is acceptable
+      await supabase
         .from('journal_entries')
         .delete()
         .eq('id', entryId)
-
-      // Ignore error if entry doesn't exist
-      if (entryError && !entryError.message.includes('no rows')) {
-        console.warn('Could not delete original entry:', entryError)
-      }
 
       setArchivedEntries(prev => prev.filter(e => e.id !== archiveId))
       showToast('Wpis usunięty z archiwum', 'success')

@@ -13,7 +13,7 @@ create table if not exists journal_entries (
 create table if not exists journal_archives (
   id uuid primary key default gen_random_uuid(),
   entry_id uuid references journal_entries(id) on delete cascade,
-  user_id uuid not null,
+  user_id uuid references auth.users(id) on delete cascade not null,
   content text not null,
   archived_at timestamptz default now()
 );
