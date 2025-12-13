@@ -93,7 +93,8 @@ export function SevenDaysBoardView({
     
     const container = scrollContainerRef.current
     const rect = container.getBoundingClientRect()
-    const x = event.delta.x + event.activatorEvent.clientX
+    const activatorEvent = event.activatorEvent as MouseEvent
+    const x = event.delta.x + activatorEvent.clientX
     
     // Auto-scroll threshold (50px from edge)
     const scrollThreshold = 50
