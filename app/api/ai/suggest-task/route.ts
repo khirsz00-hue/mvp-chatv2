@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getOpenAIClient } from '@/lib/openai'
+import { supabase } from '@/lib/supabaseClient'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -16,8 +17,6 @@ export async function POST(req: Request) {
     let userAnalytics = null
     if (userId) {
       try {
-        // Use supabase directly instead of fetching via HTTP
-        const { supabase } = await import('@/lib/supabaseClient')
         const { data, error } = await supabase
           .from('user_task_analytics')
           .select('*')

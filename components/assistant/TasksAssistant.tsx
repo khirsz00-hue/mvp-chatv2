@@ -242,7 +242,24 @@ export function TasksAssistant() {
   console.log('🎯 FINAL SORTED TASKS:', sortedTasks)
   
   // Track task analytics
-  const trackTaskAnalytics = async (analyticsData: any) => {
+  interface TaskAnalyticsData {
+    task_id: string
+    task_title: string
+    task_project?: string | null
+    task_labels?: string[]
+    priority?: number
+    estimated_duration?: number
+    actual_duration?: number
+    due_date?: string | null
+    completed_date?: string
+    action_type: 'created' | 'completed' | 'postponed' | 'deleted'
+    postponed_from?: string
+    postponed_to?: string
+    completion_speed?: 'early' | 'on-time' | 'late' | null
+    metadata?: Record<string, any>
+  }
+
+  const trackTaskAnalytics = async (analyticsData: TaskAnalyticsData) => {
     try {
       await fetch('/api/analytics/track-task', {
         method: 'POST',
