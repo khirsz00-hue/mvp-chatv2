@@ -1,1189 +1,262 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
+import { Dialog, DialogContent } from '@/components/ui/Dialog'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Textarea from '@/components/ui/Textarea'
 import Badge from '@/components/ui/Badge'
 import Separator from '@/components/ui/Separator'
-import { CheckCircle, Trash, Pencil, CalendarBlank, Flag, FolderOpen, Clock, Copy, CheckSquare, Timer, Brain, Sparkle, Tag, Stop } from '@phosphor-icons/react'
+import {
+  CheckCircle,
+  Trash,
+  CalendarBlank,
+  Flag,
+  FolderOpen,
+  Clock,
+  Timer,
+  Brain,
+  Sparkle,
+  Tag,
+  Stop
+} from '@phosphor-icons/react'
 import { format, parseISO } from 'date-fns'
 import { pl } from 'date-fns/locale'
-import { AITaskBreakdownModal } from './AITaskBreakdownModal'
 import { useTaskTimer } from './TaskTimer'
+import { AITaskBreakdownModal } from './AITaskBreakdownModal'
 
-interface Subtask {
-  id: string
-  content: string
-  completed: boolean
-}
+/* =======================
+   TYPES
+======================= */
 
 interface Task {
-  id:  string
+  id: string
   content: string
-  description?:  string
-  project_id?:  string
+  description?: string
+  project_id?: string
   priority: 1 | 2 | 3 | 4
-  due?:  { date: string } | string
-  completed?:  boolean
+  due?: { date: string } | string
   created_at?: string
-  subtasks?: Subtask[]
   duration?: number
   labels?: string[]
 }
 
-interface Project {
-  id: string
-  name: string
-  color?: string
-}
+/* =======================
+   COMPONENT
+======================= */
 
-interface TaskDetailsModalProps {
-  open: boolean
-  onOpenChange:  (open: boolean) => void
-  task: Task | null
-  onUpdate?:  (taskId: string, updates: Partial<Task>) => Promise<void>
-  onDelete:  (taskId: string) => Promise<void>
-  onComplete:  (taskId: string) => Promise<void>
-  onDuplicate?:  (task: Task) => Promise<void>
-}
-
-export function TaskDetailsModal({ 
-  open, 
-  onOpenChange, 
-  task, 
+export function TaskDetailsModal({
+  open,
+  onOpenChange,
+  task,
   onUpdate,
   onDelete,
-  onComplete,
-  onDuplicate
-}: TaskDetailsModalProps) {
-  const [editedTitle, setEditedTitle] = useState('')
-  const [editedDescription, setEditedDescription] = useState('')
-  const [editedDueDate, setEditedDueDate] = useState('')
-  const [editedPriority, setEditedPriority] = useState<1 | 2 | 3 | 4>(4)
-  const [editedProjectId, setEditedProjectId] = useState('')
-  const [editedDuration, setEditedDuration] = useState(0)
-  const [editedLabels, setEditedLabels] = useState<string[]>([])
-  const [isEditing, setIsEditing] = useState(true) // Default to editing mode
-  const [loading, setLoading] = useState(false)
-  const [projects, setProjects] = useState<Project[]>([])
-  const [showAIBreakdown, setShowAIBreakdown] = useState(false)
-  const [isCreatingSubtasks, setIsCreatingSubtasks] = useState(false)
-  const [aiSuggestions, setAiSuggestions] = useState<any>(null)
-  const [loadingSuggestions, setLoadingSuggestions] = useState(false)
-  const [showTimeTracking, setShowTimeTracking] = useState(true) // Default to open
+  onComplete
+}: any) {
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [dueDate, setDueDate] = useState('')
+  const [priority, setPriority] = useState<1 | 2 | 3 | 4>(4)
+  const [showTimer, setShowTimer] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
-  const [taskTotalTime, setTaskTotalTime] = useState<number>(0) // Total time in seconds for this task
-  const [aiUnderstanding, setAiUnderstanding] = useState<string>('')
-  const [loadingUnderstanding, setLoadingUnderstanding] = useState(false)
-  const [hasActiveTimer, setHasActiveTimer] = useState(false)
-  const [activeTimerElapsed, setActiveTimerElapsed] = useState(0)
-  
+
+  const [aiUnderstanding, setAiUnderstanding] = useState('')
+  const [loadingAI, setLoadingAI] = useState(false)
+
   const { startTimer, stopTimer, getActiveTimer } = useTaskTimer()
-  
-  const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
-  
-  // Fetch AI Understanding
-  const fetchAIUnderstanding = async () => {
-    if (!task) return
-    
-    setLoadingUnderstanding(true)
+
+  /* =======================
+     INIT TASK
+  ======================= */
+
+  useEffect(() => {
+    if (!task?.id) return
+
+    setTitle(task.content || '')
+    setDescription(task.description || '')
+    setDueDate(typeof task.due === 'string' ? task.due : task.due?.date || '')
+    setPriority(task.priority)
+
+    setAiUnderstanding('')
+    fetchAIUnderstanding(task)
+
+  }, [task?.id])
+
+  /* =======================
+     AI UNDERSTANDING
+  ======================= */
+
+  const fetchAIUnderstanding = async (task: Task) => {
+    if (!task || aiUnderstanding) return
+
+    setLoadingAI(true)
+
+    const prompt = `
+Zadanie: ${task.content}
+Opis: ${task.description || ''}
+
+W 2–3 zdaniach wyjaśnij jak rozumiesz to zadanie.
+Bądź wspierający i konkretny.
+`
+
     try {
-      // Sanitize user input to prevent prompt injection
-      const sanitizedContent = task.content.replace(/["\n\r]/g, ' ').substring(0, 500)
-      const sanitizedDescription = task.description?.replace(/["\n\r]/g, ' ').substring(0, 1000) || ''
-      
-      const prompt = `Jesteś asystentem AI wspierającym osoby z ADHD w zarządzaniu zadaniami.
-
-Zadanie użytkownika: ${sanitizedContent}
-${sanitizedDescription ? `Opis: ${sanitizedDescription}` : ''}
-
-Napisz krótkie podsumowanie (2-3 zdania) jak rozumiesz to zadanie.
-Pokaż użytkownikowi, że rozumiesz jego intencje.
-Bądź ciepły, wspierający i konkretny.`
-
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [
-            { role: 'system', content: 'Jesteś wspierającym asystentem ADHD.' },
-            { role: 'user', content: prompt }
-          ]
+          messages: [{ role: 'user', content: prompt }]
         })
       })
-      
-      if (res.ok) {
-        const data = await res.json()
-        setAiUnderstanding(data.response || 'Rozumiem to zadanie i jestem gotowy pomóc.')
-      }
-    } catch (err) {
-      console.error('Error fetching AI understanding:', err)
+
+      const data = await res.json()
+      setAiUnderstanding(data.response || '')
     } finally {
-      setLoadingUnderstanding(false)
+      setLoadingAI(false)
     }
   }
-  
-  // Fetch projects
-  useEffect(() => {
-    if (! open || !token) return
-    
-    const fetchProjects = async () => {
-      try {
-        const res = await fetch(`/api/todoist/projects?token=${token}`)
-        if (res.ok) {
-          const data = await res.json()
-          setProjects(data.projects || data || [])
-        }
-      } catch (err) {
-        console.error('Error fetching projects:', err)
-      }
-    }
-    
-    fetchProjects()
-  }, [open, token])
-  
-  // Load task data
-  useEffect(() => {
-    if (task) {
-      setEditedTitle(task.content || '')
-      setEditedDescription(task.description || '')
-      
-      const dueStr = typeof task.due === 'string' ? task.due : task.due?.date
-      setEditedDueDate(dueStr || '')
-      
-      setEditedPriority(task. priority || 4)
-      setEditedProjectId(task.project_id || '')
-      setEditedDuration(task.duration || 0)
-      setEditedLabels(task.labels || [])
-      setIsEditing(true) // Always start in edit mode
-      setAiSuggestions(null) // Reset suggestions
-      setAiUnderstanding('') // Reset AI understanding
-      
-      // Calculate total time spent on this task from timer sessions
-      try {
-        const sessions = JSON.parse(localStorage.getItem('timerSessions') || '[]')
-        const taskSessions = sessions.filter((s: any) => s.taskId === task.id)
-        const totalSeconds = taskSessions.reduce((sum: number, s: any) => sum + (s.durationSeconds || 0), 0)
-        setTaskTotalTime(totalSeconds)
-      } catch (err) {
-        console.error('Error loading timer sessions:', err)
-        setTaskTotalTime(0)
-      }
-      
-      // Check for active timer for this task
-      const checkTimer = () => {
-        const activeTimer = getActiveTimer()
-        const isActive = activeTimer.taskId === task.id && activeTimer.isActive
-        setHasActiveTimer(isActive)
-        
-        // Get current elapsed time if timer is active
-        if (isActive) {
-          try {
-            const stored = localStorage.getItem('taskTimer')
-            if (stored) {
-              const parsed = JSON.parse(stored)
-              if (parsed.isRunning && parsed.startTime) {
-                const now = Date.now()
-                const elapsed = Math.floor((now - parsed.startTime) / 1000)
-                setActiveTimerElapsed(elapsed)
-              } else {
-                setActiveTimerElapsed(parsed.elapsedSeconds || 0)
-              }
-            }
-          } catch (err) {
-            console.error('Error parsing timer data:', err)
-            setActiveTimerElapsed(0)
-          }
-        }
-      }
-      
-      checkTimer()
-      
-      // Update timer every second when active (using let for proper closure)
-      let timerInterval: NodeJS.Timeout | null = null
-      
-      const updateInterval = () => {
-        const activeTimer = getActiveTimer()
-        const isActive = activeTimer.taskId === task.id && activeTimer.isActive
-        
-        if (isActive && !timerInterval) {
-          // Start interval only when timer is active
-          timerInterval = setInterval(checkTimer, 1000)
-        } else if (!isActive && timerInterval) {
-          // Clear interval when timer is not active
-          clearInterval(timerInterval)
-          timerInterval = null
-        }
-      }
-      
-      updateInterval()
-      
-      // Listen for timer state changes
-      const handleTimerStateChange = () => {
-        checkTimer()
-        updateInterval()
-      }
-      
-      window.addEventListener('timerStateChanged', handleTimerStateChange)
-      window.addEventListener('storage', handleTimerStateChange)
-      
-      // Fetch AI understanding
-      fetchAIUnderstanding()
-      
-      return () => {
-        if (timerInterval) clearInterval(timerInterval)
-        window.removeEventListener('timerStateChanged', handleTimerStateChange)
-        window.removeEventListener('storage', handleTimerStateChange)
-      }
-    }
-  }, [task, getActiveTimer])
-  
-  // Constants
-  const MIN_TITLE_LENGTH_FOR_SUGGESTIONS = 5
-  
-  // Fetch AI suggestions when title changes (with debounce)
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
-  useEffect(() => {
-    if (!isEditing || !editedTitle) {
-      return
-    }
-    
-    // Clear previous timer
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current)
-    }
-    
-    // Reset if too short
-    if (editedTitle.length < MIN_TITLE_LENGTH_FOR_SUGGESTIONS) {
-      setAiSuggestions(null)
-      return
-    }
-    
-    // Skip if title hasn't changed and we already have suggestions
-    if (editedTitle === task?.content && aiSuggestions !== null) {
-      return
-    }
-    
-    setLoadingSuggestions(true)
-    
-    // Debounce for 1 second
-    debounceTimerRef.current = setTimeout(() => {
-      (async () => {
-        try {
-          const userId = token || 'anonymous'
-          const response = await fetch('/api/ai/suggest-task', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              title: editedTitle,
-              userId,
-              userContext: {
-                projects: projects.map(p => ({ id: p.id, name: p.name }))
-              }
-            })
-          })
-          
-          if (response.ok) {
-            const data = await response.json()
-            setAiSuggestions(data)
-          }
-        } catch (err) {
-          console.error('Error fetching AI suggestions:', err)
-        } finally {
-          setLoadingSuggestions(false)
-        }
-      })()
-    }, 1000)
-    
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current)
-      }
-    }
-    // Note: aiSuggestions is intentionally not in deps to avoid infinite loop
-    // We check aiSuggestions !== null inside the effect to prevent unnecessary fetches
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editedTitle, isEditing, task?.content, token, projects])
-  
-  // Auto-save effect - save changes after 2 seconds of inactivity
-  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  /* =======================
+     AUTO SAVE
+  ======================= */
+
   useEffect(() => {
     if (!task || !onUpdate) return
-    
-    // Skip if values haven't changed
-    const hasChanges = (
-      editedTitle !== task.content ||
-      editedDescription !== (task.description || '') ||
-      editedDueDate !== (typeof task.due === 'string' ? task.due : task.due?.date || '') ||
-      editedPriority !== task.priority ||
-      editedProjectId !== (task.project_id || '') ||
-      editedDuration !== (task.duration || 0) ||
-      JSON.stringify(editedLabels) !== JSON.stringify(task.labels || [])
-    )
-    
-    if (!hasChanges) return
-    
-    // Clear previous timer
-    if (autoSaveTimerRef.current) {
-      clearTimeout(autoSaveTimerRef.current)
-    }
-    
-    // Set new timer for auto-save
-    autoSaveTimerRef.current = setTimeout(async () => {
-      try {
-        const updates: Partial<Task> = {
-          content: editedTitle,
-          description: editedDescription,
-          priority: editedPriority
-        }
-        
-        if (editedDueDate) {
-          updates.due = editedDueDate
-        }
-        
-        if (editedProjectId) {
-          updates.project_id = editedProjectId
-        }
-        
-        if (editedDuration > 0) {
-          updates.duration = editedDuration
-        }
-        
-        if (editedLabels.length > 0) {
-          updates.labels = editedLabels
-        }
-        
-        await onUpdate(task.id, updates)
-      } catch (err) {
-        console.error('Auto-save error:', err)
-      }
-    }, 2000) // 2 seconds debounce
-    
-    return () => {
-      if (autoSaveTimerRef.current) {
-        clearTimeout(autoSaveTimerRef.current)
-      }
-    }
-  }, [editedTitle, editedDescription, editedDueDate, editedPriority, editedProjectId, editedDuration, editedLabels, task, onUpdate])
-  
-  if (!task) return null
-  
-  const applySuggestion = (field: 'priority' | 'duration' | 'description' | 'project' | 'dueDate' | 'labels') => {
-    if (!aiSuggestions) return
-    
-    switch (field) {
-      case 'priority':
-        if (aiSuggestions.priority) {
-          setEditedPriority(aiSuggestions.priority as 1 | 2 | 3 | 4)
-        }
-        break
-      case 'duration':
-        if (aiSuggestions.estimatedMinutes) {
-          setEditedDuration(aiSuggestions.estimatedMinutes)
-        }
-        break
-      case 'description':
-        if (aiSuggestions.description) {
-          setEditedDescription(aiSuggestions.description)
-        }
-        break
-      case 'project':
-        if (aiSuggestions.suggestedProject) {
-          const project = projects.find(p => p.name === aiSuggestions.suggestedProject)
-          if (project) {
-            setEditedProjectId(project.id)
-          }
-        }
-        break
-      case 'dueDate':
-        if (aiSuggestions.suggestedDueDate) {
-          setEditedDueDate(aiSuggestions.suggestedDueDate)
-        }
-        break
-      case 'labels':
-        if (aiSuggestions.suggestedLabels && aiSuggestions.suggestedLabels.length > 0) {
-          setEditedLabels(aiSuggestions.suggestedLabels)
-        }
-        break
-    }
-  }
 
-  const handleSave = async () => {
-    if (!onUpdate) {
-      setIsEditing(false)
-      return
-    }
-    
-    setLoading(true)
-    try {
-      const updates: Partial<Task> = {
-        content: editedTitle,
-        description: editedDescription,
-        priority: editedPriority
-      }
-      
-      if (editedDueDate) {
-        updates.due = editedDueDate
-      }
-      
-      if (editedProjectId) {
-        updates.project_id = editedProjectId
-      }
-      
-      if (editedDuration > 0) {
-        updates.duration = editedDuration
-      }
-      
-      if (editedLabels.length > 0) {
-        updates.labels = editedLabels
-      }
-      
-      await onUpdate(task.id, updates)
-      
-      setIsEditing(false)
-    } catch (err) {
-      console.error('Error updating task:', err)
-      alert('Nie udało się zaktualizować zadania')
-    } finally {
-      setLoading(false)
-    }
-  }
-  
-  const handleDelete = async () => {
-    if (! confirm('Czy na pewno chcesz usunąć to zadanie?')) return
-    
-    setLoading(true)
-    try {
-      await onDelete(task.id)
-      onOpenChange(false)
-    } catch (err) {
-      console.error('Error deleting task:', err)
-      alert('Nie udało się usunąć zadania')
-    } finally {
-      setLoading(false)
-    }
-  }
-  
-  const handleComplete = async () => {
-    setLoading(true)
-    try {
-      await onComplete(task.id)
-      onOpenChange(false)
-    } catch (err) {
-      console.error('Error completing task:', err)
-      alert('Nie udało się ukończyć zadania')
-    } finally {
-      setLoading(false)
-    }
-  }
-  
-  const handleDuplicate = async () => {
-    if (!onDuplicate) return
-    
-    setLoading(true)
-    try {
-      await onDuplicate(task)
-      onOpenChange(false)
-    } catch (err) {
-      console.error('Error duplicating task:', err)
-      alert('Nie udało się zduplikować zadania')
-    } finally {
-      setLoading(false)
-    }
-  }
-  
-  const handleCreateSubtasks = async (subtasks: Array<{
-    content: string
-    description?: string
-    duration?: number
-    duration_unit?: string
-  }>) => {
-    try {
-      setIsCreatingSubtasks(true)
-      
-      // Create each subtask via Todoist API
-      for (const subtask of subtasks) {
-        await fetch('/api/todoist/tasks', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            content: subtask.content,
-            description: subtask.description,
-            project_id: task.project_id,
-            parent_id: task.id,
-            priority: task.priority,
-            duration: subtask.duration,
-            duration_unit: subtask.duration_unit || 'minute'
-          })
-        })
-      }
-      
-      alert(`Utworzono ${subtasks.length} podzadań!`)
-      setShowAIBreakdown(false)
-      if (onUpdate) {
-        await onUpdate(task.id, {})
-      }
-    } catch (err) {
-      console.error('Error creating subtasks:', err)
-      alert('Nie udało się utworzyć podzadań')
-    } finally {
-      setIsCreatingSubtasks(false)
-    }
-  }
-  
-  const handleStartTimer = () => {
-    if (task) {
-      startTimer(task.id, task.content)
-    }
-  }
-  
-  const handleStopTimer = () => {
-    stopTimer()
-  }
-  
-  const dueStr = typeof task.due === 'string' ? task.due : task.due?.date
-  
-  const priorityLabels = {
-    1: 'Wysoki',
-    2: 'Średni',
-    3: 'Niski',
-    4: 'Brak'
-  }
-  
-  const priorityColors = {
-    1: 'bg-red-500',
-    2: 'bg-orange-500',
-    3: 'bg-blue-500',
-    4: 'bg-gray-400'
-  }
-  
-  const currentProject = projects.find(p => p.id === (editedProjectId || task.project_id))
-  
-  // Calculate subtasks progress
-  const subtasksTotal = task.subtasks?. length || 0
-  const subtasksCompleted = task.subtasks?.filter(s => s. completed).length || 0
-  const subtasksProgress = subtasksTotal > 0 ?  (subtasksCompleted / subtasksTotal) * 100 : 0
-  
+    const timeout = setTimeout(() => {
+      onUpdate(task.id, {
+        content: title,
+        description,
+        priority,
+        due: dueDate || undefined
+      })
+    }, 800)
+
+    return () => clearTimeout(timeout)
+  }, [title, description, priority, dueDate])
+
+  if (!task) return null
+
+  /* =======================
+     RENDER
+  ======================= */
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1">
-              {isEditing ? (
-                <>
-                  <Input 
-                    value={editedTitle}
-                    onChange={(e) => setEditedTitle(e.target.value)}
-                    className="text-xl font-semibold w-full"
-                    disabled={loading}
-                    placeholder="Tytuł zadania..."
-                  />
-                  
-                  {/* AI Suggestions */}
-                  {loadingSuggestions && (
-                    <div className="mt-2 flex items-center gap-2 text-sm text-gray-500">
-                      <div className="w-3 h-3 border-2 border-brand-purple border-t-transparent rounded-full animate-spin" />
-                      <span>Generuję sugestie AI...</span>
-                    </div>
-                  )}
-                  
-                  {aiSuggestions && !loadingSuggestions && (
-                    <div className="mt-2 p-2 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg">
-                      <div className="flex items-start gap-2 mb-1.5">
-                        <Sparkle size={14} weight="fill" className="text-blue-600 mt-0.5" />
-                        <p className="text-xs text-blue-800 font-medium">AI Suggestions:</p>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {aiSuggestions.priority && aiSuggestions.priority !== editedPriority && (
-                          <Badge
-                            className="cursor-pointer hover:bg-blue-200 transition-colors gap-1 text-xs py-0.5"
-                            onClick={() => applySuggestion('priority')}
-                          >
-                            <Flag size={12} />
-                            P{aiSuggestions.priority}
-                          </Badge>
-                        )}
-                        {aiSuggestions.estimatedMinutes && (
-                          <Badge
-                            className="cursor-pointer hover:bg-blue-200 transition-colors gap-1 text-xs py-0.5"
-                            onClick={() => applySuggestion('duration')}
-                          >
-                            <Clock size={12} />
-                            {aiSuggestions.estimatedMinutes}min
-                          </Badge>
-                        )}
-                        {aiSuggestions.suggestedDueDate && (
-                          <Badge
-                            className="cursor-pointer hover:bg-blue-200 transition-colors gap-1 text-xs py-0.5"
-                            onClick={() => applySuggestion('dueDate')}
-                          >
-                            <CalendarBlank size={12} />
-                            {aiSuggestions.suggestedDueDate}
-                          </Badge>
-                        )}
-                        {aiSuggestions.suggestedProject && (
-                          <Badge
-                            className="cursor-pointer hover:bg-blue-200 transition-colors gap-1 text-xs py-0.5"
-                            onClick={() => applySuggestion('project')}
-                          >
-                            <FolderOpen size={12} />
-                            {aiSuggestions.suggestedProject}
-                          </Badge>
-                        )}
-                        {aiSuggestions.suggestedLabels?.length > 0 && (
-                          <Badge
-                            className="cursor-pointer hover:bg-blue-200 transition-colors gap-1 text-xs py-0.5"
-                            onClick={() => applySuggestion('labels')}
-                            title={aiSuggestions.suggestedLabels.join(', ')}
-                          >
-                            <Tag size={12} />
-                            {aiSuggestions.suggestedLabels.length} labels
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <DialogTitle className="text-2xl leading-tight">{task.content}</DialogTitle>
-              )}
-            </div>
-            
-            <div className="flex gap-1 flex-shrink-0">
-              {! isEditing ? (
-                <>
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    onClick={() => setIsEditing(true)}
-                    disabled={loading}
-                    title="Edytuj"
-                  >
-                    <Pencil size={18} />
-                  </Button>
-                  {onDuplicate && (
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      onClick={handleDuplicate}
-                      disabled={loading}
-                      title="Duplikuj"
-                    >
-                      <Copy size={18} />
-                    </Button>
-                  )}
-                </>
-              ) : null}
-              <Button 
-                size="sm" 
-                variant="ghost" 
-                onClick={handleDelete}
-                disabled={loading}
-                title="Usuń"
-                className="text-red-600 hover:bg-red-50 hover:text-red-700"
-              >
-                <Trash size={18} />
-              </Button>
-            </div>
-          </div>
-        </DialogHeader>
-        
-        <div className="space-y-5 py-4">
-          {/* Meta badges */}
-          <div className="flex gap-2 flex-wrap items-center">
-            {dueStr && (
-              <Badge variant="outline" className="gap-1.5 px-3 py-1.5">
-                <CalendarBlank size={16} />
-                {format(parseISO(dueStr), 'dd MMMM yyyy', { locale:  pl })}
-              </Badge>
-            )}
-            
-            {task.priority && task.priority < 4 && (
-              <Badge variant={task.priority === 1 ? 'destructive' : 'secondary'} className="gap-1.5 px-3 py-1.5">
-                <Flag size={16} />
-                P{task.priority} - {priorityLabels[task.priority]}
-              </Badge>
-            )}
-            
-            {currentProject && (
-              <Badge variant="outline" className="gap-1.5 px-3 py-1.5">
-                <FolderOpen size={16} />
-                {currentProject.name}
-              </Badge>
-            )}
-            
-            {task.duration && task.duration > 0 && (
-              <Badge variant="outline" className="gap-1.5 px-3 py-1.5">
-                <Clock size={16} />
-                {task.duration} min
-              </Badge>
-            )}
-            
-            {/* Labels as Badges */}
-            {task.labels && task.labels.length > 0 && (
-              <>
-                {task.labels.map((label, index) => (
-                  <Badge 
-                    key={index} 
-                    variant="secondary" 
-                    className="gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 border-purple-200"
-                  >
-                    <Tag size={14} weight="fill" />
-                    {label}
-                  </Badge>
-                ))}
-              </>
-            )}
-          </div>
-          
-          <Separator />
-          
-          {/* AI Understanding Section - Always visible */}
-          <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl p-4 border-2 border-purple-200">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center flex-shrink-0">
-                <Brain size={20} className="text-white" weight="fill" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-sm text-purple-900 mb-2 flex items-center gap-2">
-                  💡 Jak AI rozumie zadanie
-                </h3>
-                {loadingUnderstanding ? (
-                  <div className="flex items-center gap-2 text-sm text-purple-700">
-                    <div className="w-3 h-3 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
-                    <span>Analizuję zadanie...</span>
-                  </div>
-                ) : (
-                  <p className="text-sm text-purple-800 leading-relaxed">
-                    {aiUnderstanding || 'AI przeanalizuje to zadanie, aby pomóc Ci lepiej je zrozumieć.'}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-          
-          {/* Time Tracking Section - Always visible */}
-          <div className="border border-gray-200 rounded-lg">
-            <button
-              onClick={() => setShowTimeTracking(!showTimeTracking)}
-              className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <Timer size={18} weight="fill" className="text-brand-purple" />
-                <h3 className="font-semibold text-sm text-gray-700">Śledzenie Czasu</h3>
-                {hasActiveTimer && (
-                  <Badge className="gap-1 text-xs bg-red-500 text-white animate-pulse">
-                    <div className="w-2 h-2 rounded-full bg-white" />
-                    Live
-                  </Badge>
-                )}
-              </div>
-              <span className="text-gray-400">{showTimeTracking ? '▼' : '▶'}</span>
-            </button>
-            
-            {showTimeTracking && (
-              <div className="p-4 pt-0 space-y-3">
-                <Separator className="mb-3" />
-                
-                {/* Active Timer Display */}
-                {hasActiveTimer && (
-                  <div className="bg-gradient-to-r from-red-50 to-pink-50 rounded-lg p-4 border-2 border-red-300 mb-3">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
-                        <span className="font-semibold text-sm text-red-900">Timer aktywny</span>
-                      </div>
-                    </div>
-                    
-                    <div className="text-center mb-3">
-                      <p className="text-4xl font-bold text-red-600 font-mono">
-                        {Math.floor(activeTimerElapsed / 3600)}:{String(Math.floor((activeTimerElapsed % 3600) / 60)).padStart(2, '0')}:{String(activeTimerElapsed % 60).padStart(2, '0')}
-                      </p>
-                      <p className="text-xs text-red-700 mt-1">
-                        Bieżąca sesja
-                      </p>
-                    </div>
-                    
-                    <Button
-                      onClick={handleStopTimer}
-                      variant="destructive"
-                      size="sm"
-                      className="w-full gap-2"
-                    >
-                      <Stop size={16} weight="fill" />
-                      Zatrzymaj Timer
-                    </Button>
-                  </div>
-                )}
-                
-                {/* Task Time Tracking Stats */}
-                <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4 border border-purple-200">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-2xl">⏱️</span>
-                    <span className="font-semibold text-sm text-gray-700">Całkowity czas pracy</span>
-                  </div>
-                  
-                  <div className="text-center mb-3">
-                    <p className="text-4xl font-bold text-purple-600">
-                      {Math.floor(taskTotalTime / 3600)}:{String(Math.floor((taskTotalTime % 3600) / 60)).padStart(2, '0')}:{String(taskTotalTime % 60).padStart(2, '0')}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {Math.floor(taskTotalTime / 60)} minut całkowitego czasu
-                    </p>
-                  </div>
-                  
-                  {task.duration && task.duration > 0 && (
-                    <div className="bg-white/50 rounded-lg p-2 mb-3">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-gray-600">Estymacja:</span>
-                        <span className="font-semibold">{task.duration} min</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs mt-1">
-                        <span className="text-gray-600">Rzeczywisty:</span>
-                        <span className="font-semibold">{Math.floor(taskTotalTime / 60)} min</span>
-                      </div>
-                      {taskTotalTime > 0 && (
-                        <div className="mt-2">
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className={`h-2 rounded-full transition-all ${
-                                (taskTotalTime / 60) > task.duration ? 'bg-red-500' : 'bg-green-500'
-                              }`}
-                              style={{ width: `${Math.min(100, (taskTotalTime / 60 / task.duration) * 100)}%` }}
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  {!hasActiveTimer && (
-                    <Button
-                      onClick={handleStartTimer}
-                      variant="outline"
-                      size="sm"
-                      className="w-full gap-2 bg-white hover:bg-purple-50 border-purple-300"
-                    >
-                      <Timer size={16} weight="fill" />
-                      Rozpocznij Timer
-                    </Button>
-                  )}
-                </div>
-                
-                <p className="text-xs text-gray-500 text-center">
-                  💡 Rozpocznij timer Pomodoro, aby śledzić czas pracy nad zadaniem
-                </p>
-              </div>
-            )}
-          </div>
-          
-          {/* View Mode */}
-          {!isEditing && (
-            <>
-              
-              {/* Description */}
-              <div>
-                <h3 className="font-semibold text-sm text-gray-500 uppercase tracking-wide mb-3">Opis</h3>
-                <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">
-                  {task.description || 'Brak opisu'}
-                </p>
-              </div>
-              
-              {/* Subtasks */}
-              {subtasksTotal > 0 && (
-                <div>
-                  <h3 className="font-semibold text-sm text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
-                    <CheckSquare size={18} />
-                    Podzadania ({subtasksCompleted}/{subtasksTotal})
-                  </h3>
-                  
-                  {/* Progress bar */}
-                  <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4">
-                    <div 
-                      className="bg-green-600 h-2.5 rounded-full transition-all duration-300"
-                      style={{ width: `${subtasksProgress}%` }}
-                    />
-                  </div>
-                  
-                  {/* Subtasks list */}
-                  <div className="space-y-2">
-                    {task.subtasks?.map(subtask => (
-                      <div 
-                        key={subtask.id}
-                        className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
-                      >
-                        <CheckCircle 
-                          size={20} 
-                          weight={subtask.completed ? 'fill' : 'regular'}
-                          className={subtask.completed ? 'text-green-600 flex-shrink-0' : 'text-gray-400 flex-shrink-0'}
-                        />
-                        <span className={subtask.completed ? 'line-through text-gray-500' : 'text-gray-700'}>
-                          {subtask.content}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto space-y-6">
 
-              {/* History Section */}
-              <div className="border border-gray-200 rounded-lg">
-                <button
-                  onClick={() => setShowHistory(!showHistory)}
-                  className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <CalendarBlank size={18} weight="fill" className="text-brand-purple" />
-                    <h3 className="font-semibold text-sm text-gray-700">Historia</h3>
-                  </div>
-                  <span className="text-gray-400">{showHistory ? '▼' : '▶'}</span>
-                </button>
-                
-                {showHistory && (
-                  <div className="p-4 pt-0">
-                    <Separator className="mb-4" />
-                    
-                    <div className="space-y-3">
-                      {/* Creation Date */}
-                      {task.created_at && (() => {
-                        try {
-                          const createdDate = parseISO(task.created_at)
-                          return (
-                            <div className="flex items-start gap-3 pb-3 border-b border-gray-100">
-                              <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                <span className="text-sm">✨</span>
-                              </div>
-                              <div className="flex-1">
-                                <p className="text-sm font-medium text-gray-700">Zadanie utworzone</p>
-                                <p className="text-xs text-gray-500 mt-0.5">
-                                  {format(createdDate, 'dd MMMM yyyy, HH:mm', { locale: pl })}
-                                </p>
-                              </div>
-                            </div>
-                          )
-                        } catch (err) {
-                          console.error('Invalid date format for created_at:', task.created_at)
-                          return null
-                        }
-                      })()}
-                      
-                      {/* Due Date Info */}
-                      {dueStr && (() => {
-                        try {
-                          const dueDate = parseISO(dueStr)
-                          return (
-                            <div className="flex items-start gap-3 pb-3 border-b border-gray-100">
-                              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                <CalendarBlank size={16} weight="fill" className="text-blue-600" />
-                              </div>
-                              <div className="flex-1">
-                                <p className="text-sm font-medium text-gray-700">Termin wykonania</p>
-                                <p className="text-xs text-gray-500 mt-0.5">
-                                  {format(dueDate, 'dd MMMM yyyy', { locale: pl })}
-                                </p>
-                              </div>
-                            </div>
-                          )
-                        } catch (err) {
-                          console.error('Invalid date format for due date:', dueStr)
-                          return null
-                        }
-                      })()}
-                      
-                      {/* Priority Info */}
-                      <div className="flex items-start gap-3 pb-3">
-                        <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <Flag size={16} weight="fill" className="text-purple-600" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-gray-700">Priorytet</p>
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            P{task.priority} - {priorityLabels[task.priority]}
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <p className="text-xs text-gray-500 text-center pt-2">
-                        📝 Historia przesunięć i zmian będzie dostępna wkrótce
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-              
-              <Separator />
-              
-              {/* AI & Timer Actions */}
-              <div className="flex gap-2 flex-wrap">
-                <Button
-                  onClick={() => setShowAIBreakdown(true)}
-                  variant="outline"
-                  className="gap-2"
-                  disabled={loading}
-                >
-                  <Brain size={18} weight="fill" />
-                  Doprecyzuj
-                </Button>
-                
-                <Button 
-                  onClick={handleStartTimer}
-                  variant="outline"
-                  className="gap-2"
-                  disabled={loading}
-                >
-                  <Timer size={18} weight="fill" />
-                  Rozpocznij Timer
-                </Button>
-              </div>
-            </>
+        {/* TITLE */}
+        <Input
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          className="text-2xl font-semibold"
+          placeholder="Tytuł zadania"
+        />
+
+        {/* META */}
+        <div className="flex gap-2 flex-wrap">
+          {dueDate && (
+            <Badge variant="outline">
+              <CalendarBlank size={14} />
+              {format(parseISO(dueDate), 'dd MMM yyyy', { locale: pl })}
+            </Badge>
           )}
-          
-          {/* Edit Mode */}
-          {isEditing && (
-            <>
-              <Separator />
-              <div className="space-y-5">
-                <h3 className="font-semibold text-lg">Edycja zadania</h3>
-                
-                {/* Description */}
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-gray-700">Opis</label>
-                  <Textarea 
-                    value={editedDescription}
-                    onChange={(e) => setEditedDescription(e.target.value)}
-                    rows={5}
-                    placeholder="Dodaj opis zadania..."
-                    disabled={loading}
-                    className="resize-none"
-                  />
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  {/* Due Date */}
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-gray-700 flex items-center gap-1.5">
-                      <CalendarBlank size={16} />
-                      Data
-                    </label>
-                    <Input
-                      type="date"
-                      value={editedDueDate}
-                      onChange={(e) => setEditedDueDate(e.target.value)}
-                      disabled={loading}
-                    />
-                  </div>
-                  
-                  {/* Duration */}
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-gray-700 flex items-center gap-1.5">
-                      <Clock size={16} />
-                      Czas (min)
-                    </label>
-                    <Input
-                      type="number"
-                      value={editedDuration || ''}
-                      onChange={(e) => setEditedDuration(parseInt(e.target.value) || 0)}
-                      min="0"
-                      step="5"
-                      disabled={loading}
-                      placeholder="0"
-                    />
-                  </div>
-                </div>
-                
-                {/* Priority */}
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-gray-700 flex items-center gap-1.5">
-                    <Flag size={16} />
-                    Priorytet
-                  </label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {[1, 2, 3, 4].map(p => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => setEditedPriority(p as 1 | 2 | 3 | 4)}
-                        className={`px-3 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
-                          editedPriority === p
-                            ? 'border-brand-purple bg-brand-purple/10 shadow-sm'
-                            : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
-                        }`}
-                        disabled={loading}
-                      >
-                        <div className="flex items-center justify-center gap-2">
-                          <div className={`w-2.5 h-2.5 rounded-full ${priorityColors[p as 1 | 2 | 3 | 4]}`} />
-                          P{p}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                
-                {/* Project */}
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-gray-700 flex items-center gap-1.5">
-                    <FolderOpen size={16} />
-                    Projekt
-                  </label>
-                  <select
-                    value={editedProjectId}
-                    onChange={(e) => setEditedProjectId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent"
-                    disabled={loading}
-                  >
-                    <option value="">Brak projektu</option>
-                    {projects.map(p => (
-                      <option key={p.id} value={p. id}>{p.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </>
-          )}
-          
-          {/* Action Buttons - Beautiful UX */}
-          <div className="bg-gradient-to-r from-gray-50 to-white rounded-xl p-6 border-2 border-gray-100 shadow-sm">
-            <div className="flex gap-3">
-              <Button 
-                onClick={handleComplete}
-                disabled={loading}
-                className="flex-1 gap-2 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 hover:shadow-lg transition-all"
-                size="lg"
-              >
-                <CheckCircle size={20} weight="bold" />
-                ✅ Ukończ zadanie
-              </Button>
-              
-              <Button 
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                className="border-2 hover:bg-gray-50"
-                size="lg"
-              >
-                Zamknij
-              </Button>
-            </div>
-            
-            <div className="mt-3 text-center">
-              <p className="text-xs text-gray-500">
-                💡 Zmiany zapisują się automatycznie
-              </p>
-            </div>
+          <Badge variant="secondary">
+            <Flag size={14} /> P{priority}
+          </Badge>
+        </div>
+
+        <Separator />
+
+        {/* AI UNDERSTANDING */}
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+          <div className="flex gap-3">
+            <Brain size={20} className="text-purple-600" />
+            {loadingAI ? (
+              <span className="text-sm">Analizuję zadanie…</span>
+            ) : (
+              <p className="text-sm text-purple-800">{aiUnderstanding}</p>
+            )}
           </div>
         </div>
+
+        {/* DESCRIPTION */}
+        <Textarea
+          value={description}
+          onChange={e => setDescription(e.target.value)}
+          placeholder="Opis zadania"
+          rows={4}
+        />
+
+        {/* TIME TRACKING (collapsed by default) */}
+        <div className="border rounded-lg">
+          <button
+            onClick={() => setShowTimer(!showTimer)}
+            className="w-full flex justify-between p-3 text-sm"
+          >
+            <span className="flex gap-2 items-center">
+              <Timer size={16} /> Śledzenie czasu
+            </span>
+            {showTimer ? '▼' : '▶'}
+          </button>
+
+          {showTimer && (
+            <div className="p-3">
+              <Button onClick={() => startTimer(task.id, task.content)}>
+                Start
+              </Button>
+              <Button variant="outline" onClick={stopTimer}>
+                Stop
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* HISTORY */}
+        <div className="border rounded-lg">
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className="w-full flex justify-between p-3 text-sm"
+          >
+            <span className="flex gap-2 items-center">
+              <CalendarBlank size={16} /> Historia zmian
+            </span>
+            {showHistory ? '▼' : '▶'}
+          </button>
+
+          {showHistory && (
+            <div className="p-3 text-xs text-gray-500">
+              (kolejne zmiany terminów / priorytetów będą tu zapisywane)
+            </div>
+          )}
+        </div>
+
+        {/* ACTIONS */}
+        <div className="flex justify-between items-center pt-4">
+          <Button
+            variant="destructive"
+            onClick={() => onDelete(task.id)}
+          >
+            <Trash size={16} />
+          </Button>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => onOpenChange(false)}
+              className="text-sm text-gray-500 hover:underline"
+            >
+              Zamknij
+            </button>
+
+            <Button
+              onClick={() => onComplete(task.id)}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <CheckCircle size={18} /> Ukończ
+            </Button>
+          </div>
+        </div>
+
       </DialogContent>
-      
-      {/* AI Task Breakdown Modal */}
-      <AITaskBreakdownModal
-        open={showAIBreakdown}
-        onClose={() => setShowAIBreakdown(false)}
-        task={task}
-        onCreateSubtasks={handleCreateSubtasks}
-      />
     </Dialog>
   )
 }
