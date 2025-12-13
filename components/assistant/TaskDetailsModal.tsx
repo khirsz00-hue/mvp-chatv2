@@ -121,13 +121,20 @@ const normalizeSubtasks = (
 ) =>
   items
     .filter(Boolean)
-    .map((s: RawSubtask) => ({
-      id: String(s.id ?? '').trim(),
-      parentId: s.parentId || parentId,
-      content: (s.content || (s as MinimalSubtaskShape).title || '').toString(),
-      createdAt: s.createdAt,
-      completed: Boolean(s.completed)
-    }))
+    .map((s: RawSubtask) => {
+      const fallbackTitle =
+        'title' in s && typeof (s as MinimalSubtaskShape).title === 'string'
+          ? (s as MinimalSubtaskShape).title
+          : ''
+      const mainContent = typeof s.content === 'string' ? s.content : ''
+      return {
+        id: String(s.id ?? '').trim(),
+        parentId: s.parentId || parentId,
+        content: (mainContent || fallbackTitle).toString(),
+        createdAt: s.createdAt,
+        completed: Boolean(s.completed)
+      }
+    })
     .filter(s => s.id !== '' && s.content.trim() !== '')
 
 const mergeSubtasks = (...groups: SubtaskItem[][]): SubtaskItem[] => {
@@ -327,13 +334,19 @@ Bądź wspierający i konkretny.
           const raw = localStorage.getItem('taskTimer')
           if (raw) {
             const parsed = JSON.parse(raw)
-            const startTs = Number(parsed.startTime)
+            if (!parsed || typeof parsed !== 'object') throw new Error('Invalid timer payload')
+            const isRunning = Boolean((parsed as any).isRunning)
+            const isPaused = Boolean((parsed as any).isPaused)
+            const startTs = Number((parsed as any).startTime)
+            const storedElapsed = Number((parsed as any).elapsedSeconds)
             const elapsed =
-              parsed.isRunning && !Number.isNaN(startTs) && startTs > 0
+              isRunning && Number.isFinite(startTs) && startTs > 0
                 ? Math.floor((Date.now() - startTs) / 1000)
-                : Number(parsed.elapsedSeconds) || 0
+                : Number.isFinite(storedElapsed)
+                ? storedElapsed
+                : 0
             setTimerInfo({
-              isActive: true,
+              isActive: isRunning || isPaused,
               isForThisTask: true,
               elapsedSeconds: elapsed
             })
@@ -348,21 +361,27 @@ Bądź wspierający i konkretny.
         const rawPomodoro = localStorage.getItem('pomodoroState')
         if (rawPomodoro) {
           const parsed = JSON.parse(rawPomodoro)
-          if (parsed.taskId === task.id && parsed.isRunning) {
+          if (!parsed || typeof parsed !== 'object') throw new Error('Invalid pomodoro payload')
+          const isRunning = Boolean((parsed as any).isRunning)
+          const phase = (parsed as any).phase as 'work' | 'shortBreak' | 'longBreak' | undefined
+          const remainingSecondsRaw = Number((parsed as any).remainingSeconds)
+          const safeRemaining = Number.isFinite(remainingSecondsRaw) ? remainingSecondsRaw : 0
+
+          if ((parsed as any).taskId === task.id && isRunning) {
             const phaseDuration =
-              parsed.phase === 'work'
+              phase === 'work'
                 ? POMODORO_WORK_DURATION
-                : parsed.phase === 'shortBreak'
+                : phase === 'shortBreak'
                 ? POMODORO_SHORT_BREAK_DURATION
                 : POMODORO_LONG_BREAK_DURATION
 
             setTimerInfo({
               isActive: true,
               isForThisTask: true,
-              elapsedSeconds: phaseDuration - (parsed.remainingSeconds || 0),
+              elapsedSeconds: phaseDuration - safeRemaining,
               isPomodoro: true,
-              pomodoroPhase: parsed.phase,
-              pomodoroRemaining: parsed.remainingSeconds
+              pomodoroPhase: phase,
+              pomodoroRemaining: safeRemaining
             })
             return
           }
@@ -693,7 +712,15 @@ Bądź wspierający i konkretny.
                   <p className="text-xs text-gray-500 mb-1 flex items-center gap-1">
                     <Flag size={12} /> Priorytet
                   </p>
-                  <Select value={String(priority)} onChange={e => setPriority(Number(e.target.value) as 1 | 2 | 3 | 4)}>
+                  <Select
+                    value={String(priority)}
+                    onChange={e => {
+                      const next = Number(e.target.value)
+                      if ([1, 2, 3, 4].includes(next)) {
+                        setPriority(next as 1 | 2 | 3 | 4)
+                      }
+                    }}
+                  >
                     <SelectOption value="1">P1 - krytyczne</SelectOption>
                     <SelectOption value="2">P2 - wysokie</SelectOption>
                     <SelectOption value="3">P3 - normalne</SelectOption>
