@@ -12,6 +12,7 @@ import { CreateTaskModal } from './CreateTaskModal'
 import { TaskDetailsModal } from './TaskDetailsModal'
 import { TaskCard } from './TaskCard'
 import { SevenDaysBoardView } from './SevenDaysBoardView'
+import { MonthView } from './MonthView'
 import { TaskTimer } from './TaskTimer'
 import { PomodoroTimer } from './PomodoroTimer'
 
@@ -35,8 +36,8 @@ interface Project {
   color?:  string
 }
 
-type FilterType = 'today' | 'tomorrow' | 'week' | 'month' | 'overdue' | 'all'
-type ViewType = 'list' | 'board'
+type FilterType = 'today' | 'tomorrow' | 'week' | 'month' | 'overdue' | 'all' | 'completed'
+type ViewType = 'list' | 'board' | 'week' | 'month'
 type SortType = 'date' | 'priority' | 'name'
 
 export function TasksAssistant() {
@@ -56,6 +57,7 @@ export function TasksAssistant() {
   const [showPomodoro, setShowPomodoro] = useState(false)
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
   const [bulkActionLoading, setBulkActionLoading] = useState(false)
+  const [activeTimerInfo, setActiveTimerInfo] = useState<{ taskId: string; taskTitle: string; isActive: boolean } | null>(null)
   
   const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
   
@@ -127,6 +129,59 @@ export function TasksAssistant() {
     fetchProjects()
   }, [token, fetchProjects])
   
+  // Monitor active timer/pomodoro
+  useEffect(() => {
+    const checkActiveTimer = () => {
+      // Check regular task timer
+      const taskTimerStored = localStorage.getItem('taskTimer')
+      if (taskTimerStored) {
+        const parsed = JSON.parse(taskTimerStored)
+        if (parsed.taskId && (parsed.isRunning || parsed.isPaused)) {
+          setActiveTimerInfo({
+            taskId: parsed.taskId,
+            taskTitle: parsed.taskTitle,
+            isActive: true
+          })
+          return
+        }
+      }
+      
+      // Check pomodoro timer
+      const pomodoroStored = localStorage.getItem('pomodoroState')
+      if (pomodoroStored) {
+        const parsed = JSON.parse(pomodoroStored)
+        if (parsed.taskId && parsed.isRunning) {
+          setActiveTimerInfo({
+            taskId: parsed.taskId,
+            taskTitle: parsed.taskTitle,
+            isActive: true
+          })
+          return
+        }
+      }
+      
+      setActiveTimerInfo(null)
+    }
+    
+    checkActiveTimer()
+    
+    // Listen for timer state changes
+    const handleStorageChange = () => checkActiveTimer()
+    const handleTimerChange = () => checkActiveTimer()
+    
+    window.addEventListener('storage', handleStorageChange)
+    window.addEventListener('timerStateChanged', handleTimerChange)
+    
+    // Poll every 2 seconds as backup
+    const interval = setInterval(checkActiveTimer, 2000)
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+      window.removeEventListener('timerStateChanged', handleTimerChange)
+      clearInterval(interval)
+    }
+  }, [])
+  
   // Filter tasks by date
   const filterTasks = (tasks: Task[], filterType: FilterType) => {
     console.log('🔍 FILTER DEBUG:', {
@@ -143,6 +198,12 @@ export function TasksAssistant() {
     const now = startOfDay(new Date())
     
     const filtered = tasks.filter(task => {
+      // Show only completed tasks when filter is 'completed'
+      if (filterType === 'completed') {
+        return task.completed === true
+      }
+      
+      // Skip completed tasks for other filters
       if (task.completed) {
         console.log('⏭️ Skipping completed task:', task.content)
         return false
@@ -606,6 +667,37 @@ export function TasksAssistant() {
   
   return (
     <div className="space-y-6">
+      {/* Active Timer Bar */}
+      {activeTimerInfo && activeTimerInfo.isActive && (
+        <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-xl p-4 shadow-lg animate-pulse">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-3 h-3 bg-white rounded-full animate-ping" />
+              <div>
+                <p className="text-sm font-semibold">Timer aktywny</p>
+                <p className="text-xs opacity-90">{activeTimerInfo.taskTitle}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button 
+                size="sm" 
+                variant="ghost"
+                className="text-white hover:bg-white/20"
+                onClick={() => {
+                  const task = tasks.find(t => t.id === activeTimerInfo.taskId)
+                  if (task) {
+                    setSelectedTask(task)
+                    setShowDetailsModal(true)
+                  }
+                }}
+              >
+                Zobacz zadanie
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Header */}
       <div className="flex flex-col gap-6">
         {/* Title Section */}
@@ -646,30 +738,54 @@ export function TasksAssistant() {
             {/* View switcher */}
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-gray-700 hidden sm:inline">Widok:</span>
-              <div className="inline-flex rounded-xl border-2 border-gray-200 p-1 bg-gray-50">
+              <div className="inline-flex rounded-xl border-2 border-gray-200 p-1 bg-gray-50 flex-wrap">
                 <button 
                   onClick={() => setView('list')}
-                  className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 font-medium ${
+                  className={`px-3 py-2 rounded-lg transition-all flex items-center gap-2 font-medium text-sm ${
                     view === 'list' 
                       ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-md' 
                       : 'text-gray-600 hover:bg-white hover:shadow-sm'
                   }`}
                   title="Widok listy"
                 >
-                  <List size={20} weight="bold" />
+                  <List size={18} weight="bold" />
                   <span className="hidden sm:inline">Lista</span>
                 </button>
                 <button 
                   onClick={() => setView('board')}
-                  className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 font-medium ${
+                  className={`px-3 py-2 rounded-lg transition-all flex items-center gap-2 font-medium text-sm ${
                     view === 'board' 
                       ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-md' 
                       : 'text-gray-600 hover:bg-white hover:shadow-sm'
                   }`}
                   title="Widok tablicy"
                 >
-                  <Kanban size={20} weight="bold" />
+                  <Kanban size={18} weight="bold" />
                   <span className="hidden sm:inline">Tablica</span>
+                </button>
+                <button 
+                  onClick={() => setView('week')}
+                  className={`px-3 py-2 rounded-lg transition-all flex items-center gap-2 font-medium text-sm ${
+                    view === 'week' 
+                      ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-md' 
+                      : 'text-gray-600 hover:bg-white hover:shadow-sm'
+                  }`}
+                  title="Widok tygodnia"
+                >
+                  <CalendarBlank size={18} weight="bold" />
+                  <span className="hidden sm:inline">Tydzień</span>
+                </button>
+                <button 
+                  onClick={() => setView('month')}
+                  className={`px-3 py-2 rounded-lg transition-all flex items-center gap-2 font-medium text-sm ${
+                    view === 'month' 
+                      ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-md' 
+                      : 'text-gray-600 hover:bg-white hover:shadow-sm'
+                  }`}
+                  title="Widok miesiąca"
+                >
+                  <CalendarBlank size={18} weight="bold" />
+                  <span className="hidden sm:inline">Miesiąc</span>
                 </button>
               </div>
             </div>
@@ -718,12 +834,13 @@ export function TasksAssistant() {
       {/* Filters */}
       {view === 'list' && (
         <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterType)}>
-          <TabsList className="grid grid-cols-5 w-full max-w-2xl">
+          <TabsList className="grid grid-cols-6 w-full max-w-3xl">
             <TabsTrigger value="today">Dziś</TabsTrigger>
             <TabsTrigger value="tomorrow">Jutro</TabsTrigger>
             <TabsTrigger value="week">Tydzień</TabsTrigger>
             <TabsTrigger value="month">Miesiąc</TabsTrigger>
             <TabsTrigger value="overdue">Przeterminowane</TabsTrigger>
+            <TabsTrigger value="completed">Ukończone</TabsTrigger>
           </TabsList>
         </Tabs>
       )}
@@ -772,7 +889,7 @@ export function TasksAssistant() {
                     Usuń
                   </Button>
                   
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm text-gray-600">Przenieś na:</span>
                     <select
                       onChange={(e) => {
@@ -784,12 +901,27 @@ export function TasksAssistant() {
                       disabled={bulkActionLoading}
                       className="text-sm px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-purple"
                     >
-                      <option value="">Wybierz datę...</option>
+                      <option value="">Szybki wybór...</option>
                       <option value={format(new Date(), 'yyyy-MM-dd')}>Dziś</option>
                       <option value={format(addDays(new Date(), 1), 'yyyy-MM-dd')}>Jutro</option>
                       <option value={format(addDays(new Date(), 3), 'yyyy-MM-dd')}>Za 3 dni</option>
                       <option value={format(addDays(new Date(), 7), 'yyyy-MM-dd')}>Za tydzień</option>
                     </select>
+                    
+                    <span className="text-sm text-gray-600">lub</span>
+                    
+                    <input
+                      type="date"
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          handleBulkMove(e.target.value)
+                          e.target.value = ''
+                        }
+                      }}
+                      disabled={bulkActionLoading}
+                      className="text-sm px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-purple"
+                      placeholder="Wybierz datę"
+                    />
                   </div>
                 </div>
               </>
@@ -818,6 +950,7 @@ export function TasksAssistant() {
                 {filter === 'week' && 'Nie masz zadań w tym tygodniu'}
                 {filter === 'month' && 'Nie masz zadań w tym miesiącu'}
                 {filter === 'overdue' && 'Nie masz przeterminowanych zadań'}
+                {filter === 'completed' && 'Nie masz ukończonych zadań'}
               </p>
               <Button onClick={() => setShowCreateModal(true)} className="gap-2">
                 <Plus size={18} />
@@ -843,9 +976,9 @@ export function TasksAssistant() {
               ))}
             </div>
           )
-        ) : (
+        ) : view === 'board' ? (
           <SevenDaysBoardView 
-            tasks={tasks. filter(t => ! t.completed)}
+            tasks={tasks.filter(t => !t.completed)}
             onMove={handleMove}
             onComplete={handleComplete}
             onDelete={handleDelete}
@@ -858,7 +991,35 @@ export function TasksAssistant() {
               // TODO: Pre-fill date in CreateTaskModal
             }}
           />
-        )}
+        ) : view === 'week' ? (
+          <SevenDaysBoardView 
+            tasks={tasks.filter(t => !t.completed)}
+            onMove={handleMove}
+            onComplete={handleComplete}
+            onDelete={handleDelete}
+            onDetails={(t) => {
+              setSelectedTask(t)
+              setShowDetailsModal(true)
+            }}
+            onAddForDate={(date) => {
+              setShowCreateModal(true)
+            }}
+          />
+        ) : view === 'month' ? (
+          <MonthView 
+            tasks={tasks.filter(t => !t.completed)}
+            onMove={handleMove}
+            onComplete={handleComplete}
+            onDelete={handleDelete}
+            onDetails={(t) => {
+              setSelectedTask(t)
+              setShowDetailsModal(true)
+            }}
+            onAddForDate={(date) => {
+              setShowCreateModal(true)
+            }}
+          />
+        ) : null}
       </div>
       
       {/* Modals */}

@@ -279,8 +279,10 @@ export function SevenDaysBoardView({
 
       <DragOverlay>
         {activeTask ? (
-          <div className="opacity-80 w-64">
-            <MiniTaskCard task={activeTask} />
+          <div className="w-64">
+            <div className="vibrate-drag shadow-2xl opacity-90">
+              <MiniTaskCard task={activeTask} />
+            </div>
           </div>
         ) : null}
       </DragOverlay>
@@ -418,36 +420,25 @@ function SortableTaskCard({
     opacity: isDragging ? 0.5 : isMoving ? 0.7 : 1
   }
 
-  // Separate drag handle from clickable content
+  // Make entire task draggable with animations
   return (
     <div
       ref={setNodeRef}
       style={style}
+      {...attributes}
+      {...listeners}
       className={cn(
-        isMoving && 'pointer-events-none'
+        'cursor-grab active:cursor-grabbing transition-all',
+        isDragging && 'opacity-0',
+        isMoving && 'pointer-events-none scale-95 opacity-70'
       )}
     >
-      <div className="flex items-stretch gap-0.5">
-        {/* Drag handle */}
-        <div
-          {...attributes}
-          {...listeners}
-          className="flex items-center cursor-grab active:cursor-grabbing px-0.5 hover:bg-gray-200 rounded transition-colors"
-          title="Przeciągnij, aby przenieść"
-        >
-          <DotsThree size={14} className="text-gray-400 rotate-90" weight="bold" />
-        </div>
-        
-        {/* Clickable task card */}
-        <div className="flex-1">
-          <MiniTaskCard
-            task={task}
-            onComplete={onComplete}
-            onDelete={onDelete}
-            onDetails={onDetails}
-          />
-        </div>
-      </div>
+      <MiniTaskCard
+        task={task}
+        onComplete={onComplete}
+        onDelete={onDelete}
+        onDetails={onDetails}
+      />
     </div>
   )
 }
