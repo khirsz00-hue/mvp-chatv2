@@ -816,7 +816,7 @@ Bądź wspierający i konkretny.
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] md:max-w-6xl max-h-[95vh] md:max-h-[90vh] overflow-hidden flex flex-col p-0">
+      <DialogContent className="max-w-[95vw] md:max-w-7xl max-h-[95vh] overflow-hidden flex flex-col p-0">
         {/* Header */}
         <div className="px-4 md:px-6 py-4 border-b bg-gradient-to-br from-purple-50 via-white to-pink-50 shrink-0">
           <div className="flex flex-col gap-3">
@@ -826,7 +826,7 @@ Bądź wspierający i konkretny.
                 <span className="hidden sm:inline">Task Cockpit Pro</span>
                 <span className="sm:hidden">Cockpit</span>
               </Badge>
-              <div className="flex gap-1 md:gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button 
                   size="sm" 
                   variant="ghost" 
@@ -877,7 +877,7 @@ Bądź wspierający i konkretny.
             <Input
               value={title}
               onChange={e => setTitle(e.target.value)}
-              className="text-xl md:text-2xl lg:text-3xl font-bold border-0 border-b-2 border-gray-200 focus:border-purple-500 rounded-none px-0"
+              className="text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold border-0 border-b-2 border-gray-200 focus:border-purple-500 rounded-none px-0"
               placeholder="Tytuł zadania"
               aria-label="Tytuł zadania"
               aria-describedby="ai-understanding-panel"
@@ -928,9 +928,9 @@ Bądź wspierający i konkretny.
           </div>
 
           {/* Main Grid Layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             {/* Left Column - Main Content */}
-            <div className="lg:col-span-2 space-y-4">
+            <div className="xl:col-span-2 space-y-4">
               {/* AI Understanding Section */}
               <Card className="p-4 md:p-6 bg-gradient-to-br from-purple-50 via-white to-pink-50 border-purple-200 shadow-lg">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
@@ -963,7 +963,7 @@ Bądź wspierający i konkretny.
                 </div>
                 <div
                   id="ai-understanding-panel"
-                  className="rounded-xl bg-white/90 border-2 border-purple-200 p-4 text-sm md:text-base text-purple-900 min-h-[100px] shadow-inner"
+                  className="rounded-xl bg-white/90 border-2 border-purple-200 p-5 md:p-6 text-sm md:text-base text-purple-900 min-h-[120px] shadow-inner"
                 >
                   {loadingAI ? (
                     <div className="flex items-center gap-2 text-purple-600">
@@ -1072,7 +1072,7 @@ Bądź wspierający i konkretny.
             </div>
 
             {/* Right Column - Metadata & Tracking */}
-            <div className="lg:col-span-1 space-y-4">
+            <div className="xl:col-span-1 space-y-4">
               {/* Timer & Pomodoro */}
               <Card className="p-4 md:p-6 shadow-lg border-gray-200 bg-gradient-to-br from-blue-50 to-cyan-50">
                 <div className="flex items-center justify-between mb-4">
@@ -1088,7 +1088,7 @@ Bądź wspierający i konkretny.
                 </div>
                 
                 {/* Timer Display */}
-                <div className="bg-white rounded-xl p-4 mb-4 shadow-inner border-2 border-blue-200">
+                <div className="bg-white rounded-xl p-5 md:p-6 mb-4 shadow-inner border-2 border-blue-200">
                   <div className="text-center">
                     <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">
                       {isTimerActiveForTask ? (timerInfo.isPomodoro ? 'Pomodoro Aktywne' : 'Timer Aktywny') : 'Czas pracy'}
