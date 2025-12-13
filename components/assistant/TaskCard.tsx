@@ -11,6 +11,7 @@ import { pl } from 'date-fns/locale'
 import { useTaskTimer } from './TaskTimer'
 import { TaskChatModal } from './TaskChatModal'
 import { AITaskBreakdownModal } from './AITaskBreakdownModal'
+import { useToast } from '@/components/ui/Toast'
 
 interface Subtask {
   id: string
@@ -58,6 +59,7 @@ export function TaskCard({
   const [showBreakdownModal, setShowBreakdownModal] = useState(false)
   
   const { startTimer, getActiveTimer } = useTaskTimer()
+  const { showToast } = useToast()
   
   // Check if this task has an active timer
   useEffect(() => {
@@ -165,10 +167,10 @@ export function TaskCard({
         })
       }
       
-      alert(`Utworzono ${subtasks.length} podzadań!`)
+      showToast(`Utworzono ${subtasks.length} podzadań!`, 'success')
     } catch (err) {
       console.error('Error creating subtasks:', err)
-      alert('Nie udało się utworzyć podzadań')
+      showToast('Nie udało się utworzyć podzadań', 'error')
     }
   }
   
