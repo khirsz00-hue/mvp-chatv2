@@ -180,29 +180,63 @@ Bądź ciepły, wspierający i konkretny.`
         
         // Get current elapsed time if timer is active
         if (isActive) {
-          const stored = localStorage.getItem('taskTimer')
-          if (stored) {
-            const parsed = JSON.parse(stored)
-            if (parsed.isRunning && parsed.startTime) {
-              const now = Date.now()
-              const elapsed = Math.floor((now - parsed.startTime) / 1000)
-              setActiveTimerElapsed(elapsed)
-            } else {
-              setActiveTimerElapsed(parsed.elapsedSeconds || 0)
+          try {
+            const stored = localStorage.getItem('taskTimer')
+            if (stored) {
+              const parsed = JSON.parse(stored)
+              if (parsed.isRunning && parsed.startTime) {
+                const now = Date.now()
+                const elapsed = Math.floor((now - parsed.startTime) / 1000)
+                setActiveTimerElapsed(elapsed)
+              } else {
+                setActiveTimerElapsed(parsed.elapsedSeconds || 0)
+              }
             }
+          } catch (err) {
+            console.error('Error parsing timer data:', err)
+            setActiveTimerElapsed(0)
           }
         }
       }
       
       checkTimer()
       
-      // Update timer every second if active
-      const timerInterval = setInterval(checkTimer, 1000)
+      // Update timer every second when active (using let for proper closure)
+      let timerInterval: NodeJS.Timeout | null = null
+      
+      const updateInterval = () => {
+        const activeTimer = getActiveTimer()
+        const isActive = activeTimer.taskId === task.id && activeTimer.isActive
+        
+        if (isActive && !timerInterval) {
+          // Start interval only when timer is active
+          timerInterval = setInterval(checkTimer, 1000)
+        } else if (!isActive && timerInterval) {
+          // Clear interval when timer is not active
+          clearInterval(timerInterval)
+          timerInterval = null
+        }
+      }
+      
+      updateInterval()
+      
+      // Listen for timer state changes
+      const handleTimerStateChange = () => {
+        checkTimer()
+        updateInterval()
+      }
+      
+      window.addEventListener('timerStateChanged', handleTimerStateChange)
+      window.addEventListener('storage', handleTimerStateChange)
       
       // Fetch AI understanding
       fetchAIUnderstanding()
       
-      return () => clearInterval(timerInterval)
+      return () => {
+        if (timerInterval) clearInterval(timerInterval)
+        window.removeEventListener('timerStateChanged', handleTimerStateChange)
+        window.removeEventListener('storage', handleTimerStateChange)
+      }
     }
   }, [task, getActiveTimer])
   
