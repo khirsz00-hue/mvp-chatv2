@@ -421,15 +421,13 @@ function SortableTaskCard({
     opacity: isDragging ? 0.5 : isMoving ? 0.7 : 1
   }
 
-  // Make entire task draggable with animations
+  // Wrapper receives sortable ref and styles, but card handles click/drag separately
   return (
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
       className={cn(
-        'cursor-grab active:cursor-grabbing transition-all',
+        'transition-all',
         isDragging && 'opacity-0',
         isMoving && 'pointer-events-none scale-95 opacity-70'
       )}
@@ -439,6 +437,7 @@ function SortableTaskCard({
         onComplete={onComplete}
         onDelete={onDelete}
         onDetails={onDetails}
+        dragHandleProps={{ ...attributes, ...listeners }}
       />
     </div>
   )
@@ -449,12 +448,14 @@ function MiniTaskCard({
   task,
   onComplete,
   onDelete,
-  onDetails
+  onDetails,
+  dragHandleProps
 }: {
   task: Task
   onComplete?: (id: string) => Promise<void>
   onDelete?: (id: string) => Promise<void>
   onDetails?: (task: Task) => void
+  dragHandleProps?: any
 }) {
   const [loading, setLoading] = useState(false)
   const [showTooltip, setShowTooltip] = useState(false)
@@ -498,16 +499,25 @@ function MiniTaskCard({
     }
   }
 
+  const handleClick = (e: React.MouseEvent) => {
+    // Only trigger details if not dragging
+    if (onDetails) {
+      onDetails(task)
+    }
+  }
+
   return (
     <div className="relative">
       {/* Using div instead of Card component for ultra-compact design with minimal padding */}
       <div
+        {...(dragHandleProps || {})}
         className={cn(
-          'px-2 py-1.5 border-l-2 rounded-md transition-all hover:shadow-sm group cursor-pointer text-xs',
+          'px-2 py-1.5 border-l-2 rounded-md transition-all hover:shadow-sm group text-xs',
           priorityColors[task.priority] || priorityColors[4],
-          loading && 'opacity-50'
+          loading && 'opacity-50',
+          dragHandleProps ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
         )}
-        onClick={() => onDetails?.(task)}
+        onClick={handleClick}
         onMouseEnter={() => setShowTooltip(true)}
         onMouseLeave={() => setShowTooltip(false)}
         role="button"

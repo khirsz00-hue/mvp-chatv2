@@ -74,7 +74,7 @@ export function TaskDetailsModal({
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
   const [showTimeTracking, setShowTimeTracking] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
-  const [pomodoroStats, setPomodoroStats] = useState<{ today: number; thisWeek: number }>({ today: 0, thisWeek: 0 })
+  const [taskTotalTime, setTaskTotalTime] = useState<number>(0) // Total time in seconds for this task
   
   const { startTimer } = useTaskTimer()
   
@@ -115,24 +115,15 @@ export function TaskDetailsModal({
       setIsEditing(true) // Always start in edit mode
       setAiSuggestions(null) // Reset suggestions
       
-      // Load Pomodoro stats from localStorage
-      const storedStats = localStorage.getItem('pomodoroStats')
-      if (storedStats) {
-        try {
-          const parsedStats = JSON.parse(storedStats)
-          // Reset daily stats if it's a new day
-          const today = new Date().toDateString()
-          if (parsedStats.lastReset !== today) {
-            parsedStats.today = 0
-            parsedStats.lastReset = today
-          }
-          setPomodoroStats({
-            today: parsedStats.today || 0,
-            thisWeek: parsedStats.thisWeek || 0
-          })
-        } catch (err) {
-          console.error('Error loading Pomodoro stats:', err)
-        }
+      // Calculate total time spent on this task from timer sessions
+      try {
+        const sessions = JSON.parse(localStorage.getItem('timerSessions') || '[]')
+        const taskSessions = sessions.filter((s: any) => s.taskId === task.id)
+        const totalSeconds = taskSessions.reduce((sum: number, s: any) => sum + (s.durationSeconds || 0), 0)
+        setTaskTotalTime(totalSeconds)
+      } catch (err) {
+        console.error('Error loading timer sessions:', err)
+        setTaskTotalTime(0)
       }
     }
   }, [task])
@@ -639,34 +630,55 @@ export function TaskDetailsModal({
                   <div className="p-4 pt-0 space-y-3">
                     <Separator className="mb-3" />
                     
-                    {/* Pomodoro Stats */}
-                    <div className="bg-gradient-to-r from-red-50 to-orange-50 rounded-lg p-4 border border-red-200">
+                    {/* Task Time Tracking Stats */}
+                    <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4 border border-purple-200">
                       <div className="flex items-center gap-2 mb-3">
-                        <span className="text-2xl">🍅</span>
-                        <span className="font-semibold text-sm text-gray-700">Sesje Pomodoro</span>
+                        <span className="text-2xl">⏱️</span>
+                        <span className="font-semibold text-sm text-gray-700">Całkowity czas pracy</span>
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-xs text-gray-500 mb-1">Dzisiaj</p>
-                          <p className="text-2xl font-bold text-red-600">{pomodoroStats.today}</p>
-                          <p className="text-xs text-gray-500">sesji ({pomodoroStats.today * 25} min)</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-500 mb-1">Ten tydzień</p>
-                          <p className="text-2xl font-bold text-orange-600">{pomodoroStats.thisWeek}</p>
-                          <p className="text-xs text-gray-500">sesji ({pomodoroStats.thisWeek * 25} min)</p>
-                        </div>
+                      <div className="text-center mb-3">
+                        <p className="text-4xl font-bold text-purple-600">
+                          {Math.floor(taskTotalTime / 3600)}:{String(Math.floor((taskTotalTime % 3600) / 60)).padStart(2, '0')}:{String(taskTotalTime % 60).padStart(2, '0')}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {Math.floor(taskTotalTime / 60)} minut całkowitego czasu
+                        </p>
                       </div>
+                      
+                      {task.duration && task.duration > 0 && (
+                        <div className="bg-white/50 rounded-lg p-2 mb-3">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-600">Estymacja:</span>
+                            <span className="font-semibold">{task.duration} min</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs mt-1">
+                            <span className="text-gray-600">Rzeczywisty:</span>
+                            <span className="font-semibold">{Math.floor(taskTotalTime / 60)} min</span>
+                          </div>
+                          {taskTotalTime > 0 && (
+                            <div className="mt-2">
+                              <div className="w-full bg-gray-200 rounded-full h-2">
+                                <div 
+                                  className={`h-2 rounded-full transition-all ${
+                                    (taskTotalTime / 60) > task.duration ? 'bg-red-500' : 'bg-green-500'
+                                  }`}
+                                  style={{ width: `${Math.min(100, (taskTotalTime / 60 / task.duration) * 100)}%` }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                       
                       <Button
                         onClick={handleStartTimer}
                         variant="outline"
                         size="sm"
-                        className="w-full mt-3 gap-2 bg-white hover:bg-red-50 border-red-300"
+                        className="w-full gap-2 bg-white hover:bg-purple-50 border-purple-300"
                       >
                         <Timer size={16} weight="fill" />
-                        Rozpocznij Pomodoro
+                        Rozpocznij Timer
                       </Button>
                     </div>
                     
@@ -796,7 +808,7 @@ export function TaskDetailsModal({
                   disabled={loading}
                 >
                   <Timer size={18} weight="fill" />
-                  Start Timer
+                  Rozpocznij Timer
                 </Button>
               </div>
             </>
@@ -923,17 +935,7 @@ export function TaskDetailsModal({
               <div className="flex gap-2 order-1 sm:order-2">
                 <Button 
                   variant="ghost" 
-                  onClick={() => {
-                    setIsEditing(false)
-                    // Reset to original values
-                    setEditedTitle(task.content)
-                    setEditedDescription(task.description || '')
-                    const dueStr = typeof task.due === 'string' ? task. due : task.due?.date
-                    setEditedDueDate(dueStr || '')
-                    setEditedPriority(task.priority)
-                    setEditedProjectId(task.project_id || '')
-                    setEditedDuration(task.duration || 0)
-                  }}
+                  onClick={() => onOpenChange(false)}
                   disabled={loading}
                   className="flex-1"
                 >
