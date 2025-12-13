@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
+const ERROR_REDIRECT_DELAY = 3000 // 3 seconds
+const SUCCESS_REDIRECT_DELAY = 1000 // 1 second
+
 export default function AuthCallbackPage() {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
@@ -18,7 +21,7 @@ export default function AuthCallbackPage() {
         
         if (errorParam) {
           setError(errorDescription || errorParam)
-          setTimeout(() => router.replace('/login'), 3000)
+          setTimeout(() => router.replace('/login'), ERROR_REDIRECT_DELAY)
           return
         }
 
@@ -29,7 +32,7 @@ export default function AuthCallbackPage() {
         if (sessionError) {
           console.error('Session error:', sessionError)
           setError(sessionError.message)
-          setTimeout(() => router.replace('/login'), 3000)
+          setTimeout(() => router.replace('/login'), ERROR_REDIRECT_DELAY)
           return
         }
 
@@ -38,12 +41,13 @@ export default function AuthCallbackPage() {
           router.replace('/')
         } else {
           // No session found, redirect to login
-          setTimeout(() => router.replace('/login'), 1000)
+          setTimeout(() => router.replace('/login'), SUCCESS_REDIRECT_DELAY)
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error handling auth callback:', err)
-        setError(err.message || 'An unexpected error occurred')
-        setTimeout(() => router.replace('/login'), 3000)
+        const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred'
+        setError(errorMessage)
+        setTimeout(() => router.replace('/login'), ERROR_REDIRECT_DELAY)
       }
     }
 
