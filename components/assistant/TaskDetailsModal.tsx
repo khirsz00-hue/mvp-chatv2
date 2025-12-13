@@ -267,7 +267,7 @@ export function TaskDetailsModal({
             {isEditing ? (
               <Input 
                 value={editedTitle}
-                onChange={(e) => setEditedTitle(e.target. value)}
+                onChange={(e) => setEditedTitle(e.target.value)}
                 className="text-xl font-semibold flex-1"
                 disabled={loading}
                 placeholder="Tytuł zadania..."
@@ -328,7 +328,7 @@ export function TaskDetailsModal({
             {task.priority && task.priority < 4 && (
               <Badge variant={task.priority === 1 ? 'destructive' : 'secondary'} className="gap-1.5 px-3 py-1.5">
                 <Flag size={16} />
-                P{task.priority} - {priorityLabels[task. priority]}
+                P{task.priority} - {priorityLabels[task.priority]}
               </Badge>
             )}
             
@@ -389,7 +389,7 @@ export function TaskDetailsModal({
                           className={subtask.completed ? 'text-green-600 flex-shrink-0' : 'text-gray-400 flex-shrink-0'}
                         />
                         <span className={subtask.completed ? 'line-through text-gray-500' : 'text-gray-700'}>
-                          {subtask. content}
+                          {subtask.content}
                         </span>
                       </div>
                     ))}
@@ -436,7 +436,7 @@ export function TaskDetailsModal({
                   <label className="block text-sm font-medium mb-2 text-gray-700">Opis</label>
                   <Textarea 
                     value={editedDescription}
-                    onChange={(e) => setEditedDescription(e. target.value)}
+                    onChange={(e) => setEditedDescription(e.target.value)}
                     rows={5}
                     placeholder="Dodaj opis zadania..."
                     disabled={loading}

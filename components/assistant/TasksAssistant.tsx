@@ -495,7 +495,7 @@ export function TasksAssistant() {
                 <SortAscending size={20} className="text-gray-500 hidden sm:inline" />
                 <select 
                   value={sortBy} 
-                  onChange={(e) => setSortBy(e.target. value as SortType)}
+                  onChange={(e) => setSortBy(e.target.value as SortType)}
                   className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-sm font-medium hover:border-gray-300 transition-colors"
                 >
                   <option value="date">📅 Sortuj: Data</option>
@@ -507,8 +507,8 @@ export function TasksAssistant() {
               <div className="flex items-center gap-2 flex-1 min-w-[200px]">
                 <select 
                   value={selectedProject} 
-                  onChange={(e) => setSelectedProject(e.target. value)}
-                  className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus: ring-brand-purple focus:border-transparent text-sm font-medium hover:border-gray-300 transition-colors"
+                  onChange={(e) => setSelectedProject(e.target.value)}
+                  className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-sm font-medium hover:border-gray-300 transition-colors"
                 >
                   <option value="all">📁 Wszystkie projekty</option>
                   {projects.map(p => (
