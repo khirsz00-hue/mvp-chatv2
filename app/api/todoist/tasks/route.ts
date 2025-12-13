@@ -4,7 +4,7 @@ import { startOfDay, endOfDay, addDays, isWithinInterval, parseISO, isBefore } f
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const token = searchParams.get('token')
-  const filter = (searchParams.get('filter') || 'today').toLowerCase()
+  const filter = (searchParams.get('filter') || 'all').toLowerCase()
 
   if (!token) {
     return NextResponse.json({ error: 'Brak tokenu Todoist' }, { status: 401 })
@@ -43,7 +43,8 @@ export async function GET(req: Request) {
       let dueDate: Date
       try {
         dueDate = parseISO(dueStr)
-      } catch {
+      } catch (e) {
+        console.warn('⚠️ Failed to parse date with parseISO, falling back to Date constructor:', dueStr, e)
         dueDate = new Date(dueStr)
       }
 
@@ -75,6 +76,6 @@ export async function GET(req: Request) {
     return NextResponse.json({ tasks: simplified })
   } catch (error: any) {
     console.error('❌ Błąd w /api/todoist/tasks:', error)
-    return NextResponse.json({ error: 'Błąd serwera' }, { status: 500 })
+    return NextResponse.json({ error: 'Nie udało się pobrać zadań' }, { status: 500 })
   }
 }
