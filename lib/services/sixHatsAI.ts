@@ -6,13 +6,22 @@ import { HAT_PROMPTS, SYNTHESIS_PROMPT } from '../prompts/sixHats'
 import type { Decision, HatColor, SixHatsAnalysis, SixHatsSynthesis, HatAnswer } from '../types/decisions'
 
 /**
- * Simple template string replacement
+ * Simple template string replacement with conditional support
  * Replaces {{variable}} with values from data object
+ * Handles {{#if variable}}...{{/if}} conditionals
  */
 function simpleTemplate(template: string, data: Record<string, any>): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
-    return data[key] !== undefined ? String(data[key]) : match
+  // First handle conditionals {{#if variable}}...{{/if}}
+  let result = template.replace(/\{\{#if (\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (match, key, content) => {
+    return data[key] ? content : ''
   })
+  
+  // Then handle simple variable replacements {{variable}}
+  result = result.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+    return data[key] !== undefined ? String(data[key]) : ''
+  })
+  
+  return result
 }
 
 /**

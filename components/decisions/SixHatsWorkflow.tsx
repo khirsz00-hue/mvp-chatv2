@@ -674,7 +674,7 @@ export default function SixHatsWorkflow({ decision, onComplete, onBack }: SixHat
                 {isCompleted ? <Check className="text-white" weight="bold" /> : hatInfo.emoji}
               </div>
               <span className="text-xs text-gray-600 text-center">
-                {hat.charAt(0).toUpperCase() + hat.slice(1)}
+                {hatInfo.title.split(' - ')[0]}
               </span>
             </motion.div>
           )
