@@ -715,12 +715,8 @@ export function TasksAssistant() {
   // OAuth Connection Screen
   if (! token) {
     const handleOAuthConnect = () => {
-      const clientId = process.env.NEXT_PUBLIC_TODOIST_CLIENT_ID
-      const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
-      const redirectUri = `${baseUrl}/api/todoist/callback`
-      const authUrl = `https://todoist.com/oauth/authorize? client_id=${clientId}&scope=data:read_write&state=mvp-chatv2`
-      
-      window.location.href = authUrl
+      // Redirect to our API endpoint which handles OAuth properly
+      window.location.href = '/api/todoist/auth'
     }
     
     return (
