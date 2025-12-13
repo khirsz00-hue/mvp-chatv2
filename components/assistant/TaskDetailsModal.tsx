@@ -273,7 +273,7 @@ export function TaskDetailsModal({
       if (!token) return
 
       try {
-        const res = await fetch(`/app/api/todoist/projects?token=${token}`)
+        const res = await fetch(`/api/todoist/projects?token=${token}`)
         if (res.ok) {
           const data = await res.json()
           setProjects(data.projects || [])
@@ -497,7 +497,7 @@ Bądź wspierający i konkretny.
       const token = localStorage.getItem('todoist_token')
       if (token) {
         try {
-          await fetch('/app/api/todoist/update', {
+          await fetch('/api/todoist/update', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -748,7 +748,7 @@ Bądź wspierający i konkretny.
       const token = localStorage.getItem('todoist_token')
       const userId = localStorage.getItem('todoist_user_id')
 
-      const res = await fetch('/app/api/ai/suggest-task', {
+      const res = await fetch('/api/ai/suggest-task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
