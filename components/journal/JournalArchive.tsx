@@ -5,9 +5,11 @@ import { supabase } from '@/lib/supabaseClient'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import { useToast } from '@/components/ui/Toast'
-import { ArrowLeft, Trash, Archive } from '@phosphor-icons/react'
+import { ArrowLeft, Trash, Archive, Database, Warning } from '@phosphor-icons/react'
 import { format, parseISO } from 'date-fns'
 import { pl } from 'date-fns/locale'
+import { isMissingTableError, isNetworkError } from '@/lib/supabaseHelper'
+import { SupabaseSetupGuide } from './SupabaseSetupGuide'
 
 interface ArchivedEntry {
   id: string
@@ -26,10 +28,23 @@ export function JournalArchive({ userId, onBack }: JournalArchiveProps) {
   const { showToast } = useToast()
   const [archivedEntries, setArchivedEntries] = useState<ArchivedEntry[]>([])
   const [loading, setLoading] = useState(false)
+  const [showSetupGuide, setShowSetupGuide] = useState(false)
+  const [errorType, setErrorType] = useState<'none' | 'missing-tables' | 'network' | 'other'>('none')
+  const [retryCount, setRetryCount] = useState(0)
 
   // Fetch archived entries
-  const fetchArchivedEntries = useCallback(async () => {
+  const fetchArchivedEntries = useCallback(async (currentRetry = 0) => {
+    // Validate userId before making request
+    if (!userId || userId.trim() === '') {
+      console.error('Invalid userId:', userId)
+      setErrorType('other')
+      showToast('Błąd: Brak identyfikatora użytkownika', 'error')
+      return
+    }
+
     setLoading(true)
+    setErrorType('none')
+    
     try {
       const { data, error } = await supabase
         .from('journal_archives')
@@ -40,9 +55,43 @@ export function JournalArchive({ userId, onBack }: JournalArchiveProps) {
       if (error) throw error
 
       setArchivedEntries(data || [])
+      setRetryCount(0) // Reset retry count on success
     } catch (err: any) {
-      console.error('Error fetching archived entries:', err)
-      showToast('Nie udało się pobrać archiwum', 'error')
+      console.error('Error fetching archived entries:', {
+        error: err,
+        message: err.message,
+        code: err.code,
+        details: err.details,
+        hint: err.hint,
+        userId: userId,
+        retryAttempt: currentRetry
+      })
+
+      // Check if error is due to missing tables
+      if (isMissingTableError(err)) {
+        console.error('Missing table detected: journal_archives table does not exist')
+        setErrorType('missing-tables')
+        showToast('Tabele nie istnieją - wymagana konfiguracja', 'error')
+        return
+      }
+
+      // Check if it's a network error and retry
+      if (isNetworkError(err) && currentRetry < 3) {
+        console.log(`Network error detected, retrying... (attempt ${currentRetry + 1}/3)`)
+        setRetryCount(currentRetry + 1)
+        setTimeout(() => fetchArchivedEntries(currentRetry + 1), 2000)
+        showToast('Błąd sieci, próba ponowna...', 'error')
+        return
+      }
+
+      setErrorType('other')
+      
+      // More detailed error message for user
+      const errorMessage = err.message 
+        ? `Nie udało się pobrać archiwum: ${err.message}`
+        : 'Nie udało się pobrać archiwum'
+      
+      showToast(errorMessage, 'error')
     } finally {
       setLoading(false)
     }
@@ -64,7 +113,14 @@ export function JournalArchive({ userId, onBack }: JournalArchiveProps) {
         .delete()
         .eq('id', archiveId)
 
-      if (archiveError) throw archiveError
+      if (archiveError) {
+        console.error('Error deleting from archive:', {
+          error: archiveError,
+          archiveId,
+          message: archiveError.message
+        })
+        throw archiveError
+      }
 
       // Delete the original entry (if it still exists)
       // Note: This may fail if the entry was already deleted, which is acceptable
@@ -76,9 +132,27 @@ export function JournalArchive({ userId, onBack }: JournalArchiveProps) {
       setArchivedEntries(prev => prev.filter(e => e.id !== archiveId))
       showToast('Wpis usunięty z archiwum', 'success')
     } catch (err: any) {
-      console.error('Error deleting archived entry:', err)
-      showToast('Nie udało się usunąć wpisu', 'error')
+      console.error('Error deleting archived entry:', {
+        error: err,
+        message: err.message,
+        code: err.code
+      })
+      
+      const errorMessage = err.message
+        ? `Nie udało się usunąć wpisu: ${err.message}`
+        : 'Nie udało się usunąć wpisu'
+      
+      showToast(errorMessage, 'error')
     }
+  }
+
+  // Show setup guide if tables are missing
+  if (showSetupGuide) {
+    return <SupabaseSetupGuide onClose={() => {
+      setShowSetupGuide(false)
+      setErrorType('none')
+      onBack()
+    }} />
   }
 
   return (
@@ -101,6 +175,60 @@ export function JournalArchive({ userId, onBack }: JournalArchiveProps) {
         </div>
       </div>
 
+      {/* Error State - Missing Tables */}
+      {errorType === 'missing-tables' && (
+        <Card className="border-orange-200 bg-orange-50">
+          <div className="p-6">
+            <div className="flex gap-3 items-start">
+              <Warning size={24} weight="bold" className="text-orange-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="font-semibold text-orange-900 mb-1">
+                  Brak tabel w bazie danych
+                </h3>
+                <p className="text-orange-800 text-sm mb-3">
+                  Tabele Dziennika nie zostały jeszcze utworzone w Supabase. 
+                  Kliknij poniższy przycisk, aby zobaczyć instrukcję konfiguracji.
+                </p>
+                <Button
+                  onClick={() => setShowSetupGuide(true)}
+                  className="gap-2"
+                  size="sm"
+                >
+                  <Database size={18} weight="bold" />
+                  Konfiguracja bazy danych
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Error State - Network/Other */}
+      {errorType === 'network' && (
+        <Card className="border-red-200 bg-red-50">
+          <div className="p-6">
+            <div className="flex gap-3 items-start">
+              <Warning size={24} weight="bold" className="text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="font-semibold text-red-900 mb-1">
+                  Błąd połączenia
+                </h3>
+                <p className="text-red-800 text-sm mb-3">
+                  Nie udało się połączyć z bazą danych. Sprawdź swoje połączenie internetowe.
+                </p>
+                <Button
+                  onClick={() => fetchArchivedEntries()}
+                  variant="outline"
+                  size="sm"
+                >
+                  Spróbuj ponownie
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Archived Entries List */}
       <div className="space-y-4">
         {loading ? (
@@ -110,7 +238,7 @@ export function JournalArchive({ userId, onBack }: JournalArchiveProps) {
               <span className="text-gray-600">Ładowanie archiwum...</span>
             </div>
           </Card>
-        ) : archivedEntries.length === 0 ? (
+        ) : archivedEntries.length === 0 && errorType === 'none' ? (
           <Card className="p-12 text-center">
             <Archive size={64} className="mx-auto mb-4 text-gray-300" weight="light" />
             <h3 className="text-lg font-semibold text-gray-600 mb-2">Archiwum puste</h3>

@@ -6,10 +6,12 @@ import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import Textarea from '@/components/ui/Textarea'
 import { useToast } from '@/components/ui/Toast'
-import { Plus, Archive, Trash, PencilSimple, FloppyDisk, X } from '@phosphor-icons/react'
+import { Plus, Archive, Trash, PencilSimple, FloppyDisk, X, Database, Warning, CheckCircle } from '@phosphor-icons/react'
 import { format, parseISO } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { JournalArchive } from './JournalArchive'
+import { SupabaseSetupGuide } from './SupabaseSetupGuide'
+import { isMissingTableError, isNetworkError, getSupabaseStatus, SupabaseStatus } from '@/lib/supabaseHelper'
 
 interface JournalEntry {
   id: string
@@ -27,24 +29,42 @@ export function JournalAssistant() {
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null)
   const [editingContent, setEditingContent] = useState('')
   const [showArchive, setShowArchive] = useState(false)
+  const [showSetupGuide, setShowSetupGuide] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
+  const [errorType, setErrorType] = useState<'none' | 'missing-tables' | 'network' | 'other'>('none')
+  const [connectionStatus, setConnectionStatus] = useState<SupabaseStatus>(SupabaseStatus.OK)
+  const [retryCount, setRetryCount] = useState(0)
 
-  // Get user ID from Supabase auth
+  // Get user ID from Supabase auth and check connection status
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         setUserId(user.id)
       }
+      
+      // Check Supabase status
+      const status = await getSupabaseStatus()
+      setConnectionStatus(status.status)
+      
+      if (status.status === SupabaseStatus.MISSING_TABLES) {
+        console.warn('Missing tables detected:', status.details)
+      }
     }
     getUser()
   }, [])
 
   // Fetch journal entries
-  const fetchEntries = useCallback(async () => {
-    if (!userId) return
+  const fetchEntries = useCallback(async (currentRetry = 0) => {
+    // Validate userId before making request
+    if (!userId || userId.trim() === '') {
+      console.error('Invalid userId:', userId)
+      return
+    }
     
     setLoading(true)
+    setErrorType('none')
+    
     try {
       const { data, error } = await supabase
         .from('journal_entries')
@@ -56,9 +76,45 @@ export function JournalAssistant() {
       if (error) throw error
 
       setEntries(data || [])
+      setRetryCount(0) // Reset retry count on success
     } catch (err: any) {
-      console.error('Error fetching entries:', err)
-      showToast('Nie udało się pobrać wpisów', 'error')
+      console.error('Error fetching entries:', {
+        error: err,
+        message: err.message,
+        code: err.code,
+        details: err.details,
+        hint: err.hint,
+        userId: userId,
+        retryAttempt: currentRetry
+      })
+
+      // Check if error is due to missing tables
+      if (isMissingTableError(err)) {
+        console.error('Missing table detected: journal_entries table does not exist')
+        setErrorType('missing-tables')
+        setConnectionStatus(SupabaseStatus.MISSING_TABLES)
+        showToast('Tabele nie istnieją - wymagana konfiguracja', 'error')
+        return
+      }
+
+      // Check if it's a network error and retry
+      if (isNetworkError(err) && currentRetry < 3) {
+        console.log(`Network error detected, retrying... (attempt ${currentRetry + 1}/3)`)
+        setRetryCount(currentRetry + 1)
+        setTimeout(() => fetchEntries(currentRetry + 1), 2000)
+        setErrorType('network')
+        showToast('Błąd sieci, próba ponowna...', 'error')
+        return
+      }
+
+      setErrorType('other')
+      
+      // More detailed error message for user
+      const errorMessage = err.message 
+        ? `Nie udało się pobrać wpisów: ${err.message}`
+        : 'Nie udało się pobrać wpisów'
+      
+      showToast(errorMessage, 'error')
     } finally {
       setLoading(false)
     }
@@ -87,14 +143,33 @@ export function JournalAssistant() {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('Error creating entry:', {
+          error,
+          message: error.message,
+          code: error.code
+        })
+        
+        if (isMissingTableError(error)) {
+          setErrorType('missing-tables')
+          showToast('Tabele nie istnieją - wymagana konfiguracja', 'error')
+          return
+        }
+        
+        throw error
+      }
 
       setEntries(prev => [data, ...prev])
       setNewEntryContent('')
       showToast('Wpis utworzony', 'success')
     } catch (err: any) {
       console.error('Error creating entry:', err)
-      showToast('Nie udało się utworzyć wpisu', 'error')
+      
+      const errorMessage = err.message
+        ? `Nie udało się utworzyć wpisu: ${err.message}`
+        : 'Nie udało się utworzyć wpisu'
+      
+      showToast(errorMessage, 'error')
     }
   }
 
@@ -205,6 +280,24 @@ export function JournalAssistant() {
     )
   }
 
+  // Show setup guide if requested or if tables are missing
+  if (showSetupGuide) {
+    return (
+      <SupabaseSetupGuide 
+        onClose={() => {
+          setShowSetupGuide(false)
+          // Refresh status after setup
+          getSupabaseStatus().then(status => {
+            setConnectionStatus(status.status)
+            if (status.status === SupabaseStatus.OK) {
+              fetchEntries()
+            }
+          })
+        }} 
+      />
+    )
+  }
+
   // Show archive view
   if (showArchive) {
     return (
@@ -224,17 +317,105 @@ export function JournalAssistant() {
             Dziennik Refleksji
           </h1>
           <p className="text-gray-600 mt-2 text-lg">Zapisuj swoje myśli i refleksje</p>
+          
+          {/* Connection status indicator */}
+          {connectionStatus !== SupabaseStatus.OK && (
+            <div className="flex items-center gap-2 mt-2">
+              {connectionStatus === SupabaseStatus.MISSING_TABLES ? (
+                <>
+                  <Warning size={16} weight="bold" className="text-orange-600" />
+                  <span className="text-sm text-orange-600">Wymagana konfiguracja bazy danych</span>
+                </>
+              ) : connectionStatus === SupabaseStatus.NOT_CONFIGURED ? (
+                <>
+                  <Warning size={16} weight="bold" className="text-red-600" />
+                  <span className="text-sm text-red-600">Supabase nie jest skonfigurowany</span>
+                </>
+              ) : (
+                <>
+                  <Warning size={16} weight="bold" className="text-yellow-600" />
+                  <span className="text-sm text-yellow-600">Błąd połączenia</span>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
-        <Button
-          onClick={() => setShowArchive(true)}
-          variant="outline"
-          className="gap-2"
-        >
-          <Archive size={20} weight="bold" />
-          Archiwum
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => setShowArchive(true)}
+            variant="outline"
+            className="gap-2"
+          >
+            <Archive size={20} weight="bold" />
+            Archiwum
+          </Button>
+          
+          {connectionStatus === SupabaseStatus.MISSING_TABLES && (
+            <Button
+              onClick={() => setShowSetupGuide(true)}
+              className="gap-2"
+            >
+              <Database size={20} weight="bold" />
+              Konfiguracja
+            </Button>
+          )}
+        </div>
       </div>
+
+      {/* Error State - Missing Tables */}
+      {errorType === 'missing-tables' && (
+        <Card className="border-orange-200 bg-orange-50">
+          <div className="p-6">
+            <div className="flex gap-3 items-start">
+              <Warning size={24} weight="bold" className="text-orange-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="font-semibold text-orange-900 mb-1">
+                  Brak tabel w bazie danych
+                </h3>
+                <p className="text-orange-800 text-sm mb-3">
+                  Tabele Dziennika nie zostały jeszcze utworzone w Supabase. 
+                  Kliknij poniższy przycisk, aby zobaczyć instrukcję konfiguracji.
+                </p>
+                <Button
+                  onClick={() => setShowSetupGuide(true)}
+                  className="gap-2"
+                  size="sm"
+                >
+                  <Database size={18} weight="bold" />
+                  Konfiguracja bazy danych
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Error State - Network */}
+      {errorType === 'network' && (
+        <Card className="border-yellow-200 bg-yellow-50">
+          <div className="p-6">
+            <div className="flex gap-3 items-start">
+              <Warning size={24} weight="bold" className="text-yellow-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="font-semibold text-yellow-900 mb-1">
+                  Problemy z połączeniem
+                </h3>
+                <p className="text-yellow-800 text-sm mb-3">
+                  Nie udało się połączyć z bazą danych. Sprawdź swoje połączenie internetowe i spróbuj ponownie.
+                </p>
+                <Button
+                  onClick={() => fetchEntries()}
+                  variant="outline"
+                  size="sm"
+                >
+                  Spróbuj ponownie
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* New Entry Form */}
       <Card className="p-6">
