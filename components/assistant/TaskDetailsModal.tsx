@@ -816,7 +816,7 @@ Bądź wspierający i konkretny.
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] md:max-w-7xl max-h-[95vh] overflow-hidden flex flex-col p-0">
+      <DialogContent className="max-w-[98vw] md:max-w-5xl max-h-[95vh] overflow-hidden flex flex-col p-0">
         {/* Header */}
         <div className="px-4 md:px-6 py-4 border-b bg-gradient-to-br from-purple-50 via-white to-pink-50 shrink-0">
           <div className="flex flex-col gap-3">
@@ -927,10 +927,8 @@ Bądź wspierający i konkretny.
             </div>
           </div>
 
-          {/* Main Grid Layout */}
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6">
-            {/* Left Column - Main Content */}
-            <div className="xl:col-span-2 space-y-4">
+          {/* Main Content - Single Column Layout */}
+          <div className="space-y-4 md:space-y-6">
               {/* AI Understanding Section */}
               <Card className="p-4 md:p-6 bg-gradient-to-br from-purple-50 via-white to-pink-50 border-purple-200 shadow-lg">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
@@ -1069,10 +1067,7 @@ Bądź wspierający i konkretny.
                   ))}
                 </div>
               </Card>
-            </div>
 
-            {/* Right Column - Metadata & Tracking */}
-            <div className="xl:col-span-1 space-y-4">
               {/* Timer & Pomodoro */}
               <Card className="p-4 md:p-6 shadow-lg border-gray-200 bg-gradient-to-br from-blue-50 to-cyan-50">
                 <div className="flex items-center justify-between mb-4">
@@ -1383,7 +1378,6 @@ Bądź wspierający i konkretny.
                   )}
                 </div>
               </Card>
-            </div>
           </div>
         </div>
       </DialogContent>
