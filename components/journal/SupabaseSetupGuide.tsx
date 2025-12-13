@@ -301,7 +301,7 @@ export function SupabaseSetupGuide({ onClose, standalone = false }: SupabaseSetu
         <CardContent className="space-y-4">
           <div>
             <h4 className="font-semibold text-blue-900 mb-2">
-              Błąd: &quot;relation already exists&quot;
+              Błąd: {'"relation already exists"'}
             </h4>
             <p className="text-blue-800 text-sm">
               Tabele już istnieją w bazie danych. Nie musisz ich tworzyć ponownie. 
@@ -311,7 +311,7 @@ export function SupabaseSetupGuide({ onClose, standalone = false }: SupabaseSetu
           
           <div>
             <h4 className="font-semibold text-blue-900 mb-2">
-              Błąd: &quot;permission denied&quot;
+              Błąd: {'"permission denied"'}
             </h4>
             <p className="text-blue-800 text-sm">
               Sprawdź czy jesteś zalogowany jako administrator projektu w Supabase.

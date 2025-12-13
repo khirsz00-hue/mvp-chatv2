@@ -33,7 +33,7 @@ export function JournalArchive({ userId, onBack }: JournalArchiveProps) {
   const [retryCount, setRetryCount] = useState(0)
 
   // Fetch archived entries
-  const fetchArchivedEntries = useCallback(async (isRetry = false) => {
+  const fetchArchivedEntries = useCallback(async (currentRetry = 0) => {
     // Validate userId before making request
     if (!userId || userId.trim() === '') {
       console.error('Invalid userId:', userId)
@@ -63,7 +63,8 @@ export function JournalArchive({ userId, onBack }: JournalArchiveProps) {
         code: err.code,
         details: err.details,
         hint: err.hint,
-        userId: userId
+        userId: userId,
+        retryAttempt: currentRetry
       })
 
       // Check if error is due to missing tables
@@ -75,10 +76,10 @@ export function JournalArchive({ userId, onBack }: JournalArchiveProps) {
       }
 
       // Check if it's a network error and retry
-      if (isNetworkError(err) && !isRetry && retryCount < 3) {
-        console.log(`Network error detected, retrying... (attempt ${retryCount + 1}/3)`)
-        setRetryCount(prev => prev + 1)
-        setTimeout(() => fetchArchivedEntries(true), 2000)
+      if (isNetworkError(err) && currentRetry < 3) {
+        console.log(`Network error detected, retrying... (attempt ${currentRetry + 1}/3)`)
+        setRetryCount(currentRetry + 1)
+        setTimeout(() => fetchArchivedEntries(currentRetry + 1), 2000)
         showToast('Błąd sieci, próba ponowna...', 'error')
         return
       }
@@ -94,7 +95,7 @@ export function JournalArchive({ userId, onBack }: JournalArchiveProps) {
     } finally {
       setLoading(false)
     }
-  }, [userId, showToast, retryCount])
+  }, [userId, showToast])
 
   useEffect(() => {
     fetchArchivedEntries()

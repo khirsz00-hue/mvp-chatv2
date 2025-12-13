@@ -22,7 +22,7 @@ export async function checkSupabaseConnection(): Promise<boolean> {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
     
-    if (supabaseUrl.includes('placeholder') || supabaseKey.includes('placeholder')) {
+    if (supabaseUrl === 'https://placeholder.supabase.co' || supabaseKey === 'placeholder-key') {
       return false
     }
 
@@ -87,30 +87,36 @@ export async function checkTablesExist(): Promise<{
 /**
  * Check if an error is related to missing tables
  */
-export function isMissingTableError(error: any): boolean {
+export function isMissingTableError(error: unknown): boolean {
   if (!error) return false
   
+  // Type guard for error objects with code property
+  const err = error as { code?: string; message?: string }
+  
   // PostgreSQL error code for "relation does not exist"
-  if (error.code === '42P01') return true
+  if (err.code === '42P01') return true
   
   // Check error message
-  const message = error.message?.toLowerCase() || ''
+  const message = err.message?.toLowerCase() || ''
   return message.includes('relation') && message.includes('does not exist')
 }
 
 /**
  * Check if an error is a network/connection error
  */
-export function isNetworkError(error: any): boolean {
+export function isNetworkError(error: unknown): boolean {
   if (!error) return false
   
-  const message = error.message?.toLowerCase() || ''
+  // Type guard for error objects with message and name properties
+  const err = error as { message?: string; name?: string }
+  
+  const message = err.message?.toLowerCase() || ''
   return (
     message.includes('network') ||
     message.includes('fetch') ||
     message.includes('timeout') ||
-    error.name === 'NetworkError' ||
-    error.name === 'TypeError'
+    err.name === 'NetworkError' ||
+    err.name === 'TypeError'
   )
 }
 

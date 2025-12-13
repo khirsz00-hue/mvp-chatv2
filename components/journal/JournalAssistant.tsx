@@ -55,7 +55,7 @@ export function JournalAssistant() {
   }, [])
 
   // Fetch journal entries
-  const fetchEntries = useCallback(async (isRetry = false) => {
+  const fetchEntries = useCallback(async (currentRetry = 0) => {
     // Validate userId before making request
     if (!userId || userId.trim() === '') {
       console.error('Invalid userId:', userId)
@@ -84,7 +84,8 @@ export function JournalAssistant() {
         code: err.code,
         details: err.details,
         hint: err.hint,
-        userId: userId
+        userId: userId,
+        retryAttempt: currentRetry
       })
 
       // Check if error is due to missing tables
@@ -97,10 +98,10 @@ export function JournalAssistant() {
       }
 
       // Check if it's a network error and retry
-      if (isNetworkError(err) && !isRetry && retryCount < 3) {
-        console.log(`Network error detected, retrying... (attempt ${retryCount + 1}/3)`)
-        setRetryCount(prev => prev + 1)
-        setTimeout(() => fetchEntries(true), 2000)
+      if (isNetworkError(err) && currentRetry < 3) {
+        console.log(`Network error detected, retrying... (attempt ${currentRetry + 1}/3)`)
+        setRetryCount(currentRetry + 1)
+        setTimeout(() => fetchEntries(currentRetry + 1), 2000)
         setErrorType('network')
         showToast('Błąd sieci, próba ponowna...', 'error')
         return
@@ -117,7 +118,7 @@ export function JournalAssistant() {
     } finally {
       setLoading(false)
     }
-  }, [userId, showToast, retryCount])
+  }, [userId, showToast])
 
   useEffect(() => {
     if (userId) {
