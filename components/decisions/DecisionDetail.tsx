@@ -1,331 +1,329 @@
-'use client'
-
-import React, { useState } from 'react'
-import { ArrowLeft, Plus, Trash, Sparkle, Hat } from '@phosphor-icons/react'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, Button, Badge, Input, Textarea } from '../ui'
-import AIAnalysisPanel from './AIAnalysisPanel'
-import SixHatsWorkflow from './SixHatsWorkflow'
-import type { DecisionWithOptions } from '@/lib/types/decisions'
+import React from 'react';
+import { Decision, DecisionOption } from '@/types/decision';
+import { Calendar, Users, CheckCircle, XCircle, Clock, TrendUp, 
+  CowboyHat, Lightbulb, Target, Flag, Brain, Scale, 
+  ChartBar, GitBranch, Path, Crosshair, MapPin, Compass, 
+  Aperture, CircleDashed, Activity, Pulse, Eye, Focus } from '@phosphor-icons/react';
 
 interface DecisionDetailProps {
-  decision: DecisionWithOptions
-  onBack: () => void
-  onUpdate: () => void
-  onDelete: (id: string) => void
+  decision: Decision;
+  onClose: () => void;
 }
 
-export default function DecisionDetail({ decision, onBack, onUpdate, onDelete }: DecisionDetailProps) {
-  const [isAddingOption, setIsAddingOption] = useState(false)
-  const [newOptionLabel, setNewOptionLabel] = useState('')
-  const [newOptionDescription, setNewOptionDescription] = useState('')
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [analysisResult, setAnalysisResult] = useState<any>(null)
-  const [showSixHats, setShowSixHats] = useState(false)
-
-  const handleAddOption = async () => {
-    if (!newOptionLabel.trim()) return
-
-    try {
-      const response = await fetch('/api/decisions/options', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          decision_id: decision.id,
-          label: newOptionLabel.trim(),
-          description: newOptionDescription.trim() || undefined,
-        }),
-      })
-
-      if (response.ok) {
-        setNewOptionLabel('')
-        setNewOptionDescription('')
-        setIsAddingOption(false)
-        onUpdate()
-      }
-    } catch (error) {
-      console.error('Error adding option:', error)
+const DecisionDetail: React.FC<DecisionDetailProps> = ({ decision, onClose }) => {
+  const getStatusIcon = () => {
+    switch (decision.status) {
+      case 'pending':
+        return <Clock className="w-5 h-5" />;
+      case 'completed':
+        return <CheckCircle className="w-5 h-5" />;
+      case 'cancelled':
+        return <XCircle className="w-5 h-5" />;
+      default:
+        return <Clock className="w-5 h-5" />;
     }
-  }
+  };
 
-  const handleAnalyze = async () => {
-    setIsAnalyzing(true)
-    try {
-      const response = await fetch(`/api/decisions/${decision.id}/analyze`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ analysisType: 'full' }),
-      })
-      const data = await response.json()
-      setAnalysisResult(data.analysis)
-    } catch (error) {
-      console.error('Error analyzing decision:', error)
-    } finally {
-      setIsAnalyzing(false)
+  const getStatusColor = () => {
+    switch (decision.status) {
+      case 'pending':
+        return 'text-yellow-600 bg-yellow-50';
+      case 'completed':
+        return 'text-green-600 bg-green-50';
+      case 'cancelled':
+        return 'text-red-600 bg-red-50';
+      default:
+        return 'text-gray-600 bg-gray-50';
     }
-  }
+  };
 
-  const handleMarkAsDecided = async () => {
-    try {
-      await fetch(`/api/decisions/${decision.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'decided' }),
-      })
-      onUpdate()
-    } catch (error) {
-      console.error('Error updating decision:', error)
+  const getCategoryIcon = () => {
+    switch (decision.category) {
+      case 'personal':
+        return <Users className="w-5 h-5" />;
+      case 'professional':
+        return <TrendUp className="w-5 h-5" />;
+      case 'financial':
+        return <ChartBar className="w-5 h-5" />;
+      case 'health':
+        return <Activity className="w-5 h-5" />;
+      case 'relationships':
+        return <Users className="w-5 h-5" />;
+      case 'education':
+        return <Brain className="w-5 h-5" />;
+      case 'lifestyle':
+        return <Compass className="w-5 h-5" />;
+      case 'other':
+        return <CircleDashed className="w-5 h-5" />;
+      default:
+        return <CircleDashed className="w-5 h-5" />;
     }
-  }
+  };
 
-  const statusLabels: Record<string, string> = {
-    pending: 'Do rozważenia',
-    analyzing: 'Analizuję...',
-    analyzed: 'Przeanalizowana',
-    decided: 'Zdecydowano',
-    archived: 'Archiwum',
-  }
+  const getPriorityIcon = () => {
+    switch (decision.priority) {
+      case 'low':
+        return <Flag className="w-4 h-4" weight="light" />;
+      case 'medium':
+        return <Flag className="w-4 h-4" weight="regular" />;
+      case 'high':
+        return <Flag className="w-4 h-4" weight="fill" />;
+      default:
+        return <Flag className="w-4 h-4" />;
+    }
+  };
 
-  // Check if Six Hats analysis is in progress or completed
-  const hasSixHatsData = decision.current_hat !== undefined || (decision.hat_answers && decision.hat_answers.length > 0)
+  const getPriorityColor = () => {
+    switch (decision.priority) {
+      case 'low':
+        return 'text-blue-600 bg-blue-50';
+      case 'medium':
+        return 'text-yellow-600 bg-yellow-50';
+      case 'high':
+        return 'text-red-600 bg-red-50';
+      default:
+        return 'text-gray-600 bg-gray-50';
+    }
+  };
 
-  // Show Six Hats workflow if active
-  if (showSixHats || hasSixHatsData) {
-    return (
-      <SixHatsWorkflow
-        decision={decision}
-        onComplete={() => {
-          setShowSixHats(false)
-          onUpdate()
-        }}
-        onBack={() => {
-          setShowSixHats(false)
-        }}
-      />
-    )
-  }
+  const formatDate = (date: Date) => {
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }).format(new Date(date));
+  };
+
+  const getWinningOption = () => {
+    if (!decision.options || decision.options.length === 0) return null;
+    return decision.options.reduce((prev, current) =>
+      (current.score || 0) > (prev.score || 0) ? current : prev
+    );
+  };
+
+  const winningOption = getWinningOption();
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <Card className="glass">
-        <CardHeader>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b border-gray-200">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
-                <Button variant="ghost" onClick={onBack} className="p-2">
-                  <ArrowLeft />
-                </Button>
-                <CardTitle className="text-2xl">{decision.title}</CardTitle>
+                <div className={`p-2 rounded-lg ${getStatusColor()}`}>
+                  {getStatusIcon()}
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900">{decision.title}</h2>
               </div>
-              {decision.description && (
-                <CardDescription className="ml-11">
-                  {decision.description}
-                </CardDescription>
-              )}
+              <p className="text-gray-600 mt-2">{decision.description}</p>
             </div>
-            <Badge variant={decision.status === 'decided' ? 'success' : 'default'}>
-              {statusLabels[decision.status] || decision.status}
-            </Badge>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <XCircle className="w-6 h-6" />
+            </button>
           </div>
-          {decision.context && (
-            <div className="ml-11 mt-4 p-4 bg-gray-50 rounded-lg">
-              <p className="text-sm text-gray-700">{decision.context}</p>
-            </div>
-          )}
-        </CardHeader>
-      </Card>
+        </div>
 
-      {/* Six Thinking Hats Analysis Card */}
-      <Card className="glass bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-brand-purple">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-brand-purple rounded-lg">
-                <Hat className="w-6 h-6 text-white" weight="duotone" />
+        <div className="p-6 space-y-6">
+          {/* Metadata Section */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+              <Calendar className="w-5 h-5 text-gray-600" />
+              <div>
+                <p className="text-sm text-gray-500">Created</p>
+                <p className="text-sm font-medium text-gray-900">
+                  {formatDate(decision.createdAt)}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+              <div className="text-gray-600">{getCategoryIcon()}</div>
+              <div>
+                <p className="text-sm text-gray-500">Category</p>
+                <p className="text-sm font-medium text-gray-900 capitalize">
+                  {decision.category}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+              <div className={`p-1.5 rounded ${getPriorityColor()}`}>
+                {getPriorityIcon()}
               </div>
               <div>
-                <CardTitle className="text-xl">Metoda 6 Kapeluszy Myślowych</CardTitle>
-                <CardDescription>
-                  Kompleksowa analiza decyzji z różnych perspektyw
-                </CardDescription>
+                <p className="text-sm text-gray-500">Priority</p>
+                <p className="text-sm font-medium text-gray-900 capitalize">
+                  {decision.priority}
+                </p>
               </div>
             </div>
-            <Button
-              onClick={() => setShowSixHats(true)}
-              className="flex items-center gap-2 bg-brand-purple hover:bg-brand-purple/90"
-            >
-              <Hat weight="bold" />
-              Rozpocznij Analizę
-            </Button>
           </div>
-        </CardHeader>
-        <CardContent>
-          <p className="text-gray-700 mb-4">
-            Przeanalizuj swoją decyzję z 6 różnych perspektyw:
-          </p>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <div className="bg-white/70 rounded-lg p-3 text-center">
-              <div className="text-3xl mb-1">🔵</div>
-              <p className="text-sm font-medium">Organizacja</p>
-            </div>
-            <div className="bg-white/70 rounded-lg p-3 text-center">
-              <div className="text-3xl mb-1">⚪</div>
-              <p className="text-sm font-medium">Fakty</p>
-            </div>
-            <div className="bg-white/70 rounded-lg p-3 text-center">
-              <div className="text-3xl mb-1">🔴</div>
-              <p className="text-sm font-medium">Emocje</p>
-            </div>
-            <div className="bg-white/70 rounded-lg p-3 text-center">
-              <div className="text-3xl mb-1">⚫</div>
-              <p className="text-sm font-medium">Ryzyka</p>
-            </div>
-            <div className="bg-white/70 rounded-lg p-3 text-center">
-              <div className="text-3xl mb-1">🟡</div>
-              <p className="text-sm font-medium">Korzyści</p>
-            </div>
-            <div className="bg-white/70 rounded-lg p-3 text-center">
-              <div className="text-3xl mb-1">🟢</div>
-              <p className="text-sm font-medium">Kreatywność</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* Options Section */}
-      <Card className="glass">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Opcje do rozważenia</CardTitle>
-            {!isAddingOption && (
-              <Button
-                variant="ghost"
-                onClick={() => setIsAddingOption(true)}
-                className="flex items-center gap-2"
-              >
-                <Plus weight="bold" />
-                Dodaj opcję
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Add option form */}
-          {isAddingOption && (
-            <div className="p-4 border-2 border-dashed border-brand-purple rounded-lg space-y-3">
-              <Input
-                value={newOptionLabel}
-                onChange={(e) => setNewOptionLabel(e.target.value)}
-                placeholder="Nazwa opcji"
-                autoFocus
-              />
-              <Textarea
-                value={newOptionDescription}
-                onChange={(e) => setNewOptionDescription(e.target.value)}
-                placeholder="Opis opcji (opcjonalnie)"
-                rows={2}
-              />
-              <div className="flex gap-2">
-                <Button onClick={handleAddOption} disabled={!newOptionLabel.trim()}>
-                  Dodaj
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setIsAddingOption(false)
-                    setNewOptionLabel('')
-                    setNewOptionDescription('')
-                  }}
-                >
-                  Anuluj
-                </Button>
+          {/* Decision Maker */}
+          {winningOption && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <CowboyHat className="w-5 h-5 text-green-600" weight="fill" />
+                <h3 className="text-lg font-semibold text-green-900">Recommended Choice</h3>
+              </div>
+              <p className="text-green-800 font-medium">{winningOption.title}</p>
+              <p className="text-sm text-green-700 mt-1">{winningOption.description}</p>
+              <div className="mt-3 flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Scale className="w-4 h-4 text-green-600" />
+                  <span className="text-sm text-green-700">
+                    Score: {winningOption.score?.toFixed(1) || 'N/A'}
+                  </span>
+                </div>
               </div>
             </div>
           )}
 
-          {/* Options list */}
-          {decision.options && decision.options.length > 0 ? (
-            <div className="space-y-3">
-              {decision.options.map((option, index) => (
-                <div
-                  key={option.id}
-                  className="p-4 border border-gray-200 rounded-lg hover:border-brand-purple transition-colors"
-                >
-                  <div className="flex items-start justify-between">
+          {/* Options */}
+          {decision.options && decision.options.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <CowboyHat className="w-5 h-5" />
+                Options Considered
+              </h3>
+              <div className="space-y-3">
+                {decision.options.map((option, index) => (
+                  <div
+                    key={option.id || index}
+                    className={`border rounded-lg p-4 ${
+                      option.id === winningOption?.id
+                        ? 'border-green-300 bg-green-50'
+                        : 'border-gray-200 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-900">{option.title}</h4>
+                        <p className="text-sm text-gray-600 mt-1">{option.description}</p>
+                      </div>
+                      <div className="ml-4 text-right">
+                        <div className="text-lg font-semibold text-gray-900">
+                          {option.score?.toFixed(1) || 'N/A'}
+                        </div>
+                        <div className="text-xs text-gray-500">Score</div>
+                      </div>
+                    </div>
+
+                    {/* Pros and Cons */}
+                    {(option.pros && option.pros.length > 0) || (option.cons && option.cons.length > 0) ? (
+                      <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {option.pros && option.pros.length > 0 && (
+                          <div>
+                            <div className="flex items-center gap-1 mb-1">
+                              <CheckCircle className="w-4 h-4 text-green-600" />
+                              <span className="text-xs font-medium text-green-700">Pros</span>
+                            </div>
+                            <ul className="text-sm text-gray-700 space-y-1">
+                              {option.pros.map((pro, idx) => (
+                                <li key={idx} className="flex items-start gap-1">
+                                  <span className="text-green-600 mt-0.5">•</span>
+                                  <span>{pro}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {option.cons && option.cons.length > 0 && (
+                          <div>
+                            <div className="flex items-center gap-1 mb-1">
+                              <XCircle className="w-4 h-4 text-red-600" />
+                              <span className="text-xs font-medium text-red-700">Cons</span>
+                            </div>
+                            <ul className="text-sm text-gray-700 space-y-1">
+                              {option.cons.map((con, idx) => (
+                                <li key={idx} className="flex items-start gap-1">
+                                  <span className="text-red-600 mt-0.5">•</span>
+                                  <span>{con}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Criteria */}
+          {decision.criteria && decision.criteria.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <Scale className="w-5 h-5" />
+                Decision Criteria
+              </h3>
+              <div className="space-y-2">
+                {decision.criteria.map((criterion, index) => (
+                  <div
+                    key={criterion.id || index}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                  >
                     <div className="flex-1">
-                      <h4 className="font-semibold text-lg mb-1">
-                        {index + 1}. {option.label}
-                      </h4>
-                      {option.description && (
-                        <p className="text-sm text-gray-600 mb-3">{option.description}</p>
-                      )}
-                      {(option.pros && option.pros.length > 0) && (
-                        <div className="mb-2">
-                          <p className="text-xs font-medium text-green-600 mb-1">Zalety:</p>
-                          <ul className="text-sm text-gray-700 space-y-1">
-                            {option.pros.map((pro, i) => (
-                              <li key={i}>✓ {pro}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                      {(option.cons && option.cons.length > 0) && (
-                        <div>
-                          <p className="text-xs font-medium text-red-600 mb-1">Wady:</p>
-                          <ul className="text-sm text-gray-700 space-y-1">
-                            {option.cons.map((con, i) => (
-                              <li key={i}>✗ {con}</li>
-                            ))}
-                          </ul>
-                        </div>
+                      <p className="font-medium text-gray-900">{criterion.name}</p>
+                      {criterion.description && (
+                        <p className="text-sm text-gray-600 mt-0.5">{criterion.description}</p>
                       )}
                     </div>
+                    <div className="ml-4 flex items-center gap-2">
+                      <div className="text-right">
+                        <div className="text-sm font-semibold text-gray-900">
+                          Weight: {criterion.weight}
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          ) : (
-            <p className="text-center text-gray-500 py-8">
-              Brak opcji. Dodaj opcje do rozważenia.
-            </p>
           )}
-        </CardContent>
-      </Card>
 
-      {/* AI Analysis Section */}
-      <AIAnalysisPanel
-        decision={decision}
-        analysisResult={analysisResult}
-        isAnalyzing={isAnalyzing}
-        onAnalyze={handleAnalyze}
-      />
-
-      {/* Actions */}
-      <Card className="glass">
-        <CardFooter className="flex justify-between">
-          <Button
-            variant="destructive"
-            onClick={() => {
-              if (confirm('Czy na pewno chcesz usunąć tę decyzję?')) {
-                onDelete(decision.id)
-              }
-            }}
-            className="flex items-center gap-2"
-          >
-            <Trash weight="bold" />
-            Usuń decyzję
-          </Button>
-          
-          {decision.status !== 'decided' && (
-            <Button
-              variant="success"
-              onClick={handleMarkAsDecided}
-            >
-              Oznacz jako zdecydowane
-            </Button>
+          {/* Notes */}
+          {decision.notes && decision.notes.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <Lightbulb className="w-5 h-5" />
+                Notes & Insights
+              </h3>
+              <div className="space-y-2">
+                {decision.notes.map((note, index) => (
+                  <div key={index} className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-900">{note}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
-        </CardFooter>
-      </Card>
+
+          {/* Tags */}
+          {decision.tags && decision.tags.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Tags</h3>
+              <div className="flex flex-wrap gap-2">
+                {decision.tags.map((tag, index) => (
+                  <span
+                    key={index}
+                    className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
-  )
-}
+  );
+};
+
+export default DecisionDetail;
