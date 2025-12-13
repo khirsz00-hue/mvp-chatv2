@@ -311,3 +311,104 @@ export async function getDecisionEvents(
 
   return data || []
 }
+
+// ============================================
+// Six Thinking Hats Operations
+// ============================================
+
+/**
+ * Save hat answer and update current hat
+ */
+export async function saveHatAnswer(
+  decisionId: string,
+  hatAnswer: import('../types/decisions').HatAnswer
+): Promise<boolean> {
+  try {
+    // Get current decision to get existing hat_answers
+    const decision = await getDecisionById(decisionId)
+    if (!decision) {
+      console.error('Decision not found')
+      return false
+    }
+
+    // Update hat_answers array
+    const hatAnswers = decision.hat_answers || []
+    const existingIndex = hatAnswers.findIndex(a => a.hat === hatAnswer.hat)
+    
+    if (existingIndex >= 0) {
+      hatAnswers[existingIndex] = hatAnswer
+    } else {
+      hatAnswers.push(hatAnswer)
+    }
+
+    // Update decision with new hat_answers
+    const { error } = await supabase
+      .from('decisions')
+      .update({ hat_answers: hatAnswers })
+      .eq('id', decisionId)
+
+    if (error) {
+      console.error('Error saving hat answer:', error)
+      return false
+    }
+
+    // Create event for this hat analysis
+    await createDecisionEvent(
+      decisionId,
+      'hat_analysis',
+      { hat_color: hatAnswer.hat },
+      hatAnswer.aiAnalysis
+    )
+
+    return true
+  } catch (error) {
+    console.error('Error in saveHatAnswer:', error)
+    return false
+  }
+}
+
+/**
+ * Move to next hat in the Six Thinking Hats process
+ */
+export async function moveToNextHat(
+  decisionId: string,
+  nextHat: import('../types/decisions').HatColor | null
+): Promise<boolean> {
+  const { error } = await supabase
+    .from('decisions')
+    .update({ current_hat: nextHat })
+    .eq('id', decisionId)
+
+  if (error) {
+    console.error('Error moving to next hat:', error)
+    return false
+  }
+
+  return true
+}
+
+/**
+ * Save final synthesis
+ */
+export async function saveSynthesis(
+  decisionId: string,
+  synthesis: import('../types/decisions').SixHatsSynthesis
+): Promise<boolean> {
+  try {
+    // Update decision status to analyzed
+    await updateDecision(decisionId, { status: 'analyzed' })
+
+    // Create synthesis event
+    await createDecisionEvent(
+      decisionId,
+      'synthesis',
+      synthesis,
+      JSON.stringify(synthesis)
+    )
+
+    return true
+  } catch (error) {
+    console.error('Error saving synthesis:', error)
+    return false
+  }
+}
