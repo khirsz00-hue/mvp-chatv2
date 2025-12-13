@@ -57,6 +57,8 @@ export function TaskCard({
   const [hasActiveTimer, setHasActiveTimer] = useState(false)
   const [showChatModal, setShowChatModal] = useState(false)
   const [showBreakdownModal, setShowBreakdownModal] = useState(false)
+  const [showAITooltip, setShowAITooltip] = useState(false)
+  const [aiUnderstanding, setAiUnderstanding] = useState<string>('')
   
   const { startTimer, stopTimer, getActiveTimer } = useTaskTimer()
   const { showToast } = useToast()
@@ -277,6 +279,37 @@ export function TaskCard({
               >
                 {priorityLabels[task. priority]}
               </Badge>
+            )}
+            
+            {/* AI Understanding Tooltip */}
+            {task.description && (
+              <div className="relative">
+                <Badge 
+                  variant="outline" 
+                  className="gap-1 text-xs cursor-help border-purple-300 bg-purple-50 text-purple-700"
+                  onMouseEnter={() => setShowAITooltip(true)}
+                  onMouseLeave={() => setShowAITooltip(false)}
+                  title="Jak AI rozumie zadanie"
+                >
+                  <Brain size={12} weight="fill" />
+                  AI
+                </Badge>
+                
+                {showAITooltip && (
+                  <div className="absolute z-50 left-0 top-full mt-2 w-64 p-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white text-xs rounded-lg shadow-xl pointer-events-none">
+                    <div className="font-semibold mb-1 flex items-center gap-1">
+                      <Brain size={14} weight="fill" />
+                      Jak AI rozumie zadanie
+                    </div>
+                    <div className="text-purple-100">
+                      {task.description?.substring(0, 150)}{task.description && task.description.length > 150 ? '...' : ''}
+                    </div>
+                    <div className="text-xs text-purple-200 mt-2">
+                      💡 Kliknij "Szczegóły" aby zobaczyć pełną analizę AI
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>

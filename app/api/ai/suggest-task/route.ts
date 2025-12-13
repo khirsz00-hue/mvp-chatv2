@@ -80,13 +80,18 @@ Na podstawie tytułu i kontekstu zasugeruj:
 
 3. **Opis zadania** (1-2 zdania praktycznych wskazówek co i jak zrobić)
 
-4. **Sugerowany projekt** (nazwa z dostępnych projektów lub null jeśli nie pasuje)
+4. **Sugerowany projekt** (nazwa z dostępnych projektów lub null jeśli nie pasuje):
+   - ZAWSZE sugeruj projekt gdy pasuje do zadania, nawet dla nowych zadań
+   - Dopasuj zadanie do najlepszego projektu z kontekstu użytkownika
+   - Jeśli brak pasującego projektu, zwróć null
 
 5. **Sugerowana data wykonania** (format YYYY-MM-DD):
+   - WAŻNE: Dzisiaj jest ${new Date().toISOString().split('T')[0]} (rok 2025)
    - Pilne: dziś lub jutro
    - Ważne: w ciągu 3 dni
    - Normalne: w ciągu tygodnia
    - Niskie: w ciągu 2 tygodni
+   - NIGDY nie używaj dat z przeszłości ani z roku 2023 lub 2024!
 
 6. **Sugerowane etykiety** (2-4 słowa kluczowe opisujące zadanie)
 
@@ -110,7 +115,10 @@ Zwróć odpowiedź jako JSON:
       messages: [
         { 
           role: 'system', 
-          content: 'Jesteś asystentem ADHD pomagającym oszacować wymagania zadania na podstawie tytułu i kontekstu użytkownika.  Bądź praktyczny i konkretny.' 
+          content: `Jesteś asystentem ADHD pomagającym oszacować wymagania zadania na podstawie tytułu i kontekstu użytkownika. Bądź praktyczny i konkretny. 
+          
+WAŻNE: Dzisiaj jest ${new Date().toISOString().split('T')[0]}. NIGDY nie używaj dat z przeszłości. Wszystkie sugestie dat muszą być z roku 2025 lub późniejszego.
+ZAWSZE sugeruj projekt dla nowych zadań na podstawie dostępnych projektów użytkownika i treści zadania.` 
         },
         { role: 'user', content: prompt }
       ],

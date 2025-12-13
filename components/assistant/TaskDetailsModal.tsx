@@ -75,10 +75,49 @@ export function TaskDetailsModal({
   const [showTimeTracking, setShowTimeTracking] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [taskTotalTime, setTaskTotalTime] = useState<number>(0) // Total time in seconds for this task
+  const [aiUnderstanding, setAiUnderstanding] = useState<string>('')
+  const [loadingUnderstanding, setLoadingUnderstanding] = useState(false)
   
   const { startTimer } = useTaskTimer()
   
   const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
+  
+  // Fetch AI Understanding
+  const fetchAIUnderstanding = async () => {
+    if (!task) return
+    
+    setLoadingUnderstanding(true)
+    try {
+      const prompt = `Jesteś asystentem AI wspierającym osoby z ADHD w zarządzaniu zadaniami.
+
+Zadanie użytkownika: "${task.content}"
+${task.description ? `Opis: "${task.description}"` : ''}
+
+Napisz krótkie podsumowanie (2-3 zdania) jak rozumiesz to zadanie.
+Pokaż użytkownikowi, że rozumiesz jego intencje.
+Bądź ciepły, wspierający i konkretny.`
+
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: 'Jesteś wspierającym asystentem ADHD.' },
+            { role: 'user', content: prompt }
+          ]
+        })
+      })
+      
+      if (res.ok) {
+        const data = await res.json()
+        setAiUnderstanding(data.response || 'Rozumiem to zadanie i jestem gotowy pomóc.')
+      }
+    } catch (err) {
+      console.error('Error fetching AI understanding:', err)
+    } finally {
+      setLoadingUnderstanding(false)
+    }
+  }
   
   // Fetch projects
   useEffect(() => {
@@ -114,6 +153,7 @@ export function TaskDetailsModal({
       setEditedLabels(task.labels || [])
       setIsEditing(true) // Always start in edit mode
       setAiSuggestions(null) // Reset suggestions
+      setAiUnderstanding('') // Reset AI understanding
       
       // Calculate total time spent on this task from timer sessions
       try {
@@ -125,6 +165,9 @@ export function TaskDetailsModal({
         console.error('Error loading timer sessions:', err)
         setTaskTotalTime(0)
       }
+      
+      // Fetch AI understanding
+      fetchAIUnderstanding()
     }
   }, [task])
   
@@ -568,6 +611,30 @@ export function TaskDetailsModal({
           {/* View Mode */}
           {!isEditing && (
             <>
+              {/* AI Understanding Section */}
+              <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl p-4 border-2 border-purple-200">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center flex-shrink-0">
+                    <Brain size={20} className="text-white" weight="fill" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-sm text-purple-900 mb-2 flex items-center gap-2">
+                      💡 Jak AI rozumie zadanie
+                    </h3>
+                    {loadingUnderstanding ? (
+                      <div className="flex items-center gap-2 text-sm text-purple-700">
+                        <div className="w-3 h-3 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
+                        <span>Analizuję zadanie...</span>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-purple-800 leading-relaxed">
+                        {aiUnderstanding || 'Kliknij "Doprecyzuj" aby AI przeanalizowało zadanie.'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
               {/* Description */}
               <div>
                 <h3 className="font-semibold text-sm text-gray-500 uppercase tracking-wide mb-3">Opis</h3>
@@ -798,7 +865,7 @@ export function TaskDetailsModal({
                   disabled={loading}
                 >
                   <Brain size={18} weight="fill" />
-                  AI Breakdown
+                  Doprecyzuj
                 </Button>
                 
                 <Button 
