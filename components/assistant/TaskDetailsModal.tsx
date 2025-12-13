@@ -97,10 +97,23 @@ const formatStopwatch = (seconds: number): string => {
     .padStart(2, '0')}`
 }
 
+const POMODORO_WORK_DURATION = 25 * 60
+const POMODORO_SHORT_BREAK_DURATION = 5 * 60
+const POMODORO_LONG_BREAK_DURATION = 15 * 60
+
+interface MinimalSubtaskShape {
+  id: string
+  content?: string
+  title?: string
+  completed?: boolean
+  parentId?: string
+  createdAt?: number
+}
+
 type RawSubtask =
   | SubtaskItem
   | LocalSubtask
-  | { id?: string; content?: string; title?: string; completed?: boolean; parentId?: string; createdAt?: number }
+  | MinimalSubtaskShape
 
 const normalizeSubtasks = (
   items: RawSubtask[] = [],
@@ -109,13 +122,13 @@ const normalizeSubtasks = (
   items
     .filter(Boolean)
     .map((s: RawSubtask) => ({
-      id: s.id,
+      id: String(s.id ?? '').trim(),
       parentId: s.parentId || parentId,
-      content: s.content || s.title || '',
+      content: (s.content || (s as MinimalSubtaskShape).title || '').toString(),
       createdAt: s.createdAt,
       completed: Boolean(s.completed)
     }))
-    .filter(s => s.id && s.content)
+    .filter(s => s.id !== '' && s.content.trim() !== '')
 
 const mergeSubtasks = (...groups: SubtaskItem[][]): SubtaskItem[] => {
   const map = new Map<string, SubtaskItem>()
@@ -241,6 +254,8 @@ Bądź wspierający i konkretny.
         if (res.ok) {
           const data = await res.json()
           remote.push(...normalizeSubtasks(data.subtasks || [], task.id))
+        } else {
+          showToast('Nie udało się pobrać podzadań', 'error')
         }
         const merged = mergeSubtasks(
           remote,
@@ -250,6 +265,7 @@ Bądź wspierający i konkretny.
         setSubtasks(merged)
       } catch (err) {
         console.error('Error loading subtasks', err)
+        showToast('Błąd przy ładowaniu podzadań', 'error')
         setSubtasks(normalizeSubtasks(task.subtasks || [], task.id))
       } finally {
         setSubtasksLoading(false)
@@ -261,7 +277,7 @@ Bądź wspierający i konkretny.
       setAiUnderstanding('')
       fetchAIUnderstanding(task)
     }
-  }, [task, fetchAIUnderstanding])
+  }, [task, fetchAIUnderstanding, showToast])
 
   /* =======================
      AUTO SAVE
@@ -311,10 +327,11 @@ Bądź wspierający i konkretny.
           const raw = localStorage.getItem('taskTimer')
           if (raw) {
             const parsed = JSON.parse(raw)
+            const startTs = Number(parsed.startTime)
             const elapsed =
-              parsed.isRunning && parsed.startTime
-                ? Math.floor((Date.now() - parsed.startTime) / 1000)
-                : parsed.elapsedSeconds || 0
+              parsed.isRunning && !Number.isNaN(startTs) && startTs > 0
+                ? Math.floor((Date.now() - startTs) / 1000)
+                : Number(parsed.elapsedSeconds) || 0
             setTimerInfo({
               isActive: true,
               isForThisTask: true,
@@ -332,15 +349,12 @@ Bądź wspierający i konkretny.
         if (rawPomodoro) {
           const parsed = JSON.parse(rawPomodoro)
           if (parsed.taskId === task.id && parsed.isRunning) {
-            const WORK_DURATION = 25 * 60
-            const SHORT_BREAK_DURATION = 5 * 60
-            const LONG_BREAK_DURATION = 15 * 60
             const phaseDuration =
               parsed.phase === 'work'
-                ? WORK_DURATION
+                ? POMODORO_WORK_DURATION
                 : parsed.phase === 'shortBreak'
-                ? SHORT_BREAK_DURATION
-                : LONG_BREAK_DURATION
+                ? POMODORO_SHORT_BREAK_DURATION
+                : POMODORO_LONG_BREAK_DURATION
 
             setTimerInfo({
               isActive: true,
