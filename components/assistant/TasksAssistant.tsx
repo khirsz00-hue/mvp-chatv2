@@ -37,7 +37,7 @@ interface Project {
 }
 
 type FilterType = 'today' | 'tomorrow' | 'week' | 'month' | 'overdue' | 'all' | 'completed'
-type ViewType = 'list' | 'board' | 'week' | 'month'
+type ViewType = 'list' | 'board'
 type SortType = 'date' | 'priority' | 'name'
 
 export function TasksAssistant() {
@@ -57,7 +57,7 @@ export function TasksAssistant() {
   const [showPomodoro, setShowPomodoro] = useState(false)
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
   const [bulkActionLoading, setBulkActionLoading] = useState(false)
-  const [activeTimerInfo, setActiveTimerInfo] = useState<{ taskId: string; taskTitle: string; isActive: boolean } | null>(null)
+  const [activeTimerInfo, setActiveTimerInfo] = useState<{ taskId: string; taskTitle: string; isActive: boolean; elapsedSeconds?: number; startTime?: number } | null>(null)
   
   const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
   
@@ -137,10 +137,18 @@ export function TasksAssistant() {
       if (taskTimerStored) {
         const parsed = JSON.parse(taskTimerStored)
         if (parsed.taskId && (parsed.isRunning || parsed.isPaused)) {
+          // Calculate elapsed time
+          const now = Date.now()
+          const elapsed = parsed.isRunning && parsed.startTime 
+            ? Math.floor((now - parsed.startTime) / 1000)
+            : parsed.elapsedSeconds || 0
+          
           setActiveTimerInfo({
             taskId: parsed.taskId,
             taskTitle: parsed.taskTitle,
-            isActive: true
+            isActive: true,
+            elapsedSeconds: elapsed,
+            startTime: parsed.startTime
           })
           return
         }
@@ -165,15 +173,15 @@ export function TasksAssistant() {
     
     checkActiveTimer()
     
+    // Update timer every second
+    const interval = setInterval(checkActiveTimer, 1000)
+    
     // Listen for timer state changes
     const handleStorageChange = () => checkActiveTimer()
     const handleTimerChange = () => checkActiveTimer()
     
     window.addEventListener('storage', handleStorageChange)
     window.addEventListener('timerStateChanged', handleTimerChange)
-    
-    // Poll every 5 seconds as backup
-    const interval = setInterval(checkActiveTimer, 5000)
     
     return () => {
       window.removeEventListener('storage', handleStorageChange)
@@ -673,20 +681,31 @@ export function TasksAssistant() {
     <div className="space-y-6">
       {/* Active Timer Bar */}
       {activeTimerInfo && activeTimerInfo.isActive && (
-        <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-xl p-4 shadow-lg animate-pulse">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+        <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-xl p-4 shadow-lg">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
               <div className="w-3 h-3 bg-white rounded-full animate-ping" />
-              <div>
+              <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold">Timer aktywny</p>
-                <p className="text-xs opacity-90">{activeTimerInfo.taskTitle}</p>
+                <p className="text-xs opacity-90 truncate">{activeTimerInfo.taskTitle}</p>
               </div>
             </div>
+            
+            {/* Elapsed Time */}
+            {activeTimerInfo.elapsedSeconds !== undefined && (
+              <div className="text-right">
+                <p className="text-xs opacity-75">Czas</p>
+                <p className="text-lg font-mono font-bold">
+                  {Math.floor(activeTimerInfo.elapsedSeconds / 3600)}:{String(Math.floor((activeTimerInfo.elapsedSeconds % 3600) / 60)).padStart(2, '0')}:{String(activeTimerInfo.elapsedSeconds % 60).padStart(2, '0')}
+                </p>
+              </div>
+            )}
+            
             <div className="flex items-center gap-2">
               <Button 
                 size="sm" 
                 variant="ghost"
-                className="text-white hover:bg-white/20"
+                className="text-white hover:bg-white/20 whitespace-nowrap"
                 onClick={() => {
                   const task = tasks.find(t => t.id === activeTimerInfo.taskId)
                   if (task) {
@@ -696,6 +715,28 @@ export function TasksAssistant() {
                 }}
               >
                 Zobacz zadanie
+              </Button>
+              
+              <Button 
+                size="sm" 
+                variant="ghost"
+                className="text-white hover:bg-red-700"
+                onClick={() => {
+                  // Stop the timer
+                  const timerState = {
+                    taskId: null,
+                    taskTitle: null,
+                    startTime: null,
+                    elapsedSeconds: 0,
+                    isRunning: false,
+                    isPaused: false
+                  }
+                  localStorage.setItem('taskTimer', JSON.stringify(timerState))
+                  window.dispatchEvent(new CustomEvent('timerStateChanged', { detail: timerState }))
+                  setActiveTimerInfo(null)
+                }}
+              >
+                Zatrzymaj
               </Button>
             </div>
           </div>
@@ -766,30 +807,6 @@ export function TasksAssistant() {
                 >
                   <Kanban size={18} weight="bold" />
                   <span className="hidden sm:inline">Tablica</span>
-                </button>
-                <button 
-                  onClick={() => setView('week')}
-                  className={`px-3 py-2 rounded-lg transition-all flex items-center gap-2 font-medium text-sm ${
-                    view === 'week' 
-                      ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-md' 
-                      : 'text-gray-600 hover:bg-white hover:shadow-sm'
-                  }`}
-                  title="Widok tygodnia"
-                >
-                  <Calendar size={18} weight="bold" />
-                  <span className="hidden sm:inline">Tydzień</span>
-                </button>
-                <button 
-                  onClick={() => setView('month')}
-                  className={`px-3 py-2 rounded-lg transition-all flex items-center gap-2 font-medium text-sm ${
-                    view === 'month' 
-                      ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-md' 
-                      : 'text-gray-600 hover:bg-white hover:shadow-sm'
-                  }`}
-                  title="Widok miesiąca"
-                >
-                  <CalendarBlank size={18} weight="bold" />
-                  <span className="hidden sm:inline">Miesiąc</span>
                 </button>
               </div>
             </div>
@@ -993,34 +1010,6 @@ export function TasksAssistant() {
             onAddForDate={(date) => {
               setShowCreateModal(true)
               // TODO: Pre-fill date in CreateTaskModal
-            }}
-          />
-        ) : view === 'week' ? (
-          <SevenDaysBoardView 
-            tasks={activeTasks}
-            onMove={handleMove}
-            onComplete={handleComplete}
-            onDelete={handleDelete}
-            onDetails={(t) => {
-              setSelectedTask(t)
-              setShowDetailsModal(true)
-            }}
-            onAddForDate={(date) => {
-              setShowCreateModal(true)
-            }}
-          />
-        ) : view === 'month' ? (
-          <MonthView 
-            tasks={activeTasks}
-            onMove={handleMove}
-            onComplete={handleComplete}
-            onDelete={handleDelete}
-            onDetails={(t) => {
-              setSelectedTask(t)
-              setShowDetailsModal(true)
-            }}
-            onAddForDate={(date) => {
-              setShowCreateModal(true)
             }}
           />
         ) : null}

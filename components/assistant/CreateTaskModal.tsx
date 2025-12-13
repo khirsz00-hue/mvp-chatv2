@@ -122,6 +122,7 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
           
           if (response.ok) {
             const data = await response.json()
+            console.log('AI Suggestions received:', data)
             setAiSuggestions(data)
           }
         } catch (err) {
@@ -160,10 +161,18 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
         break
       case 'project':
         if (aiSuggestions.suggestedProject) {
-          // Find project by name
-          const project = projects.find(p => p.name === aiSuggestions.suggestedProject)
+          // Find project by name (case-insensitive and flexible matching)
+          const suggestedName = aiSuggestions.suggestedProject.toLowerCase().trim()
+          const project = projects.find(p => 
+            p.name.toLowerCase().trim() === suggestedName ||
+            p.name.toLowerCase().includes(suggestedName) ||
+            suggestedName.includes(p.name.toLowerCase())
+          )
           if (project) {
+            console.log('Applying suggested project:', project.name)
             setProjectId(project.id)
+          } else {
+            console.warn('Could not find project matching:', aiSuggestions.suggestedProject, 'in', projects.map(p => p.name))
           }
         }
         break
