@@ -490,7 +490,10 @@ Bądź konkretny, wspierający i naturalny.  Odpowiedz w 2-4 zdaniach.`
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={onClose}
+            onClick={(e) => {
+              e.stopPropagation()
+              onClose()
+            }}
           />
           
           {/* Modal */}
@@ -500,6 +503,7 @@ Bądź konkretny, wspierający i naturalny.  Odpowiedz w 2-4 zdaniach.`
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
             className="relative z-10 w-full max-w-4xl max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
             <div className="px-6 py-5 border-b bg-gradient-to-r from-purple-50 to-pink-50 shrink-0">
