@@ -709,34 +709,50 @@ export function TaskDetailsModal({
                     
                     <div className="space-y-3">
                       {/* Creation Date */}
-                      {task.created_at && (
-                        <div className="flex items-start gap-3 pb-3 border-b border-gray-100">
-                          <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                            <span className="text-sm">✨</span>
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-700">Zadanie utworzone</p>
-                            <p className="text-xs text-gray-500 mt-0.5">
-                              {format(parseISO(task.created_at), 'dd MMMM yyyy, HH:mm', { locale: pl })}
-                            </p>
-                          </div>
-                        </div>
-                      )}
+                      {task.created_at && (() => {
+                        try {
+                          const createdDate = parseISO(task.created_at)
+                          return (
+                            <div className="flex items-start gap-3 pb-3 border-b border-gray-100">
+                              <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <span className="text-sm">✨</span>
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-gray-700">Zadanie utworzone</p>
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                  {format(createdDate, 'dd MMMM yyyy, HH:mm', { locale: pl })}
+                                </p>
+                              </div>
+                            </div>
+                          )
+                        } catch (err) {
+                          console.error('Invalid date format for created_at:', task.created_at)
+                          return null
+                        }
+                      })()}
                       
                       {/* Due Date Info */}
-                      {dueStr && (
-                        <div className="flex items-start gap-3 pb-3 border-b border-gray-100">
-                          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                            <CalendarBlank size={16} weight="fill" className="text-blue-600" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-700">Termin wykonania</p>
-                            <p className="text-xs text-gray-500 mt-0.5">
-                              {format(parseISO(dueStr), 'dd MMMM yyyy', { locale: pl })}
-                            </p>
-                          </div>
-                        </div>
-                      )}
+                      {dueStr && (() => {
+                        try {
+                          const dueDate = parseISO(dueStr)
+                          return (
+                            <div className="flex items-start gap-3 pb-3 border-b border-gray-100">
+                              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <CalendarBlank size={16} weight="fill" className="text-blue-600" />
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-gray-700">Termin wykonania</p>
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                  {format(dueDate, 'dd MMMM yyyy', { locale: pl })}
+                                </p>
+                              </div>
+                            </div>
+                          )
+                        } catch (err) {
+                          console.error('Invalid date format for due date:', dueStr)
+                          return null
+                        }
+                      })()}
                       
                       {/* Priority Info */}
                       <div className="flex items-start gap-3 pb-3">

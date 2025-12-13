@@ -302,8 +302,9 @@ export function TasksAssistant() {
   filteredTasks = filterByProject(filteredTasks)
   const sortedTasks = sortTasks(filteredTasks)
   
-  // Non-completed tasks for board/week/month views
-  const activeTasks = tasks.filter(t => !t.completed)
+  // Non-completed tasks for board/week/month views (respecting project filter)
+  let activeTasks = tasks.filter(t => !t.completed)
+  activeTasks = filterByProject(activeTasks)
   
   console.log('🎯 FINAL SORTED TASKS:', sortedTasks)
   
@@ -837,13 +838,13 @@ export function TasksAssistant() {
       {/* Filters */}
       {view === 'list' && (
         <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterType)}>
-          <TabsList className="grid grid-cols-6 w-full max-w-3xl">
-            <TabsTrigger value="today">Dziś</TabsTrigger>
-            <TabsTrigger value="tomorrow">Jutro</TabsTrigger>
-            <TabsTrigger value="week">Tydzień</TabsTrigger>
-            <TabsTrigger value="month">Miesiąc</TabsTrigger>
-            <TabsTrigger value="overdue">Przeterminowane</TabsTrigger>
-            <TabsTrigger value="completed">Ukończone</TabsTrigger>
+          <TabsList className="flex flex-wrap w-full max-w-3xl justify-start gap-1">
+            <TabsTrigger value="today" className="flex-1 min-w-[100px]">Dziś</TabsTrigger>
+            <TabsTrigger value="tomorrow" className="flex-1 min-w-[100px]">Jutro</TabsTrigger>
+            <TabsTrigger value="week" className="flex-1 min-w-[100px]">Tydzień</TabsTrigger>
+            <TabsTrigger value="month" className="flex-1 min-w-[100px]">Miesiąc</TabsTrigger>
+            <TabsTrigger value="overdue" className="flex-1 min-w-[140px]">Przeterminowane</TabsTrigger>
+            <TabsTrigger value="completed" className="flex-1 min-w-[120px]">Ukończone</TabsTrigger>
           </TabsList>
         </Tabs>
       )}
