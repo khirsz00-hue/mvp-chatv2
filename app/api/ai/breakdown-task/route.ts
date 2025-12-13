@@ -3,31 +3,37 @@ import { getOpenAIClient } from '@/lib/openai'
 
 export async function POST(req: Request) {
   try {
-    const { taskContent } = await req.json()
+    const { taskContent, taskDescription } = await req.json()
     
     if (!taskContent) {
       return NextResponse.json({ error: 'Missing taskContent' }, { status: 400 })
     }
     
-    const prompt = `Rozłóż to zadanie na konkretne, wykonalne kroki: "${taskContent}"
+    const descriptionPart = taskDescription ? `\nOpis: "${taskDescription}"` : ''
+    
+    const prompt = `Jesteś asystentem AI wspierającym osoby z ADHD.
 
-Dla każdego kroku podaj:
-- Tytuł (krótki, max 50 znaków)
-- Opis (1-2 zdania, konkretne instrukcje)
-- Estymowany czas w minutach
+Zadanie: "${taskContent}"${descriptionPart}
 
-Zwróć odpowiedź w formacie JSON:
+Wygeneruj:
+1. **4-7 konkretnych subtasków** (kroków do wykonania)
+2. **Całkowitą estymację** czasu (suma subtasków w minutach)
+3. **Najlepszy dzień tygodnia** (0=niedziela... 6=sobota)
+4. **Najlepsza pora dnia** (morning/afternoon/evening)
+5. **Uzasadnienie schedulingu** (1-2 zdania)
+6. **2-3 praktyczne tipy**
+
+Zwróć JSON:
 {
   "steps": [
-    {
-      "title": "...",
-      "description": "...",
-      "estimatedMinutes": 30
-    }
-  ]
-}
-
-Maksymalnie 5-7 kroków. Bądź praktyczny i konkretny.`
+    {"title": "Krok 1", "description": "Dokładny opis", "estimatedMinutes": 30}
+  ],
+  "totalEstimation": 120,
+  "bestDayOfWeek": 2,
+  "bestTimeOfDay": "morning",
+  "schedulingReasoning": "...",
+  "tips": ["Tip 1", "Tip 2"]
+}`
 
     const openai = getOpenAIClient()
     
