@@ -80,10 +80,10 @@ export function TaskDetailsModal({
     
     const fetchProjects = async () => {
       try {
-        const res = await fetch(`/api/todoist/projects? token=${token}`)
+        const res = await fetch(`/api/todoist/projects?token=${token}`)
         if (res.ok) {
           const data = await res.json()
-          setProjects(data. projects || data || [])
+          setProjects(data.projects || data || [])
         }
       } catch (err) {
         console.error('Error fetching projects:', err)
