@@ -6,10 +6,25 @@ export const runtime = 'nodejs'
 
 export async function POST(req: Request) {
   try {
-    const { title, description, userContext } = await req.json()
+    const { title, description, userContext, userId } = await req.json()
     
     if (!title || title.length < 3) {
       return NextResponse.json({ error: 'Title too short' }, { status: 400 })
+    }
+    
+    // Fetch user analytics if userId provided
+    let userAnalytics = null
+    if (userId) {
+      try {
+        const analyticsUrl = `${req.headers.get('origin') || ''}/api/analytics/track-task?user_id=${userId}&limit=50`
+        const analyticsRes = await fetch(analyticsUrl)
+        if (analyticsRes.ok) {
+          const analyticsData = await analyticsRes.json()
+          userAnalytics = analyticsData.analytics
+        }
+      } catch (err) {
+        console.error('Error fetching analytics:', err)
+      }
     }
     
     const prompt = `Jesteś asystentem AI wspierającym osoby z ADHD w zarządzaniu zadaniami. 
@@ -22,6 +37,27 @@ Kontekst użytkownika:
 ${userContext?. recentTasks ? `Ostatnie zadania:\n${userContext.recentTasks.slice(0, 5).map((t:  any) => `- ${t.content} (projekt: ${t.project_name || 'brak'}, priorytet: P${t.priority})`).join('\n')}` : ''}
 
 ${userContext?.projects ? `Dostępne projekty:\n${userContext.projects.map((p: any) => `- ${p.name}`).join('\n')}` : ''}
+
+${userAnalytics && userAnalytics.length > 0 ? `
+Historia użytkownika (ostatnie ${userAnalytics.length} akcji):
+${userAnalytics.slice(0, 10).map((a: any) => 
+  `- ${a.action_type}: "${a.task_title}" (projekt: ${a.task_project || 'brak'}, priorytet: P${a.priority || 4}, etykiety: ${a.task_labels?.join(', ') || 'brak'})`
+).join('\n')}
+
+Wzorce użytkownika:
+- Najczęściej używane projekty: ${(() => {
+  const projects = userAnalytics.map((a: any) => a.task_project).filter(Boolean)
+  const counts = projects.reduce((acc: any, p: string) => ({ ...acc, [p]: (acc[p] || 0) + 1 }), {})
+  return Object.entries(counts).sort((a: any, b: any) => b[1] - a[1]).slice(0, 3).map(([p]: any) => p).join(', ') || 'brak'
+})()}
+- Najczęściej używane etykiety: ${(() => {
+  const labels = userAnalytics.flatMap((a: any) => a.task_labels || [])
+  const counts = labels.reduce((acc: any, l: string) => ({ ...acc, [l]: (acc[l] || 0) + 1 }), {})
+  return Object.entries(counts).sort((a: any, b: any) => b[1] - a[1]).slice(0, 5).map(([l]: any) => l).join(', ') || 'brak'
+})()}
+- Przełożone zadania: ${userAnalytics.filter((a: any) => a.action_type === 'postponed').length}
+- Ukończone zadania: ${userAnalytics.filter((a: any) => a.action_type === 'completed').length}
+` : ''}
 
 Na podstawie tytułu i kontekstu zasugeruj: 
 

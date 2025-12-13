@@ -38,6 +38,9 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
     priority?: number
     estimatedMinutes?: number
     description?: string
+    suggestedProject?: string
+    suggestedDueDate?: string
+    suggestedLabels?: string[]
   } | null>(null)
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -100,10 +103,19 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
       // Fetch suggestions in async IIFE to handle errors properly
       (async () => {
         try {
+          // Get userId from localStorage (using token as identifier for now)
+          const userId = token || 'anonymous'
+          
           const response = await fetch('/api/ai/suggest-task', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title })
+            body: JSON.stringify({ 
+              title,
+              userId,
+              userContext: {
+                projects: projects.map(p => ({ id: p.id, name: p.name }))
+              }
+            })
           })
           
           if (response.ok) {
@@ -125,7 +137,7 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
     }
   }, [title])
   
-  const applySuggestion = (field: 'priority' | 'estimatedMinutes' | 'description') => {
+  const applySuggestion = (field: 'priority' | 'estimatedMinutes' | 'description' | 'project' | 'dueDate' | 'labels') => {
     if (!aiSuggestions) return
     
     switch (field) {
@@ -142,6 +154,25 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
       case 'description':
         if (aiSuggestions.description) {
           setDescription(aiSuggestions.description)
+        }
+        break
+      case 'project':
+        if (aiSuggestions.suggestedProject) {
+          // Find project by name
+          const project = projects.find(p => p.name === aiSuggestions.suggestedProject)
+          if (project) {
+            setProjectId(project.id)
+          }
+        }
+        break
+      case 'dueDate':
+        if (aiSuggestions.suggestedDueDate) {
+          setDueDate(aiSuggestions.suggestedDueDate)
+        }
+        break
+      case 'labels':
+        if (aiSuggestions.suggestedLabels && aiSuggestions.suggestedLabels.length > 0) {
+          setLabels(aiSuggestions.suggestedLabels.join(', '))
         }
         break
     }
@@ -261,10 +292,10 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
             )}
             
             {aiSuggestions && !loadingSuggestions && (
-              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="mt-3 p-3 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg">
                 <div className="flex items-start gap-2 mb-2">
                   <Sparkle size={16} weight="fill" className="text-blue-600 mt-0.5" />
-                  <p className="text-sm text-blue-800 font-medium">AI Suggestions:</p>
+                  <p className="text-sm text-blue-800 font-medium">AI Suggestions (kliknij, aby zastosować):</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {aiSuggestions.priority && (
@@ -273,7 +304,7 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
                       onClick={() => applySuggestion('priority')}
                     >
                       <Flag size={14} />
-                      P{aiSuggestions.priority} - {aiSuggestions.priority === 1 ? 'Wysoki priorytet' : aiSuggestions.priority === 2 ? 'Średni priorytet' : 'Niski priorytet'}
+                      P{aiSuggestions.priority}
                     </Badge>
                   )}
                   {aiSuggestions.estimatedMinutes && (
@@ -282,7 +313,35 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
                       onClick={() => applySuggestion('estimatedMinutes')}
                     >
                       <Clock size={14} />
-                      ⏱ {aiSuggestions.estimatedMinutes} min
+                      {aiSuggestions.estimatedMinutes} min
+                    </Badge>
+                  )}
+                  {aiSuggestions.suggestedDueDate && (
+                    <Badge
+                      className="cursor-pointer hover:bg-blue-200 transition-colors gap-1"
+                      onClick={() => applySuggestion('dueDate')}
+                    >
+                      <CalendarBlank size={14} />
+                      📅 {aiSuggestions.suggestedDueDate}
+                    </Badge>
+                  )}
+                  {aiSuggestions.suggestedProject && (
+                    <Badge
+                      className="cursor-pointer hover:bg-blue-200 transition-colors gap-1"
+                      onClick={() => applySuggestion('project')}
+                    >
+                      <FolderOpen size={14} />
+                      📁 {aiSuggestions.suggestedProject}
+                    </Badge>
+                  )}
+                  {aiSuggestions.suggestedLabels && aiSuggestions.suggestedLabels.length > 0 && (
+                    <Badge
+                      className="cursor-pointer hover:bg-blue-200 transition-colors gap-1"
+                      onClick={() => applySuggestion('labels')}
+                      title={aiSuggestions.suggestedLabels.join(', ')}
+                    >
+                      <Tag size={14} />
+                      🏷️ {aiSuggestions.suggestedLabels.length} etykiet
                     </Badge>
                   )}
                   {aiSuggestions.description && (

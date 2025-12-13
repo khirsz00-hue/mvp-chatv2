@@ -30,6 +30,32 @@ create table if not exists user_tokens (
   unique (provider, user_id)
 );
 
+-- Tabela analityki zadań użytkownika (dla AI learning)
+create table if not exists user_task_analytics (
+  id uuid primary key default gen_random_uuid(),
+  user_id text not null,  -- Todoist user ID or session identifier
+  task_id text not null,
+  task_title text not null,
+  task_project text,
+  task_labels text[],
+  priority integer,
+  estimated_duration integer,  -- in minutes
+  actual_duration integer,  -- in minutes (from timer)
+  due_date date,
+  completed_date timestamp,
+  created_at timestamp default now(),
+  action_type text check (action_type in ('created', 'completed', 'postponed', 'deleted')),
+  postponed_from date,  -- original date if postponed
+  postponed_to date,  -- new date if postponed
+  completion_speed text check (completion_speed in ('early', 'on-time', 'late', null)),
+  metadata jsonb  -- additional context
+);
+
+-- Indeksy dla wydajności
+create index if not exists idx_user_task_analytics_user_id on user_task_analytics(user_id);
+create index if not exists idx_user_task_analytics_action_type on user_task_analytics(action_type);
+create index if not exists idx_user_task_analytics_created_at on user_task_analytics(created_at desc);
+
 -- Reguły bezpieczeństwa RLS
 alter table user_access enable row level security;
 alter table hats_sessions enable row level security;

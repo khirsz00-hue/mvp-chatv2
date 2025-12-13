@@ -241,6 +241,23 @@ export function TasksAssistant() {
   
   console.log('🎯 FINAL SORTED TASKS:', sortedTasks)
   
+  // Track task analytics
+  const trackTaskAnalytics = async (analyticsData: any) => {
+    try {
+      await fetch('/api/analytics/track-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: token || 'anonymous',
+          ...analyticsData
+        })
+      })
+    } catch (err) {
+      console.error('Error tracking analytics:', err)
+      // Don't throw - analytics should not break main functionality
+    }
+  }
+
   // Handlers
   const handleAddTask = async (taskData: any) => {
     try {
@@ -268,6 +285,18 @@ export function TasksAssistant() {
       setTasks(prev => [newTask, ...prev])
       showToast('Zadanie zostało utworzone', 'success')
       
+      // Track analytics
+      trackTaskAnalytics({
+        task_id: newTask.id,
+        task_title: newTask.content,
+        task_project: taskData.project_id || null,
+        task_labels: taskData.labels || [],
+        priority: taskData.priority || 4,
+        estimated_duration: taskData.duration || null,
+        due_date: taskData.due_date || null,
+        action_type: 'created'
+      })
+      
       // Refresh tasks to get updated list
       setTimeout(() => fetchTasks(), 500)
       
@@ -279,6 +308,8 @@ export function TasksAssistant() {
   
   const handleComplete = async (taskId: string) => {
     try {
+      const task = tasks.find(t => t.id === taskId)
+      
       const res = await fetch('/api/todoist/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -290,6 +321,31 @@ export function TasksAssistant() {
       setTasks(prev => prev.filter(t => t.id !== taskId))
       showToast('Zadanie ukończone!', 'success')
       
+      // Track analytics
+      if (task) {
+        const dueDate = typeof task.due === 'string' ? task.due : task.due?.date
+        const today = new Date().toISOString().split('T')[0]
+        let completionSpeed: 'early' | 'on-time' | 'late' | null = null
+        
+        if (dueDate) {
+          if (dueDate > today) completionSpeed = 'early'
+          else if (dueDate === today) completionSpeed = 'on-time'
+          else completionSpeed = 'late'
+        }
+        
+        trackTaskAnalytics({
+          task_id: taskId,
+          task_title: task.content,
+          task_project: task.project_id || null,
+          task_labels: task.labels || [],
+          priority: task.priority || 4,
+          due_date: dueDate || null,
+          completed_date: new Date().toISOString(),
+          action_type: 'completed',
+          completion_speed: completionSpeed
+        })
+      }
+      
       console.log('✅ Zadanie ukończone!')
     } catch (err) {
       console.error('Error completing task:', err)
@@ -299,6 +355,8 @@ export function TasksAssistant() {
   
   const handleDelete = async (taskId: string) => {
     try {
+      const task = tasks.find(t => t.id === taskId)
+      
       const res = await fetch('/api/todoist/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -309,6 +367,20 @@ export function TasksAssistant() {
       
       setTasks(prev => prev.filter(t => t.id !== taskId))
       showToast('Zadanie usunięte', 'success')
+      
+      // Track analytics
+      if (task) {
+        const dueDate = typeof task.due === 'string' ? task.due : task.due?.date
+        trackTaskAnalytics({
+          task_id: taskId,
+          task_title: task.content,
+          task_project: task.project_id || null,
+          task_labels: task.labels || [],
+          priority: task.priority || 4,
+          due_date: dueDate || null,
+          action_type: 'deleted'
+        })
+      }
       
       console.log('🗑️ Zadanie usunięte!')
     } catch (err) {
@@ -350,8 +422,25 @@ export function TasksAssistant() {
   
   const handleMove = async (taskId: string, newDate: string) => {
     try {
+      const task = tasks.find(t => t.id === taskId)
+      const oldDate = task ? (typeof task.due === 'string' ? task.due : task.due?.date) : null
+      
       await handleUpdate(taskId, { due: newDate }, false)
       showToast('Zadanie przeniesione', 'success')
+      
+      // Track analytics for postponement
+      if (task && oldDate && oldDate !== newDate) {
+        trackTaskAnalytics({
+          task_id: taskId,
+          task_title: task.content,
+          task_project: task.project_id || null,
+          task_labels: task.labels || [],
+          priority: task.priority || 4,
+          action_type: 'postponed',
+          postponed_from: oldDate,
+          postponed_to: newDate
+        })
+      }
     } catch (err) {
       console.error('Error moving task:', err)
       showToast('Nie udało się przenieść zadania', 'error')
