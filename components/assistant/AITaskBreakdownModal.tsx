@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Brain, 
@@ -90,18 +90,7 @@ export function AITaskBreakdownModal({
   const [tips, setTips] = useState<string[]>([])
   const [isCreatingSubtasks, setIsCreatingSubtasks] = useState(false)
   
-  // Initialize - fetch AI summary
-  useEffect(() => {
-    if (open && ! aiSummary) {
-      generateAISummary()
-    }
-    
-    if (! open) {
-      resetModal()
-    }
-  }, [open])
-  
-  const resetModal = () => {
+  const resetModal = useCallback(() => {
     setViewMode('init')
     setAiSummary('')
     setClarifyQuestions([])
@@ -115,10 +104,10 @@ export function AITaskBreakdownModal({
     setBestTimeOfDay(undefined)
     setSchedulingReasoning('')
     setTips([])
-  }
+  }, [])
   
   // AI Summary Generation
-  const generateAISummary = async () => {
+  const generateAISummary = useCallback(async () => {
     setIsLoadingSummary(true)
     try {
       const prompt = `Jesteś asystentem AI wspierającym osoby z ADHD w zarządzaniu zadaniami. 
@@ -151,7 +140,18 @@ Bądź ciepły, wspierający i konkretny.`
     } finally {
       setIsLoadingSummary(false)
     }
-  }
+  }, [task])
+  
+  // Initialize - fetch AI summary
+  useEffect(() => {
+    if (open && ! aiSummary) {
+      generateAISummary()
+    }
+    
+    if (! open) {
+      resetModal()
+    }
+  }, [open, aiSummary, generateAISummary, resetModal])
   
   // Questions Mode - Generate Questions
   const handleStartQuestions = async () => {

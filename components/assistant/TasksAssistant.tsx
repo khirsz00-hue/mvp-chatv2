@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Card from '@/components/ui/Card'
@@ -57,26 +57,7 @@ export function TasksAssistant() {
   
   const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
   
-  // Fetch tasks
-  useEffect(() => {
-    if (! token) return
-    fetchTasks()
-    
-    // Poll every 45 seconds
-    const interval = setInterval(() => {
-      fetchTasks()
-    }, 45000)
-    
-    return () => clearInterval(interval)
-  }, [token])
-  
-  // Fetch projects
-  useEffect(() => {
-    if (!token) return
-    fetchProjects()
-  }, [token])
-  
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     setLoading(true)
     try {
       console.log('🔍 Fetching tasks with token:', token ?  'EXISTS' : 'MISSING')
@@ -108,9 +89,9 @@ export function TasksAssistant() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [token])
   
-  const fetchProjects = async () => {
+  const fetchProjects = useCallback(async () => {
     try {
       const res = await fetch(`/api/todoist/projects?token=${token}`)
       if (res.ok) {
@@ -123,7 +104,26 @@ export function TasksAssistant() {
       console.error('Error fetching projects:', err)
       showToast('Błąd przy pobieraniu projektów', 'error')
     }
-  }
+  }, [token])
+  
+  // Fetch tasks
+  useEffect(() => {
+    if (! token) return
+    fetchTasks()
+    
+    // Poll every 45 seconds
+    const interval = setInterval(() => {
+      fetchTasks()
+    }, 45000)
+    
+    return () => clearInterval(interval)
+  }, [token, fetchTasks])
+  
+  // Fetch projects
+  useEffect(() => {
+    if (!token) return
+    fetchProjects()
+  }, [token, fetchProjects])
   
   // Filter tasks by date
   const filterTasks = (tasks: Task[], filterType: FilterType) => {
