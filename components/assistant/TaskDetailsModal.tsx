@@ -176,6 +176,7 @@ export function TaskDetailsModal({
         clearTimeout(debounceTimerRef.current)
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editedTitle, isEditing, task?.content, token, projects])
   
   if (!task) return null
