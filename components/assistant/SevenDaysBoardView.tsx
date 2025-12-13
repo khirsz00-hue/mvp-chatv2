@@ -7,7 +7,7 @@ import { CSS } from '@dnd-kit/utilities'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
-import { CalendarBlank, CheckCircle, Trash, Plus, CaretLeft, CaretRight, DotsThree, Brain, ChatCircle, Timer } from '@phosphor-icons/react'
+import { CalendarBlank, CheckCircle, Trash, Plus, CaretLeft, CaretRight, DotsThree, Brain, ChatCircle, Timer, DotsNine } from '@phosphor-icons/react'
 import { format, addDays, parseISO, startOfDay, isSameDay, isSameWeek } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
@@ -616,8 +616,8 @@ function MiniTaskCard({
   }
 
   const handleClick = (e: React.MouseEvent) => {
-    // Only trigger details if not dragging
-    if (onDetails && !isDraggingGlobal) {
+    // Trigger details when card is clicked
+    if (onDetails) {
       onDetails(task)
     }
   }
@@ -626,12 +626,10 @@ function MiniTaskCard({
     <div className="relative">
       {/* Using div instead of Card component for ultra-compact design with minimal padding */}
       <div
-        {...(dragHandleProps || {})}
         className={cn(
-          'px-2 py-1.5 border-l-2 rounded-md transition-all hover:shadow-sm group text-xs',
+          'px-2 py-1.5 border-l-2 rounded-md transition-all hover:shadow-sm group text-xs cursor-pointer',
           priorityColors[task.priority] || priorityColors[4],
-          loading && 'opacity-50',
-          dragHandleProps ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
+          loading && 'opacity-50'
         )}
         onClick={handleClick}
         onMouseEnter={() => setShowTooltip(true)}
@@ -641,6 +639,18 @@ function MiniTaskCard({
         aria-label={`Task: ${task.content}`}
       >
         <div className="flex items-center gap-1.5">
+          {/* Drag handle - only this part is draggable */}
+          {dragHandleProps && (
+            <button
+              {...dragHandleProps}
+              className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-200 rounded opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+              onClick={(e) => e.stopPropagation()}
+              title="Przeciągnij aby przenieść"
+            >
+              <DotsNine size={14} weight="bold" className="text-gray-400" />
+            </button>
+          )}
+          
           {/* Priority indicator dot */}
           <div className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', priorityDots[task.priority])} />
           
@@ -662,7 +672,7 @@ function MiniTaskCard({
               })
               setShowContextMenu(true)
             }}
-            className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-gray-200 rounded"
+            className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-gray-200 rounded flex-shrink-0"
             title="Więcej opcji"
           >
             <DotsThree size={14} weight="bold" className="text-gray-600" />
