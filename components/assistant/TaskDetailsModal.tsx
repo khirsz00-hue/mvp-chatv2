@@ -519,38 +519,41 @@ Bądź wspierający i konkretny.
               </Button>
             </div>
           </div>
-          <DialogTitle className="text-3xl font-semibold text-gray-900 flex flex-col gap-3">
-            <Input
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              className="text-3xl font-semibold"
-              placeholder="Tytuł zadania"
-            />
-            <div className="flex flex-wrap gap-2 text-sm text-gray-600">
-              {dueDate && (
-                <Badge variant="outline" className="gap-1">
-                  <CalendarBlank size={14} />
-                  {formatDateSafely(dueDate)}
-                </Badge>
-              )}
-              <Badge variant="secondary" className="gap-1">
-                <Flag size={14} /> Priorytet P{priority}
-              </Badge>
-              {task.project_id && (
-                <Badge variant="outline" className="gap-1">
-                  <FolderOpen size={14} />
-                  {task.project_name || task.project_id}
-                </Badge>
-              )}
-              {(task.labels || []).map(label => (
-                <Badge key={label} className="bg-slate-100 text-slate-700 border border-slate-200">
-                  <Tag size={12} />
-                  {label}
-                </Badge>
-              ))}
-            </div>
-          </DialogTitle>
+          <DialogTitle className="text-xl font-semibold text-gray-900">Szczegóły zadania</DialogTitle>
         </DialogHeader>
+
+        <div className="space-y-2 mb-4">
+          <Input
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            className="text-3xl font-semibold"
+            placeholder="Tytuł zadania"
+            aria-label="Tytuł zadania"
+          />
+          <div className="flex flex-wrap gap-2 text-sm text-gray-600">
+            {dueDate && (
+              <Badge variant="outline" className="gap-1">
+                <CalendarBlank size={14} />
+                {formatDateSafely(dueDate)}
+              </Badge>
+            )}
+            <Badge variant="secondary" className="gap-1">
+              <Flag size={14} /> Priorytet P{priority}
+            </Badge>
+            {task.project_id && (
+              <Badge variant="outline" className="gap-1">
+                <FolderOpen size={14} />
+                {task.project_name || task.project_id}
+              </Badge>
+            )}
+            {(task.labels || []).map(label => (
+              <Badge key={label} className="bg-slate-100 text-slate-700 border border-slate-200">
+                <Tag size={12} />
+                {label}
+              </Badge>
+            ))}
+          </div>
+        </div>
 
         <div className="grid lg:grid-cols-[1.5fr_1fr] gap-6">
           <div className="space-y-4">
