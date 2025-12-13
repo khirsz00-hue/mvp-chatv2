@@ -11,6 +11,7 @@ import {
   SkipForward 
 } from '@phosphor-icons/react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, Button, Textarea } from '../ui'
+import { useToast } from '../ui/Toast'
 import { HAT_PROMPTS, HAT_ORDER, getHatProgress } from '@/lib/prompts/sixHats'
 import type { Decision, HatColor, HatAnswer, SixHatsSynthesis } from '@/lib/types/decisions'
 
@@ -29,6 +30,7 @@ interface HatState {
 }
 
 export default function SixHatsWorkflow({ decision, onComplete, onBack }: SixHatsWorkflowProps) {
+  const { showToast } = useToast()
   const [currentHatIndex, setCurrentHatIndex] = useState(0)
   const [hatStates, setHatStates] = useState<Record<HatColor, HatState>>({
     blue: { questions: [], userAnswer: '', isLoading: false },
@@ -108,6 +110,7 @@ export default function SixHatsWorkflow({ decision, onComplete, onBack }: SixHat
       }
     } catch (error: any) {
       console.error('Error loading questions:', error)
+      showToast('Nie udało się wczytać pytań. Spróbuj ponownie.', 'error')
       setHatStates(prev => ({
         ...prev,
         [currentHat]: { 
@@ -156,10 +159,12 @@ export default function SixHatsWorkflow({ decision, onComplete, onBack }: SixHat
         // Move to next hat or complete
         if (data.completed) {
           setIsCompleted(true)
+          showToast('Analiza ukończona! Generuję podsumowanie...', 'success')
           if (data.synthesis) {
             setSynthesis(data.synthesis)
           }
         } else {
+          showToast(`Analiza ${currentHatInfo.title} zapisana!`, 'success')
           setTimeout(() => {
             setCurrentHatIndex(prev => prev + 1)
           }, 1000)
@@ -169,6 +174,7 @@ export default function SixHatsWorkflow({ decision, onComplete, onBack }: SixHat
       }
     } catch (error: any) {
       console.error('Error submitting answer:', error)
+      showToast('Nie udało się przetworzyć odpowiedzi. Spróbuj ponownie.', 'error')
       setHatStates(prev => ({
         ...prev,
         [currentHat]: { 
@@ -196,12 +202,15 @@ export default function SixHatsWorkflow({ decision, onComplete, onBack }: SixHat
       if (response.ok) {
         if (data.completed) {
           setIsCompleted(true)
+          showToast('Analiza ukończona!', 'success')
         } else {
+          showToast('Pominięto kapelusz', 'info')
           setCurrentHatIndex(prev => prev + 1)
         }
       }
     } catch (error) {
       console.error('Error skipping hat:', error)
+      showToast('Wystąpił błąd', 'error')
     }
   }
 
@@ -220,9 +229,13 @@ export default function SixHatsWorkflow({ decision, onComplete, onBack }: SixHat
 
       if (response.ok) {
         setSynthesis(data.synthesis)
+        showToast('Podsumowanie wygenerowane!', 'success')
+      } else {
+        showToast('Nie udało się wygenerować podsumowania', 'error')
       }
     } catch (error) {
       console.error('Error loading synthesis:', error)
+      showToast('Wystąpił błąd podczas generowania podsumowania', 'error')
     } finally {
       setIsLoadingSynthesis(false)
     }
