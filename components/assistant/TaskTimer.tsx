@@ -264,6 +264,32 @@ export function useTaskTimer() {
     window.dispatchEvent(new CustomEvent('timerStateChanged', { detail: timerState }))
   }
   
+  const stopTimer = () => {
+    const stored = localStorage.getItem('taskTimer')
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      
+      // Save session to history if timer was running
+      if (parsed.taskId && parsed.taskTitle) {
+        const sessions: TimerSession[] = JSON.parse(localStorage.getItem('timerSessions') || '[]')
+        const newSession: TimerSession = {
+          taskId: parsed.taskId,
+          taskTitle: parsed.taskTitle,
+          startTime: new Date(parsed.startTime).toISOString(),
+          endTime: new Date().toISOString(),
+          durationSeconds: parsed.elapsedSeconds
+        }
+        sessions.push(newSession)
+        localStorage.setItem('timerSessions', JSON.stringify(sessions))
+      }
+    }
+    
+    // Clear timer
+    localStorage.removeItem('taskTimer')
+    // Dispatch custom event for same-tab updates
+    window.dispatchEvent(new CustomEvent('timerStateChanged', { detail: null }))
+  }
+  
   const getActiveTimer = (): { taskId: string | null; isActive: boolean } => {
     const stored = localStorage.getItem('taskTimer')
     if (stored) {
@@ -276,5 +302,5 @@ export function useTaskTimer() {
     return { taskId: null, isActive: false }
   }
   
-  return { startTimer, getActiveTimer }
+  return { startTimer, stopTimer, getActiveTimer }
 }

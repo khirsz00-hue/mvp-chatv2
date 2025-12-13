@@ -678,7 +678,7 @@ export function TaskDetailsModal({
                         className="w-full gap-2 bg-white hover:bg-purple-50 border-purple-300"
                       >
                         <Timer size={16} weight="fill" />
-                        Start Timer
+                        Rozpocznij Timer
                       </Button>
                     </div>
                     
@@ -808,7 +808,7 @@ export function TaskDetailsModal({
                   disabled={loading}
                 >
                   <Timer size={18} weight="fill" />
-                  Start Timer
+                  Rozpocznij Timer
                 </Button>
               </div>
             </>

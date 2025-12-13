@@ -58,7 +58,7 @@ export function TaskCard({
   const [showChatModal, setShowChatModal] = useState(false)
   const [showBreakdownModal, setShowBreakdownModal] = useState(false)
   
-  const { startTimer, getActiveTimer } = useTaskTimer()
+  const { startTimer, stopTimer, getActiveTimer } = useTaskTimer()
   const { showToast } = useToast()
   
   // Check if this task has an active timer
@@ -123,9 +123,8 @@ export function TaskCard({
   const handleStartStopTimer = (e: React.MouseEvent) => {
     e.stopPropagation()
     if (hasActiveTimer) {
-      // Stop the timer by clearing it
-      localStorage.removeItem('taskTimer')
-      window.dispatchEvent(new CustomEvent('timerStateChanged', { detail: null }))
+      // Stop the timer
+      stopTimer()
     } else {
       // Start the timer
       startTimer(task.id, task.content)
