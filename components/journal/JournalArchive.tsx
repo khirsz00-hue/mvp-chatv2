@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabaseClient'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import { useToast } from '@/components/ui/Toast'
-import { ArrowLeft, Trash, ArchiveBox } from '@phosphor-icons/react'
+import { ArrowLeft, Trash, Archive } from '@phosphor-icons/react'
 import { format, parseISO } from 'date-fns'
 import { pl } from 'date-fns/locale'
 
@@ -116,7 +116,7 @@ export function JournalArchive({ userId, onBack }: JournalArchiveProps) {
           </Card>
         ) : archivedEntries.length === 0 ? (
           <Card className="p-12 text-center">
-            <ArchiveBox size={64} className="mx-auto mb-4 text-gray-300" weight="light" />
+            <Archive size={64} className="mx-auto mb-4 text-gray-300" weight="light" />
             <h3 className="text-lg font-semibold text-gray-600 mb-2">Archiwum puste</h3>
             <p className="text-gray-500">Nie masz jeszcze żadnych zarchiwizowanych wpisów</p>
           </Card>
