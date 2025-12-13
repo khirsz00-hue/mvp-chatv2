@@ -5,7 +5,6 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const token = searchParams.get('token')
   const filter = (searchParams.get('filter') || 'all').toLowerCase()
-  const filter = (searchParams.get('filter') || 'today').toLowerCase()
 
   if (!token) {
     return NextResponse.json({ error: 'Brak tokenu Todoist' }, { status: 401 })
@@ -33,15 +32,6 @@ export async function GET(req: Request) {
     const sevenDaysEnd = endOfDay(addDays(todayStart, 6))
 
     const filtered = allTasks.filter((t: any) => {
-      const dueStr = t?.due?.date || t?.due || null
-      if (!dueStr) return filter === 'all'
-
-      let dueDate: Date
-      try { 
-        dueDate = parseISO(dueStr) 
-      } catch (e) { 
-        console.warn('⚠️ Failed to parse date with parseISO, falling back to Date constructor:', dueStr, e)
-        dueDate = new Date(dueStr) 
       // unify due source: Todoist may return object with .date or a string
       const dueStr = t?.due?.date || t?.due || null
       if (!dueStr) {
@@ -53,7 +43,8 @@ export async function GET(req: Request) {
       let dueDate: Date
       try {
         dueDate = parseISO(dueStr)
-      } catch {
+      } catch (e) {
+        console.warn('⚠️ Failed to parse date with parseISO, falling back to Date constructor:', dueStr, e)
         dueDate = new Date(dueStr)
       }
 
@@ -73,6 +64,7 @@ export async function GET(req: Request) {
       }
     })
 
+    // zwracamy due w formacie oczekiwanym przez UI: { date: 'YYYY-MM-DD' } lub null
     const simplified = filtered.map((t: any) => ({
       id: t.id,
       content: t.content,
@@ -84,6 +76,6 @@ export async function GET(req: Request) {
     return NextResponse.json({ tasks: simplified })
   } catch (error: any) {
     console.error('❌ Błąd w /api/todoist/tasks:', error)
-    return NextResponse.json({ error: 'Błąd serwera' }, { status: 500 })
+    return NextResponse.json({ error: 'Nie udało się pobrać zadań' }, { status: 500 })
   }
 }
