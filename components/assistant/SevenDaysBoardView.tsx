@@ -505,6 +505,7 @@ function MiniTaskCard({
 
   return (
     <div className="relative">
+      {/* Using div instead of Card component for ultra-compact design with minimal padding */}
       <div
         className={cn(
           'px-2 py-1.5 border-l-2 rounded-md transition-all hover:shadow-sm group cursor-pointer text-xs',
@@ -514,6 +515,9 @@ function MiniTaskCard({
         onClick={() => onDetails?.(task)}
         onMouseEnter={() => setShowTooltip(true)}
         onMouseLeave={() => setShowTooltip(false)}
+        role="button"
+        tabIndex={0}
+        aria-label={`Task: ${task.content}`}
       >
         <div className="flex items-center gap-1.5">
           {/* Priority indicator dot */}

@@ -176,6 +176,8 @@ export function TaskDetailsModal({
         clearTimeout(debounceTimerRef.current)
       }
     }
+    // Note: aiSuggestions is intentionally not in deps to avoid infinite loop
+    // We check aiSuggestions !== null inside the effect to prevent unnecessary fetches
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editedTitle, isEditing, task?.content, token, projects])
   
