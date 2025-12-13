@@ -1,13 +1,13 @@
 'use client'
 
-import { useState } from 'react'
-import { DndContext, closestCenter, DragEndEvent, DragOverlay, DragStartEvent, useDroppable } from '@dnd-kit/core'
+import { useState, useRef, useEffect } from 'react'
+import { DndContext, closestCenter, DragEndEvent, DragOverlay, DragStartEvent, useDroppable, DragMoveEvent } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
-import { CalendarBlank, CheckCircle, Trash, DotsThree, Plus } from '@phosphor-icons/react'
+import { CalendarBlank, CheckCircle, Trash, DotsThree, Plus, CaretLeft, CaretRight } from '@phosphor-icons/react'
 import { format, addDays, parseISO, startOfDay, isSameDay } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
@@ -51,8 +51,11 @@ export function SevenDaysBoardView({
 }:  SevenDaysBoardViewProps) {
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [movingTaskId, setMovingTaskId] = useState<string | null>(null)
+  const [scrollPosition, setScrollPosition] = useState(0)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const autoScrollIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Generate 7 days columns
+  // Generate 7 days columns (but show only 5 at a time on desktop)
   const days: DayColumn[] = Array.from({ length: 7 }, (_, i) => {
     const date = addDays(startOfDay(new Date()), i)
     const dateStr = format(date, 'yyyy-MM-dd')
@@ -85,8 +88,65 @@ export function SevenDaysBoardView({
     }
   }
 
+  const handleDragMove = (event: DragMoveEvent) => {
+    if (!scrollContainerRef.current || !activeTask) return
+    
+    const container = scrollContainerRef.current
+    const rect = container.getBoundingClientRect()
+    
+    // Get client position from either MouseEvent or TouchEvent
+    let clientX = 0
+    const activatorEvent = event.activatorEvent
+    if ('clientX' in activatorEvent) {
+      clientX = activatorEvent.clientX
+    } else if ('touches' in activatorEvent && activatorEvent.touches.length > 0) {
+      clientX = activatorEvent.touches[0].clientX
+    }
+    
+    const x = event.delta.x + clientX
+    
+    // Auto-scroll threshold (50px from edge)
+    const scrollThreshold = 50
+    const scrollSpeed = 10
+    
+    // Clear existing interval
+    if (autoScrollIntervalRef.current) {
+      clearInterval(autoScrollIntervalRef.current)
+      autoScrollIntervalRef.current = null
+    }
+    
+    // Check if near left edge
+    if (x < rect.left + scrollThreshold && container.scrollLeft > 0) {
+      autoScrollIntervalRef.current = setInterval(() => {
+        if (container.scrollLeft > 0) {
+          container.scrollLeft -= scrollSpeed
+        } else if (autoScrollIntervalRef.current) {
+          clearInterval(autoScrollIntervalRef.current)
+          autoScrollIntervalRef.current = null
+        }
+      }, 16)
+    }
+    // Check if near right edge
+    else if (x > rect.right - scrollThreshold && container.scrollLeft < container.scrollWidth - container.clientWidth) {
+      autoScrollIntervalRef.current = setInterval(() => {
+        if (container.scrollLeft < container.scrollWidth - container.clientWidth) {
+          container.scrollLeft += scrollSpeed
+        } else if (autoScrollIntervalRef.current) {
+          clearInterval(autoScrollIntervalRef.current)
+          autoScrollIntervalRef.current = null
+        }
+      }, 16)
+    }
+  }
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
+    
+    // Clear auto-scroll interval
+    if (autoScrollIntervalRef.current) {
+      clearInterval(autoScrollIntervalRef.current)
+      autoScrollIntervalRef.current = null
+    }
     
     setActiveTask(null)
     
@@ -115,30 +175,108 @@ export function SevenDaysBoardView({
     }
   }
 
+  // Clean up interval on unmount
+  useEffect(() => {
+    return () => {
+      if (autoScrollIntervalRef.current) {
+        clearInterval(autoScrollIntervalRef.current)
+      }
+    }
+  }, [])
+
+  const scrollLeft = () => {
+    if (scrollContainerRef.current) {
+      const columnWidth = scrollContainerRef.current.scrollWidth / days.length
+      scrollContainerRef.current.scrollBy({ left: -columnWidth, behavior: 'smooth' })
+    }
+  }
+
+  const scrollRight = () => {
+    if (scrollContainerRef.current) {
+      const columnWidth = scrollContainerRef.current.scrollWidth / days.length
+      scrollContainerRef.current.scrollBy({ left: columnWidth, behavior: 'smooth' })
+    }
+  }
+
+  const handleScroll = () => {
+    if (scrollContainerRef.current) {
+      setScrollPosition(scrollContainerRef.current.scrollLeft)
+    }
+  }
+
+  const [canScrollRight, setCanScrollRight] = useState(false)
+
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      const container = scrollContainerRef.current
+      setCanScrollRight(scrollPosition < container.scrollWidth - container.clientWidth)
+    }
+  }, [scrollPosition])
+
+  const canScrollLeft = scrollPosition > 0
+
   return (
     <DndContext
       collisionDetection={closestCenter}
       onDragStart={handleDragStart}
+      onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
     >
-      {/* Responsive grid layout - 7 columns fit on screen, vertical stack on small screens */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 pb-4">
-        {days.map(day => (
-          <DayColumnComponent
-            key={day.id}
-            day={day}
-            onComplete={onComplete}
-            onDelete={onDelete}
-            onDetails={onDetails}
-            onAddForDate={onAddForDate}
-            movingTaskId={movingTaskId}
-          />
-        ))}
+      {/* Carousel container with navigation arrows */}
+      <div className="relative pb-4">
+        {/* Left scroll arrow - hidden on mobile */}
+        <button
+          onClick={scrollLeft}
+          disabled={!canScrollLeft}
+          className={cn(
+            'hidden lg:flex absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 items-center justify-center bg-white rounded-full shadow-lg border-2 border-gray-200 transition-all hover:shadow-xl hover:scale-110',
+            !canScrollLeft && 'opacity-0 pointer-events-none'
+          )}
+          aria-label="Scroll left"
+        >
+          <CaretLeft size={24} weight="bold" className="text-gray-700" />
+        </button>
+
+        {/* Right scroll arrow - hidden on mobile */}
+        <button
+          onClick={scrollRight}
+          disabled={!canScrollRight}
+          className={cn(
+            'hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 items-center justify-center bg-white rounded-full shadow-lg border-2 border-gray-200 transition-all hover:shadow-xl hover:scale-110',
+            !canScrollRight && 'opacity-0 pointer-events-none'
+          )}
+          aria-label="Scroll right"
+        >
+          <CaretRight size={24} weight="bold" className="text-gray-700" />
+        </button>
+
+        {/* Scrollable carousel container */}
+        <div
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="overflow-x-auto scrollbar-hide"
+        >
+          {/* Fixed 5-column grid on desktop, responsive on mobile */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 min-w-min lg:w-max">
+            {days.map(day => (
+              <div key={day.id} className="lg:w-64">
+                <DayColumnComponent
+                  day={day}
+                  onComplete={onComplete}
+                  onDelete={onDelete}
+                  onDetails={onDetails}
+                  onAddForDate={onAddForDate}
+                  movingTaskId={movingTaskId}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       <DragOverlay>
         {activeTask ? (
-          <div className="opacity-80">
+          <div className="opacity-80 w-64">
             <MiniTaskCard task={activeTask} />
           </div>
         ) : null}
@@ -209,10 +347,10 @@ function DayColumnComponent({
         items={day.tasks.map(t => t.id)}
         strategy={verticalListSortingStrategy}
       >
-        <div className="p-2 space-y-1.5 min-h-[150px] max-h-[calc(100vh-280px)] overflow-y-auto">
+        <div className="p-1.5 space-y-1 min-h-[150px] max-h-[calc(100vh-280px)] overflow-y-auto">
           {day.tasks.length === 0 ? (
-            <div className="text-center py-8 text-gray-400">
-              <CalendarBlank size={32} className="mx-auto mb-2 opacity-40" />
+            <div className="text-center py-6 text-gray-400">
+              <CalendarBlank size={24} className="mx-auto mb-1 opacity-40" />
               <p className="text-xs font-medium">Brak zadań</p>
             </div>
           ) : (
@@ -286,7 +424,7 @@ function SortableTaskCard({
         isMoving && 'pointer-events-none'
       )}
     >
-      <div className="flex items-stretch gap-1">
+      <div className="flex items-stretch gap-0.5">
         {/* Drag handle */}
         <div
           {...attributes}
@@ -294,7 +432,7 @@ function SortableTaskCard({
           className="flex items-center cursor-grab active:cursor-grabbing px-0.5 hover:bg-gray-200 rounded transition-colors"
           title="Przeciągnij, aby przenieść"
         >
-          <DotsThree size={16} className="text-gray-400 rotate-90" weight="bold" />
+          <DotsThree size={14} className="text-gray-400 rotate-90" weight="bold" />
         </div>
         
         {/* Clickable task card */}
@@ -311,7 +449,7 @@ function SortableTaskCard({
   )
 }
 
-// Mini Task Card - Compact Premium Design
+// Mini Task Card - Ultra Compact Design
 function MiniTaskCard({
   task,
   onComplete,
@@ -327,9 +465,9 @@ function MiniTaskCard({
   const [showTooltip, setShowTooltip] = useState(false)
 
   const priorityColors = {
-    1: 'border-l-red-500 bg-gradient-to-r from-red-50/80 to-transparent',
-    2: 'border-l-orange-500 bg-gradient-to-r from-orange-50/80 to-transparent',
-    3: 'border-l-blue-500 bg-gradient-to-r from-blue-50/80 to-transparent',
+    1: 'border-l-red-500 bg-red-50/30',
+    2: 'border-l-orange-500 bg-orange-50/30',
+    3: 'border-l-blue-500 bg-blue-50/30',
     4: 'border-l-gray-300 bg-white'
   }
 
@@ -367,52 +505,56 @@ function MiniTaskCard({
 
   return (
     <div className="relative">
-      <Card
+      {/* Using div instead of Card component for ultra-compact design with minimal padding */}
+      <div
         className={cn(
-          'p-2.5 border-l-[3px] transition-all hover:shadow-md hover:scale-[1.02] group cursor-pointer',
+          'px-2 py-1.5 border-l-2 rounded-md transition-all hover:shadow-sm group cursor-pointer text-xs',
           priorityColors[task.priority] || priorityColors[4],
           loading && 'opacity-50'
         )}
         onClick={() => onDetails?.(task)}
         onMouseEnter={() => setShowTooltip(true)}
         onMouseLeave={() => setShowTooltip(false)}
+        role="button"
+        tabIndex={0}
+        aria-label={`Task: ${task.content}`}
       >
-        <div className="flex items-start gap-2">
+        <div className="flex items-center gap-1.5">
           {/* Priority indicator dot */}
-          <div className={cn('w-2 h-2 rounded-full flex-shrink-0 mt-1.5', priorityDots[task.priority])} />
+          <div className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', priorityDots[task.priority])} />
           
           {/* Content */}
           <div className="flex-1 min-w-0">
-            <h4 className="font-medium text-xs line-clamp-2 group-hover:text-brand-purple transition-colors leading-tight">
+            <p className="font-medium text-xs line-clamp-1 group-hover:text-brand-purple transition-colors">
               {task.content}
-            </h4>
-            
-            {/* Quick actions - shown on hover */}
-            <div className="flex gap-0.5 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-              {onComplete && (
-                <button
-                  onClick={handleComplete}
-                  disabled={loading}
-                  className="p-1 hover:bg-green-100 rounded text-green-600 transition-colors"
-                  title="Ukończ"
-                >
-                  <CheckCircle size={14} weight="bold" />
-                </button>
-              )}
-              {onDelete && (
-                <button
-                  onClick={handleDelete}
-                  disabled={loading}
-                  className="p-1 hover:bg-red-100 rounded text-red-600 transition-colors"
-                  title="Usuń"
-                >
-                  <Trash size={14} weight="bold" />
-                </button>
-              )}
-            </div>
+            </p>
+          </div>
+          
+          {/* Quick actions - shown on hover */}
+          <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+            {onComplete && (
+              <button
+                onClick={handleComplete}
+                disabled={loading}
+                className="p-0.5 hover:bg-green-100 rounded text-green-600 transition-colors"
+                title="Ukończ"
+              >
+                <CheckCircle size={12} weight="bold" />
+              </button>
+            )}
+            {onDelete && (
+              <button
+                onClick={handleDelete}
+                disabled={loading}
+                className="p-0.5 hover:bg-red-100 rounded text-red-600 transition-colors"
+                title="Usuń"
+              >
+                <Trash size={12} weight="bold" />
+              </button>
+            )}
           </div>
         </div>
-      </Card>
+      </div>
       
       {/* Enhanced tooltip on hover */}
       {showTooltip && task.description && (

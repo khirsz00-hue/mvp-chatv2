@@ -120,7 +120,7 @@ export function TaskDetailsModal({
   // Fetch AI suggestions when title changes (with debounce)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   useEffect(() => {
-    if (!isEditing || !editedTitle || editedTitle === task?.content) {
+    if (!isEditing || !editedTitle) {
       return
     }
     
@@ -132,6 +132,11 @@ export function TaskDetailsModal({
     // Reset if too short
     if (editedTitle.length < MIN_TITLE_LENGTH_FOR_SUGGESTIONS) {
       setAiSuggestions(null)
+      return
+    }
+    
+    // Skip if title hasn't changed and we already have suggestions
+    if (editedTitle === task?.content && aiSuggestions !== null) {
       return
     }
     
@@ -171,6 +176,9 @@ export function TaskDetailsModal({
         clearTimeout(debounceTimerRef.current)
       }
     }
+    // Note: aiSuggestions is intentionally not in deps to avoid infinite loop
+    // We check aiSuggestions !== null inside the effect to prevent unnecessary fetches
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editedTitle, isEditing, task?.content, token, projects])
   
   if (!task) return null

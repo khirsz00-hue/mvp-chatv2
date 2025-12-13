@@ -135,7 +135,7 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
         clearTimeout(debounceTimerRef.current)
       }
     }
-  }, [title])
+  }, [title, projects, token])
   
   const applySuggestion = (field: 'priority' | 'estimatedMinutes' | 'description' | 'project' | 'dueDate' | 'labels') => {
     if (!aiSuggestions) return
