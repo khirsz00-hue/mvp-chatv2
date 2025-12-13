@@ -42,6 +42,10 @@ interface TaskCardProps {
   onToggleSelection?: (taskId: string) => void
 }
 
+const DESCRIPTION_PREVIEW_LENGTH = 150
+const CONTEXT_MENU_WIDTH = 200
+const CONTEXT_MENU_HEIGHT = 150
+
 export function TaskCard({ 
   task, 
   onComplete, 
@@ -57,6 +61,10 @@ export function TaskCard({
   const [hasActiveTimer, setHasActiveTimer] = useState(false)
   const [showChatModal, setShowChatModal] = useState(false)
   const [showBreakdownModal, setShowBreakdownModal] = useState(false)
+  const [showAITooltip, setShowAITooltip] = useState(false)
+  const [aiUnderstanding, setAiUnderstanding] = useState<string>('')
+  const [showContextMenu, setShowContextMenu] = useState(false)
+  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 })
   
   const { startTimer, stopTimer, getActiveTimer } = useTaskTimer()
   const { showToast } = useToast()
@@ -254,7 +262,7 @@ export function TaskCard({
             </div>
           )}
           
-          {/* Footer badges and actions */}
+          {/* Footer badges */}
           <div className="flex gap-2 mt-3 flex-wrap items-center">
             {hasActiveTimer && (
               <Badge className="gap-1 text-xs bg-red-500 text-white animate-pulse">
@@ -278,91 +286,136 @@ export function TaskCard({
                 {priorityLabels[task. priority]}
               </Badge>
             )}
-          </div>
-          
-          {/* Quick Action Buttons */}
-          <div className="flex gap-2 mt-3">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleChatClick}
-              className="gap-1.5 text-xs flex-1"
-              title="Czat o zadaniu"
-            >
-              <ChatCircle size={16} weight="bold" />
-              Czat
-            </Button>
             
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleBreakdownClick}
-              className="gap-1.5 text-xs flex-1"
-              title="AI Breakdown"
-            >
-              <Brain size={16} weight="bold" />
-              Breakdown
-            </Button>
-            
-            <Button
-              size="sm"
-              variant={hasActiveTimer ? 'destructive' : 'default'}
-              onClick={handleStartStopTimer}
-              className="gap-1.5 text-xs flex-1"
-              title={hasActiveTimer ? 'Stop Timer' : 'Start Timer'}
-            >
-              {hasActiveTimer ? (
-                <>
-                  <Stop size={16} weight="fill" />
-                  Stop
-                </>
-              ) : (
-                <>
-                  <TimerIcon size={16} weight="fill" />
-                  Timer
-                </>
-              )}
-            </Button>
+            {/* AI Understanding Tooltip */}
+            {task.description && (
+              <div className="relative">
+                <Badge 
+                  variant="outline" 
+                  className="gap-1 text-xs cursor-help border-purple-300 bg-purple-50 text-purple-700"
+                  onMouseEnter={() => setShowAITooltip(true)}
+                  onMouseLeave={() => setShowAITooltip(false)}
+                  title="Jak AI rozumie zadanie"
+                >
+                  <Brain size={12} weight="fill" />
+                  AI
+                </Badge>
+                
+                {showAITooltip && (
+                  <div className="absolute z-50 left-0 top-full mt-2 w-64 p-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white text-xs rounded-lg shadow-xl pointer-events-none">
+                    <div className="font-semibold mb-1 flex items-center gap-1">
+                      <Brain size={14} weight="fill" />
+                      Jak AI rozumie zadanie
+                    </div>
+                    <div className="text-purple-100">
+                      {task.description?.substring(0, DESCRIPTION_PREVIEW_LENGTH)}{task.description && task.description.length > DESCRIPTION_PREVIEW_LENGTH ? '...' : ''}
+                    </div>
+                    <div className="text-xs text-purple-200 mt-2">
+                      💡 Kliknij na zadanie aby zobaczyć pełną analizę AI
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
         
-        {/* Actions (visible on hover) */}
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+        {/* Minimalistic Actions on the Right (always visible, no hover needed) */}
+        <div className="flex flex-col gap-1 flex-shrink-0 ml-2">
+          <Button 
+            size="sm" 
+            variant="ghost"
+            onClick={handleChatClick}
+            title="Czat"
+            className="p-1.5 h-auto"
+          >
+            <ChatCircle size={18} weight="bold" className="text-blue-600" />
+          </Button>
+          
+          <Button 
+            size="sm" 
+            variant="ghost"
+            onClick={handleStartStopTimer}
+            title={hasActiveTimer ? 'Stop Timer' : 'Start Timer'}
+            className="p-1.5 h-auto"
+          >
+            {hasActiveTimer ? (
+              <Stop size={18} weight="fill" className="text-red-600" />
+            ) : (
+              <TimerIcon size={18} weight="fill" className="text-purple-600" />
+            )}
+          </Button>
+          
           <Button 
             size="sm" 
             variant="ghost"
             onClick={(e) => {
               e.stopPropagation()
-              onDetails(task)
+              // Ensure menu stays within viewport
+              const x = Math.min(e.clientX, window.innerWidth - CONTEXT_MENU_WIDTH)
+              const y = Math.min(e.clientY, window.innerHeight - CONTEXT_MENU_HEIGHT)
+              setMenuPosition({ x, y })
+              setShowContextMenu(true)
             }}
-            title="Szczegóły"
+            title="Więcej opcji"
+            className="p-1.5 h-auto"
           >
-            <DotsThree size={18} weight="bold" />
-          </Button>
-          
-          <Button 
-            size="sm" 
-            variant="ghost"
-            onClick={handleComplete}
-            disabled={loading}
-            title="Ukończ"
-            className="text-green-600 hover:bg-green-50 hover:text-green-700"
-          >
-            <CheckCircle size={18} weight={loading ? 'regular' : 'bold'} />
-          </Button>
-          
-          <Button 
-            size="sm" 
-            variant="ghost"
-            onClick={handleDelete}
-            disabled={deleting}
-            title="Usuń"
-            className="text-red-600 hover:bg-red-50 hover:text-red-700"
-          >
-            <Trash size={18} weight="bold" />
+            <DotsThree size={18} weight="bold" className="text-gray-600" />
           </Button>
         </div>
       </div>
+      
+      {/* Context Menu */}
+      {showContextMenu && (
+        <>
+          <div 
+            className="fixed inset-0 z-40" 
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowContextMenu(false)
+            }}
+          />
+          <div 
+            className="fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 p-2 space-y-1"
+            style={{ left: menuPosition.x, top: menuPosition.y }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleBreakdownClick(e)
+                setShowContextMenu(false)
+              }}
+              className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded hover:bg-gray-100 transition-colors text-purple-600"
+            >
+              <Brain size={16} weight="bold" />
+              <span>Doprecyzuj</span>
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleComplete(e)
+                setShowContextMenu(false)
+              }}
+              className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded hover:bg-gray-100 transition-colors text-green-600"
+            >
+              <CheckCircle size={16} weight="bold" />
+              <span>Ukończ</span>
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleDelete(e)
+                setShowContextMenu(false)
+              }}
+              className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded hover:bg-gray-100 transition-colors text-red-600"
+            >
+              <Trash size={16} weight="bold" />
+              <span>Usuń</span>
+            </button>
+          </div>
+        </>
+      )}
       
       {/* Modals */}
       <TaskChatModal
