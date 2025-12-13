@@ -7,7 +7,7 @@ import { CSS } from '@dnd-kit/utilities'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
-import { CalendarBlank, CheckCircle, Trash, Plus, CaretLeft, CaretRight } from '@phosphor-icons/react'
+import { CalendarBlank, CheckCircle, Trash, Plus, CaretLeft, CaretRight, DotsThree, Brain, ChatCircle, Timer } from '@phosphor-icons/react'
 import { format, addDays, parseISO, startOfDay, isSameDay } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
@@ -459,6 +459,8 @@ function MiniTaskCard({
 }) {
   const [loading, setLoading] = useState(false)
   const [showTooltip, setShowTooltip] = useState(false)
+  const [showContextMenu, setShowContextMenu] = useState(false)
+  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 })
 
   const priorityColors = {
     1: 'border-l-red-500 bg-red-50/30',
@@ -535,7 +537,22 @@ function MiniTaskCard({
             </p>
           </div>
           
-
+          {/* Context menu button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              const rect = e.currentTarget.getBoundingClientRect()
+              setMenuPosition({ 
+                x: Math.min(rect.left, window.innerWidth - 200), 
+                y: rect.bottom + 5 
+              })
+              setShowContextMenu(true)
+            }}
+            className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-gray-200 rounded"
+            title="Więcej opcji"
+          >
+            <DotsThree size={14} weight="bold" className="text-gray-600" />
+          </button>
         </div>
       </div>
       
@@ -545,6 +562,58 @@ function MiniTaskCard({
           <div className="font-semibold mb-1">{task.content}</div>
           <div className="text-gray-300 line-clamp-3">{task.description}</div>
         </div>
+      )}
+      
+      {/* Context Menu */}
+      {showContextMenu && (
+        <>
+          <div 
+            className="fixed inset-0 z-[100]" 
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowContextMenu(false)
+            }}
+          />
+          <div 
+            className="fixed z-[101] bg-white rounded-lg shadow-xl border border-gray-200 p-2 space-y-1 min-w-[160px]"
+            style={{ left: menuPosition.x, top: menuPosition.y }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onDetails?.(task)
+                setShowContextMenu(false)
+              }}
+              className="flex items-center gap-2 w-full px-3 py-2 text-xs rounded hover:bg-gray-100 transition-colors text-gray-700"
+            >
+              <Brain size={14} weight="bold" />
+              <span>Doprecyzuj</span>
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleComplete(e)
+                setShowContextMenu(false)
+              }}
+              className="flex items-center gap-2 w-full px-3 py-2 text-xs rounded hover:bg-gray-100 transition-colors text-green-600"
+            >
+              <CheckCircle size={14} weight="bold" />
+              <span>Ukończ</span>
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleDelete(e)
+                setShowContextMenu(false)
+              }}
+              className="flex items-center gap-2 w-full px-3 py-2 text-xs rounded hover:bg-gray-100 transition-colors text-red-600"
+            >
+              <Trash size={14} weight="bold" />
+              <span>Usuń</span>
+            </button>
+          </div>
+        </>
       )}
     </div>
   )
