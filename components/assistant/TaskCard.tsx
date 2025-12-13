@@ -43,8 +43,6 @@ interface TaskCardProps {
 }
 
 const DESCRIPTION_PREVIEW_LENGTH = 150
-const CONTEXT_MENU_WIDTH = 200
-const CONTEXT_MENU_HEIGHT = 150
 
 export function TaskCard({ 
   task, 
@@ -63,8 +61,6 @@ export function TaskCard({
   const [showBreakdownModal, setShowBreakdownModal] = useState(false)
   const [showAITooltip, setShowAITooltip] = useState(false)
   const [aiUnderstanding, setAiUnderstanding] = useState<string>('')
-  const [showContextMenu, setShowContextMenu] = useState(false)
-  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 })
   
   const { startTimer, stopTimer, getActiveTimer } = useTaskTimer()
   const { showToast } = useToast()
@@ -320,14 +316,14 @@ export function TaskCard({
           </div>
         </div>
         
-        {/* Minimalistic Actions on the Right (always visible, no hover needed) */}
-        <div className="flex flex-col gap-1 flex-shrink-0 ml-2">
+        {/* Actions on the Right - horizontal layout for list view */}
+        <div className="flex gap-1 flex-shrink-0 ml-2 items-center">
           <Button 
             size="sm" 
             variant="ghost"
             onClick={handleChatClick}
             title="Czat"
-            className="p-1.5 h-auto"
+            className="p-2 h-auto"
           >
             <ChatCircle size={18} weight="bold" className="text-blue-600" />
           </Button>
@@ -335,9 +331,19 @@ export function TaskCard({
           <Button 
             size="sm" 
             variant="ghost"
+            onClick={handleBreakdownClick}
+            title="Doprecyzuj"
+            className="p-2 h-auto"
+          >
+            <Brain size={18} weight="bold" className="text-purple-600" />
+          </Button>
+          
+          <Button 
+            size="sm" 
+            variant="ghost"
             onClick={handleStartStopTimer}
             title={hasActiveTimer ? 'Stop Timer' : 'Start Timer'}
-            className="p-1.5 h-auto"
+            className="p-2 h-auto"
           >
             {hasActiveTimer ? (
               <Stop size={18} weight="fill" className="text-red-600" />
@@ -349,74 +355,25 @@ export function TaskCard({
           <Button 
             size="sm" 
             variant="ghost"
-            onClick={(e) => {
-              e.stopPropagation()
-              // Ensure menu stays within viewport
-              const x = Math.min(e.clientX, window.innerWidth - CONTEXT_MENU_WIDTH)
-              const y = Math.min(e.clientY, window.innerHeight - CONTEXT_MENU_HEIGHT)
-              setMenuPosition({ x, y })
-              setShowContextMenu(true)
-            }}
-            title="Więcej opcji"
-            className="p-1.5 h-auto"
+            onClick={handleComplete}
+            title="Ukończ"
+            className="p-2 h-auto"
           >
-            <DotsThree size={18} weight="bold" className="text-gray-600" />
+            <CheckCircle size={18} weight="bold" className="text-green-600" />
+          </Button>
+          
+          <Button 
+            size="sm" 
+            variant="ghost"
+            onClick={handleDelete}
+            title="Usuń"
+            className="p-2 h-auto"
+          >
+            <Trash size={18} weight="bold" className="text-red-600" />
           </Button>
         </div>
       </div>
-      
-      {/* Context Menu */}
-      {showContextMenu && (
-        <>
-          <div 
-            className="fixed inset-0 z-40" 
-            onClick={(e) => {
-              e.stopPropagation()
-              setShowContextMenu(false)
-            }}
-          />
-          <div 
-            className="fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 p-2 space-y-1"
-            style={{ left: menuPosition.x, top: menuPosition.y }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                handleBreakdownClick(e)
-                setShowContextMenu(false)
-              }}
-              className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded hover:bg-gray-100 transition-colors text-purple-600"
-            >
-              <Brain size={16} weight="bold" />
-              <span>Doprecyzuj</span>
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                handleComplete(e)
-                setShowContextMenu(false)
-              }}
-              className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded hover:bg-gray-100 transition-colors text-green-600"
-            >
-              <CheckCircle size={16} weight="bold" />
-              <span>Ukończ</span>
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                handleDelete(e)
-                setShowContextMenu(false)
-              }}
-              className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded hover:bg-gray-100 transition-colors text-red-600"
-            >
-              <Trash size={16} weight="bold" />
-              <span>Usuń</span>
-            </button>
-          </div>
-        </>
-      )}
-      
+
       {/* Modals */}
       <TaskChatModal
         open={showChatModal}

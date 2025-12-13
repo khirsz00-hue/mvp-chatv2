@@ -7,7 +7,7 @@ import Input from '@/components/ui/Input'
 import Textarea from '@/components/ui/Textarea'
 import Badge from '@/components/ui/Badge'
 import Separator from '@/components/ui/Separator'
-import { CheckCircle, Trash, Pencil, CalendarBlank, Flag, FolderOpen, Clock, Copy, CheckSquare, Timer, Brain, Sparkle, Tag } from '@phosphor-icons/react'
+import { CheckCircle, Trash, Pencil, CalendarBlank, Flag, FolderOpen, Clock, Copy, CheckSquare, Timer, Brain, Sparkle, Tag, Stop } from '@phosphor-icons/react'
 import { format, parseISO } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { AITaskBreakdownModal } from './AITaskBreakdownModal'
@@ -72,13 +72,15 @@ export function TaskDetailsModal({
   const [isCreatingSubtasks, setIsCreatingSubtasks] = useState(false)
   const [aiSuggestions, setAiSuggestions] = useState<any>(null)
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
-  const [showTimeTracking, setShowTimeTracking] = useState(false)
+  const [showTimeTracking, setShowTimeTracking] = useState(true) // Default to open
   const [showHistory, setShowHistory] = useState(false)
   const [taskTotalTime, setTaskTotalTime] = useState<number>(0) // Total time in seconds for this task
   const [aiUnderstanding, setAiUnderstanding] = useState<string>('')
   const [loadingUnderstanding, setLoadingUnderstanding] = useState(false)
+  const [hasActiveTimer, setHasActiveTimer] = useState(false)
+  const [activeTimerElapsed, setActiveTimerElapsed] = useState(0)
   
-  const { startTimer } = useTaskTimer()
+  const { startTimer, stopTimer, getActiveTimer } = useTaskTimer()
   
   const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
   
@@ -170,10 +172,73 @@ Bądź ciepły, wspierający i konkretny.`
         setTaskTotalTime(0)
       }
       
+      // Check for active timer for this task
+      const checkTimer = () => {
+        const activeTimer = getActiveTimer()
+        const isActive = activeTimer.taskId === task.id && activeTimer.isActive
+        setHasActiveTimer(isActive)
+        
+        // Get current elapsed time if timer is active
+        if (isActive) {
+          try {
+            const stored = localStorage.getItem('taskTimer')
+            if (stored) {
+              const parsed = JSON.parse(stored)
+              if (parsed.isRunning && parsed.startTime) {
+                const now = Date.now()
+                const elapsed = Math.floor((now - parsed.startTime) / 1000)
+                setActiveTimerElapsed(elapsed)
+              } else {
+                setActiveTimerElapsed(parsed.elapsedSeconds || 0)
+              }
+            }
+          } catch (err) {
+            console.error('Error parsing timer data:', err)
+            setActiveTimerElapsed(0)
+          }
+        }
+      }
+      
+      checkTimer()
+      
+      // Update timer every second when active (using let for proper closure)
+      let timerInterval: NodeJS.Timeout | null = null
+      
+      const updateInterval = () => {
+        const activeTimer = getActiveTimer()
+        const isActive = activeTimer.taskId === task.id && activeTimer.isActive
+        
+        if (isActive && !timerInterval) {
+          // Start interval only when timer is active
+          timerInterval = setInterval(checkTimer, 1000)
+        } else if (!isActive && timerInterval) {
+          // Clear interval when timer is not active
+          clearInterval(timerInterval)
+          timerInterval = null
+        }
+      }
+      
+      updateInterval()
+      
+      // Listen for timer state changes
+      const handleTimerStateChange = () => {
+        checkTimer()
+        updateInterval()
+      }
+      
+      window.addEventListener('timerStateChanged', handleTimerStateChange)
+      window.addEventListener('storage', handleTimerStateChange)
+      
       // Fetch AI understanding
       fetchAIUnderstanding()
+      
+      return () => {
+        if (timerInterval) clearInterval(timerInterval)
+        window.removeEventListener('timerStateChanged', handleTimerStateChange)
+        window.removeEventListener('storage', handleTimerStateChange)
+      }
     }
-  }, [task])
+  }, [task, getActiveTimer])
   
   // Constants
   const MIN_TITLE_LENGTH_FOR_SUGGESTIONS = 5
@@ -241,6 +306,67 @@ Bądź ciepły, wspierający i konkretny.`
     // We check aiSuggestions !== null inside the effect to prevent unnecessary fetches
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editedTitle, isEditing, task?.content, token, projects])
+  
+  // Auto-save effect - save changes after 2 seconds of inactivity
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
+  useEffect(() => {
+    if (!task || !onUpdate) return
+    
+    // Skip if values haven't changed
+    const hasChanges = (
+      editedTitle !== task.content ||
+      editedDescription !== (task.description || '') ||
+      editedDueDate !== (typeof task.due === 'string' ? task.due : task.due?.date || '') ||
+      editedPriority !== task.priority ||
+      editedProjectId !== (task.project_id || '') ||
+      editedDuration !== (task.duration || 0) ||
+      JSON.stringify(editedLabels) !== JSON.stringify(task.labels || [])
+    )
+    
+    if (!hasChanges) return
+    
+    // Clear previous timer
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current)
+    }
+    
+    // Set new timer for auto-save
+    autoSaveTimerRef.current = setTimeout(async () => {
+      try {
+        const updates: Partial<Task> = {
+          content: editedTitle,
+          description: editedDescription,
+          priority: editedPriority
+        }
+        
+        if (editedDueDate) {
+          updates.due = editedDueDate
+        }
+        
+        if (editedProjectId) {
+          updates.project_id = editedProjectId
+        }
+        
+        if (editedDuration > 0) {
+          updates.duration = editedDuration
+        }
+        
+        if (editedLabels.length > 0) {
+          updates.labels = editedLabels
+        }
+        
+        await onUpdate(task.id, updates)
+      } catch (err) {
+        console.error('Auto-save error:', err)
+      }
+    }, 2000) // 2 seconds debounce
+    
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current)
+      }
+    }
+  }, [editedTitle, editedDescription, editedDueDate, editedPriority, editedProjectId, editedDuration, editedLabels, task, onUpdate])
   
   if (!task) return null
   
@@ -410,8 +536,11 @@ Bądź ciepły, wspierający i konkretny.`
   const handleStartTimer = () => {
     if (task) {
       startTimer(task.id, task.content)
-      alert('Timer started!')
     }
+  }
+  
+  const handleStopTimer = () => {
+    stopTimer()
   }
   
   const dueStr = typeof task.due === 'string' ? task.due : task.due?.date
@@ -610,34 +739,150 @@ Bądź ciepły, wspierający i konkretny.`
             )}
           </div>
           
-          {!isEditing && <Separator />}
+          <Separator />
+          
+          {/* AI Understanding Section - Always visible */}
+          <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl p-4 border-2 border-purple-200">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center flex-shrink-0">
+                <Brain size={20} className="text-white" weight="fill" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-sm text-purple-900 mb-2 flex items-center gap-2">
+                  💡 Jak AI rozumie zadanie
+                </h3>
+                {loadingUnderstanding ? (
+                  <div className="flex items-center gap-2 text-sm text-purple-700">
+                    <div className="w-3 h-3 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
+                    <span>Analizuję zadanie...</span>
+                  </div>
+                ) : (
+                  <p className="text-sm text-purple-800 leading-relaxed">
+                    {aiUnderstanding || 'AI przeanalizuje to zadanie, aby pomóc Ci lepiej je zrozumieć.'}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          {/* Time Tracking Section - Always visible */}
+          <div className="border border-gray-200 rounded-lg">
+            <button
+              onClick={() => setShowTimeTracking(!showTimeTracking)}
+              className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Timer size={18} weight="fill" className="text-brand-purple" />
+                <h3 className="font-semibold text-sm text-gray-700">Śledzenie Czasu</h3>
+                {hasActiveTimer && (
+                  <Badge className="gap-1 text-xs bg-red-500 text-white animate-pulse">
+                    <div className="w-2 h-2 rounded-full bg-white" />
+                    Live
+                  </Badge>
+                )}
+              </div>
+              <span className="text-gray-400">{showTimeTracking ? '▼' : '▶'}</span>
+            </button>
+            
+            {showTimeTracking && (
+              <div className="p-4 pt-0 space-y-3">
+                <Separator className="mb-3" />
+                
+                {/* Active Timer Display */}
+                {hasActiveTimer && (
+                  <div className="bg-gradient-to-r from-red-50 to-pink-50 rounded-lg p-4 border-2 border-red-300 mb-3">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+                        <span className="font-semibold text-sm text-red-900">Timer aktywny</span>
+                      </div>
+                    </div>
+                    
+                    <div className="text-center mb-3">
+                      <p className="text-4xl font-bold text-red-600 font-mono">
+                        {Math.floor(activeTimerElapsed / 3600)}:{String(Math.floor((activeTimerElapsed % 3600) / 60)).padStart(2, '0')}:{String(activeTimerElapsed % 60).padStart(2, '0')}
+                      </p>
+                      <p className="text-xs text-red-700 mt-1">
+                        Bieżąca sesja
+                      </p>
+                    </div>
+                    
+                    <Button
+                      onClick={handleStopTimer}
+                      variant="destructive"
+                      size="sm"
+                      className="w-full gap-2"
+                    >
+                      <Stop size={16} weight="fill" />
+                      Zatrzymaj Timer
+                    </Button>
+                  </div>
+                )}
+                
+                {/* Task Time Tracking Stats */}
+                <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4 border border-purple-200">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-2xl">⏱️</span>
+                    <span className="font-semibold text-sm text-gray-700">Całkowity czas pracy</span>
+                  </div>
+                  
+                  <div className="text-center mb-3">
+                    <p className="text-4xl font-bold text-purple-600">
+                      {Math.floor(taskTotalTime / 3600)}:{String(Math.floor((taskTotalTime % 3600) / 60)).padStart(2, '0')}:{String(taskTotalTime % 60).padStart(2, '0')}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {Math.floor(taskTotalTime / 60)} minut całkowitego czasu
+                    </p>
+                  </div>
+                  
+                  {task.duration && task.duration > 0 && (
+                    <div className="bg-white/50 rounded-lg p-2 mb-3">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-600">Estymacja:</span>
+                        <span className="font-semibold">{task.duration} min</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs mt-1">
+                        <span className="text-gray-600">Rzeczywisty:</span>
+                        <span className="font-semibold">{Math.floor(taskTotalTime / 60)} min</span>
+                      </div>
+                      {taskTotalTime > 0 && (
+                        <div className="mt-2">
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              className={`h-2 rounded-full transition-all ${
+                                (taskTotalTime / 60) > task.duration ? 'bg-red-500' : 'bg-green-500'
+                              }`}
+                              style={{ width: `${Math.min(100, (taskTotalTime / 60 / task.duration) * 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {!hasActiveTimer && (
+                    <Button
+                      onClick={handleStartTimer}
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-2 bg-white hover:bg-purple-50 border-purple-300"
+                    >
+                      <Timer size={16} weight="fill" />
+                      Rozpocznij Timer
+                    </Button>
+                  )}
+                </div>
+                
+                <p className="text-xs text-gray-500 text-center">
+                  💡 Rozpocznij timer Pomodoro, aby śledzić czas pracy nad zadaniem
+                </p>
+              </div>
+            )}
+          </div>
           
           {/* View Mode */}
           {!isEditing && (
             <>
-              {/* AI Understanding Section */}
-              <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl p-4 border-2 border-purple-200">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center flex-shrink-0">
-                    <Brain size={20} className="text-white" weight="fill" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-sm text-purple-900 mb-2 flex items-center gap-2">
-                      💡 Jak AI rozumie zadanie
-                    </h3>
-                    {loadingUnderstanding ? (
-                      <div className="flex items-center gap-2 text-sm text-purple-700">
-                        <div className="w-3 h-3 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
-                        <span>Analizuję zadanie...</span>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-purple-800 leading-relaxed">
-                        {aiUnderstanding || 'AI przeanalizuje to zadanie, aby pomóc Ci lepiej je zrozumieć.'}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
               
               {/* Description */}
               <div>
@@ -684,95 +929,7 @@ Bądź ciepły, wspierający i konkretny.`
                 </div>
               )}
               
-              {/* Time Tracking Section */}
-              <div className="border border-gray-200 rounded-lg">
-                <button
-                  onClick={() => setShowTimeTracking(!showTimeTracking)}
-                  className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <Timer size={18} weight="fill" className="text-brand-purple" />
-                    <h3 className="font-semibold text-sm text-gray-700">Śledzenie Czasu</h3>
-                  </div>
-                  <span className="text-gray-400">{showTimeTracking ? '▼' : '▶'}</span>
-                </button>
-                
-                {showTimeTracking && (
-                  <div className="p-4 pt-0 space-y-3">
-                    <Separator className="mb-3" />
-                    
-                    {/* Task Time Tracking Stats */}
-                    <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4 border border-purple-200">
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className="text-2xl">⏱️</span>
-                        <span className="font-semibold text-sm text-gray-700">Całkowity czas pracy</span>
-                      </div>
-                      
-                      <div className="text-center mb-3">
-                        <p className="text-4xl font-bold text-purple-600">
-                          {Math.floor(taskTotalTime / 3600)}:{String(Math.floor((taskTotalTime % 3600) / 60)).padStart(2, '0')}:{String(taskTotalTime % 60).padStart(2, '0')}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {Math.floor(taskTotalTime / 60)} minut całkowitego czasu
-                        </p>
-                      </div>
-                      
-                      {task.duration && task.duration > 0 && (
-                        <div className="bg-white/50 rounded-lg p-2 mb-3">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-gray-600">Estymacja:</span>
-                            <span className="font-semibold">{task.duration} min</span>
-                          </div>
-                          <div className="flex items-center justify-between text-xs mt-1">
-                            <span className="text-gray-600">Rzeczywisty:</span>
-                            <span className="font-semibold">{Math.floor(taskTotalTime / 60)} min</span>
-                          </div>
-                          {taskTotalTime > 0 && (
-                            <div className="mt-2">
-                              <div className="w-full bg-gray-200 rounded-full h-2">
-                                <div 
-                                  className={`h-2 rounded-full transition-all ${
-                                    (taskTotalTime / 60) > task.duration ? 'bg-red-500' : 'bg-green-500'
-                                  }`}
-                                  style={{ width: `${Math.min(100, (taskTotalTime / 60 / task.duration) * 100)}%` }}
-                                />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      
-                      <Button
-                        onClick={handleStartTimer}
-                        variant="outline"
-                        size="sm"
-                        className="w-full gap-2 bg-white hover:bg-purple-50 border-purple-300"
-                      >
-                        <Timer size={16} weight="fill" />
-                        Rozpocznij Timer
-                      </Button>
-                    </div>
-                    
-                    {/* Estimated vs Actual */}
-                    {task.duration && task.duration > 0 && (
-                      <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-xs text-gray-600">Estymowany czas</p>
-                            <p className="text-lg font-semibold text-blue-700">{task.duration} min</p>
-                          </div>
-                          <Clock size={32} weight="duotone" className="text-blue-400" />
-                        </div>
-                      </div>
-                    )}
-                    
-                    <p className="text-xs text-gray-500 text-center">
-                      💡 Rozpocznij timer Pomodoro, aby śledzić czas pracy nad zadaniem
-                    </p>
-                  </div>
-                )}
-              </div>
-              
+
               {/* History Section */}
               <div className="border border-gray-200 rounded-lg">
                 <button
@@ -990,52 +1147,32 @@ Bądź ciepły, wspierający i konkretny.`
           
           {/* Action Buttons - Beautiful UX */}
           <div className="bg-gradient-to-r from-gray-50 to-white rounded-xl p-6 border-2 border-gray-100 shadow-sm">
-            {isEditing ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-600">💾 Zapisz zmiany?</span>
-                </div>
-                <div className="flex gap-3">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => onOpenChange(false)}
-                    disabled={loading}
-                    className="flex-1 border-2 hover:bg-gray-50"
-                    size="lg"
-                  >
-                    Anuluj
-                  </Button>
-                  <Button 
-                    onClick={handleSave}
-                    disabled={loading || !editedTitle.trim()}
-                    className="flex-1 gap-2 bg-gradient-to-r from-brand-purple to-brand-pink hover:shadow-lg transition-all"
-                    size="lg"
-                  >
-                    {loading ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        Zapisywanie...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle size={20} weight="bold" />
-                        Zapisz
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            ) : (
+            <div className="flex gap-3">
               <Button 
                 onClick={handleComplete}
                 disabled={loading}
-                className="w-full gap-2 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 hover:shadow-lg transition-all"
+                className="flex-1 gap-2 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 hover:shadow-lg transition-all"
                 size="lg"
               >
                 <CheckCircle size={20} weight="bold" />
                 ✅ Ukończ zadanie
               </Button>
-            )}
+              
+              <Button 
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                className="border-2 hover:bg-gray-50"
+                size="lg"
+              >
+                Zamknij
+              </Button>
+            </div>
+            
+            <div className="mt-3 text-center">
+              <p className="text-xs text-gray-500">
+                💡 Zmiany zapisują się automatycznie
+              </p>
+            </div>
           </div>
         </div>
       </DialogContent>
