@@ -16,11 +16,17 @@ export async function POST(req: Request) {
     let userAnalytics = null
     if (userId) {
       try {
-        const analyticsUrl = `${req.headers.get('origin') || ''}/api/analytics/track-task?user_id=${userId}&limit=50`
-        const analyticsRes = await fetch(analyticsUrl)
-        if (analyticsRes.ok) {
-          const analyticsData = await analyticsRes.json()
-          userAnalytics = analyticsData.analytics
+        // Use supabase directly instead of fetching via HTTP
+        const { supabase } = await import('@/lib/supabaseClient')
+        const { data, error } = await supabase
+          .from('user_task_analytics')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(50)
+        
+        if (!error && data) {
+          userAnalytics = data
         }
       } catch (err) {
         console.error('Error fetching analytics:', err)

@@ -114,6 +114,9 @@ export function TaskDetailsModal({
     }
   }, [task])
   
+  // Constants
+  const MIN_TITLE_LENGTH_FOR_SUGGESTIONS = 5
+  
   // Fetch AI suggestions when title changes (with debounce)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   useEffect(() => {
@@ -127,7 +130,7 @@ export function TaskDetailsModal({
     }
     
     // Reset if too short
-    if (editedTitle.length < 5) {
+    if (editedTitle.length < MIN_TITLE_LENGTH_FOR_SUGGESTIONS) {
       setAiSuggestions(null)
       return
     }

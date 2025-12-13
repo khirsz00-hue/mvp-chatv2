@@ -209,7 +209,7 @@ function DayColumnComponent({
         items={day.tasks.map(t => t.id)}
         strategy={verticalListSortingStrategy}
       >
-        <div className="p-2 space-y-1.5 min-h-[150px] max-h-[calc(100vh-280px)] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+        <div className="p-2 space-y-1.5 min-h-[150px] max-h-[calc(100vh-280px)] overflow-y-auto">
           {day.tasks.length === 0 ? (
             <div className="text-center py-8 text-gray-400">
               <CalendarBlank size={32} className="mx-auto mb-2 opacity-40" />
@@ -291,10 +291,10 @@ function SortableTaskCard({
         <div
           {...attributes}
           {...listeners}
-          className="flex items-center cursor-grab active:cursor-grabbing px-1 hover:bg-gray-200 rounded transition-colors"
+          className="flex items-center cursor-grab active:cursor-grabbing px-0.5 hover:bg-gray-200 rounded transition-colors"
           title="Przeciągnij, aby przenieść"
         >
-          <DotsThree size={16} className="text-gray-400" weight="bold" />
+          <DotsThree size={16} className="text-gray-400 rotate-90" weight="bold" />
         </div>
         
         {/* Clickable task card */}
