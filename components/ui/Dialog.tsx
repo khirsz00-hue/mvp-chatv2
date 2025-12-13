@@ -55,7 +55,7 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
         initial={{ opacity: 0, scale: 0.95, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 10 }}
-        className={`relative z-50 w-full max-w-lg rounded-2xl bg-white p-6 shadow-glow-lg animate-scale-in ${className}`}
+        className={`relative z-50 w-full max-w-3xl rounded-2xl bg-white p-6 shadow-glow-lg animate-scale-in ${className}`}
         onClick={(e) => e.stopPropagation()}
       >
         {children}
