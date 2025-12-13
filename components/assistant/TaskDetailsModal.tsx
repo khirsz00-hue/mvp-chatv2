@@ -115,6 +115,32 @@ type RawSubtask =
   | LocalSubtask
   | MinimalSubtaskShape
 
+interface StoredTimerState {
+  taskId?: string
+  taskTitle?: string
+  startTime?: number
+  elapsedSeconds?: number
+  isRunning?: boolean
+  isPaused?: boolean
+}
+
+interface StoredPomodoroState {
+  taskId?: string
+  taskTitle?: string
+  phase?: 'work' | 'shortBreak' | 'longBreak'
+  remainingSeconds?: number
+  isRunning?: boolean
+}
+
+const hasTitle = (s: RawSubtask): s is MinimalSubtaskShape =>
+  'title' in s && typeof (s as MinimalSubtaskShape).title === 'string'
+
+const isStoredTimerState = (value: any): value is StoredTimerState =>
+  Boolean(value) && typeof value === 'object'
+
+const isStoredPomodoroState = (value: any): value is StoredPomodoroState =>
+  Boolean(value) && typeof value === 'object'
+
 const normalizeSubtasks = (
   items: RawSubtask[] = [],
   parentId?: string
@@ -122,10 +148,7 @@ const normalizeSubtasks = (
   items
     .filter(Boolean)
     .map((s: RawSubtask) => {
-      const fallbackTitle =
-        'title' in s && typeof (s as MinimalSubtaskShape).title === 'string'
-          ? (s as MinimalSubtaskShape).title
-          : ''
+      const fallbackTitle = hasTitle(s) ? s.title : ''
       const mainContent = typeof s.content === 'string' ? s.content : ''
       return {
         id: String(s.id ?? '').trim(),
@@ -334,11 +357,11 @@ Bądź wspierający i konkretny.
           const raw = localStorage.getItem('taskTimer')
           if (raw) {
             const parsed = JSON.parse(raw)
-            if (!parsed || typeof parsed !== 'object') throw new Error('Invalid timer payload')
-            const isRunning = Boolean((parsed as any).isRunning)
-            const isPaused = Boolean((parsed as any).isPaused)
-            const startTs = Number((parsed as any).startTime)
-            const storedElapsed = Number((parsed as any).elapsedSeconds)
+            if (!isStoredTimerState(parsed)) throw new Error('Invalid timer payload')
+            const isRunning = Boolean(parsed.isRunning)
+            const isPaused = Boolean(parsed.isPaused)
+            const startTs = Number(parsed.startTime)
+            const storedElapsed = Number(parsed.elapsedSeconds)
             const elapsed =
               isRunning && Number.isFinite(startTs) && startTs > 0
                 ? Math.floor((Date.now() - startTs) / 1000)
@@ -361,13 +384,13 @@ Bądź wspierający i konkretny.
         const rawPomodoro = localStorage.getItem('pomodoroState')
         if (rawPomodoro) {
           const parsed = JSON.parse(rawPomodoro)
-          if (!parsed || typeof parsed !== 'object') throw new Error('Invalid pomodoro payload')
-          const isRunning = Boolean((parsed as any).isRunning)
-          const phase = (parsed as any).phase as 'work' | 'shortBreak' | 'longBreak' | undefined
-          const remainingSecondsRaw = Number((parsed as any).remainingSeconds)
+          if (!isStoredPomodoroState(parsed)) throw new Error('Invalid pomodoro payload')
+          const isRunning = Boolean(parsed.isRunning)
+          const phase = parsed.phase || 'work'
+          const remainingSecondsRaw = Number(parsed.remainingSeconds)
           const safeRemaining = Number.isFinite(remainingSecondsRaw) ? remainingSecondsRaw : 0
 
-          if ((parsed as any).taskId === task.id && isRunning) {
+          if (parsed.taskId === task.id && isRunning) {
             const phaseDuration =
               phase === 'work'
                 ? POMODORO_WORK_DURATION
@@ -412,13 +435,18 @@ Bądź wspierający i konkretny.
      ACTION HANDLERS
   ======================= */
 
+  const generateSubtaskId = () =>
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `tmp-${Date.now()}-${Math.random().toString(16).slice(2)}`
+
   const handleAddSubtask = async () => {
     if (!newSubtask.trim()) return
     const content = newSubtask.trim()
     setNewSubtask('')
 
     const optimistic: SubtaskItem = {
-      id: `tmp-${Date.now()}`,
+      id: generateSubtaskId(),
       parentId: task.id,
       content,
       completed: false
@@ -466,7 +494,7 @@ Bądź wspierający i konkretny.
     try {
       const token = localStorage.getItem('todoist_token')
       if (!token) {
-        showToast('Brak tokenu Todoist - zaloguj się aby tworzyć podzadania', 'error')
+        showToast('Brak tokenu Todoist - zaloguj się, żeby tworzyć podzadania', 'error')
         return
       }
 
