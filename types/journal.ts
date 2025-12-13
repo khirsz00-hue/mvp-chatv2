@@ -1,0 +1,62 @@
+// Types for Journal Assistant with ADHD-specific metrics
+
+export interface JournalEntry {
+  id: string
+  user_id: string
+  date: string // ISO date string (YYYY-MM-DD)
+  energy: number // 0-10
+  motivation: number // 0-10
+  sleep_quality: number // 0-10
+  hours_slept: number
+  sleep_time?: string // HH:MM format
+  wake_time?: string // HH:MM format
+  planned_tasks: string
+  completed_tasks_snapshot: string[]
+  notes: string[]
+  comments: string[]
+  ai_summary?: string
+  created_at: string
+  updated_at: string
+  // Legacy fields for compatibility
+  content?: string
+  archived?: boolean
+}
+
+export interface TodoistTask {
+  id: string
+  content: string
+  description?: string
+  completed: boolean
+  due?: {
+    date: string
+    datetime?: string
+  }
+  project_id?: string
+  priority?: number
+  labels?: string[]
+}
+
+export interface JournalStats {
+  avgEnergy: number
+  avgMotivation: number
+  avgSleepQuality: number
+  avgHoursSlept: number
+  totalEntries: number
+}
+
+export interface ArchiveHierarchy {
+  year: number
+  months?: {
+    month: number
+    weeks?: {
+      week: number
+      days?: {
+        day: string // ISO date
+        entry: JournalEntry
+      }[]
+      stats: JournalStats
+    }[]
+    stats: JournalStats
+  }[]
+  stats: JournalStats
+}
