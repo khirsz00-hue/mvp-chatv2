@@ -121,7 +121,8 @@ export function SevenDaysBoardView({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex gap-4 overflow-x-auto pb-4">
+      {/* Responsive grid layout - horizontal scroll on large screens, vertical stack on small screens */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:gap-4 gap-4 lg:overflow-x-auto pb-4">
         {days.map(day => (
           <DayColumnComponent
             key={day.id}
@@ -170,7 +171,7 @@ function DayColumnComponent({
     <div
       ref={setNodeRef}
       className={cn(
-        'flex-shrink-0 w-80 bg-white rounded-xl border-2 shadow-sm transition-all',
+        'w-full lg:flex-shrink-0 lg:w-80 bg-white rounded-xl border-2 shadow-sm transition-all',
         isOver ? 'border-brand-purple bg-brand-purple/5 shadow-lg' : 'border-gray-200',
         isToday && 'border-brand-pink shadow-md'
       )}
