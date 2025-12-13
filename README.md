@@ -185,6 +185,8 @@ Aby utworzyć tabele w bazie danych:
 supabase db push
 ```
 
+**💡 Pomoc w aplikacji:** Jeśli zapomniałeś utworzyć tabele dla Dziennika, aplikacja automatycznie wykryje to i pokaże szczegółową instrukcję konfiguracji z możliwością skopiowania SQL jednym kliknięciem. Wystarczy kliknąć przycisk "Konfiguracja bazy danych" w interfejsie Dziennika.
+
 ### 5. Weryfikacja
 
 Po uruchomieniu migracji, sprawdź w panelu Supabase → **Table Editor**, czy zostały utworzone następujące tabele:
@@ -202,6 +204,11 @@ Po uruchomieniu migracji, sprawdź w panelu Supabase → **Table Editor**, czy z
 ### 6. Row Level Security (RLS)
 
 Wszystkie tabele mają włączone RLS - użytkownicy widzą tylko swoje dane. Polityki bezpieczeństwa są już skonfigurowane w migracjach.
+
+### 📚 Dodatkowa dokumentacja
+
+- Szczegółowy przewodnik konfiguracji Dziennika: [JOURNAL_SETUP.md](./JOURNAL_SETUP.md)
+- Instrukcja dostępna również bezpośrednio w aplikacji (przycisk "Konfiguracja" w Dzienniku)
 
 ---
 
