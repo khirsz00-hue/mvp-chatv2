@@ -59,6 +59,8 @@ export function TaskCard({
   const [showBreakdownModal, setShowBreakdownModal] = useState(false)
   const [showAITooltip, setShowAITooltip] = useState(false)
   const [aiUnderstanding, setAiUnderstanding] = useState<string>('')
+  const [showContextMenu, setShowContextMenu] = useState(false)
+  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 })
   
   const { startTimer, stopTimer, getActiveTimer } = useTaskTimer()
   const { showToast } = useToast()
@@ -345,40 +347,8 @@ export function TaskCard({
             variant="ghost"
             onClick={(e) => {
               e.stopPropagation()
-              // Show context menu with more options
-              const menu = document.createElement('div')
-              menu.className = 'fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 p-2 space-y-1'
-              menu.style.left = e.clientX + 'px'
-              menu.style.top = e.clientY + 'px'
-              
-              const menuItems = [
-                { label: 'Doprecyzuj', icon: Brain, onClick: handleBreakdownClick, color: 'text-purple-600' },
-                { label: 'Ukończ', icon: CheckCircle, onClick: handleComplete, color: 'text-green-600' },
-                { label: 'Usuń', icon: Trash, onClick: handleDelete, color: 'text-red-600' }
-              ]
-              
-              menuItems.forEach(item => {
-                const btn = document.createElement('button')
-                btn.className = `flex items-center gap-2 w-full px-3 py-2 text-sm rounded hover:bg-gray-100 transition-colors ${item.color}`
-                btn.innerHTML = `<span class="icon"></span><span>${item.label}</span>`
-                btn.onclick = (event) => {
-                  event.stopPropagation()
-                  item.onClick(event as any)
-                  document.body.removeChild(menu)
-                }
-                menu.appendChild(btn)
-              })
-              
-              // Close menu on click outside
-              const closeMenu = () => {
-                if (document.body.contains(menu)) {
-                  document.body.removeChild(menu)
-                }
-                document.removeEventListener('click', closeMenu)
-              }
-              setTimeout(() => document.addEventListener('click', closeMenu), 100)
-              
-              document.body.appendChild(menu)
+              setMenuPosition({ x: e.clientX, y: e.clientY })
+              setShowContextMenu(true)
             }}
             title="Więcej opcji"
             className="p-1.5 h-auto"
@@ -387,6 +357,58 @@ export function TaskCard({
           </Button>
         </div>
       </div>
+      
+      {/* Context Menu */}
+      {showContextMenu && (
+        <>
+          <div 
+            className="fixed inset-0 z-40" 
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowContextMenu(false)
+            }}
+          />
+          <div 
+            className="fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 p-2 space-y-1"
+            style={{ left: menuPosition.x, top: menuPosition.y }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleBreakdownClick(e)
+                setShowContextMenu(false)
+              }}
+              className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded hover:bg-gray-100 transition-colors text-purple-600"
+            >
+              <Brain size={16} weight="bold" />
+              <span>Doprecyzuj</span>
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleComplete(e)
+                setShowContextMenu(false)
+              }}
+              className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded hover:bg-gray-100 transition-colors text-green-600"
+            >
+              <CheckCircle size={16} weight="bold" />
+              <span>Ukończ</span>
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleDelete(e)
+                setShowContextMenu(false)
+              }}
+              className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded hover:bg-gray-100 transition-colors text-red-600"
+            >
+              <Trash size={16} weight="bold" />
+              <span>Usuń</span>
+            </button>
+          </div>
+        </>
+      )}
       
       {/* Modals */}
       <TaskChatModal

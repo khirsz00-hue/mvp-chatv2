@@ -86,12 +86,12 @@ Na podstawie tytułu i kontekstu zasugeruj:
    - Jeśli brak pasującego projektu, zwróć null
 
 5. **Sugerowana data wykonania** (format YYYY-MM-DD):
-   - WAŻNE: Dzisiaj jest ${new Date().toISOString().split('T')[0]} (rok 2025)
+   - WAŻNE: Dzisiaj jest ${new Date().toISOString().split('T')[0]}
    - Pilne: dziś lub jutro
    - Ważne: w ciągu 3 dni
    - Normalne: w ciągu tygodnia
    - Niskie: w ciągu 2 tygodni
-   - NIGDY nie używaj dat z przeszłości ani z roku 2023 lub 2024!
+   - NIGDY nie używaj dat z przeszłości!
 
 6. **Sugerowane etykiety** (2-4 słowa kluczowe opisujące zadanie)
 
@@ -117,7 +117,7 @@ Zwróć odpowiedź jako JSON:
           role: 'system', 
           content: `Jesteś asystentem ADHD pomagającym oszacować wymagania zadania na podstawie tytułu i kontekstu użytkownika. Bądź praktyczny i konkretny. 
           
-WAŻNE: Dzisiaj jest ${new Date().toISOString().split('T')[0]}. NIGDY nie używaj dat z przeszłości. Wszystkie sugestie dat muszą być z roku 2025 lub późniejszego.
+WAŻNE: Dzisiaj jest ${new Date().toISOString().split('T')[0]}. NIGDY nie używaj dat z przeszłości. Wszystkie sugestie dat muszą być z bieżącego roku lub późniejszego.
 ZAWSZE sugeruj projekt dla nowych zadań na podstawie dostępnych projektów użytkownika i treści zadania.` 
         },
         { role: 'user', content: prompt }
