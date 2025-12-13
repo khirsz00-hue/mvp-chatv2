@@ -10,7 +10,7 @@ export async function GET(req: Request) {
 
   const clientId = process.env.TODOIST_CLIENT_ID
   const clientSecret = process.env.TODOIST_CLIENT_SECRET
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://mvp-chatv2.vercel.app'
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mvp-chatv2.vercel.app'
 
   if (!clientId || !clientSecret) {
     console.error('❌ Brak danych OAuth Todoist (client_id / secret)')

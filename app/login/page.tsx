@@ -20,7 +20,10 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
+      if (!baseUrl) {
+        throw new Error('NEXT_PUBLIC_SITE_URL is not configured. Please set it in your environment variables.')
+      }
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {

@@ -6,16 +6,16 @@ export async function GET() {
   const clientId = process.env.TODOIST_CLIENT_ID
   const redirectUri = process.env.TODOIST_REDIRECT_URI
   const clientSecret = process.env.TODOIST_CLIENT_SECRET
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
 
   // 🧩 Pełny debug środowiska — pojawi się w logach Vercel
   console.log('🧩 [DEBUG OAuth ENV]', {
     TODOIST_CLIENT_ID: clientId ? '✅ set' : '❌ missing',
     TODOIST_CLIENT_SECRET: clientSecret ? '✅ set' : '❌ missing',
     TODOIST_REDIRECT_URI: redirectUri,
-    NEXT_PUBLIC_APP_URL: baseUrl,
+    NEXT_PUBLIC_SITE_URL: baseUrl,
     ENV_KEYS: Object.keys(process.env).filter(k =>
-      k.startsWith('TODOIST') || k.startsWith('NEXT_PUBLIC_APP')
+      k.startsWith('TODOIST') || k.startsWith('NEXT_PUBLIC_SITE')
     ),
   })
 
