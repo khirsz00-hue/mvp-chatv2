@@ -518,28 +518,16 @@ export function TasksAssistant() {
     if (!confirmed) return
     
     setBulkActionLoading(true)
-    let successCount = 0
-    let errorCount = 0
+    const count = selectedTaskIds.size
     
+    // Execute all complete operations (individual toasts will show for any errors)
     for (const taskId of selectedTaskIds) {
-      try {
-        await handleComplete(taskId)
-        successCount++
-      } catch (err) {
-        errorCount++
-        console.error(`Error completing task ${taskId}:`, err)
-      }
+      await handleComplete(taskId)
     }
     
     setBulkActionLoading(false)
     setSelectedTaskIds(new Set())
-    
-    if (successCount > 0) {
-      showToast(`Ukończono ${successCount} zadań`, 'success')
-    }
-    if (errorCount > 0) {
-      showToast(`Nie udało się ukończyć ${errorCount} zadań`, 'error')
-    }
+    showToast(`Przetworzono ${count} zadań`, 'success')
   }
   
   const handleBulkDelete = async () => {
@@ -549,56 +537,36 @@ export function TasksAssistant() {
     if (!confirmed) return
     
     setBulkActionLoading(true)
-    let successCount = 0
-    let errorCount = 0
+    const count = selectedTaskIds.size
     
+    // Execute all delete operations (individual toasts will show for any errors)
     for (const taskId of selectedTaskIds) {
-      try {
-        await handleDelete(taskId)
-        successCount++
-      } catch (err) {
-        errorCount++
-        console.error(`Error deleting task ${taskId}:`, err)
-      }
+      await handleDelete(taskId)
     }
     
     setBulkActionLoading(false)
     setSelectedTaskIds(new Set())
-    
-    if (successCount > 0) {
-      showToast(`Usunięto ${successCount} zadań`, 'success')
-    }
-    if (errorCount > 0) {
-      showToast(`Nie udało się usunąć ${errorCount} zadań`, 'error')
-    }
+    showToast(`Przetworzono ${count} zadań`, 'success')
   }
   
   const handleBulkMove = async (newDate: string) => {
     if (selectedTaskIds.size === 0) return
     
     setBulkActionLoading(true)
-    let successCount = 0
-    let errorCount = 0
+    const count = selectedTaskIds.size
     
+    // Execute all move operations (individual toasts will show for any errors)
     for (const taskId of selectedTaskIds) {
       try {
         await handleMove(taskId, newDate)
-        successCount++
       } catch (err) {
-        errorCount++
         console.error(`Error moving task ${taskId}:`, err)
       }
     }
     
     setBulkActionLoading(false)
     setSelectedTaskIds(new Set())
-    
-    if (successCount > 0) {
-      showToast(`Przeniesiono ${successCount} zadań`, 'success')
-    }
-    if (errorCount > 0) {
-      showToast(`Nie udało się przenieść ${errorCount} zadań`, 'error')
-    }
+    showToast(`Przetworzono ${count} zadań`, 'success')
   }
   
   // OAuth Connection Screen
