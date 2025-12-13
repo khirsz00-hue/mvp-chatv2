@@ -26,13 +26,16 @@ import {
   Plus,
   ArrowClockwise,
   Lightning,
-  ListChecks
+  ListChecks,
+  ChatCircle,
+  ClockClockwise
 } from '@phosphor-icons/react'
 import { format, parseISO } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { useTaskTimer } from './TaskTimer'
 import { AITaskBreakdownModal } from './AITaskBreakdownModal'
 import { PomodoroTimer } from './PomodoroTimer'
+import { TaskChatModal } from './TaskChatModal'
 import {
   listSubtasksLocal,
   addSubtaskLocal,
@@ -213,6 +216,24 @@ export function TaskDetailsModal({
   const [newSubtask, setNewSubtask] = useState('')
   const [showBreakdown, setShowBreakdown] = useState(false)
   const [showPomodoro, setShowPomodoro] = useState(false)
+  const [showChat, setShowChat] = useState(false)
+  const [changeHistory, setChangeHistory] = useState<Array<{
+    timestamp: string
+    field: string
+    oldValue: string
+    newValue: string
+  }>>([])
+  const lastValuesRef = useRef<{
+    title: string
+    description: string
+    priority: number
+    dueDate: string
+  }>({
+    title: '',
+    description: '',
+    priority: 4,
+    dueDate: ''
+  })
   const [timerInfo, setTimerInfo] = useState<{
     isActive: boolean
     isForThisTask: boolean
@@ -233,13 +254,24 @@ export function TaskDetailsModal({
      AI UNDERSTANDING
   ======================= */
 
-  const fetchAIUnderstanding = useCallback(async (currentTask: Task, force = false) => {
-    if (!currentTask || !currentTask.id || (!force && fetchedTaskIdRef.current === currentTask.id)) return
+  const fetchAIUnderstanding = useCallback(async (currentTask: Task, force = false, clarificationContext?: string) => {
+    if (!currentTask || !currentTask.id || (!force && fetchedTaskIdRef.current === currentTask.id && !clarificationContext)) return
 
     fetchedTaskIdRef.current = currentTask.id
     setLoadingAI(true)
 
-    const prompt = `
+    const prompt = clarificationContext 
+      ? `
+Poprzednia analiza: ${aiUnderstanding}
+
+Zadanie: ${currentTask.content}
+Opis: ${currentTask.description || ''}
+
+Kontekst doprecyzowania: ${clarificationContext}
+
+Zaktualizuj swoją analizę zadania uwzględniając nowy kontekst. Bądź wspierający i konkretny (2-3 zdania).
+`
+      : `
 Zadanie: ${currentTask.content}
 Opis: ${currentTask.description || ''}
 
@@ -264,7 +296,7 @@ Bądź wspierający i konkretny.
     } finally {
       setLoadingAI(false)
     }
-  }, [])
+  }, [aiUnderstanding])
 
   /* =======================
      INIT TASK
@@ -274,14 +306,33 @@ Bądź wspierający i konkretny.
     if (!task?.id) {
       setAiUnderstanding('')
       setSubtasks([])
+      setChangeHistory([])
       fetchedTaskIdRef.current = null
+      lastValuesRef.current = {
+        title: '',
+        description: '',
+        priority: 4,
+        dueDate: ''
+      }
       return
     }
 
-    setTitle(task.content || '')
-    setDescription(task.description || '')
-    setDueDate(parseDueDate(task.due))
-    setPriority(task.priority)
+    const initialTitle = task.content || ''
+    const initialDescription = task.description || ''
+    const initialDueDate = parseDueDate(task.due)
+    const initialPriority = task.priority
+
+    setTitle(initialTitle)
+    setDescription(initialDescription)
+    setDueDate(initialDueDate)
+    setPriority(initialPriority)
+
+    lastValuesRef.current = {
+      title: initialTitle,
+      description: initialDescription,
+      priority: initialPriority,
+      dueDate: initialDueDate
+    }
 
     const loadSubtasks = async () => {
       setSubtasksLoading(true)
@@ -333,6 +384,56 @@ Bądź wspierający i konkretny.
     }
 
     const timeout = setTimeout(() => {
+      const now = new Date().toISOString()
+      const changes: typeof changeHistory = []
+
+      if (title !== lastValuesRef.current.title && lastValuesRef.current.title !== '') {
+        changes.push({
+          timestamp: now,
+          field: 'Tytuł',
+          oldValue: lastValuesRef.current.title,
+          newValue: title
+        })
+      }
+
+      if (description !== lastValuesRef.current.description && lastValuesRef.current.description !== '') {
+        changes.push({
+          timestamp: now,
+          field: 'Opis',
+          oldValue: lastValuesRef.current.description || '(pusty)',
+          newValue: description || '(pusty)'
+        })
+      }
+
+      if (priority !== lastValuesRef.current.priority && lastValuesRef.current.priority !== 0) {
+        changes.push({
+          timestamp: now,
+          field: 'Priorytet',
+          oldValue: `P${lastValuesRef.current.priority}`,
+          newValue: `P${priority}`
+        })
+      }
+
+      if (dueDate !== lastValuesRef.current.dueDate && lastValuesRef.current.dueDate !== '') {
+        changes.push({
+          timestamp: now,
+          field: 'Termin',
+          oldValue: lastValuesRef.current.dueDate || '(brak)',
+          newValue: dueDate || '(brak)'
+        })
+      }
+
+      if (changes.length > 0) {
+        setChangeHistory(prev => [...changes, ...prev])
+      }
+
+      lastValuesRef.current = {
+        title,
+        description,
+        priority,
+        dueDate
+      }
+
       onUpdate(task.id, {
         content: title,
         description,
@@ -546,10 +647,19 @@ Bądź wspierający i konkretny.
     }
   }
 
+  const handleClarify = async () => {
+    const clarification = prompt('Napisz, co chcesz doprecyzować w tym zadaniu:')
+    if (clarification && task) {
+      await fetchAIUnderstanding(task, true, clarification)
+    }
+  }
+
   const isTimerActiveForTask = timerInfo.isActive && timerInfo.isForThisTask
 
   const completedSubtasksCount = subtasks.filter(s => s.completed).length
   const totalSubtasksCount = subtasks.length
+
+  const totalTimeWorked = task.duration || timerInfo.elapsedSeconds
 
   /* =======================
      RENDER
@@ -557,274 +667,426 @@ Bądź wspierający i konkretny.
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <Badge className="bg-purple-100 text-purple-800 border-purple-200">
-              <Sparkle size={16} weight="fill" />
-              Task cockpit
-            </Badge>
-            <div className="flex gap-2">
-              <Button variant="ghost" onClick={() => fetchAIUnderstanding(task, true)} title="Odśwież opis AI">
-                <ArrowClockwise size={16} />
-                AI
-              </Button>
-              <Button variant="ghost" onClick={() => setShowPomodoro(true)} title="Pomodoro dla tego zadania">
-                <Lightning size={16} />
-                Pomodoro
-              </Button>
-              <Button variant="destructive" onClick={() => onDelete(task.id)} title="Usuń zadanie">
-                <Trash size={16} />
-              </Button>
-              <Button
-                onClick={() => onComplete(task.id)}
-                className="bg-green-600 hover:bg-green-700"
-                title="Oznacz jako ukończone"
-              >
-                <CheckCircle size={18} /> Ukończ
-              </Button>
+      <DialogContent className="max-w-[95vw] md:max-w-6xl max-h-[95vh] md:max-h-[90vh] overflow-hidden flex flex-col p-0">
+        {/* Header */}
+        <div className="px-4 md:px-6 py-4 border-b bg-gradient-to-br from-purple-50 via-white to-pink-50 shrink-0">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-2">
+              <Badge className="bg-gradient-to-r from-purple-600 to-pink-600 text-white border-0 shadow-lg">
+                <Sparkle size={16} weight="fill" />
+                <span className="hidden sm:inline">Task Cockpit Pro</span>
+                <span className="sm:hidden">Cockpit</span>
+              </Badge>
+              <div className="flex gap-1 md:gap-2">
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  onClick={() => fetchAIUnderstanding(task, true)} 
+                  title="Odśwież opis AI"
+                  className="hidden sm:flex"
+                >
+                  <ArrowClockwise size={16} />
+                  <span className="hidden lg:inline">AI</span>
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  onClick={() => setShowPomodoro(true)} 
+                  title="Pomodoro"
+                  className="hidden sm:flex"
+                >
+                  <Lightning size={16} />
+                  <span className="hidden lg:inline">Pomodoro</span>
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="destructive" 
+                  onClick={() => onDelete(task.id)} 
+                  title="Usuń"
+                >
+                  <Trash size={16} />
+                  <span className="hidden lg:inline">Usuń</span>
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => onComplete(task.id)}
+                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg"
+                  title="Ukończ"
+                >
+                  <CheckCircle size={18} />
+                  <span className="hidden lg:inline">Ukończ</span>
+                </Button>
+              </div>
             </div>
-          </div>
-          <DialogTitle className="text-xl font-semibold text-gray-900">Szczegóły zadania</DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-2 mb-4">
-          <Input
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            className="text-3xl font-semibold"
-            placeholder="Tytuł zadania"
-            aria-label="Tytuł zadania"
-            aria-describedby="ai-understanding-panel"
-          />
-          <div className="flex flex-wrap gap-2 text-sm text-gray-600">
-            {dueDate && (
-              <Badge variant="outline" className="gap-1">
-                <CalendarBlank size={14} />
-                {formatDateSafely(dueDate)}
-              </Badge>
-            )}
-            <Badge variant="secondary" className="gap-1">
-              <Flag size={14} /> Priorytet P{priority}
-            </Badge>
-            {task.project_id && (
-              <Badge variant="outline" className="gap-1">
-                <FolderOpen size={14} />
-                {task.project_name || task.project_id}
-              </Badge>
-            )}
-            {(task.labels || []).map(label => (
-              <Badge key={label} className="bg-slate-100 text-slate-700 border border-slate-200">
-                <Tag size={12} />
-                {label}
-              </Badge>
-            ))}
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-[1.5fr_1fr] gap-6">
-          <div className="space-y-4">
-            <Card className="p-4 md:p-5 bg-gradient-to-br from-purple-50 via-white to-pink-50 border-purple-100/60 shadow-sm">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2 text-purple-800">
-                  <Brain size={20} weight="fill" />
-                  <span className="font-semibold">Jak AI rozumie to zadanie</span>
-                </div>
-                <Button size="sm" variant="outline" onClick={() => fetchAIUnderstanding(task, true)} disabled={loadingAI}>
-                  <Sparkle size={14} />
-                  Odśwież
-                </Button>
-              </div>
-              <div
-                id="ai-understanding-panel"
-                className="rounded-xl bg-white/80 border border-purple-100 p-4 text-sm text-purple-900 min-h-[96px]"
-              >
-                {loadingAI ? 'Analizuję zadanie…' : aiUnderstanding || 'AI przygotowuje interpretację zadania.'}
-              </div>
-            </Card>
-
-            <Card className="p-4 md:p-5 space-y-3 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 font-semibold">
-                  <Clock size={18} /> Opis
-                </div>
-              </div>
-              <Textarea
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                placeholder="Dodaj kontekst, linki, checklistę…"
-                rows={6}
-              />
-            </Card>
-
-            <Card className="p-4 md:p-5 space-y-3 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 font-semibold">
-                  <ListChecks size={18} weight="bold" />
-                  Subtaski
-                </div>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="ghost" onClick={() => setShowBreakdown(true)}>
-                    <Brain size={14} />
-                    Wygeneruj AI
-                  </Button>
-                  <Badge variant="secondary">
-                    {totalSubtasksCount ? `${completedSubtasksCount}/${totalSubtasksCount}` : '0/0'} ukończone
-                  </Badge>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  value={newSubtask}
-                  onChange={e => setNewSubtask(e.target.value)}
-                  placeholder="Nowy subtask"
-                />
-                <Button onClick={handleAddSubtask} disabled={subtasksLoading}>
-                  <Plus size={16} />
-                  Dodaj
-                </Button>
-              </div>
-              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                {subtasksLoading && <p className="text-sm text-gray-500">Ładuję podzadania…</p>}
-                {!subtasksLoading && subtasks.length === 0 && (
-                  <p className="text-sm text-gray-500">Brak podzadań — dodaj własne lub wygeneruj z AI.</p>
-                )}
-                {subtasks.map(subtask => (
-                  <label
-                    key={subtask.id}
-                    className="flex items-start gap-2 rounded-lg border border-gray-200 p-3 hover:border-purple-200 cursor-pointer transition"
-                  >
-                    <input
-                      type="checkbox"
-                      className="mt-0.5 h-4 w-4 text-purple-600"
-                      checked={Boolean(subtask.completed)}
-                      onChange={e => handleToggleSubtask(subtask.id, e.target.checked)}
-                    />
-                    <span
-                      className={`text-sm leading-tight ${
-                        subtask.completed ? 'line-through text-gray-400' : 'text-gray-800'
-                      }`}
-                    >
-                      {subtask.content}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </Card>
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4">
+          {/* Title and Metadata */}
+          <div className="space-y-3 mb-4">
+            <Input
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              className="text-xl md:text-2xl lg:text-3xl font-bold border-0 border-b-2 border-gray-200 focus:border-purple-500 rounded-none px-0"
+              placeholder="Tytuł zadania"
+              aria-label="Tytuł zadania"
+              aria-describedby="ai-understanding-panel"
+            />
+            <div className="flex flex-wrap gap-2 text-xs md:text-sm">
+              {dueDate && (
+                <Badge variant="outline" className="gap-1">
+                  <CalendarBlank size={14} />
+                  <span className="hidden sm:inline">{formatDateSafely(dueDate)}</span>
+                  <span className="sm:hidden">{format(parseISO(dueDate), 'dd MMM', { locale: pl })}</span>
+                </Badge>
+              )}
+              <Badge variant="secondary" className="gap-1">
+                <Flag size={14} /> P{priority}
+              </Badge>
+              {task.project_id && (
+                <Badge variant="outline" className="gap-1">
+                  <FolderOpen size={14} />
+                  <span className="max-w-[100px] md:max-w-none truncate">
+                    {task.project_name || task.project_id}
+                  </span>
+                </Badge>
+              )}
+              {(task.labels || []).map(label => (
+                <Badge key={label} className="bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 border border-purple-200">
+                  <Tag size={12} />
+                  {label}
+                </Badge>
+              ))}
+            </div>
           </div>
 
-          <div className="space-y-4">
-            <Card className="p-4 md:p-5 shadow-sm">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2 font-semibold">
-                  <Timer size={18} /> Timer & Pomodoro
+          {/* Main Grid Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+            {/* Left Column - Main Content */}
+            <div className="lg:col-span-2 space-y-4">
+              {/* AI Understanding Section */}
+              <Card className="p-4 md:p-6 bg-gradient-to-br from-purple-50 via-white to-pink-50 border-purple-200 shadow-lg">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                  <div className="flex items-center gap-2 text-purple-800">
+                    <Brain size={24} weight="fill" />
+                    <span className="font-bold text-base md:text-lg">Jak AI rozumie to zadanie</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={handleClarify} 
+                      disabled={loadingAI}
+                      className="border-purple-300 hover:bg-purple-100 text-purple-700"
+                    >
+                      <Sparkle size={14} />
+                      <span className="hidden sm:inline">Doprecyzuj</span>
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => setShowChat(true)} 
+                      disabled={loadingAI}
+                      className="border-purple-300 hover:bg-purple-100 text-purple-700"
+                    >
+                      <ChatCircle size={14} />
+                      <span className="hidden sm:inline">Rozmowa</span>
+                    </Button>
+                  </div>
                 </div>
-                <Badge variant={isTimerActiveForTask ? 'secondary' : 'outline'} className="gap-1">
-                  {isTimerActiveForTask ? (timerInfo.isPomodoro ? 'Pomodoro' : 'Timer') : 'Brak timera'}
-                </Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-gray-500">Status</p>
-                  <p className="text-lg font-semibold text-gray-900">
-                    {isTimerActiveForTask ? (timerInfo.isPomodoro ? 'Pomodoro aktywne' : 'Timer aktywny') : 'Nieaktywne'}
-                  </p>
-                  {timerInfo.isPomodoro && timerInfo.pomodoroRemaining !== undefined ? (
-                    <p className="text-sm text-gray-500">
-                      Faza: {timerInfo.pomodoroPhase || '-'} · Pozostało {formatStopwatch(timerInfo.pomodoroRemaining || 0)}
-                    </p>
+                <div
+                  id="ai-understanding-panel"
+                  className="rounded-xl bg-white/90 border-2 border-purple-200 p-4 text-sm md:text-base text-purple-900 min-h-[100px] shadow-inner"
+                >
+                  {loadingAI ? (
+                    <div className="flex items-center gap-2 text-purple-600">
+                      <ArrowClockwise size={16} className="animate-spin" />
+                      Analizuję zadanie…
+                    </div>
+                  ) : aiUnderstanding ? (
+                    <p className="leading-relaxed">{aiUnderstanding}</p>
                   ) : (
-                    <p className="text-sm text-gray-500">
-                      {isTimerActiveForTask ? `Czas: ${formatStopwatch(timerInfo.elapsedSeconds)}` : 'Brak odpalonego trackera'}
-                    </p>
+                    <p className="text-purple-600 italic">AI przygotowuje interpretację zadania...</p>
                   )}
                 </div>
+              </Card>
+
+              {/* Description Section */}
+              <Card className="p-4 md:p-6 space-y-3 shadow-lg border-gray-200">
+                <div className="flex items-center gap-2 font-bold text-base md:text-lg text-gray-800">
+                  <Clock size={20} weight="bold" /> Opis zadania
+                </div>
+                <Textarea
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  placeholder="Dodaj szczegółowy kontekst, linki, checklistę lub notatki…"
+                  rows={6}
+                  className="resize-none focus:ring-2 focus:ring-purple-500 text-sm md:text-base"
+                />
+              </Card>
+
+              {/* Subtasks Section */}
+              <Card className="p-4 md:p-6 space-y-3 shadow-lg border-gray-200">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 font-bold text-base md:text-lg text-gray-800">
+                    <ListChecks size={20} weight="bold" />
+                    Podzadania
+                    <Badge 
+                      variant="secondary" 
+                      className="ml-2 bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-800"
+                    >
+                      {completedSubtasksCount}/{totalSubtasksCount}
+                    </Badge>
+                  </div>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => setShowBreakdown(true)}
+                    className="border-purple-300 hover:bg-purple-50 text-purple-700"
+                  >
+                    <Brain size={14} />
+                    <span className="hidden sm:inline">Wygeneruj AI</span>
+                  </Button>
+                </div>
+                
                 <div className="flex gap-2">
+                  <Input
+                    value={newSubtask}
+                    onChange={e => setNewSubtask(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleAddSubtask()}
+                    placeholder="Dodaj nowe podzadanie..."
+                    className="flex-1 text-sm md:text-base"
+                  />
+                  <Button 
+                    onClick={handleAddSubtask} 
+                    disabled={subtasksLoading || !newSubtask.trim()}
+                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                  >
+                    <Plus size={16} />
+                    <span className="hidden sm:inline">Dodaj</span>
+                  </Button>
+                </div>
+                
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                  {subtasksLoading && (
+                    <div className="flex items-center gap-2 text-gray-500 py-4">
+                      <ArrowClockwise size={16} className="animate-spin" />
+                      Ładuję podzadania…
+                    </div>
+                  )}
+                  {!subtasksLoading && subtasks.length === 0 && (
+                    <div className="text-center py-8 text-gray-400">
+                      <ListChecks size={32} weight="light" className="mx-auto mb-2" />
+                      <p className="text-sm">Brak podzadań — dodaj własne lub wygeneruj z AI</p>
+                    </div>
+                  )}
+                  {subtasks.map(subtask => (
+                    <label
+                      key={subtask.id}
+                      className="flex items-start gap-3 rounded-lg border-2 border-gray-200 p-3 hover:border-purple-300 hover:bg-purple-50/30 cursor-pointer transition-all"
+                    >
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 h-5 w-5 rounded text-purple-600 focus:ring-2 focus:ring-purple-500"
+                        checked={Boolean(subtask.completed)}
+                        onChange={e => handleToggleSubtask(subtask.id, e.target.checked)}
+                      />
+                      <span
+                        className={`text-sm md:text-base leading-tight flex-1 ${
+                          subtask.completed ? 'line-through text-gray-400' : 'text-gray-800'
+                        }`}
+                      >
+                        {subtask.content}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </Card>
+            </div>
+
+            {/* Right Column - Metadata & Tracking */}
+            <div className="lg:col-span-1 space-y-4">
+              {/* Timer & Pomodoro */}
+              <Card className="p-4 md:p-6 shadow-lg border-gray-200 bg-gradient-to-br from-blue-50 to-cyan-50">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2 font-bold text-base md:text-lg">
+                    <Timer size={20} weight="bold" /> Mierzenie czasu
+                  </div>
+                  <Badge 
+                    variant={isTimerActiveForTask ? 'default' : 'outline'} 
+                    className={isTimerActiveForTask ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white' : ''}
+                  >
+                    {isTimerActiveForTask ? (timerInfo.isPomodoro ? '🍅' : '⏱️') : '⏸️'}
+                  </Badge>
+                </div>
+                
+                {/* Timer Display */}
+                <div className="bg-white rounded-xl p-4 mb-4 shadow-inner border-2 border-blue-200">
+                  <div className="text-center">
+                    <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">
+                      {isTimerActiveForTask ? (timerInfo.isPomodoro ? 'Pomodoro Aktywne' : 'Timer Aktywny') : 'Czas pracy'}
+                    </p>
+                    <p className="text-3xl md:text-4xl font-bold text-gray-900 font-mono mb-1">
+                      {formatStopwatch(totalTimeWorked)}
+                    </p>
+                    {timerInfo.isPomodoro && timerInfo.pomodoroPhase && (
+                      <p className="text-xs text-gray-600">
+                        {timerInfo.pomodoroPhase === 'work' ? '🎯 Praca' : 
+                         timerInfo.pomodoroPhase === 'shortBreak' ? '☕ Krótka przerwa' : 
+                         '🌴 Długa przerwa'}
+                        {timerInfo.pomodoroRemaining !== undefined && 
+                          ` · ${formatStopwatch(timerInfo.pomodoroRemaining)} pozostało`
+                        }
+                      </p>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Timer Controls */}
+                <div className="grid grid-cols-2 gap-2 mb-3">
                   <Button
+                    size="sm"
                     variant={isTimerActiveForTask && !timerInfo.isPomodoro ? 'outline' : 'default'}
                     onClick={() => startTimer(task.id, title || task.content)}
+                    className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
                   >
-                    <Play size={16} /> Start
+                    <Play size={16} weight="fill" /> Start
                   </Button>
-                  <Button variant="outline" onClick={() => stopTimer()}>
-                    <Stop size={16} /> Stop
-                  </Button>
-                </div>
-              </div>
-              <Separator className="my-4" />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
-                  <p className="text-xs text-gray-500 mb-1 flex items-center gap-1">
-                    <CalendarBlank size={12} /> Termin
-                  </p>
-                  <Input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
-                </div>
-                <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
-                  <p className="text-xs text-gray-500 mb-1 flex items-center gap-1">
-                    <Flag size={12} /> Priorytet
-                  </p>
-                  <Select
-                    value={String(priority)}
-                    onChange={e => {
-                      const next = Number(e.target.value)
-                      if ([1, 2, 3, 4].includes(next)) {
-                        setPriority(next as 1 | 2 | 3 | 4)
-                      }
-                    }}
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => stopTimer()}
+                    disabled={!isTimerActiveForTask}
                   >
-                    <SelectOption value="1">P1 - krytyczne</SelectOption>
-                    <SelectOption value="2">P2 - wysokie</SelectOption>
-                    <SelectOption value="3">P3 - normalne</SelectOption>
-                    <SelectOption value="4">P4 - później</SelectOption>
-                  </Select>
+                    <Stop size={16} weight="fill" /> Stop
+                  </Button>
                 </div>
-                <div className="bg-slate-50 rounded-lg p-3 border border-slate-100 sm:col-span-2">
-                  <p className="text-xs text-gray-500 mb-1 flex items-center gap-1">
-                    <FolderOpen size={12} /> Projekt
-                  </p>
-                  <div className="text-sm font-medium text-gray-800">
-                    {task.project_name || task.project_id || 'Brak projektu'}
-                  </div>
+                
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={() => setShowPomodoro(true)}
+                  className="w-full border-blue-300 hover:bg-blue-100 text-blue-700"
+                >
+                  <Lightning size={14} weight="fill" /> Uruchom Pomodoro
+                </Button>
+              </Card>
+
+              {/* Properties */}
+              <Card className="p-4 md:p-6 shadow-lg border-gray-200">
+                <div className="flex items-center gap-2 font-bold text-base md:text-lg mb-4">
+                  <Flag size={20} weight="bold" /> Właściwości
                 </div>
-                {task.labels && task.labels.length > 0 && (
-                  <div className="sm:col-span-2 bg-slate-50 rounded-lg p-3 border border-slate-100">
-                    <p className="text-xs text-gray-500 mb-2 flex items-center gap-1">
-                      <Tag size={12} /> Etykiety
+                
+                <div className="space-y-3">
+                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                    <p className="text-xs text-gray-600 mb-2 flex items-center gap-1 font-medium">
+                      <CalendarBlank size={12} /> Termin
                     </p>
-                    <div className="flex flex-wrap gap-2">
-                      {task.labels.map(label => (
-                        <Badge key={label} variant="outline" className="border-purple-200 text-purple-700">
-                          {label}
-                        </Badge>
-                      ))}
+                    <Input 
+                      type="date" 
+                      value={dueDate} 
+                      onChange={e => setDueDate(e.target.value)}
+                      className="text-sm"
+                    />
+                  </div>
+                  
+                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                    <p className="text-xs text-gray-600 mb-2 flex items-center gap-1 font-medium">
+                      <Flag size={12} /> Priorytet
+                    </p>
+                    <Select
+                      value={String(priority)}
+                      onChange={e => {
+                        const next = Number(e.target.value)
+                        if ([1, 2, 3, 4].includes(next)) {
+                          setPriority(next as 1 | 2 | 3 | 4)
+                        }
+                      }}
+                      className="text-sm"
+                    >
+                      <SelectOption value="1">P1 - 🔴 Krytyczne</SelectOption>
+                      <SelectOption value="2">P2 - 🟠 Wysokie</SelectOption>
+                      <SelectOption value="3">P3 - 🟡 Normalne</SelectOption>
+                      <SelectOption value="4">P4 - 🔵 Niskie</SelectOption>
+                    </Select>
+                  </div>
+                  
+                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                    <p className="text-xs text-gray-600 mb-2 flex items-center gap-1 font-medium">
+                      <FolderOpen size={12} /> Projekt
+                    </p>
+                    <div className="text-sm font-medium text-gray-800 truncate">
+                      {task.project_name || task.project_id || '—'}
                     </div>
                   </div>
-                )}
-              </div>
-            </Card>
+                  
+                  {task.labels && task.labels.length > 0 && (
+                    <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                      <p className="text-xs text-gray-600 mb-2 flex items-center gap-1 font-medium">
+                        <Tag size={12} /> Etykiety
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {task.labels.map(label => (
+                          <Badge 
+                            key={label} 
+                            variant="outline" 
+                            className="text-xs border-purple-200 bg-purple-50 text-purple-700"
+                          >
+                            {label}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Card>
 
-            <Card className="p-4 md:p-5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 font-semibold">
-                  <CalendarBlank size={16} /> Kontrola
+              {/* Change History */}
+              <Card className="p-4 md:p-6 shadow-lg border-gray-200">
+                <div className="flex items-center gap-2 font-bold text-base md:text-lg mb-3">
+                  <ClockClockwise size={20} weight="bold" /> Historia zmian
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="ghost" onClick={() => onOpenChange(false)}>
-                    Zamknij
-                  </Button>
-                  <Button onClick={() => onComplete(task.id)} className="bg-green-600 hover:bg-green-700">
-                    <CheckCircle size={18} /> Ukończ
-                  </Button>
+                
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                  {changeHistory.length === 0 ? (
+                    <div className="text-center py-6 text-gray-400">
+                      <ClockClockwise size={28} weight="light" className="mx-auto mb-2" />
+                      <p className="text-xs">Brak historii zmian</p>
+                    </div>
+                  ) : (
+                    changeHistory.map((change, idx) => (
+                      <div 
+                        key={idx}
+                        className="bg-gray-50 rounded-lg p-3 border border-gray-200 text-xs"
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-semibold text-gray-700">{change.field}</span>
+                          <span className="text-gray-500">
+                            {format(parseISO(change.timestamp), 'HH:mm', { locale: pl })}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-gray-600">
+                          <span className="line-through text-red-600 truncate max-w-[100px]">
+                            {change.oldValue}
+                          </span>
+                          →
+                          <span className="text-green-600 truncate max-w-[100px]">
+                            {change.newValue}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
-              </div>
-              <p className="text-sm text-gray-500 mt-2">
-                Zmieniaj daty, priorytet i odpalaj timery bez wychodzenia z modalki.
-              </p>
-            </Card>
+              </Card>
+            </div>
           </div>
         </div>
       </DialogContent>
 
+      {/* Additional Modals */}
       <PomodoroTimer
         open={showPomodoro}
         onOpenChange={setShowPomodoro}
@@ -838,6 +1100,14 @@ Bądź wspierający i konkretny.
           onClose={() => setShowBreakdown(false)}
           task={task}
           onCreateSubtasks={handleCreateSubtasks}
+        />
+      )}
+
+      {showChat && (
+        <TaskChatModal
+          open={showChat}
+          onClose={() => setShowChat(false)}
+          task={task}
         />
       )}
     </Dialog>

@@ -8,6 +8,7 @@ Modularna platforma AI zbudowana w **Next.js 14 + Supabase + OpenAI + Tailwind +
 2. 📅 **AI Planner** - Inteligentne planowanie dnia (w przygotowaniu)
 3. 📔 **Journal** - Codzienny dziennik refleksji (w pełni zaimplementowany)
 4. 🧠 **Decision Assistant** - AI wspierający podejmowanie decyzji (w pełni zaimplementowany)
+4. 🧠 **Decision Assistant** - Framework decyzyjny Six Thinking Hats (w pełni zaimplementowany)
 5. 💬 **Chat Support** - Coaching dla ADHD (w pełni zaimplementowany)
 
 ---
@@ -82,6 +83,49 @@ Dostępne w `components/ui/`:
 - `.shimmer` - efekt shimmer na elementach
 
 Szczegóły w `theme.json` i `tailwind.config.ts`.
+
+---
+
+## 🧠 Asystent Decyzji (Decision Assistant)
+
+Asystent decyzji wykorzystuje metodologię **Six Thinking Hats** (6 kapeluszy myślowych) do kompleksowej analizy decyzji z różnych perspektyw.
+
+### Funkcjonalności
+- ✅ Tworzenie decyzji z opcjami do rozważenia
+- ✅ Analiza AI przez 6 etapów:
+  - 🔵 **Niebieski** - Definicja problemu i synteza
+  - ⚪ **Biały** - Fakty i obiektywne dane
+  - 🔴 **Czerwony** - Emocje i intuicje
+  - ⚫ **Czarny** - Ryzyka i zagrożenia
+  - 🟡 **Żółty** - Korzyści i szanse
+  - 🟢 **Zielony** - Kreatywne pomysły i rozwiązania
+- ✅ Automatyczna synteza z rekomendacjami
+- ✅ Persystencja w Supabase
+- ✅ Historia analizy dla każdej decyzji
+
+### Struktura
+```
+src/features/decision-assistant/
+├── types/           # Typy TypeScript
+├── services/        # Logika biznesowa (Supabase, AI)
+├── prompts/         # Prompty dla każdego kapelusza
+└── components/      # Komponenty React
+
+db/migrations/
+└── 20231214_create_decision_tables.sql  # Migracja bazy danych
+```
+
+### Baza danych
+Tabele utworzone przez migrację:
+- `decisions` - Główne decyzje użytkownika
+- `decision_options` - Opcje do rozważenia dla każdej decyzji
+- `decision_events` - Historia analizy (AI responses, user input, synthesis)
+
+Zastosuj migrację w Supabase:
+```sql
+-- Uruchom skrypt: db/migrations/20231214_create_decision_tables.sql
+-- lub skopiuj z: supabase/migrations/20231214_create_decision_tables.sql
+```
 
 ---
 
