@@ -34,6 +34,9 @@ interface TaskCardProps {
   onDelete:  (id: string) => Promise<void>
   onDetails: (task: Task) => void
   showCheckbox?: boolean
+  selectable?: boolean
+  selected?: boolean
+  onToggleSelection?: (taskId: string) => void
 }
 
 export function TaskCard({ 
@@ -41,7 +44,10 @@ export function TaskCard({
   onComplete, 
   onDelete, 
   onDetails,
-  showCheckbox = true
+  showCheckbox = true,
+  selectable = false,
+  selected = false,
+  onToggleSelection
 }: TaskCardProps) {
   const [loading, setLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -121,13 +127,28 @@ export function TaskCard({
         'p-4 border-l-4 transition-all hover:shadow-lg group cursor-pointer',
         priorityColors[task.priority] || priorityColors[4],
         loading && 'opacity-50 pointer-events-none',
-        deleting && 'opacity-0 scale-95'
+        deleting && 'opacity-0 scale-95',
+        selected && 'ring-2 ring-brand-purple bg-brand-purple/5'
       )}
       onClick={() => onDetails(task)}
     >
       <div className="flex items-start gap-3">
-        {/* Quick complete checkbox */}
-        {showCheckbox && (
+        {/* Selection checkbox - shown when bulk selection is active */}
+        {selectable && onToggleSelection && (
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={(e) => {
+              e.stopPropagation()
+              onToggleSelection(task.id)
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="mt-1 w-4 h-4 text-brand-purple border-gray-300 rounded focus:ring-brand-purple cursor-pointer flex-shrink-0"
+          />
+        )}
+        
+        {/* Quick complete checkbox - shown in normal mode (not during bulk selection) */}
+        {!selectable && showCheckbox && (
           <button 
             onClick={handleComplete}
             disabled={loading}
