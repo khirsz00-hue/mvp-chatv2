@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import Button from '@/components/ui/Button'
-import Card from '@/components/ui/Card'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import { useToast } from '@/components/ui/Toast'
 import { Check, Crown, Sparkle } from '@phosphor-icons/react'
@@ -16,7 +16,7 @@ interface UserProfile {
   stripe_customer_id?: string
 }
 
-export default function SubscriptionPage() {
+function SubscriptionContent() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [processingCheckout, setProcessingCheckout] = useState(false)
@@ -27,10 +27,10 @@ export default function SubscriptionPage() {
 
   useEffect(() => {
     // Check for success/cancel params
-    if (searchParams.get('success')) {
+    if (searchParams?.get('success')) {
       showToast('Subskrypcja aktywowana pomyślnie!', 'success')
       router.replace('/subscription')
-    } else if (searchParams.get('canceled')) {
+    } else if (searchParams?.get('canceled')) {
       showToast('Płatność anulowana', 'error')
       router.replace('/subscription')
     }
@@ -138,10 +138,10 @@ export default function SubscriptionPage() {
 
         {profile && (
           <Card className="max-w-md mx-auto">
-            <Card.Header>
-              <Card.Title>Twoja subskrypcja</Card.Title>
-            </Card.Header>
-            <Card.Content className="space-y-3">
+            <CardHeader>
+              <CardTitle>Twoja subskrypcja</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Status:</span>
                 <Badge variant={hasActiveSubscription ? 'success' : 'default'}>
@@ -170,22 +170,22 @@ export default function SubscriptionPage() {
                   {processingPortal ? 'Ładowanie...' : 'Zarządzaj subskrypcją'}
                 </Button>
               )}
-            </Card.Content>
+            </CardContent>
           </Card>
         )}
 
         <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
           {/* Free Plan */}
           <Card className="relative">
-            <Card.Header>
+            <CardHeader>
               <div className="flex items-center gap-2 mb-2">
                 <Sparkle size={24} className="text-gray-500" />
-                <Card.Title>Free</Card.Title>
+                <CardTitle>Free</CardTitle>
               </div>
               <div className="text-3xl font-bold mb-2">0 zł</div>
-              <Card.Description>Podstawowe funkcje do wypróbowania</Card.Description>
-            </Card.Header>
-            <Card.Content className="space-y-3">
+              <CardDescription>Podstawowe funkcje do wypróbowania</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
               <div className="flex items-start gap-2">
                 <Check size={20} className="text-green-600 mt-0.5" />
                 <span className="text-sm">Ograniczony dostęp do asystentów</span>
@@ -198,8 +198,8 @@ export default function SubscriptionPage() {
                 <Check size={20} className="text-green-600 mt-0.5" />
                 <span className="text-sm">Podstawowy dziennik</span>
               </div>
-            </Card.Content>
-            <Card.Footer>
+            </CardContent>
+            <CardFooter>
               <Button
                 variant="outline"
                 className="w-full"
@@ -207,7 +207,7 @@ export default function SubscriptionPage() {
               >
                 {profile?.subscription_tier === 'free' ? 'Aktualny plan' : 'Darmowy'}
               </Button>
-            </Card.Footer>
+            </CardFooter>
           </Card>
 
           {/* Pro Plan */}
@@ -217,17 +217,17 @@ export default function SubscriptionPage() {
                 Polecany
               </Badge>
             </div>
-            <Card.Header>
+            <CardHeader>
               <div className="flex items-center gap-2 mb-2">
                 <Crown size={24} className="text-brand-purple" />
-                <Card.Title>Pro</Card.Title>
+                <CardTitle>Pro</CardTitle>
               </div>
               <div className="text-3xl font-bold mb-2">
                 49 zł <span className="text-base font-normal text-muted-foreground">/miesiąc</span>
               </div>
-              <Card.Description>Pełen dostęp do wszystkich funkcji</Card.Description>
-            </Card.Header>
-            <Card.Content className="space-y-3">
+              <CardDescription>Pełen dostęp do wszystkich funkcji</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
               <div className="flex items-start gap-2">
                 <Check size={20} className="text-green-600 mt-0.5" />
                 <span className="text-sm">Nieograniczony dostęp do wszystkich asystentów</span>
@@ -248,8 +248,8 @@ export default function SubscriptionPage() {
                 <Check size={20} className="text-green-600 mt-0.5" />
                 <span className="text-sm">Integracje z Todoist</span>
               </div>
-            </Card.Content>
-            <Card.Footer>
+            </CardContent>
+            <CardFooter>
               <Button
                 onClick={() => handleSubscribe(process.env.NEXT_PUBLIC_STRIPE_PRO_MONTHLY_PRICE_ID || '')}
                 disabled={processingCheckout || hasActiveSubscription}
@@ -261,10 +261,22 @@ export default function SubscriptionPage() {
                   ? 'Przetwarzanie...'
                   : 'Rozpocznij teraz'}
               </Button>
-            </Card.Footer>
+            </CardFooter>
           </Card>
         </div>
       </div>
     </div>
+  )
+}
+
+export default function SubscriptionPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+      </div>
+    }>
+      <SubscriptionContent />
+    </Suspense>
   )
 }

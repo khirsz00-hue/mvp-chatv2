@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import Button from '@/components/ui/Button'
-import Card from '@/components/ui/Card'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
-import Tabs from '@/components/ui/Tabs'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs'
 import { useToast } from '@/components/ui/Toast'
 import { useRouter } from 'next/navigation'
 import { User, Notebook, Sparkle, CreditCard } from '@phosphor-icons/react'
@@ -42,6 +42,7 @@ export default function ProfilePage() {
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([])
   const [insights, setInsights] = useState<AIInsight[]>([])
   const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('journal')
   const { showToast } = useToast()
   const router = useRouter()
 
@@ -112,9 +113,9 @@ export default function ProfilePage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 flex items-center justify-center">
         <Card>
-          <Card.Content>
+          <CardContent>
             <p>Nie znaleziono profilu użytkownika</p>
-          </Card.Content>
+          </CardContent>
         </Card>
       </div>
     )
@@ -129,18 +130,18 @@ export default function ProfilePage() {
 
         {/* Profile Info */}
         <Card>
-          <Card.Header>
+          <CardHeader>
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-full bg-gradient-to-br from-brand-purple to-brand-pink flex items-center justify-center">
                 <User size={24} className="text-white" />
               </div>
               <div>
-                <Card.Title>{profile.full_name || profile.email}</Card.Title>
-                <Card.Description>{profile.email}</Card.Description>
+                <CardTitle>{profile.full_name || profile.email}</CardTitle>
+                <CardDescription>{profile.email}</CardDescription>
               </div>
             </div>
-          </Card.Header>
-          <Card.Content className="space-y-4">
+          </CardHeader>
+          <CardContent className="space-y-4">
             <div className="grid md:grid-cols-3 gap-4">
               <div>
                 <div className="text-sm text-muted-foreground mb-1">Status subskrypcji</div>
@@ -169,31 +170,31 @@ export default function ProfilePage() {
                 Zarządzaj subskrypcją
               </Button>
             </div>
-          </Card.Content>
+          </CardContent>
         </Card>
 
         {/* Tabs for Journal and Insights */}
-        <Tabs defaultValue="journal">
-          <Tabs.List>
-            <Tabs.Trigger value="journal">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="journal">
               <Notebook size={20} className="mr-2" />
               Wpisy z dziennika ({journalEntries.length})
-            </Tabs.Trigger>
-            <Tabs.Trigger value="insights">
+            </TabsTrigger>
+            <TabsTrigger value="insights">
               <Sparkle size={20} className="mr-2" />
               Wnioski AI ({insights.length})
-            </Tabs.Trigger>
-          </Tabs.List>
+            </TabsTrigger>
+          </TabsList>
 
-          <Tabs.Content value="journal">
+          <TabsContent value="journal">
             <Card>
-              <Card.Header>
-                <Card.Title>Ostatnie wpisy z dziennika</Card.Title>
-                <Card.Description>
+              <CardHeader>
+                <CardTitle>Ostatnie wpisy z dziennika</CardTitle>
+                <CardDescription>
                   Twoje 10 najnowszych wpisów z dziennika
-                </Card.Description>
-              </Card.Header>
-              <Card.Content>
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
                 {journalEntries.length === 0 ? (
                   <p className="text-muted-foreground text-center py-8">
                     Nie masz jeszcze żadnych wpisów w dzienniku
@@ -213,19 +214,19 @@ export default function ProfilePage() {
                     ))}
                   </div>
                 )}
-              </Card.Content>
+              </CardContent>
             </Card>
-          </Tabs.Content>
+          </TabsContent>
 
-          <Tabs.Content value="insights">
+          <TabsContent value="insights">
             <Card>
-              <Card.Header>
-                <Card.Title>Wnioski AI</Card.Title>
-                <Card.Description>
+              <CardHeader>
+                <CardTitle>Wnioski AI</CardTitle>
+                <CardDescription>
                   Analizy i rekomendacje wygenerowane przez AI
-                </Card.Description>
-              </Card.Header>
-              <Card.Content>
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
                 {insights.length === 0 ? (
                   <p className="text-muted-foreground text-center py-8">
                     Nie masz jeszcze żadnych wniosków AI
@@ -255,9 +256,9 @@ export default function ProfilePage() {
                     ))}
                   </div>
                 )}
-              </Card.Content>
+              </CardContent>
             </Card>
-          </Tabs.Content>
+          </TabsContent>
         </Tabs>
       </div>
     </div>

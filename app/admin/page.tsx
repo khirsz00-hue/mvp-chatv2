@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
-import Card from '@/components/ui/Card'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { useToast } from '@/components/ui/Toast'
@@ -128,13 +128,13 @@ export default function AdminPage() {
         <h1 className="text-3xl font-bold">⚙️ Panel administratora</h1>
         
         <Card>
-          <Card.Header>
-            <Card.Title>Użytkownicy ({users.length})</Card.Title>
-            <Card.Description>
+          <CardHeader>
+            <CardTitle>Użytkownicy ({users.length})</CardTitle>
+            <CardDescription>
               Zarządzaj użytkownikami i ich subskrypcjami
-            </Card.Description>
-          </Card.Header>
-          <Card.Content>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -190,21 +190,21 @@ export default function AdminPage() {
                 </tbody>
               </table>
             </div>
-          </Card.Content>
+          </CardContent>
         </Card>
 
         <Card>
-          <Card.Header>
-            <Card.Title>Prompty i wiedza</Card.Title>
-            <Card.Description>
+          <CardHeader>
+            <CardTitle>Prompty i wiedza</CardTitle>
+            <CardDescription>
               Zarządzaj promptami systemowymi i bazą wiedzy
-            </Card.Description>
-          </Card.Header>
-          <Card.Content>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
             <Button onClick={() => router.push('/admin/knowledge')}>
               Przejdź do edytora
             </Button>
-          </Card.Content>
+          </CardContent>
         </Card>
       </div>
     </div>

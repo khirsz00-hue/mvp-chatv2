@@ -113,15 +113,23 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
   if (!profile) return
 
   const status = subscription.status
-  const currentPeriodEnd = new Date(subscription.current_period_end * 1000).toISOString()
+  const subscriptionData = subscription as any
+  const currentPeriodEnd = subscriptionData.current_period_end 
+    ? new Date(subscriptionData.current_period_end * 1000).toISOString()
+    : null
+
+  const updateData: any = {
+    stripe_subscription_id: subscription.id,
+    subscription_status: status,
+  }
+
+  if (currentPeriodEnd) {
+    updateData.subscription_end_date = currentPeriodEnd
+  }
 
   await supabase
     .from('user_profiles')
-    .update({
-      stripe_subscription_id: subscription.id,
-      subscription_status: status,
-      subscription_end_date: currentPeriodEnd,
-    })
+    .update(updateData)
     .eq('id', profile.id)
 
   // Log to subscription history

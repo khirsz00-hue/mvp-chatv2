@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import Button from '@/components/ui/Button'
-import Card from '@/components/ui/Card'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card'
 import Input from '@/components/ui/Input'
 import { useToast } from '@/components/ui/Toast'
 import { useRouter } from 'next/navigation'
@@ -41,15 +41,15 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
-        <Card.Header>
-          <Card.Title className="text-center text-2xl">
+        <CardHeader>
+          <CardTitle className="text-center text-2xl">
             🧠 AI Assistants PRO
-          </Card.Title>
-          <Card.Description className="text-center">
+          </CardTitle>
+          <CardDescription className="text-center">
             {sent ? 'Sprawdź swoją skrzynkę email' : 'Zaloguj się za pomocą magic link'}
-          </Card.Description>
-        </Card.Header>
-        <Card.Content>
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
           {sent ? (
             <div className="text-center space-y-4">
               <p className="text-muted-foreground">
@@ -94,7 +94,7 @@ export default function LoginPage() {
               </p>
             </form>
           )}
-        </Card.Content>
+        </CardContent>
       </Card>
     </div>
   )

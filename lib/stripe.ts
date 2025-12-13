@@ -1,9 +1,23 @@
 import Stripe from 'stripe'
 
-// Server-side Stripe instance
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2024-12-18.acacia',
-  typescript: true,
+// Server-side Stripe instance (lazy initialization)
+let stripeInstance: Stripe | null = null
+
+export function getStripe(): Stripe {
+  if (!stripeInstance) {
+    stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+      apiVersion: '2025-11-17.clover',
+      typescript: true,
+    })
+  }
+  return stripeInstance
+}
+
+// For backward compatibility
+export const stripe = new Proxy({} as Stripe, {
+  get: (_, prop) => {
+    return (getStripe() as any)[prop]
+  }
 })
 
 // Price IDs from environment
