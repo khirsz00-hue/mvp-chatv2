@@ -5,6 +5,7 @@ import Sidebar, { AssistantId } from './Sidebar'
 import { ReactNode, useState, useEffect } from 'react'
 import { TasksAssistant } from '@/components/assistant/TasksAssistant'
 import { JournalAssistant } from '@/components/journal/JournalAssistant'
+import { DecisionAssistant } from '@/src/features/decision-assistant/components/DecisionAssistant'
 
 interface MainLayoutProps {
   children?: ReactNode
@@ -31,14 +32,15 @@ export default function MainLayout({ children }: MainLayoutProps) {
       case 'journal':
         return <JournalAssistant />
       
-      case 'planning':
       case 'decisions':
+        return <DecisionAssistant />
+      
+      case 'planning':
       case 'support':
         return (
           <div className="glass p-8 rounded-2xl text-center">
             <h2 className="text-2xl font-bold mb-4">
               {activeView === 'planning' && 'Asystent Planowania'}
-              {activeView === 'decisions' && 'Podejmowanie Decyzji'}
               {activeView === 'support' && 'Wsparcie'}
             </h2>
             <p className="text-muted-foreground">
