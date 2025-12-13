@@ -6,7 +6,7 @@ import Badge from '@/components/ui/Badge'
 import Card from '@/components/ui/Card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs'
 import { useToast } from '@/components/ui/Toast'
-import { Plus, List, Kanban, CalendarBlank, SortAscending, Timer as TimerIcon, CheckSquare, Trash, ArrowRight } from '@phosphor-icons/react'
+import { Plus, List, Kanban, CalendarBlank, Calendar, SortAscending, Timer as TimerIcon, CheckSquare, Trash, ArrowRight } from '@phosphor-icons/react'
 import { startOfDay, addDays, parseISO, isSameDay, isBefore, isWithinInterval, format } from 'date-fns'
 import { CreateTaskModal } from './CreateTaskModal'
 import { TaskDetailsModal } from './TaskDetailsModal'
@@ -172,8 +172,8 @@ export function TasksAssistant() {
     window.addEventListener('storage', handleStorageChange)
     window.addEventListener('timerStateChanged', handleTimerChange)
     
-    // Poll every 2 seconds as backup
-    const interval = setInterval(checkActiveTimer, 2000)
+    // Poll every 5 seconds as backup
+    const interval = setInterval(checkActiveTimer, 5000)
     
     return () => {
       window.removeEventListener('storage', handleStorageChange)
@@ -301,6 +301,9 @@ export function TasksAssistant() {
   let filteredTasks = filterTasks(tasks, filter)
   filteredTasks = filterByProject(filteredTasks)
   const sortedTasks = sortTasks(filteredTasks)
+  
+  // Non-completed tasks for board/week/month views
+  const activeTasks = tasks.filter(t => !t.completed)
   
   console.log('🎯 FINAL SORTED TASKS:', sortedTasks)
   
@@ -772,7 +775,7 @@ export function TasksAssistant() {
                   }`}
                   title="Widok tygodnia"
                 >
-                  <CalendarBlank size={18} weight="bold" />
+                  <Calendar size={18} weight="bold" />
                   <span className="hidden sm:inline">Tydzień</span>
                 </button>
                 <button 
@@ -978,7 +981,7 @@ export function TasksAssistant() {
           )
         ) : view === 'board' ? (
           <SevenDaysBoardView 
-            tasks={tasks.filter(t => !t.completed)}
+            tasks={activeTasks}
             onMove={handleMove}
             onComplete={handleComplete}
             onDelete={handleDelete}
@@ -993,7 +996,7 @@ export function TasksAssistant() {
           />
         ) : view === 'week' ? (
           <SevenDaysBoardView 
-            tasks={tasks.filter(t => !t.completed)}
+            tasks={activeTasks}
             onMove={handleMove}
             onComplete={handleComplete}
             onDelete={handleDelete}
@@ -1007,7 +1010,7 @@ export function TasksAssistant() {
           />
         ) : view === 'month' ? (
           <MonthView 
-            tasks={tasks.filter(t => !t.completed)}
+            tasks={activeTasks}
             onMove={handleMove}
             onComplete={handleComplete}
             onDelete={handleDelete}

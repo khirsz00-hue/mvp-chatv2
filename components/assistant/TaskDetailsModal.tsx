@@ -74,6 +74,7 @@ export function TaskDetailsModal({
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
   const [showTimeTracking, setShowTimeTracking] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
+  const [pomodoroStats, setPomodoroStats] = useState<{ today: number; thisWeek: number }>({ today: 0, thisWeek: 0 })
   
   const { startTimer } = useTaskTimer()
   
@@ -113,6 +114,26 @@ export function TaskDetailsModal({
       setEditedLabels(task.labels || [])
       setIsEditing(true) // Always start in edit mode
       setAiSuggestions(null) // Reset suggestions
+      
+      // Load Pomodoro stats from localStorage
+      const storedStats = localStorage.getItem('pomodoroStats')
+      if (storedStats) {
+        try {
+          const parsedStats = JSON.parse(storedStats)
+          // Reset daily stats if it's a new day
+          const today = new Date().toDateString()
+          if (parsedStats.lastReset !== today) {
+            parsedStats.today = 0
+            parsedStats.lastReset = today
+          }
+          setPomodoroStats({
+            today: parsedStats.today || 0,
+            thisWeek: parsedStats.thisWeek || 0
+          })
+        } catch (err) {
+          console.error('Error loading Pomodoro stats:', err)
+        }
+      }
     }
   }, [task])
   
@@ -628,13 +649,13 @@ export function TaskDetailsModal({
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <p className="text-xs text-gray-500 mb-1">Dzisiaj</p>
-                          <p className="text-2xl font-bold text-red-600">0</p>
-                          <p className="text-xs text-gray-500">sesji (0 min)</p>
+                          <p className="text-2xl font-bold text-red-600">{pomodoroStats.today}</p>
+                          <p className="text-xs text-gray-500">sesji ({pomodoroStats.today * 25} min)</p>
                         </div>
                         <div>
                           <p className="text-xs text-gray-500 mb-1">Ten tydzień</p>
-                          <p className="text-2xl font-bold text-orange-600">0</p>
-                          <p className="text-xs text-gray-500">sesji (0 min)</p>
+                          <p className="text-2xl font-bold text-orange-600">{pomodoroStats.thisWeek}</p>
+                          <p className="text-xs text-gray-500">sesji ({pomodoroStats.thisWeek * 25} min)</p>
                         </div>
                       </div>
                       
