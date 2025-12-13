@@ -1,16 +1,12 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-})
+import { getOpenAIClient } from '@/lib/openai'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 export async function POST(req: Request) {
   try {
-    const { title, description, userContext } = await req. json()
+    const { title, description, userContext } = await req.json()
     
     if (!title || title.length < 3) {
       return NextResponse.json({ error: 'Title too short' }, { status: 400 })
@@ -66,6 +62,8 @@ Zwróć odpowiedź jako JSON:
   "reasoning": "Krótkie wyjaśnienie sugestii..."
 }`
 
+    const openai = getOpenAIClient()
+    
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
