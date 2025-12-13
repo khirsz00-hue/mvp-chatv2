@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
+import { startOfDay, endOfDay, addDays, isWithinInterval, parseISO, isBefore } from 'date-fns'
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const token = searchParams.get('token')
-  const filter = searchParams.get('filter') || 'today'
+  const filter = (searchParams.get('filter') || 'today').toLowerCase()
 
   if (!token) {
     return NextResponse.json({ error: 'Brak tokenu Todoist' }, { status: 401 })
@@ -22,60 +23,58 @@ export async function GET(req: Request) {
 
     const allTasks = await res.json()
 
-    // 🕒 Offset strefy czasowej (w milisekundach)
-    const tzOffset = new Date().getTimezoneOffset() * 60000
-
-    // 📆 Zakresy dni z uwzględnieniem offsetu
+    // Lokalne zakresy dat (użytkownika)
     const now = new Date()
-    const todayStart = new Date(now)
-    todayStart.setHours(0, 0, 0, 0)
-    const todayEnd = new Date(now)
-    todayEnd.setHours(23, 59, 59, 999)
+    const todayStart = startOfDay(now)
+    const todayEnd = endOfDay(now)
+    const tomorrowStart = startOfDay(addDays(now, 1))
+    const tomorrowEnd = endOfDay(addDays(now, 1))
+    const sevenDaysEnd = endOfDay(addDays(todayStart, 6))
 
-    // uwzględnij przesunięcie UTC — dla "today" traktuj dzień +2h tolerancji
-    const todayStartUTC = new Date(todayStart.getTime() - tzOffset - 2 * 60 * 60 * 1000)
-    const todayEndUTC = new Date(todayEnd.getTime() - tzOffset + 2 * 60 * 60 * 1000)
-
-    const tomorrowStart = new Date(todayEnd)
-    tomorrowStart.setDate(todayEnd.getDate() + 1)
-    tomorrowStart.setHours(0, 0, 0, 0)
-    const tomorrowEnd = new Date(tomorrowStart)
-    tomorrowEnd.setHours(23, 59, 59, 999)
-
-    const in7Days = new Date(todayStart)
-    in7Days.setDate(todayStart.getDate() + 7)
-
-    // 🧩 Filtrowanie
     const filtered = allTasks.filter((t: any) => {
-      if (!t.due?.date) return false
-      const due = new Date(t.due.date)
+      // unify due source: Todoist may return object with .date or a string
+      const dueStr = t?.due?.date || t?.due || null
+      if (!dueStr) {
+        // show tasks without due only when filter == all
+        return filter === 'all'
+      }
+
+      // parse date (prefer parseISO for date-only strings)
+      let dueDate: Date
+      try {
+        dueDate = parseISO(dueStr)
+      } catch {
+        dueDate = new Date(dueStr)
+      }
 
       switch (filter) {
         case 'today':
-          return due >= todayStartUTC && due <= todayEndUTC
+          return dueDate >= todayStart && dueDate <= todayEnd
         case 'tomorrow':
-          return due >= tomorrowStart && due <= tomorrowEnd
+          return dueDate >= tomorrowStart && dueDate <= tomorrowEnd
         case 'overdue':
-          return due < todayStartUTC
+          return isBefore(dueDate, todayStart)
         case '7 days':
-          return due <= in7Days
+        case 'week':
+          return isWithinInterval(dueDate, { start: todayStart, end: sevenDaysEnd })
+        case 'all':
         default:
           return true
       }
     })
 
-    // 🎯 Upraszczamy dane — ZWRACAMY due JAKO OBIEKT { date: ... } (zgodnie z oczekiwaniem UI)
+    // zwracamy due w formacie oczekiwanym przez UI: { date: 'YYYY-MM-DD' } lub null
     const simplified = filtered.map((t: any) => ({
       id: t.id,
       content: t.content,
       project_id: t.project_id,
-      due: t.due ? { date: t.due.date } : null,
+      due: t.due ? { date: t.due.date || t.due } : null,
       priority: t.priority,
     }))
 
     return NextResponse.json({ tasks: simplified })
   } catch (error: any) {
     console.error('❌ Błąd w /api/todoist/tasks:', error)
-    return NextResponse.json({ error: 'Nie udało się pobrać zadań' }, { status: 500 })
+    return NextResponse.json({ error: 'Błąd serwera' }, { status: 500 })
   }
 }
