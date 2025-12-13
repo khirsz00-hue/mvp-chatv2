@@ -108,7 +108,7 @@ const normalizeSubtasks = (
 ) =>
   items
     .filter(Boolean)
-    .map((s: any) => ({
+    .map((s: RawSubtask) => ({
       id: s.id,
       parentId: s.parentId || parentId,
       content: s.content || s.title || '',
@@ -468,6 +468,9 @@ Bądź wspierający i konkretny.
 
   const isTimerActiveForTask = timerInfo.isActive && timerInfo.isForThisTask
 
+  const completedSubtasksCount = subtasks.filter(s => s.completed).length
+  const totalSubtasksCount = subtasks.length
+
   /* =======================
      RENDER
   ======================= */
@@ -579,7 +582,7 @@ Bądź wspierający i konkretny.
                     Wygeneruj AI
                   </Button>
                   <Badge variant="secondary">
-                    {subtasks.filter(s => s.completed).length}/{subtasks.length || 1} ukończone
+                    {totalSubtasksCount ? `${completedSubtasksCount}/${totalSubtasksCount}` : '0/0'} ukończone
                   </Badge>
                 </div>
               </div>
