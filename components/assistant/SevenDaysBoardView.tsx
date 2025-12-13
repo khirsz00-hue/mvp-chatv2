@@ -60,6 +60,17 @@ export function SevenDaysBoardView({
 
   // Constants
   const DRAG_THRESHOLD = 5 // pixels of movement before considering it a drag
+  const SCROLL_TO_TODAY_DELAY = 100 // ms delay to ensure DOM is ready before scrolling
+
+  // Helper function to extract coordinates from mouse or touch events
+  const getEventCoordinates = (event: MouseEvent | TouchEvent): { x: number; y: number } => {
+    if ('clientX' in event) {
+      return { x: event.clientX, y: event.clientY }
+    } else if (event.touches && event.touches.length > 0) {
+      return { x: event.touches[0].clientX, y: event.touches[0].clientY }
+    }
+    return { x: 0, y: 0 }
+  }
 
   // Navigation functions
   const goToPreviousWeek = () => {
@@ -74,7 +85,7 @@ export function SevenDaysBoardView({
     const today = startOfDay(new Date())
     setStartDate(today)
     
-    // Scroll to today's column
+    // Scroll to today's column after state update
     setTimeout(() => {
       if (scrollContainerRef.current) {
         const todayIndex = days.findIndex(d => isSameDay(d.date, today))
@@ -86,7 +97,7 @@ export function SevenDaysBoardView({
           })
         }
       }
-    }, 100)
+    }, SCROLL_TO_TODAY_DELAY)
   }
 
   // Generate 7 days columns from startDate
@@ -131,9 +142,8 @@ export function SevenDaysBoardView({
     // Track drag start position
     const activatorEvent = event.activatorEvent as MouseEvent | TouchEvent
     if (activatorEvent) {
-      const clientX = 'clientX' in activatorEvent ? activatorEvent.clientX : activatorEvent.touches?.[0]?.clientX ?? 0
-      const clientY = 'clientY' in activatorEvent ? activatorEvent.clientY : activatorEvent.touches?.[0]?.clientY ?? 0
-      setDragStartPos({ x: clientX, y: clientY })
+      const coords = getEventCoordinates(activatorEvent)
+      setDragStartPos(coords)
       setIsDragging(false)
     }
   }
@@ -144,10 +154,9 @@ export function SevenDaysBoardView({
     // Detect if user actually dragged (moved more than threshold)
     if (dragStartPos && !isDragging) {
       const activatorEvent = event.activatorEvent as MouseEvent | TouchEvent
-      const clientX = 'clientX' in activatorEvent ? activatorEvent.clientX : activatorEvent.touches?.[0]?.clientX ?? 0
-      const clientY = 'clientY' in activatorEvent ? activatorEvent.clientY : activatorEvent.touches?.[0]?.clientY ?? 0
+      const coords = getEventCoordinates(activatorEvent)
       const distance = Math.sqrt(
-        Math.pow(clientX - dragStartPos.x, 2) + Math.pow(clientY - dragStartPos.y, 2)
+        Math.pow(coords.x - dragStartPos.x, 2) + Math.pow(coords.y - dragStartPos.y, 2)
       )
       if (distance > DRAG_THRESHOLD) {
         setIsDragging(true)
@@ -158,18 +167,9 @@ export function SevenDaysBoardView({
     const rect = container.getBoundingClientRect()
     
     // Get client position from either MouseEvent or TouchEvent
-    let clientX = 0
     const activatorEvent = event.activatorEvent as MouseEvent | TouchEvent
-    if ('clientX' in activatorEvent && typeof activatorEvent.clientX === 'number') {
-      clientX = activatorEvent.clientX
-    } else if ('touches' in activatorEvent && activatorEvent.touches && activatorEvent.touches.length > 0) {
-      const touch = activatorEvent.touches[0]
-      if (touch && typeof touch.clientX === 'number') {
-        clientX = touch.clientX
-      }
-    }
-    
-    const x = event.delta.x + clientX
+    const coords = getEventCoordinates(activatorEvent)
+    const x = event.delta.x + coords.x
     
     // Auto-scroll threshold (50px from edge)
     const scrollThreshold = 50
