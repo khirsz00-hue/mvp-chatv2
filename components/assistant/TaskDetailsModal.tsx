@@ -72,6 +72,9 @@ export function TaskDetailsModal({
   const [isCreatingSubtasks, setIsCreatingSubtasks] = useState(false)
   const [aiSuggestions, setAiSuggestions] = useState<any>(null)
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
+  const [showTimeTracking, setShowTimeTracking] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
+  const [pomodoroStats, setPomodoroStats] = useState<{ today: number; thisWeek: number }>({ today: 0, thisWeek: 0 })
   
   const { startTimer } = useTaskTimer()
   
@@ -111,6 +114,26 @@ export function TaskDetailsModal({
       setEditedLabels(task.labels || [])
       setIsEditing(true) // Always start in edit mode
       setAiSuggestions(null) // Reset suggestions
+      
+      // Load Pomodoro stats from localStorage
+      const storedStats = localStorage.getItem('pomodoroStats')
+      if (storedStats) {
+        try {
+          const parsedStats = JSON.parse(storedStats)
+          // Reset daily stats if it's a new day
+          const today = new Date().toDateString()
+          if (parsedStats.lastReset !== today) {
+            parsedStats.today = 0
+            parsedStats.lastReset = today
+          }
+          setPomodoroStats({
+            today: parsedStats.today || 0,
+            thisWeek: parsedStats.thisWeek || 0
+          })
+        } catch (err) {
+          console.error('Error loading Pomodoro stats:', err)
+        }
+      }
     }
   }, [task])
   
@@ -531,6 +554,22 @@ export function TaskDetailsModal({
                 {task.duration} min
               </Badge>
             )}
+            
+            {/* Labels as Badges */}
+            {task.labels && task.labels.length > 0 && (
+              <>
+                {task.labels.map((label, index) => (
+                  <Badge 
+                    key={index} 
+                    variant="secondary" 
+                    className="gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 border-purple-200"
+                  >
+                    <Tag size={14} weight="fill" />
+                    {label}
+                  </Badge>
+                ))}
+              </>
+            )}
           </div>
           
           {!isEditing && <Separator />}
@@ -582,6 +621,159 @@ export function TaskDetailsModal({
                   </div>
                 </div>
               )}
+              
+              {/* Time Tracking Section */}
+              <div className="border border-gray-200 rounded-lg">
+                <button
+                  onClick={() => setShowTimeTracking(!showTimeTracking)}
+                  className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Timer size={18} weight="fill" className="text-brand-purple" />
+                    <h3 className="font-semibold text-sm text-gray-700">Śledzenie Czasu</h3>
+                  </div>
+                  <span className="text-gray-400">{showTimeTracking ? '▼' : '▶'}</span>
+                </button>
+                
+                {showTimeTracking && (
+                  <div className="p-4 pt-0 space-y-3">
+                    <Separator className="mb-3" />
+                    
+                    {/* Pomodoro Stats */}
+                    <div className="bg-gradient-to-r from-red-50 to-orange-50 rounded-lg p-4 border border-red-200">
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-2xl">🍅</span>
+                        <span className="font-semibold text-sm text-gray-700">Sesje Pomodoro</span>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">Dzisiaj</p>
+                          <p className="text-2xl font-bold text-red-600">{pomodoroStats.today}</p>
+                          <p className="text-xs text-gray-500">sesji ({pomodoroStats.today * 25} min)</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">Ten tydzień</p>
+                          <p className="text-2xl font-bold text-orange-600">{pomodoroStats.thisWeek}</p>
+                          <p className="text-xs text-gray-500">sesji ({pomodoroStats.thisWeek * 25} min)</p>
+                        </div>
+                      </div>
+                      
+                      <Button
+                        onClick={handleStartTimer}
+                        variant="outline"
+                        size="sm"
+                        className="w-full mt-3 gap-2 bg-white hover:bg-red-50 border-red-300"
+                      >
+                        <Timer size={16} weight="fill" />
+                        Rozpocznij Pomodoro
+                      </Button>
+                    </div>
+                    
+                    {/* Estimated vs Actual */}
+                    {task.duration && task.duration > 0 && (
+                      <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs text-gray-600">Estymowany czas</p>
+                            <p className="text-lg font-semibold text-blue-700">{task.duration} min</p>
+                          </div>
+                          <Clock size={32} weight="duotone" className="text-blue-400" />
+                        </div>
+                      </div>
+                    )}
+                    
+                    <p className="text-xs text-gray-500 text-center">
+                      💡 Rozpocznij timer Pomodoro, aby śledzić czas pracy nad zadaniem
+                    </p>
+                  </div>
+                )}
+              </div>
+              
+              {/* History Section */}
+              <div className="border border-gray-200 rounded-lg">
+                <button
+                  onClick={() => setShowHistory(!showHistory)}
+                  className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <CalendarBlank size={18} weight="fill" className="text-brand-purple" />
+                    <h3 className="font-semibold text-sm text-gray-700">Historia</h3>
+                  </div>
+                  <span className="text-gray-400">{showHistory ? '▼' : '▶'}</span>
+                </button>
+                
+                {showHistory && (
+                  <div className="p-4 pt-0">
+                    <Separator className="mb-4" />
+                    
+                    <div className="space-y-3">
+                      {/* Creation Date */}
+                      {task.created_at && (() => {
+                        try {
+                          const createdDate = parseISO(task.created_at)
+                          return (
+                            <div className="flex items-start gap-3 pb-3 border-b border-gray-100">
+                              <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <span className="text-sm">✨</span>
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-gray-700">Zadanie utworzone</p>
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                  {format(createdDate, 'dd MMMM yyyy, HH:mm', { locale: pl })}
+                                </p>
+                              </div>
+                            </div>
+                          )
+                        } catch (err) {
+                          console.error('Invalid date format for created_at:', task.created_at)
+                          return null
+                        }
+                      })()}
+                      
+                      {/* Due Date Info */}
+                      {dueStr && (() => {
+                        try {
+                          const dueDate = parseISO(dueStr)
+                          return (
+                            <div className="flex items-start gap-3 pb-3 border-b border-gray-100">
+                              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <CalendarBlank size={16} weight="fill" className="text-blue-600" />
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-gray-700">Termin wykonania</p>
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                  {format(dueDate, 'dd MMMM yyyy', { locale: pl })}
+                                </p>
+                              </div>
+                            </div>
+                          )
+                        } catch (err) {
+                          console.error('Invalid date format for due date:', dueStr)
+                          return null
+                        }
+                      })()}
+                      
+                      {/* Priority Info */}
+                      <div className="flex items-start gap-3 pb-3">
+                        <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <Flag size={16} weight="fill" className="text-purple-600" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-700">Priorytet</p>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            P{task.priority} - {priorityLabels[task.priority]}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <p className="text-xs text-gray-500 text-center pt-2">
+                        📝 Historia przesunięć i zmian będzie dostępna wkrótce
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
               
               <Separator />
               
