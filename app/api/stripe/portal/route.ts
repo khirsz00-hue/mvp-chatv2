@@ -5,8 +5,8 @@ import { supabase } from '@/lib/supabaseClient'
 export async function POST(req: NextRequest) {
   try {
     // Validate required environment variables
-    if (!process.env.NEXT_PUBLIC_APP_URL) {
-      console.error('NEXT_PUBLIC_APP_URL is not configured')
+    if (!process.env.NEXT_PUBLIC_SITE_URL) {
+      console.error('NEXT_PUBLIC_SITE_URL is not configured')
       return NextResponse.json(
         { error: 'Server configuration error' },
         { status: 500 }
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     // Create portal session
     const session = await stripe.billingPortal.sessions.create({
       customer: profile.stripe_customer_id,
-      return_url: `${process.env.NEXT_PUBLIC_APP_URL}/subscription`,
+      return_url: `${process.env.NEXT_PUBLIC_SITE_URL}/subscription`,
     })
 
     return NextResponse.json({ url: session.url })

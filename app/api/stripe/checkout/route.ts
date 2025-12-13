@@ -5,8 +5,8 @@ import { supabase } from '@/lib/supabaseClient'
 export async function POST(req: NextRequest) {
   try {
     // Validate required environment variables
-    if (!process.env.NEXT_PUBLIC_APP_URL) {
-      console.error('NEXT_PUBLIC_APP_URL is not configured')
+    if (!process.env.NEXT_PUBLIC_SITE_URL) {
+      console.error('NEXT_PUBLIC_SITE_URL is not configured')
       return NextResponse.json(
         { error: 'Server configuration error' },
         { status: 500 }
@@ -61,8 +61,8 @@ export async function POST(req: NextRequest) {
           quantity: 1,
         },
       ],
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/subscription?success=true`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/subscription?canceled=true`,
+      success_url: `${process.env.NEXT_PUBLIC_SITE_URL}/subscription?success=true`,
+      cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL}/subscription?canceled=true`,
       metadata: {
         user_id: user.id,
       },
