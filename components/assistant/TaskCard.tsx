@@ -133,7 +133,7 @@ export function TaskCard({
       onClick={() => onDetails(task)}
     >
       <div className="flex items-start gap-3">
-        {/* Selection checkbox */}
+        {/* Selection checkbox - shown when bulk selection is active */}
         {selectable && onToggleSelection && (
           <input
             type="checkbox"
@@ -147,7 +147,7 @@ export function TaskCard({
           />
         )}
         
-        {/* Quick complete checkbox */}
+        {/* Quick complete checkbox - shown in normal mode (not during bulk selection) */}
         {!selectable && showCheckbox && (
           <button 
             onClick={handleComplete}

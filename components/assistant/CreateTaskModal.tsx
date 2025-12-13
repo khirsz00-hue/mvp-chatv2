@@ -53,17 +53,15 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
     
     const fetchProjects = async () => {
       try {
-        console.log('🔍 Fetching projects for CreateTaskModal')
         const res = await fetch(`/api/todoist/projects?token=${token}`)
         if (res.ok) {
           const data = await res.json()
-          console.log('✅ Projects fetched:', data)
           setProjects(data.projects || data || [])
         } else {
-          console.error('❌ Failed to fetch projects:', res.status, await res.text())
+          console.error('Failed to fetch projects:', res.status, await res.text())
         }
       } catch (err) {
-        console.error('❌ Error fetching projects:', err)
+        console.error('Error fetching projects:', err)
       }
     }
     

@@ -868,7 +868,7 @@ export function TasksAssistant() {
                     setSelectedTask(t)
                     setShowDetailsModal(true)
                   }}
-                  selectable={selectedTaskIds.size > 0 || false}
+                  selectable={selectedTaskIds.size > 0}
                   selected={selectedTaskIds.has(task.id)}
                   onToggleSelection={toggleTaskSelection}
                 />
