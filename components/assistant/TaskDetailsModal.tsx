@@ -41,6 +41,28 @@ interface Task {
   labels?: string[]
 }
 
+/* =======================
+   HELPER FUNCTIONS
+======================= */
+
+/**
+ * Parse due date from task object to string format
+ */
+const parseDueDate = (due?: { date: string } | string): string => {
+  return typeof due === 'string' ? due : due?.date || ''
+}
+
+/**
+ * Safely format date string with error handling
+ */
+const formatDateSafely = (dateStr: string): string => {
+  try {
+    return format(parseISO(dateStr), 'dd MMM yyyy', { locale: pl })
+  } catch {
+    return dateStr
+  }
+}
+
 interface TaskDetailsModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -128,7 +150,7 @@ Bądź wspierający i konkretny.
 
     setTitle(task.content || '')
     setDescription(task.description || '')
-    setDueDate(typeof task.due === 'string' ? task.due : task.due?.date || '')
+    setDueDate(parseDueDate(task.due))
     setPriority(task.priority)
 
     // Reset AI understanding only if it's a different task
@@ -151,7 +173,7 @@ Bądź wspierający i konkretny.
       title === (task.content || '') &&
       description === (task.description || '') &&
       priority === task.priority &&
-      dueDate === (typeof task.due === 'string' ? task.due : task.due?.date || '')
+      dueDate === parseDueDate(task.due)
     ) {
       return
     }
@@ -191,13 +213,7 @@ Bądź wspierający i konkretny.
           {dueDate && (
             <Badge variant="outline">
               <CalendarBlank size={14} />
-              {(() => {
-                try {
-                  return format(parseISO(dueDate), 'dd MMM yyyy', { locale: pl })
-                } catch {
-                  return dueDate
-                }
-              })()}
+              {formatDateSafely(dueDate)}
             </Badge>
           )}
           <Badge variant="secondary">
