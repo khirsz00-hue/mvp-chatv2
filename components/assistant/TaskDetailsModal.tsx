@@ -367,7 +367,7 @@ Bądź wspierający i konkretny.
             const storedElapsed = Number(parsed.elapsedSeconds)
             const elapsed =
               isRunning && Number.isFinite(startTs) && startTs > 0
-                ? Math.floor((Date.now() - startTs) / 1000)
+                ? Math.max(0, Math.floor((Date.now() - startTs) / 1000))
                 : Number.isFinite(storedElapsed)
                 ? storedElapsed
                 : 0
@@ -441,6 +441,10 @@ Bądź wspierający i konkretny.
   const generateSubtaskId = () =>
     typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
       ? crypto.randomUUID()
+      : typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function'
+      ? `tmp-${Array.from(crypto.getRandomValues(new Uint32Array(4)))
+          .map(n => n.toString(16))
+          .join('-')}`
       : `tmp-${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`
 
   const handleAddSubtask = async () => {
@@ -702,11 +706,11 @@ Bądź wspierający i konkretny.
           <div className="space-y-4">
             <Card className="p-4 md:p-5 shadow-sm">
               <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2 font-semibold">
+              <div className="flex items-center gap-2 font-semibold">
                   <Timer size={18} /> Timer &amp; Pomodoro
                 </div>
                 <Badge variant={isTimerActiveForTask ? 'secondary' : 'outline'} className="gap-1">
-                  {timerInfo.isPomodoro ? 'Pomodoro' : 'Timer'}
+                  {isTimerActiveForTask ? (timerInfo.isPomodoro ? 'Pomodoro' : 'Timer') : 'Brak timera'}
                 </Badge>
               </div>
               <div className="flex items-center justify-between">
