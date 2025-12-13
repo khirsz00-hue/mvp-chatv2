@@ -60,11 +60,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 overflow-x-hidden">
       <Header />
       <div className="flex">
         <Sidebar activeView={activeView} onNavigate={handleNavigate} />
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-6 overflow-x-hidden">
           {children || renderAssistant()}
         </main>
       </div>

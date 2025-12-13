@@ -226,7 +226,7 @@ export function SevenDaysBoardView({
       onDragEnd={handleDragEnd}
     >
       {/* Carousel container with navigation arrows */}
-      <div className="relative pb-4">
+      <div className="relative pb-4 w-full overflow-x-hidden">
         {/* Left scroll arrow - visible on all devices */}
         <button
           onClick={scrollLeft}
@@ -257,7 +257,7 @@ export function SevenDaysBoardView({
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
-          className="overflow-x-auto scrollbar-hide snap-x snap-mandatory"
+          className="overflow-x-auto scrollbar-hide snap-x snap-mandatory w-full"
           style={{ scrollBehavior: 'smooth' }}
         >
           {/* Single row flex layout for carousel behavior */}
