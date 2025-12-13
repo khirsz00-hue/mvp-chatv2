@@ -40,12 +40,26 @@ type FilterType = 'today' | 'tomorrow' | 'week' | 'month' | 'overdue' | 'all' | 
 type ViewType = 'list' | 'board'
 type SortType = 'date' | 'priority' | 'name'
 
-// Helper function to format elapsed time
+/**
+ * Formats elapsed time in seconds to HH:MM:SS format
+ * @param seconds - Total elapsed seconds
+ * @returns Formatted time string in HH:MM:SS format
+ */
 const formatElapsedTime = (seconds: number): string => {
   const hrs = Math.floor(seconds / 3600)
   const mins = Math.floor((seconds % 3600) / 60)
   const secs = seconds % 60
   return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+}
+
+/**
+ * Calculates elapsed time from a start timestamp
+ * @param startTime - Start timestamp in milliseconds
+ * @returns Elapsed seconds
+ */
+const calculateElapsedSeconds = (startTime: number): number => {
+  const now = Date.now()
+  return Math.floor((now - startTime) / 1000)
 }
 
 export function TasksAssistant() {
@@ -146,9 +160,8 @@ export function TasksAssistant() {
         const parsed = JSON.parse(taskTimerStored)
         if (parsed.taskId && (parsed.isRunning || parsed.isPaused)) {
           // Calculate elapsed time
-          const now = Date.now()
           const elapsed = parsed.isRunning && parsed.startTime 
-            ? Math.floor((now - parsed.startTime) / 1000)
+            ? calculateElapsedSeconds(parsed.startTime)
             : parsed.elapsedSeconds || 0
           
           setActiveTimerInfo({
