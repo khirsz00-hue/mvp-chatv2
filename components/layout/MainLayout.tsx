@@ -5,6 +5,7 @@ import Sidebar, { AssistantId } from './Sidebar'
 import { ReactNode, useState, useEffect } from 'react'
 import { TasksAssistant } from '@/components/assistant/TasksAssistant'
 import { JournalAssistant } from '@/components/journal/JournalAssistant'
+import DecisionAssistant from '@/components/decisions/DecisionAssistant'
 import { DecisionAssistant } from '@/src/features/decision-assistant/components/DecisionAssistant'
 
 interface MainLayoutProps {

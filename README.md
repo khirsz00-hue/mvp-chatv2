@@ -7,6 +7,7 @@ Modularna platforma AI zbudowana w **Next.js 14 + Supabase + OpenAI + Tailwind +
 1. 📝 **Todoist Helper** - Zarządzaj zadaniami z AI (w pełni zaimplementowany)
 2. 📅 **AI Planner** - Inteligentne planowanie dnia (w przygotowaniu)
 3. 📔 **Journal** - Codzienny dziennik refleksji (w pełni zaimplementowany)
+4. 🧠 **Decision Assistant** - AI wspierający podejmowanie decyzji (w pełni zaimplementowany)
 4. 🧠 **Decision Assistant** - Framework decyzyjny Six Thinking Hats (w pełni zaimplementowany)
 5. 💬 **Chat Support** - Coaching dla ADHD (w pełni zaimplementowany)
 
@@ -133,3 +134,130 @@ Zastosuj migrację w Supabase:
 npm install
 cp .env.example .env.local
 npm dev
+```
+
+---
+
+## 🗄️ Konfiguracja Supabase
+
+Projekt korzysta z Supabase jako bazy danych. Aby uruchomić aplikację, musisz skonfigurować projekt Supabase.
+
+### 1. Tworzenie projektu Supabase
+
+1. Przejdź do [supabase.com](https://supabase.com) i utwórz nowe konto (jeśli nie masz)
+2. Kliknij "New Project" i wypełnij wymagane dane:
+   - Nazwa projektu
+   - Hasło do bazy danych (zapisz je bezpiecznie!)
+   - Region (wybierz najbliższy)
+3. Poczekaj kilka minut na utworzenie projektu
+
+### 2. Pobranie kluczy API
+
+Po utworzeniu projektu:
+
+1. W menu bocznym przejdź do **Settings** → **API**
+2. Skopiuj:
+   - **Project URL** (np. `https://xxxxx.supabase.co`)
+   - **anon/public key** (klucz publiczny)
+
+### 3. Konfiguracja zmiennych środowiskowych
+
+Otwórz plik `.env.local` i uzupełnij:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+OPENAI_API_KEY=sk-your-openai-api-key
+```
+
+### 4. Uruchomienie migracji SQL
+
+Aby utworzyć tabele w bazie danych:
+
+1. W panelu Supabase przejdź do **SQL Editor**
+2. Otwórz kolejno pliki z folderu `supabase/migrations/` i wykonaj je:
+   - `20231213_journal_tables.sql` - tabele dla dziennika
+   - `20231214_decision_assistant_tables.sql` - tabele dla asystenta decyzji
+   
+**Lub** wykonaj migracje lokalnie:
+```bash
+# Jeśli masz zainstalowane Supabase CLI
+supabase db push
+```
+
+### 5. Weryfikacja
+
+Po uruchomieniu migracji, sprawdź w panelu Supabase → **Table Editor**, czy zostały utworzone następujące tabele:
+
+**Dla Decision Assistant:**
+- `decisions` - przechowuje decyzje użytkowników
+- `decision_options` - opcje dla każdej decyzji
+- `decision_events` - historia wydarzeń i analiz AI
+- `users` - rozszerzenie profilu użytkownika
+
+**Dla Journal:**
+- `journal_entries` - wpisy dziennika
+- `journal_archives` - zarchiwizowane wpisy
+
+### 6. Row Level Security (RLS)
+
+Wszystkie tabele mają włączone RLS - użytkownicy widzą tylko swoje dane. Polityki bezpieczeństwa są już skonfigurowane w migracjach.
+
+---
+
+## 🧠 Decision Assistant - Funkcje
+
+Asystent decyzji to narzędzie AI wspierające użytkownika w podejmowaniu trudnych wyborów:
+
+### Główne funkcje:
+- ✅ **Tworzenie decyzji** - opisz decyzję, która wymaga przemyślenia
+- ✅ **Dodawanie opcji** - wymień możliwe wybory z zaletami i wadami
+- ✅ **Analiza AI** - GPT-4 analizuje sytuację i przedstawia rekomendacje
+- ✅ **Persystencja** - wszystkie decyzje zapisywane w Supabase
+- ✅ **Historia** - przeglądaj historię decyzji i analiz AI
+- ✅ **Status tracking** - śledź postęp każdej decyzji
+
+### API Endpoints:
+- `GET /api/decisions` - lista decyzji użytkownika
+- `POST /api/decisions` - utwórz nową decyzję
+- `GET /api/decisions/[id]` - szczegóły decyzji
+- `PUT /api/decisions/[id]` - aktualizuj decyzję
+- `DELETE /api/decisions/[id]` - usuń decyzję
+- `POST /api/decisions/[id]/analyze` - uruchom analizę AI
+- `POST /api/decisions/options` - dodaj opcję do decyzji
+
+### Komponenty:
+- `DecisionAssistant.tsx` - główny komponent zarządzający widokami
+- `DecisionList.tsx` - lista decyzji użytkownika
+- `DecisionForm.tsx` - formularz tworzenia nowej decyzji
+- `DecisionDetail.tsx` - widok szczegółów decyzji z opcjami
+- `AIAnalysisPanel.tsx` - panel z analizą AI i rekomendacjami
+
+---
+
+## 📝 Uwagi dla deweloperów
+
+### Struktura projektu
+```
+├── app/api/decisions/          # API endpoints dla decyzji
+├── components/decisions/       # Komponenty UI dla asystenta decyzji
+├── lib/
+│   ├── services/
+│   │   ├── decisionService.ts  # CRUD operacje na Supabase
+│   │   └── decisionAI.ts       # Logika analizy AI
+│   └── types/
+│       └── decisions.ts        # TypeScript typy
+└── supabase/migrations/        # Migracje SQL
+```
+
+### User ID Mock
+Obecnie użyty jest `MOCK_USER_ID` w komponentach. W produkcji należy:
+1. Zintegrować Supabase Auth
+2. Pobrać `auth.uid()` z sesji użytkownika
+3. Zastąpić mocka prawdziwym ID
+
+### OpenAI API
+Asystent używa modelu `gpt-4-turbo-preview`. Upewnij się, że:
+- Masz aktywny klucz API OpenAI
+- Masz dostęp do modelu GPT-4
+- Ustawiono `OPENAI_API_KEY` w zmiennych środowiskowych
