@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
@@ -97,40 +97,7 @@ export function PomodoroTimer({ open, onOpenChange, taskId, taskTitle }: Pomodor
     }
   }, [taskId, taskTitle])
   
-  // Timer tick
-  useEffect(() => {
-    if (state.isRunning && state.remainingSeconds > 0) {
-      intervalRef.current = setInterval(() => {
-        setState(prev => {
-          const newRemaining = prev.remainingSeconds - 1
-          
-          if (newRemaining === 0) {
-            // Phase completed
-            handlePhaseComplete(prev)
-            return prev
-          }
-          
-          return {
-            ...prev,
-            remainingSeconds: newRemaining
-          }
-        })
-      }, 1000)
-    } else {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-        intervalRef.current = null
-      }
-    }
-    
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-      }
-    }
-  }, [state.isRunning, state.remainingSeconds])
-  
-  const handlePhaseComplete = (currentState: PomodoroState) => {
+  const handlePhaseComplete = useCallback((currentState: PomodoroState) => {
     // Play notification sound
     playNotification()
     
@@ -182,7 +149,40 @@ export function PomodoroTimer({ open, onOpenChange, taskId, taskTitle }: Pomodor
       remainingSeconds: newRemaining,
       isRunning: false
     }))
-  }
+  }, [])
+  
+  // Timer tick
+  useEffect(() => {
+    if (state.isRunning && state.remainingSeconds > 0) {
+      intervalRef.current = setInterval(() => {
+        setState(prev => {
+          const newRemaining = prev.remainingSeconds - 1
+          
+          if (newRemaining === 0) {
+            // Phase completed
+            handlePhaseComplete(prev)
+            return prev
+          }
+          
+          return {
+            ...prev,
+            remainingSeconds: newRemaining
+          }
+        })
+      }, 1000)
+    } else {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+    }
+    
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+      }
+    }
+  }, [state.isRunning, state.remainingSeconds, handlePhaseComplete])
   
   const playNotification = () => {
     try {

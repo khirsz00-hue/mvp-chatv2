@@ -96,11 +96,14 @@ export function SevenDaysBoardView({
     
     // Get client position from either MouseEvent or TouchEvent
     let clientX = 0
-    const activatorEvent = event.activatorEvent
-    if ('clientX' in activatorEvent) {
+    const activatorEvent = event.activatorEvent as any
+    if (activatorEvent && typeof activatorEvent.clientX === 'number') {
       clientX = activatorEvent.clientX
-    } else if ('touches' in activatorEvent && activatorEvent.touches.length > 0) {
-      clientX = activatorEvent.touches[0].clientX
+    } else if (activatorEvent && activatorEvent.touches && Array.isArray(activatorEvent.touches) && activatorEvent.touches.length > 0) {
+      const touch = activatorEvent.touches[0]
+      if (touch && typeof touch.clientX === 'number') {
+        clientX = touch.clientX
+      }
     }
     
     const x = event.delta.x + clientX
