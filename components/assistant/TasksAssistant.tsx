@@ -39,6 +39,7 @@ interface Project {
 type FilterType = 'today' | 'tomorrow' | 'week' | 'month' | 'overdue' | 'all' | 'completed'
 type ViewType = 'list' | 'board'
 type SortType = 'date' | 'priority' | 'name'
+type GroupByType = 'none' | 'day' | 'project' | 'priority'
 
 /**
  * Formats elapsed time in seconds to HH:MM:SS format
@@ -72,6 +73,7 @@ export function TasksAssistant() {
   // Change to 'all' to include tasks without due dates by default
   const [filter, setFilter] = useState<FilterType>('today')
   const [sortBy, setSortBy] = useState<SortType>('date')
+  const [groupBy, setGroupBy] = useState<GroupByType>('none')
   const [selectedProject, setSelectedProject] = useState<string>('all')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
@@ -330,6 +332,52 @@ export function TasksAssistant() {
   let filteredTasks = filterTasks(tasks, filter)
   filteredTasks = filterByProject(filteredTasks)
   const sortedTasks = sortTasks(filteredTasks)
+  
+  // Group tasks
+  const groupTasks = (tasks: Task[]) => {
+    if (groupBy === 'none') {
+      return { 'all': tasks }
+    }
+    
+    const groups: Record<string, Task[]> = {}
+    
+    tasks.forEach(task => {
+      let groupKey = ''
+      
+      if (groupBy === 'day') {
+        const dueStr = typeof task.due === 'string' ? task.due : task.due?.date
+        if (dueStr) {
+          try {
+            groupKey = format(parseISO(dueStr), 'EEEE, d MMMM yyyy', { locale: pl })
+          } catch {
+            groupKey = 'Bez daty'
+          }
+        } else {
+          groupKey = 'Bez daty'
+        }
+      } else if (groupBy === 'project') {
+        const project = projects.find(p => p.id === task.project_id)
+        groupKey = project ? project.name : 'Bez projektu'
+      } else if (groupBy === 'priority') {
+        const priorityLabels = {
+          1: 'P1 - Wysoki',
+          2: 'P2 - Średni',
+          3: 'P3 - Niski',
+          4: 'P4 - Brak'
+        }
+        groupKey = priorityLabels[task.priority] || 'P4 - Brak'
+      }
+      
+      if (!groups[groupKey]) {
+        groups[groupKey] = []
+      }
+      groups[groupKey].push(task)
+    })
+    
+    return groups
+  }
+  
+  const groupedTasks = groupTasks(sortedTasks)
   
   // Non-completed tasks for board/week/month views (respecting project filter)
   let activeTasks = tasks.filter(t => !t.completed)
@@ -849,6 +897,21 @@ export function TasksAssistant() {
                 </select>
               </div>
               
+              {view === 'list' && (
+                <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                  <select 
+                    value={groupBy} 
+                    onChange={(e) => setGroupBy(e.target.value as GroupByType)}
+                    className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-sm font-medium hover:border-gray-300 transition-colors"
+                  >
+                    <option value="none">📋 Grupuj: Brak</option>
+                    <option value="day">📅 Grupuj: Dzień</option>
+                    <option value="project">📁 Grupuj: Projekt</option>
+                    <option value="priority">🚩 Grupuj: Priorytet</option>
+                  </select>
+                </div>
+              )}
+              
               <div className="flex items-center gap-2 flex-1 min-w-[200px]">
                 <select 
                   value={selectedProject} 
@@ -897,10 +960,10 @@ export function TasksAssistant() {
                 checked={selectedTaskIds.size === sortedTasks.length && sortedTasks.length > 0}
                 onChange={toggleAllTasksSelection}
                 className="w-4 h-4 text-brand-purple border-gray-300 rounded focus:ring-brand-purple cursor-pointer"
-                title="Zaznacz wszystkie"
+                title="Zaznacz"
               />
               <span className="text-sm font-medium text-gray-700">
-                {selectedTaskIds.size > 0 ? `Zaznaczono ${selectedTaskIds.size}` : 'Zaznacz wszystkie'}
+                {selectedTaskIds.size > 0 ? `Zaznaczono ${selectedTaskIds.size}` : 'Zaznacz'}
               </span>
             </div>
             
@@ -1000,21 +1063,35 @@ export function TasksAssistant() {
               </Button>
             </Card>
           ) : (
-            <div className="space-y-3">
-              {sortedTasks.map(task => (
-                <TaskCard 
-                  key={task.id}
-                  task={task}
-                  onComplete={handleComplete}
-                  onDelete={handleDelete}
-                  onDetails={(t) => {
-                    setSelectedTask(t)
-                    setShowDetailsModal(true)
-                  }}
-                  selectable={selectedTaskIds.size > 0}
-                  selected={selectedTaskIds.has(task.id)}
-                  onToggleSelection={toggleTaskSelection}
-                />
+            <div className="space-y-6">
+              {Object.entries(groupedTasks).map(([groupName, groupTasks]) => (
+                <div key={groupName}>
+                  {groupBy !== 'none' && (
+                    <div className="mb-3 flex items-center gap-3">
+                      <h3 className="text-lg font-semibold text-gray-700">{groupName}</h3>
+                      <Badge variant="secondary" className="text-xs">
+                        {groupTasks.length}
+                      </Badge>
+                    </div>
+                  )}
+                  <div className="space-y-3">
+                    {groupTasks.map(task => (
+                      <TaskCard 
+                        key={task.id}
+                        task={task}
+                        onComplete={handleComplete}
+                        onDelete={handleDelete}
+                        onDetails={(t) => {
+                          setSelectedTask(t)
+                          setShowDetailsModal(true)
+                        }}
+                        selectable={selectedTaskIds.size > 0}
+                        selected={selectedTaskIds.has(task.id)}
+                        onToggleSelection={toggleTaskSelection}
+                      />
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           )

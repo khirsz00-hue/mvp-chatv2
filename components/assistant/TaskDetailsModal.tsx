@@ -917,45 +917,53 @@ export function TaskDetailsModal({
             </>
           )}
           
-          <Separator />
-          
-          {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
-            <Button 
-              onClick={handleComplete}
-              variant="default"
-              className="gap-2 bg-green-600 hover:bg-green-700 order-2 sm:order-1"
-              disabled={loading}
-            >
-              <CheckCircle size={18} weight="bold" />
-              Ukończ zadanie
-            </Button>
-            
-            {isEditing &&  (
-              <div className="flex gap-2 order-1 sm:order-2">
-                <Button 
-                  variant="ghost" 
-                  onClick={() => onOpenChange(false)}
-                  disabled={loading}
-                  className="flex-1"
-                >
-                  Anuluj
-                </Button>
-                <Button 
-                  onClick={handleSave}
-                  disabled={loading || !editedTitle.trim()}
-                  className="gap-2 flex-1"
-                >
-                  {loading ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Zapisywanie...
-                    </>
-                  ) : (
-                    'Zapisz zmiany'
-                  )}
-                </Button>
+          {/* Action Buttons - Beautiful UX */}
+          <div className="bg-gradient-to-r from-gray-50 to-white rounded-xl p-6 border-2 border-gray-100 shadow-sm">
+            {isEditing ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-600">💾 Zapisz zmiany?</span>
+                </div>
+                <div className="flex gap-3">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => onOpenChange(false)}
+                    disabled={loading}
+                    className="flex-1 border-2 hover:bg-gray-50"
+                    size="lg"
+                  >
+                    Anuluj
+                  </Button>
+                  <Button 
+                    onClick={handleSave}
+                    disabled={loading || !editedTitle.trim()}
+                    className="flex-1 gap-2 bg-gradient-to-r from-brand-purple to-brand-pink hover:shadow-lg transition-all"
+                    size="lg"
+                  >
+                    {loading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Zapisywanie...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle size={20} weight="bold" />
+                        Zapisz
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
+            ) : (
+              <Button 
+                onClick={handleComplete}
+                disabled={loading}
+                className="w-full gap-2 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 hover:shadow-lg transition-all"
+                size="lg"
+              >
+                <CheckCircle size={20} weight="bold" />
+                ✅ Ukończ zadanie
+              </Button>
             )}
           </div>
         </div>
