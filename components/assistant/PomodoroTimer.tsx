@@ -16,6 +16,7 @@ interface PomodoroState {
   cycleCount: number
   remainingSeconds: number
   isRunning: boolean
+  workSessionStartTime?: number
 }
 
 interface PomodoroStats {
@@ -123,6 +124,33 @@ export function PomodoroTimer({ open, onOpenChange, taskId, taskTitle }: Pomodor
     if (currentState.phase === 'work') {
       newCycleCount++
       
+      // Save completed work session to history
+      if (currentState.taskId) {
+        try {
+          const sessions = JSON.parse(localStorage.getItem('pomodoroSessions') || '[]')
+          // Use actual elapsed time if workSessionStartTime is tracked, otherwise fall back to WORK_DURATION
+          // Note: Fallback is used for sessions that started before this tracking was added
+          const actualDuration = currentState.workSessionStartTime 
+            ? Math.floor((Date.now() - currentState.workSessionStartTime) / 1000)
+            : WORK_DURATION
+          const startTime = currentState.workSessionStartTime 
+            ? new Date(currentState.workSessionStartTime).toISOString()
+            : new Date(Date.now() - (actualDuration * 1000)).toISOString()
+          
+          sessions.push({
+            taskId: currentState.taskId,
+            taskTitle: currentState.taskTitle,
+            startTime,
+            endTime: new Date().toISOString(),
+            durationSeconds: actualDuration,
+            phase: 'work'
+          })
+          localStorage.setItem('pomodoroSessions', JSON.stringify(sessions))
+        } catch (err) {
+          console.error('Error saving pomodoro session:', err)
+        }
+      }
+      
       // Update stats
       setStats(prev => ({
         ...prev,
@@ -147,7 +175,8 @@ export function PomodoroTimer({ open, onOpenChange, taskId, taskTitle }: Pomodor
       phase: newPhase,
       cycleCount: newCycleCount,
       remainingSeconds: newRemaining,
-      isRunning: false
+      isRunning: false,
+      workSessionStartTime: undefined // Reset for next work session
     }))
   }, [])
   
@@ -219,7 +248,11 @@ export function PomodoroTimer({ open, onOpenChange, taskId, taskTitle }: Pomodor
   
   const startTimer = () => {
     requestNotificationPermission()
-    setState(prev => ({ ...prev, isRunning: true }))
+    setState(prev => ({ 
+      ...prev, 
+      isRunning: true,
+      workSessionStartTime: prev.phase === 'work' && !prev.workSessionStartTime ? Date.now() : prev.workSessionStartTime
+    }))
   }
   
   const pauseTimer = () => {

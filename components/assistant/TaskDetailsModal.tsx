@@ -28,7 +28,10 @@ import {
   Lightning,
   ListChecks,
   ChatCircle,
-  ClockClockwise
+  ClockClockwise,
+  CaretDown,
+  CaretUp,
+  X
 } from '@phosphor-icons/react'
 import { format, parseISO } from 'date-fns'
 import { pl } from 'date-fns/locale'
@@ -57,6 +60,7 @@ interface Task {
   due?: { date: string } | string
   created_at?: string
   duration?: number
+  estimated_minutes?: number
   labels?: string[]
   subtasks?: Array<{ id: string; content: string; completed?: boolean }>
 }
@@ -206,6 +210,15 @@ export function TaskDetailsModal({
   const [description, setDescription] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [priority, setPriority] = useState<1 | 2 | 3 | 4>(4)
+  const [projectId, setProjectId] = useState('')
+  const [projectName, setProjectName] = useState('')
+  const [labels, setLabels] = useState<string[]>([])
+  const [newLabel, setNewLabel] = useState('')
+  const [estimatedMinutes, setEstimatedMinutes] = useState(0)
+  const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([])
+  const [loadingAISuggestions, setLoadingAISuggestions] = useState(false)
+  const [timeTrackingExpanded, setTimeTrackingExpanded] = useState(false)
+  const [activeTimeTab, setActiveTimeTab] = useState<'manual' | 'pomodoro'>('manual')
 
   const [aiUnderstanding, setAiUnderstanding] = useState('')
   const [loadingAI, setLoadingAI] = useState(false)
@@ -249,6 +262,31 @@ export function TaskDetailsModal({
 
   const { startTimer, stopTimer, getActiveTimer } = useTaskTimer()
   const { showToast } = useToast()
+
+  /* =======================
+     FETCH PROJECTS
+  ======================= */
+
+  useEffect(() => {
+    const fetchProjects = async () => {
+      const token = localStorage.getItem('todoist_token')
+      if (!token) return
+
+      try {
+        const res = await fetch(`/api/todoist/projects?token=${token}`)
+        if (res.ok) {
+          const data = await res.json()
+          setProjects(data.projects || [])
+        }
+      } catch (err) {
+        console.error('Error fetching projects:', err)
+      }
+    }
+
+    if (open) {
+      fetchProjects()
+    }
+  }, [open])
 
   /* =======================
      AI UNDERSTANDING
@@ -326,6 +364,10 @@ Bądź wspierający i konkretny.
     setDescription(initialDescription)
     setDueDate(initialDueDate)
     setPriority(initialPriority)
+    setProjectId(task.project_id || '')
+    setProjectName(task.project_name || '')
+    setLabels(task.labels || [])
+    setEstimatedMinutes(task.estimated_minutes || 0)
 
     lastValuesRef.current = {
       title: initialTitle,
@@ -368,6 +410,21 @@ Bądź wspierający i konkretny.
   }, [task, fetchAIUnderstanding, showToast])
 
   /* =======================
+     LABEL HANDLERS
+  ======================= */
+
+  const handleAddLabel = () => {
+    const trimmedLabel = newLabel.trim()
+    if (!trimmedLabel || labels.includes(trimmedLabel)) return
+    setLabels(prev => [...prev, trimmedLabel])
+    setNewLabel('')
+  }
+
+  const handleRemoveLabel = (labelToRemove: string) => {
+    setLabels(prev => prev.filter(l => l !== labelToRemove))
+  }
+
+  /* =======================
      AUTO SAVE
   ======================= */
 
@@ -378,7 +435,10 @@ Bądź wspierający i konkretny.
       title === (task.content || '') &&
       description === (task.description || '') &&
       priority === task.priority &&
-      dueDate === parseDueDate(task.due)
+      dueDate === parseDueDate(task.due) &&
+      projectId === (task.project_id || '') &&
+      JSON.stringify(labels) === JSON.stringify(task.labels || []) &&
+      estimatedMinutes === (task.estimated_minutes || 0)
     ) {
       return
     }
@@ -434,16 +494,41 @@ Bądź wspierający i konkretny.
         dueDate
       }
 
+      // Update via Todoist API (fire and forget - don't block)
+      const token = localStorage.getItem('todoist_token')
+      if (token) {
+        fetch('/api/todoist/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: task.id,
+            token,
+            content: title,
+            description,
+            priority,
+            due: dueDate || undefined,
+            project_id: projectId || undefined,
+            labels: labels.length > 0 ? labels : undefined
+          })
+        }).catch(err => {
+          console.error('Error updating task:', err)
+        })
+      }
+
+      // Also call the onUpdate callback
       onUpdate(task.id, {
         content: title,
         description,
         priority,
-        due: dueDate || undefined
+        due: dueDate || undefined,
+        project_id: projectId || undefined,
+        labels,
+        estimated_minutes: estimatedMinutes
       })
     }, 800)
 
     return () => clearTimeout(timeout)
-  }, [title, description, priority, dueDate, task, onUpdate])
+  }, [title, description, priority, dueDate, projectId, labels, estimatedMinutes, task, onUpdate])
 
   /* =======================
      TIMER / POMODORO SYNC
@@ -536,6 +621,20 @@ Bądź wspierający i konkretny.
       window.removeEventListener('storage', syncTimer)
     }
   }, [task?.id, getActiveTimer])
+
+  // Get sessions for this task from localStorage (must be before early return)
+  const getSessions = useCallback((storageKey: string) => {
+    if (!task) return []
+    try {
+      const sessions = JSON.parse(localStorage.getItem(storageKey) || '[]')
+      return sessions.filter((s: { taskId: string }) => s.taskId === task.id)
+    } catch {
+      return []
+    }
+  }, [task])
+
+  const getTimerSessions = useCallback(() => getSessions('timerSessions'), [getSessions])
+  const getPomodoroSessions = useCallback(() => getSessions('pomodoroSessions'), [getSessions])
 
   if (!task) return null
 
@@ -654,6 +753,56 @@ Bądź wspierający i konkretny.
     }
   }
 
+  const handleAISuggestions = async () => {
+    if (!task || !title) return
+
+    setLoadingAISuggestions(true)
+    try {
+      const token = localStorage.getItem('todoist_token')
+      const userId = localStorage.getItem('todoist_user_id')
+
+      const res = await fetch('/api/ai/suggest-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          description,
+          userId,
+          userContext: {
+            projects: projects,
+            recentTasks: []
+          }
+        })
+      })
+
+      if (res.ok) {
+        const suggestions = await res.json()
+        
+        // Apply suggestions
+        if (suggestions.priority) setPriority(suggestions.priority)
+        if (suggestions.estimatedMinutes) setEstimatedMinutes(suggestions.estimatedMinutes)
+        if (suggestions.suggestedDueDate) setDueDate(suggestions.suggestedDueDate)
+        if (suggestions.suggestedLabels) setLabels(prev => [...new Set([...prev, ...suggestions.suggestedLabels])])
+        
+        // Find project by name
+        if (suggestions.suggestedProject) {
+          const matchingProject = projects.find(p => p.name === suggestions.suggestedProject)
+          if (matchingProject) {
+            setProjectId(matchingProject.id)
+            setProjectName(matchingProject.name)
+          }
+        }
+
+        showToast(suggestions.reasoning || 'AI zasugerowało właściwości zadania', 'success')
+      }
+    } catch (err) {
+      console.error('Error fetching AI suggestions:', err)
+      showToast('Nie udało się pobrać sugestii AI', 'error')
+    } finally {
+      setLoadingAISuggestions(false)
+    }
+  }
+
   const isTimerActiveForTask = timerInfo.isActive && timerInfo.isForThisTask
 
   const completedSubtasksCount = subtasks.filter(s => s.completed).length
@@ -733,31 +882,48 @@ Bądź wspierający i konkretny.
               aria-label="Tytuł zadania"
               aria-describedby="ai-understanding-panel"
             />
-            <div className="flex flex-wrap gap-2 text-xs md:text-sm">
-              {dueDate && (
-                <Badge variant="outline" className="gap-1">
-                  <CalendarBlank size={14} />
-                  <span className="hidden sm:inline">{formatDateSafely(dueDate)}</span>
-                  <span className="sm:hidden">{format(parseISO(dueDate), 'dd MMM', { locale: pl })}</span>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-wrap gap-2 text-xs md:text-sm flex-1">
+                {dueDate && (
+                  <Badge variant="outline" className="gap-1">
+                    <CalendarBlank size={14} />
+                    <span className="hidden sm:inline">{formatDateSafely(dueDate)}</span>
+                    <span className="sm:hidden">{format(parseISO(dueDate), 'dd MMM', { locale: pl })}</span>
+                  </Badge>
+                )}
+                <Badge variant="secondary" className="gap-1">
+                  <Flag size={14} /> P{priority}
                 </Badge>
-              )}
-              <Badge variant="secondary" className="gap-1">
-                <Flag size={14} /> P{priority}
-              </Badge>
-              {task.project_id && (
-                <Badge variant="outline" className="gap-1">
-                  <FolderOpen size={14} />
-                  <span className="max-w-[100px] md:max-w-none truncate">
-                    {task.project_name || task.project_id}
-                  </span>
-                </Badge>
-              )}
-              {(task.labels || []).map(label => (
-                <Badge key={label} className="bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 border border-purple-200">
-                  <Tag size={12} />
-                  {label}
-                </Badge>
-              ))}
+                {projectName && (
+                  <Badge variant="outline" className="gap-1">
+                    <FolderOpen size={14} />
+                    <span className="max-w-[100px] md:max-w-none truncate">
+                      {projectName}
+                    </span>
+                  </Badge>
+                )}
+                {labels.map(label => (
+                  <Badge key={label} className="bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 border border-purple-200">
+                    <Tag size={12} />
+                    {label}
+                  </Badge>
+                ))}
+                {estimatedMinutes > 0 && (
+                  <Badge variant="outline" className="gap-1">
+                    <Clock size={14} />
+                    {estimatedMinutes}min
+                  </Badge>
+                )}
+              </div>
+              <Button
+                size="sm"
+                onClick={handleAISuggestions}
+                disabled={loadingAISuggestions || !title}
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shrink-0"
+              >
+                <Sparkle size={14} weight="fill" />
+                <span className="hidden sm:inline">Sugestie AI</span>
+              </Button>
             </div>
           </div>
 
@@ -967,10 +1133,102 @@ Bądź wspierający i konkretny.
                   size="sm" 
                   variant="outline" 
                   onClick={() => setShowPomodoro(true)}
-                  className="w-full border-blue-300 hover:bg-blue-100 text-blue-700"
+                  className="w-full border-blue-300 hover:bg-blue-100 text-blue-700 mb-3"
                 >
                   <Lightning size={14} weight="fill" /> Uruchom Pomodoro
                 </Button>
+
+                {/* Time Tracking History - Collapsible */}
+                <div className="border-t-2 border-blue-200 pt-3">
+                  <button
+                    onClick={() => setTimeTrackingExpanded(!timeTrackingExpanded)}
+                    className="w-full flex items-center justify-between text-sm font-semibold text-blue-800 hover:text-blue-900 transition-colors"
+                  >
+                    <span>Śledzenie czasu</span>
+                    {timeTrackingExpanded ? <CaretUp size={16} /> : <CaretDown size={16} />}
+                  </button>
+
+                  {timeTrackingExpanded && (
+                    <div className="mt-3 space-y-3">
+                      {/* Tabs */}
+                      <div className="flex gap-2 border-b border-blue-200">
+                        <button
+                          onClick={() => setActiveTimeTab('manual')}
+                          className={`px-3 py-2 text-xs font-medium transition-colors ${
+                            activeTimeTab === 'manual'
+                              ? 'border-b-2 border-blue-600 text-blue-800'
+                              : 'text-gray-600 hover:text-blue-700'
+                          }`}
+                        >
+                          Manualny
+                        </button>
+                        <button
+                          onClick={() => setActiveTimeTab('pomodoro')}
+                          className={`px-3 py-2 text-xs font-medium transition-colors ${
+                            activeTimeTab === 'pomodoro'
+                              ? 'border-b-2 border-blue-600 text-blue-800'
+                              : 'text-gray-600 hover:text-blue-700'
+                          }`}
+                        >
+                          Pomodoro
+                        </button>
+                      </div>
+
+                      {/* Tab Content */}
+                      <div className="bg-white rounded-lg p-3 max-h-48 overflow-y-auto">
+                        {activeTimeTab === 'manual' ? (
+                          <div className="space-y-2">
+                            {getTimerSessions().length === 0 ? (
+                              <p className="text-xs text-gray-500 text-center py-4">
+                                Brak sesji manualnych
+                              </p>
+                            ) : (
+                              getTimerSessions().map((session: any, idx: number) => (
+                                <div
+                                  key={idx}
+                                  className="flex items-center justify-between text-xs border-b border-gray-100 pb-2"
+                                >
+                                  <div>
+                                    <p className="font-medium text-gray-800">
+                                      {formatStopwatch(session.durationSeconds)}
+                                    </p>
+                                    <p className="text-gray-500">
+                                      {format(parseISO(session.startTime), 'dd MMM HH:mm', { locale: pl })}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {getPomodoroSessions().length === 0 ? (
+                              <p className="text-xs text-gray-500 text-center py-4">
+                                Brak sesji pomodoro
+                              </p>
+                            ) : (
+                              getPomodoroSessions().map((session: any, idx: number) => (
+                                <div
+                                  key={idx}
+                                  className="flex items-center justify-between text-xs border-b border-gray-100 pb-2"
+                                >
+                                  <div>
+                                    <p className="font-medium text-gray-800">
+                                      🍅 {formatStopwatch(session.durationSeconds)}
+                                    </p>
+                                    <p className="text-gray-500">
+                                      {format(parseISO(session.startTime), 'dd MMM HH:mm', { locale: pl })}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </Card>
 
               {/* Properties */}
@@ -1017,29 +1275,73 @@ Bądź wspierający i konkretny.
                     <p className="text-xs text-gray-600 mb-2 flex items-center gap-1 font-medium">
                       <FolderOpen size={12} /> Projekt
                     </p>
-                    <div className="text-sm font-medium text-gray-800 truncate">
-                      {task.project_name || task.project_id || '—'}
-                    </div>
+                    <Select
+                      value={projectId}
+                      onChange={e => {
+                        const selectedProject = projects.find(p => p.id === e.target.value)
+                        setProjectId(e.target.value)
+                        setProjectName(selectedProject?.name || '')
+                      }}
+                      className="text-sm"
+                    >
+                      <SelectOption value="">Brak projektu</SelectOption>
+                      {projects.map(project => (
+                        <SelectOption key={project.id} value={project.id}>
+                          {project.name}
+                        </SelectOption>
+                      ))}
+                    </Select>
                   </div>
                   
-                  {task.labels && task.labels.length > 0 && (
-                    <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                      <p className="text-xs text-gray-600 mb-2 flex items-center gap-1 font-medium">
-                        <Tag size={12} /> Etykiety
-                      </p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {task.labels.map(label => (
-                          <Badge 
-                            key={label} 
-                            variant="outline" 
-                            className="text-xs border-purple-200 bg-purple-50 text-purple-700"
-                          >
-                            {label}
-                          </Badge>
-                        ))}
-                      </div>
+                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                    <p className="text-xs text-gray-600 mb-2 flex items-center gap-1 font-medium">
+                      <Tag size={12} /> Etykiety
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {labels.map(label => (
+                        <Badge 
+                          key={label} 
+                          variant="outline" 
+                          className="text-xs border-purple-200 bg-purple-50 text-purple-700 flex items-center gap-1 cursor-pointer hover:bg-purple-100"
+                          onClick={() => handleRemoveLabel(label)}
+                        >
+                          {label}
+                          <X size={12} />
+                        </Badge>
+                      ))}
                     </div>
-                  )}
+                    <div className="flex gap-2">
+                      <Input
+                        value={newLabel}
+                        onChange={e => setNewLabel(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleAddLabel()}
+                        placeholder="Nowa etykieta..."
+                        className="text-xs flex-1"
+                      />
+                      <Button
+                        size="sm"
+                        onClick={handleAddLabel}
+                        disabled={!newLabel.trim()}
+                        className="bg-purple-600 hover:bg-purple-700"
+                      >
+                        <Plus size={12} />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                    <p className="text-xs text-gray-600 mb-2 flex items-center gap-1 font-medium">
+                      <Clock size={12} /> Estymowany czas (minuty)
+                    </p>
+                    <Input
+                      type="number"
+                      value={estimatedMinutes || ''}
+                      onChange={e => setEstimatedMinutes(Number(e.target.value) || 0)}
+                      placeholder="0"
+                      min="0"
+                      className="text-sm"
+                    />
+                  </div>
                 </div>
               </Card>
 
