@@ -4,10 +4,30 @@ import { supabase } from '@/lib/supabaseClient'
 
 export async function POST(req: NextRequest) {
   try {
-    const { priceId } = await req.json()
+    // Validate required environment variables
+    if (!process.env.NEXT_PUBLIC_APP_URL) {
+      console.error('NEXT_PUBLIC_APP_URL is not configured')
+      return NextResponse.json(
+        { error: 'Server configuration error' },
+        { status: 500 }
+      )
+    }
 
+    const { planType } = await req.json()
+
+    if (!planType) {
+      return NextResponse.json({ error: 'Plan type is required' }, { status: 400 })
+    }
+
+    // Map plan types to price IDs (server-side only)
+    const priceMap: Record<string, string> = {
+      pro_monthly: process.env.STRIPE_PRO_MONTHLY_PRICE_ID || '',
+      pro_yearly: process.env.STRIPE_PRO_YEARLY_PRICE_ID || '',
+    }
+
+    const priceId = priceMap[planType]
     if (!priceId) {
-      return NextResponse.json({ error: 'Price ID is required' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid plan type' }, { status: 400 })
     }
 
     // Get user from session
@@ -41,8 +61,8 @@ export async function POST(req: NextRequest) {
           quantity: 1,
         },
       ],
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/subscription?success=true`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/subscription?canceled=true`,
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/subscription?success=true`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/subscription?canceled=true`,
       metadata: {
         user_id: user.id,
       },

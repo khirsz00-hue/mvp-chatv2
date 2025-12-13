@@ -18,6 +18,12 @@ export default function Header({ user, onSignIn, onSignOut }: HeaderProps) {
   const [showMenu, setShowMenu] = useState(false)
   const router = useRouter()
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      setShowMenu(false)
+    }
+  }
+
   return (
     <header className="sticky top-0 z-50 glass shadow-glow border-b border-white/20">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
@@ -35,6 +41,9 @@ export default function Header({ user, onSignIn, onSignOut }: HeaderProps) {
             <div className="flex items-center gap-3 relative">
               <button
                 onClick={() => setShowMenu(!showMenu)}
+                onKeyDown={handleKeyDown}
+                aria-expanded={showMenu}
+                aria-haspopup="true"
                 className="hidden md:flex items-center gap-2 text-sm hover:bg-white/10 px-3 py-2 rounded-lg transition-colors"
               >
                 <User size={16} className="text-gray-600" />
@@ -44,8 +53,13 @@ export default function Header({ user, onSignIn, onSignOut }: HeaderProps) {
               </button>
               
               {showMenu && (
-                <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1">
+                <div 
+                  role="menu"
+                  className="absolute top-full right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1"
+                  onKeyDown={handleKeyDown}
+                >
                   <button
+                    role="menuitem"
                     onClick={() => {
                       setShowMenu(false)
                       router.push('/profile')
@@ -56,6 +70,7 @@ export default function Header({ user, onSignIn, onSignOut }: HeaderProps) {
                     Mój profil
                   </button>
                   <button
+                    role="menuitem"
                     onClick={() => {
                       setShowMenu(false)
                       router.push('/subscription')
@@ -67,6 +82,7 @@ export default function Header({ user, onSignIn, onSignOut }: HeaderProps) {
                   </button>
                   <hr className="my-1" />
                   <button
+                    role="menuitem"
                     onClick={() => {
                       setShowMenu(false)
                       onSignOut?.()

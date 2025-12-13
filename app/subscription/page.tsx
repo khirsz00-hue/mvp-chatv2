@@ -60,7 +60,7 @@ function SubscriptionContent() {
     }
   }
 
-  const handleSubscribe = async (priceId: string) => {
+  const handleSubscribe = async (planType: string) => {
     setProcessingCheckout(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -72,7 +72,7 @@ function SubscriptionContent() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ priceId }),
+        body: JSON.stringify({ planType }),
       })
 
       const data = await response.json()
@@ -251,7 +251,7 @@ function SubscriptionContent() {
             </CardContent>
             <CardFooter>
               <Button
-                onClick={() => handleSubscribe(process.env.NEXT_PUBLIC_STRIPE_PRO_MONTHLY_PRICE_ID || '')}
+                onClick={() => handleSubscribe('pro_monthly')}
                 disabled={processingCheckout || hasActiveSubscription}
                 className="w-full bg-gradient-to-r from-brand-purple to-brand-pink"
               >
