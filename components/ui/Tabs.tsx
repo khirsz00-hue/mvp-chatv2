@@ -44,7 +44,7 @@ export function TabsList({ children, className }: TabsListProps) {
   return (
     <div
       className={cn(
-        'inline-flex h-10 items-center justify-center rounded-lg bg-gray-100 p-1 text-gray-500',
+        'inline-flex h-12 items-center justify-center rounded-xl bg-gray-50 p-1.5 text-gray-500 border-2 border-gray-200 shadow-sm',
         className
       )}
     >
@@ -68,12 +68,12 @@ export function TabsTrigger({ value, children, className }: TabsTriggerProps) {
       type="button"
       onClick={() => onValueChange(value)}
       className={cn(
-        'inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-all',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
+        'inline-flex items-center justify-center whitespace-nowrap rounded-lg px-4 py-2 text-sm font-semibold transition-all',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-brand-purple',
         'disabled:pointer-events-none disabled:opacity-50',
         isSelected
-          ? 'bg-white text-gray-900 shadow-sm'
-          : 'text-gray-600 hover:text-gray-900',
+          ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-md'
+          : 'text-gray-600 hover:text-gray-900 hover:bg-white',
         className
       )}
     >
