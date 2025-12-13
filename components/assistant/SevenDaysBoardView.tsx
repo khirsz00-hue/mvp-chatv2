@@ -8,7 +8,7 @@ import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import { CalendarBlank, CheckCircle, Trash, Plus, CaretLeft, CaretRight, DotsThree, Brain, ChatCircle, Timer } from '@phosphor-icons/react'
-import { format, addDays, parseISO, startOfDay, isSameDay } from 'date-fns'
+import { format, addDays, parseISO, startOfDay, isSameDay, isSameWeek } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 
@@ -49,15 +49,46 @@ export function SevenDaysBoardView({
   onDetails,
   onAddForDate
 }:  SevenDaysBoardViewProps) {
+  const [startDate, setStartDate] = useState(startOfDay(new Date()))
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [movingTaskId, setMovingTaskId] = useState<string | null>(null)
   const [scrollPosition, setScrollPosition] = useState(0)
+  const [dragStartPos, setDragStartPos] = useState<{ x: number; y: number } | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const autoScrollIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Generate 7 days columns (but show only 5 at a time on desktop)
+  // Navigation functions
+  const goToPreviousWeek = () => {
+    setStartDate(prev => addDays(prev, -7))
+  }
+
+  const goToNextWeek = () => {
+    setStartDate(prev => addDays(prev, 7))
+  }
+
+  const goToToday = () => {
+    const today = startOfDay(new Date())
+    setStartDate(today)
+    
+    // Scroll to today's column
+    setTimeout(() => {
+      if (scrollContainerRef.current) {
+        const todayIndex = days.findIndex(d => isSameDay(d.date, today))
+        if (todayIndex >= 0) {
+          const columnWidth = scrollContainerRef.current.scrollWidth / days.length
+          scrollContainerRef.current.scrollTo({ 
+            left: columnWidth * todayIndex, 
+            behavior: 'smooth' 
+          })
+        }
+      }
+    }, 100)
+  }
+
+  // Generate 7 days columns from startDate
   const days: DayColumn[] = Array.from({ length: 7 }, (_, i) => {
-    const date = addDays(startOfDay(new Date()), i)
+    const date = addDays(startDate, i)
     const dateStr = format(date, 'yyyy-MM-dd')
     
     return {
@@ -80,16 +111,45 @@ export function SevenDaysBoardView({
     }
   })
 
+  // Date range label for header
+  const dateRangeLabel = `${format(startDate, 'd MMM', { locale: pl })} - ${format(addDays(startDate, 6), 'd MMM yyyy', { locale: pl })}`
+  
+  // Check if current view contains today
+  const today = startOfDay(new Date())
+  const isCurrentWeek = isSameWeek(startDate, today, { locale: pl })
+
   const handleDragStart = (event: DragStartEvent) => {
     const taskId = event.active.id as string
     const task = tasks.find(t => t.id === taskId)
     if (task) {
       setActiveTask(task)
     }
+    
+    // Track drag start position
+    const activatorEvent = event.activatorEvent as any
+    if (activatorEvent) {
+      const clientX = activatorEvent.clientX ?? activatorEvent.touches?.[0]?.clientX ?? 0
+      const clientY = activatorEvent.clientY ?? activatorEvent.touches?.[0]?.clientY ?? 0
+      setDragStartPos({ x: clientX, y: clientY })
+      setIsDragging(false)
+    }
   }
 
   const handleDragMove = (event: DragMoveEvent) => {
     if (!scrollContainerRef.current || !activeTask) return
+    
+    // Detect if user actually dragged (moved more than 5px)
+    if (dragStartPos && !isDragging) {
+      const activatorEvent = event.activatorEvent as any
+      const clientX = activatorEvent?.clientX ?? activatorEvent?.touches?.[0]?.clientX ?? 0
+      const clientY = activatorEvent?.clientY ?? activatorEvent?.touches?.[0]?.clientY ?? 0
+      const distance = Math.sqrt(
+        Math.pow(clientX - dragStartPos.x, 2) + Math.pow(clientY - dragStartPos.y, 2)
+      )
+      if (distance > 5) {
+        setIsDragging(true)
+      }
+    }
     
     const container = scrollContainerRef.current
     const rect = container.getBoundingClientRect()
@@ -151,9 +211,12 @@ export function SevenDaysBoardView({
       autoScrollIntervalRef.current = null
     }
     
+    const wasDragging = isDragging
     setActiveTask(null)
+    setDragStartPos(null)
+    setIsDragging(false)
     
-    if (!over) return
+    if (!over || !wasDragging) return
     
     const taskId = active.id as string
     const newDateStr = over.id as string
@@ -225,6 +288,45 @@ export function SevenDaysBoardView({
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
     >
+      {/* Header with date range and navigation */}
+      <div className="flex items-center justify-between mb-4 px-2">
+        <div className="flex items-center gap-3">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={goToPreviousWeek}
+            className="gap-1"
+          >
+            <CaretLeft size={16} weight="bold" />
+          </Button>
+          
+          <h3 className="text-lg font-bold text-gray-800 min-w-[200px] text-center">
+            {dateRangeLabel}
+          </h3>
+          
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={goToNextWeek}
+            className="gap-1"
+          >
+            <CaretRight size={16} weight="bold" />
+          </Button>
+        </div>
+        
+        {!isCurrentWeek && (
+          <Button
+            size="sm"
+            variant="default"
+            onClick={goToToday}
+            className="gap-1.5 bg-gradient-to-r from-brand-purple to-brand-pink hover:opacity-90 text-white font-semibold"
+          >
+            <CalendarBlank size={16} weight="bold" />
+            Dzisiaj
+          </Button>
+        )}
+      </div>
+
       {/* Carousel container with navigation arrows */}
       <div className="relative pb-4 w-full overflow-x-hidden">
         {/* Left scroll arrow - visible on all devices */}
@@ -271,6 +373,7 @@ export function SevenDaysBoardView({
                   onDetails={onDetails}
                   onAddForDate={onAddForDate}
                   movingTaskId={movingTaskId}
+                  isDraggingGlobal={isDragging}
                 />
               </div>
             ))}
@@ -298,7 +401,8 @@ function DayColumnComponent({
   onDelete,
   onDetails,
   onAddForDate,
-  movingTaskId
+  movingTaskId,
+  isDraggingGlobal
 }: {
   day: DayColumn
   onComplete: (id: string) => Promise<void>
@@ -306,6 +410,7 @@ function DayColumnComponent({
   onDetails: (task: Task) => void
   onAddForDate?: (date: string) => void
   movingTaskId: string | null
+  isDraggingGlobal: boolean
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: day.id })
   
@@ -368,6 +473,7 @@ function DayColumnComponent({
                 onDelete={onDelete}
                 onDetails={onDetails}
                 isMoving={movingTaskId === task.id}
+                isDraggingGlobal={isDraggingGlobal}
               />
             ))
           )}
@@ -398,13 +504,15 @@ function SortableTaskCard({
   onComplete,
   onDelete,
   onDetails,
-  isMoving
+  isMoving,
+  isDraggingGlobal
 }: {
   task: Task
   onComplete: (id: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
   onDetails: (task: Task) => void
   isMoving: boolean
+  isDraggingGlobal: boolean
 }) {
   const {
     attributes,
@@ -438,6 +546,7 @@ function SortableTaskCard({
         onDelete={onDelete}
         onDetails={onDetails}
         dragHandleProps={{ ...attributes, ...listeners }}
+        isDraggingGlobal={isDraggingGlobal}
       />
     </div>
   )
@@ -449,13 +558,15 @@ function MiniTaskCard({
   onComplete,
   onDelete,
   onDetails,
-  dragHandleProps
+  dragHandleProps,
+  isDraggingGlobal
 }: {
   task: Task
   onComplete?: (id: string) => Promise<void>
   onDelete?: (id: string) => Promise<void>
   onDetails?: (task: Task) => void
   dragHandleProps?: any
+  isDraggingGlobal?: boolean
 }) {
   const [loading, setLoading] = useState(false)
   const [showTooltip, setShowTooltip] = useState(false)
@@ -503,7 +614,7 @@ function MiniTaskCard({
 
   const handleClick = (e: React.MouseEvent) => {
     // Only trigger details if not dragging
-    if (onDetails) {
+    if (onDetails && !isDraggingGlobal) {
       onDetails(task)
     }
   }
