@@ -88,10 +88,14 @@ export function TaskDetailsModal({
     
     setLoadingUnderstanding(true)
     try {
+      // Sanitize user input to prevent prompt injection
+      const sanitizedContent = task.content.replace(/["\n\r]/g, ' ').substring(0, 500)
+      const sanitizedDescription = task.description?.replace(/["\n\r]/g, ' ').substring(0, 1000) || ''
+      
       const prompt = `Jesteś asystentem AI wspierającym osoby z ADHD w zarządzaniu zadaniami.
 
-Zadanie użytkownika: "${task.content}"
-${task.description ? `Opis: "${task.description}"` : ''}
+Zadanie użytkownika: ${sanitizedContent}
+${sanitizedDescription ? `Opis: ${sanitizedDescription}` : ''}
 
 Napisz krótkie podsumowanie (2-3 zdania) jak rozumiesz to zadanie.
 Pokaż użytkownikowi, że rozumiesz jego intencje.

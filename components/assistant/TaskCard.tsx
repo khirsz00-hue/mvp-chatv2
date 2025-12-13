@@ -43,6 +43,8 @@ interface TaskCardProps {
 }
 
 const DESCRIPTION_PREVIEW_LENGTH = 150
+const CONTEXT_MENU_WIDTH = 200
+const CONTEXT_MENU_HEIGHT = 150
 
 export function TaskCard({ 
   task, 
@@ -350,10 +352,8 @@ export function TaskCard({
             onClick={(e) => {
               e.stopPropagation()
               // Ensure menu stays within viewport
-              const menuWidth = 200 // Approximate menu width
-              const menuHeight = 150 // Approximate menu height
-              const x = Math.min(e.clientX, window.innerWidth - menuWidth)
-              const y = Math.min(e.clientY, window.innerHeight - menuHeight)
+              const x = Math.min(e.clientX, window.innerWidth - CONTEXT_MENU_WIDTH)
+              const y = Math.min(e.clientY, window.innerHeight - CONTEXT_MENU_HEIGHT)
               setMenuPosition({ x, y })
               setShowContextMenu(true)
             }}
