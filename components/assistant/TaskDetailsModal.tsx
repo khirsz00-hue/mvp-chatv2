@@ -414,8 +414,9 @@ Bądź wspierający i konkretny.
   ======================= */
 
   const handleAddLabel = () => {
-    if (!newLabel.trim() || labels.includes(newLabel.trim())) return
-    setLabels(prev => [...prev, newLabel.trim()])
+    const trimmedLabel = newLabel.trim()
+    if (!trimmedLabel || labels.includes(trimmedLabel)) return
+    setLabels(prev => [...prev, trimmedLabel])
     setNewLabel('')
   }
 
@@ -442,7 +443,7 @@ Bądź wspierający i konkretny.
       return
     }
 
-    const timeout = setTimeout(async () => {
+    const timeout = setTimeout(() => {
       const now = new Date().toISOString()
       const changes: typeof changeHistory = []
 
@@ -493,27 +494,25 @@ Bądź wspierający i konkretny.
         dueDate
       }
 
-      // Update via Todoist API
+      // Update via Todoist API (fire and forget - don't block)
       const token = localStorage.getItem('todoist_token')
       if (token) {
-        try {
-          await fetch('/api/todoist/update', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              id: task.id,
-              token,
-              content: title,
-              description,
-              priority,
-              due: dueDate || undefined,
-              project_id: projectId || undefined,
-              labels: labels.length > 0 ? labels : undefined
-            })
+        fetch('/api/todoist/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: task.id,
+            token,
+            content: title,
+            description,
+            priority,
+            due: dueDate || undefined,
+            project_id: projectId || undefined,
+            labels: labels.length > 0 ? labels : undefined
           })
-        } catch (err) {
+        }).catch(err => {
           console.error('Error updating task:', err)
-        }
+        })
       }
 
       // Also call the onUpdate callback
@@ -797,25 +796,18 @@ Bądź wspierający i konkretny.
 
   const totalTimeWorked = task.duration || timerInfo.elapsedSeconds
 
-  // Get timer sessions for this task
-  const getTimerSessions = () => {
+  // Get sessions for this task from localStorage
+  const getSessions = (storageKey: string) => {
     try {
-      const sessions = JSON.parse(localStorage.getItem('timerSessions') || '[]')
-      return sessions.filter((s: any) => s.taskId === task.id)
+      const sessions = JSON.parse(localStorage.getItem(storageKey) || '[]')
+      return sessions.filter((s: { taskId: string }) => s.taskId === task.id)
     } catch {
       return []
     }
   }
 
-  // Get pomodoro sessions for this task
-  const getPomodoroSessions = () => {
-    try {
-      const sessions = JSON.parse(localStorage.getItem('pomodoroSessions') || '[]')
-      return sessions.filter((s: any) => s.taskId === task.id)
-    } catch {
-      return []
-    }
-  }
+  const getTimerSessions = () => getSessions('timerSessions')
+  const getPomodoroSessions = () => getSessions('pomodoroSessions')
 
   /* =======================
      RENDER

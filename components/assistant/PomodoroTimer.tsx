@@ -16,6 +16,7 @@ interface PomodoroState {
   cycleCount: number
   remainingSeconds: number
   isRunning: boolean
+  workSessionStartTime?: number
 }
 
 interface PomodoroStats {
@@ -127,12 +128,19 @@ export function PomodoroTimer({ open, onOpenChange, taskId, taskTitle }: Pomodor
       if (currentState.taskId) {
         try {
           const sessions = JSON.parse(localStorage.getItem('pomodoroSessions') || '[]')
+          const actualDuration = currentState.workSessionStartTime 
+            ? Math.floor((Date.now() - currentState.workSessionStartTime) / 1000)
+            : WORK_DURATION
+          const startTime = currentState.workSessionStartTime 
+            ? new Date(currentState.workSessionStartTime).toISOString()
+            : new Date(Date.now() - (actualDuration * 1000)).toISOString()
+          
           sessions.push({
             taskId: currentState.taskId,
             taskTitle: currentState.taskTitle,
-            startTime: new Date(Date.now() - (WORK_DURATION * 1000)).toISOString(),
+            startTime,
             endTime: new Date().toISOString(),
-            durationSeconds: WORK_DURATION,
+            durationSeconds: actualDuration,
             phase: 'work'
           })
           localStorage.setItem('pomodoroSessions', JSON.stringify(sessions))
@@ -165,7 +173,8 @@ export function PomodoroTimer({ open, onOpenChange, taskId, taskTitle }: Pomodor
       phase: newPhase,
       cycleCount: newCycleCount,
       remainingSeconds: newRemaining,
-      isRunning: false
+      isRunning: false,
+      workSessionStartTime: undefined // Reset for next work session
     }))
   }, [])
   
@@ -237,7 +246,11 @@ export function PomodoroTimer({ open, onOpenChange, taskId, taskTitle }: Pomodor
   
   const startTimer = () => {
     requestNotificationPermission()
-    setState(prev => ({ ...prev, isRunning: true }))
+    setState(prev => ({ 
+      ...prev, 
+      isRunning: true,
+      workSessionStartTime: prev.phase === 'work' && !prev.workSessionStartTime ? Date.now() : prev.workSessionStartTime
+    }))
   }
   
   const pauseTimer = () => {
