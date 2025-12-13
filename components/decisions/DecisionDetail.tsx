@@ -2,11 +2,7 @@
 
 import React, { useState } from 'react'
 import { ArrowLeft, Plus, Trash, Sparkle } from '@phosphor-icons/react'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../ui/Card'
-import { Button } from '../ui/Button'
-import { Badge } from '../ui/Badge'
-import { Input } from '../ui/Input'
-import { Textarea } from '../ui/Textarea'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, Button, Badge, Input, Textarea } from '../ui'
 import AIAnalysisPanel from './AIAnalysisPanel'
 import type { DecisionWithOptions } from '@/lib/types/decisions'
 
@@ -106,7 +102,7 @@ export default function DecisionDetail({ decision, onBack, onUpdate, onDelete }:
                 </CardDescription>
               )}
             </div>
-            <Badge variant={decision.status === 'decided' ? 'green' : 'default'}>
+            <Badge variant={decision.status === 'decided' ? 'success' : 'default'}>
               {statusLabels[decision.status] || decision.status}
             </Badge>
           </div>

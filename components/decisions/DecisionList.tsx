@@ -3,8 +3,7 @@
 import React from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import { pl } from 'date-fns/locale'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui/Card'
-import { Badge } from '../ui/Badge'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge } from '../ui'
 import type { Decision } from '@/lib/types/decisions'
 
 interface DecisionListProps {
@@ -21,12 +20,12 @@ const statusLabels: Record<string, string> = {
   archived: 'Archiwum',
 }
 
-const statusColors: Record<string, 'default' | 'purple' | 'green' | 'blue' | 'gray'> = {
+const statusColors: Record<string, 'default' | 'purple' | 'success' | 'secondary' | 'outline'> = {
   pending: 'default',
-  analyzing: 'blue',
+  analyzing: 'secondary',
   analyzed: 'purple',
-  decided: 'green',
-  archived: 'gray',
+  decided: 'success',
+  archived: 'outline',
 }
 
 export default function DecisionList({ decisions, isLoading, onSelectDecision }: DecisionListProps) {
@@ -51,7 +50,7 @@ export default function DecisionList({ decisions, isLoading, onSelectDecision }:
         <CardContent className="p-12 text-center">
           <p className="text-gray-500 text-lg mb-2">Brak decyzji do wyświetlenia</p>
           <p className="text-gray-400 text-sm">
-            Kliknij "Nowa decyzja" aby zacząć
+            Kliknij &ldquo;Nowa decyzja&rdquo; aby zacząć
           </p>
         </CardContent>
       </Card>

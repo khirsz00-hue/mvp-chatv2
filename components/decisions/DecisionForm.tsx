@@ -2,10 +2,7 @@
 
 import React, { useState } from 'react'
 import { ArrowLeft } from '@phosphor-icons/react'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../ui/Card'
-import { Button } from '../ui/Button'
-import { Input } from '../ui/Input'
-import { Textarea } from '../ui/Textarea'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, Button, Input, Textarea } from '../ui'
 
 interface DecisionFormProps {
   onSubmit: (data: { title: string; description?: string; context?: string }) => void

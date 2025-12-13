@@ -2,8 +2,7 @@
 
 import React from 'react'
 import { Sparkle, Robot } from '@phosphor-icons/react'
-import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card'
-import { Button } from '../ui/Button'
+import { Card, CardHeader, CardTitle, CardContent, Button } from '../ui'
 import ReactMarkdown from 'react-markdown'
 import type { DecisionWithOptions, AIAnalysisResponse } from '@/lib/types/decisions'
 
@@ -63,7 +62,7 @@ export default function AIAnalysisPanel({
         {hasOptions && !hasAnalysis && !isAnalyzing && (
           <div className="text-center py-8 text-gray-500">
             <Sparkle className="w-12 h-12 mx-auto mb-3 text-brand-purple" weight="duotone" />
-            <p>Kliknij "Uruchom analizę AI" aby otrzymać rekomendacje</p>
+            <p>Kliknij &ldquo;Uruchom analizę AI&rdquo; aby otrzymać rekomendacje</p>
           </div>
         )}
 

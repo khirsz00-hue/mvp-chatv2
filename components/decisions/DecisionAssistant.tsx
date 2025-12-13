@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { Brain, Plus } from '@phosphor-icons/react'
-import { Card, CardHeader, CardTitle, CardDescription } from '../ui/Card'
-import { Button } from '../ui/Button'
+import { Card, CardHeader, CardTitle, CardDescription, Button } from '../ui'
 import DecisionList from './DecisionList'
 import DecisionForm from './DecisionForm'
 import DecisionDetail from './DecisionDetail'
