@@ -122,7 +122,10 @@ export function TaskChatModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={onClose}
+            onClick={(e) => {
+              e.stopPropagation()
+              onClose()
+            }}
           />
           
           {/* Modal */}
@@ -132,6 +135,7 @@ export function TaskChatModal({
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
             className="relative z-[60] w-full max-w-3xl h-[80vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
             <div className="px-6 py-4 border-b bg-gradient-to-r from-blue-50 to-cyan-50 shrink-0">
