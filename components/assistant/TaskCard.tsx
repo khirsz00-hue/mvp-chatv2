@@ -4,11 +4,13 @@ import { useState, useEffect } from 'react'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
-import { CalendarBlank, CheckCircle, Trash, DotsThree, Circle, CheckSquare } from '@phosphor-icons/react'
+import { CalendarBlank, CheckCircle, Trash, DotsThree, Circle, CheckSquare, ChatCircle, Brain, Timer as TimerIcon, Stop } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { format, parseISO } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { useTaskTimer } from './TaskTimer'
+import { TaskChatModal } from './TaskChatModal'
+import { AITaskBreakdownModal } from './AITaskBreakdownModal'
 
 interface Subtask {
   id: string
@@ -52,8 +54,10 @@ export function TaskCard({
   const [loading, setLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [hasActiveTimer, setHasActiveTimer] = useState(false)
+  const [showChatModal, setShowChatModal] = useState(false)
+  const [showBreakdownModal, setShowBreakdownModal] = useState(false)
   
-  const { getActiveTimer } = useTaskTimer()
+  const { startTimer, getActiveTimer } = useTaskTimer()
   
   // Check if this task has an active timer
   useEffect(() => {
@@ -111,6 +115,60 @@ export function TaskCard({
     } catch (err) {
       console.error('Error deleting task:', err)
       setDeleting(false)
+    }
+  }
+  
+  const handleStartStopTimer = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (hasActiveTimer) {
+      // Stop the timer by clearing it
+      localStorage.removeItem('taskTimer')
+      window.dispatchEvent(new CustomEvent('timerStateChanged', { detail: null }))
+    } else {
+      // Start the timer
+      startTimer(task.id, task.content)
+    }
+  }
+  
+  const handleChatClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setShowChatModal(true)
+  }
+  
+  const handleBreakdownClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setShowBreakdownModal(true)
+  }
+  
+  const handleCreateSubtasks = async (subtasks: Array<{
+    content: string
+    description?: string
+    duration?: number
+    duration_unit?: string
+  }>) => {
+    try {
+      // Create each subtask via Todoist API
+      const token = localStorage.getItem('todoist_token')
+      for (const subtask of subtasks) {
+        await fetch('/api/todoist/tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: subtask.content,
+            description: subtask.description,
+            project_id: task.project_id,
+            parent_id: task.id,
+            priority: task.priority,
+            duration: subtask.duration,
+            duration_unit: subtask.duration_unit || 'minute'
+          })
+        })
+      }
+      
+      alert(`Utworzono ${subtasks.length} podzadań!`)
+    } catch (err) {
+      console.error('Error creating subtasks:', err)
+      alert('Nie udało się utworzyć podzadań')
     }
   }
   
@@ -195,8 +253,8 @@ export function TaskCard({
             </div>
           )}
           
-          {/* Footer badges */}
-          <div className="flex gap-2 mt-3 flex-wrap">
+          {/* Footer badges and actions */}
+          <div className="flex gap-2 mt-3 flex-wrap items-center">
             {hasActiveTimer && (
               <Badge className="gap-1 text-xs bg-red-500 text-white animate-pulse">
                 <div className="w-2 h-2 rounded-full bg-white" />
@@ -219,6 +277,51 @@ export function TaskCard({
                 {priorityLabels[task. priority]}
               </Badge>
             )}
+          </div>
+          
+          {/* Quick Action Buttons */}
+          <div className="flex gap-2 mt-3">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleChatClick}
+              className="gap-1.5 text-xs flex-1"
+              title="Czat o zadaniu"
+            >
+              <ChatCircle size={16} weight="bold" />
+              Czat
+            </Button>
+            
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleBreakdownClick}
+              className="gap-1.5 text-xs flex-1"
+              title="AI Breakdown"
+            >
+              <Brain size={16} weight="bold" />
+              Breakdown
+            </Button>
+            
+            <Button
+              size="sm"
+              variant={hasActiveTimer ? 'destructive' : 'default'}
+              onClick={handleStartStopTimer}
+              className="gap-1.5 text-xs flex-1"
+              title={hasActiveTimer ? 'Stop Timer' : 'Start Timer'}
+            >
+              {hasActiveTimer ? (
+                <>
+                  <Stop size={16} weight="fill" />
+                  Stop
+                </>
+              ) : (
+                <>
+                  <TimerIcon size={16} weight="fill" />
+                  Timer
+                </>
+              )}
+            </Button>
           </div>
         </div>
         
@@ -259,6 +362,20 @@ export function TaskCard({
           </Button>
         </div>
       </div>
+      
+      {/* Modals */}
+      <TaskChatModal
+        open={showChatModal}
+        onClose={() => setShowChatModal(false)}
+        task={task}
+      />
+      
+      <AITaskBreakdownModal
+        open={showBreakdownModal}
+        onClose={() => setShowBreakdownModal(false)}
+        task={task}
+        onCreateSubtasks={handleCreateSubtasks}
+      />
     </Card>
   )
 }
