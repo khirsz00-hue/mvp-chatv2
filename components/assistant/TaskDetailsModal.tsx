@@ -145,20 +145,23 @@ const normalizeSubtasks = (
   items: RawSubtask[] = [],
   parentId?: string
 ) =>
-  items
-    .filter(Boolean)
-    .map((s: RawSubtask) => {
-      const fallbackTitle = hasTitle(s) ? s.title : ''
-      const mainContent = typeof s.content === 'string' ? s.content : ''
-      return {
-        id: String(s.id ?? '').trim(),
-        parentId: s.parentId || parentId,
-        content: (mainContent || fallbackTitle).toString(),
-        createdAt: s.createdAt,
-        completed: Boolean(s.completed)
-      }
+  items.reduce<SubtaskItem[]>((acc, raw) => {
+    if (!raw) return acc
+    const fallbackTitle = hasTitle(raw) ? raw.title : ''
+    const mainContent = typeof raw.content === 'string' ? raw.content : ''
+    const id = String(raw.id ?? '').trim()
+    const content = (mainContent || fallbackTitle).toString()
+    if (id === '' || content.trim() === '') return acc
+
+    acc.push({
+      id,
+      parentId: raw.parentId || parentId,
+      content,
+      createdAt: raw.createdAt,
+      completed: Boolean(raw.completed)
     })
-    .filter(s => s.id !== '' && s.content.trim() !== '')
+    return acc
+  }, [])
 
 const mergeSubtasks = (...groups: SubtaskItem[][]): SubtaskItem[] => {
   const map = new Map<string, SubtaskItem>()
@@ -357,7 +360,7 @@ Bądź wspierający i konkretny.
           const raw = localStorage.getItem('taskTimer')
           if (raw) {
             const parsed = JSON.parse(raw)
-            if (!isStoredTimerState(parsed)) throw new Error('Invalid timer payload')
+            if (!isStoredTimerState(parsed)) throw new Error('Invalid timer payload structure')
             const isRunning = Boolean(parsed.isRunning)
             const isPaused = Boolean(parsed.isPaused)
             const startTs = Number(parsed.startTime)
@@ -384,7 +387,7 @@ Bądź wspierający i konkretny.
         const rawPomodoro = localStorage.getItem('pomodoroState')
         if (rawPomodoro) {
           const parsed = JSON.parse(rawPomodoro)
-          if (!isStoredPomodoroState(parsed)) throw new Error('Invalid pomodoro payload')
+          if (!isStoredPomodoroState(parsed)) throw new Error('Invalid pomodoro payload structure')
           const isRunning = Boolean(parsed.isRunning)
           const phase = parsed.phase || 'work'
           const remainingSecondsRaw = Number(parsed.remainingSeconds)
@@ -438,7 +441,7 @@ Bądź wspierający i konkretny.
   const generateSubtaskId = () =>
     typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
       ? crypto.randomUUID()
-      : `tmp-${Date.now()}-${Math.random().toString(16).slice(2)}`
+      : `tmp-${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`
 
   const handleAddSubtask = async () => {
     if (!newSubtask.trim()) return
@@ -498,20 +501,22 @@ Bądź wspierający i konkretny.
         return
       }
 
-      for (const sub of aiSubtasks) {
-        await fetch('/api/todoist/tasks/add', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            token,
-            content: sub.content,
-            description: sub.description,
-            project_id: task.project_id,
-            parent_id: task.id,
-            duration: sub.duration
+      await Promise.all(
+        aiSubtasks.map(sub =>
+          fetch('/api/todoist/tasks/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              token,
+              content: sub.content,
+              description: sub.description,
+              project_id: task.project_id,
+              parent_id: task.id,
+              duration: sub.duration
+            })
           })
-        })
-      }
+        )
+      )
 
       showToast(`Utworzono ${aiSubtasks.length} podzadań`, 'success')
       const res = await fetch(`/api/todoist/subtasks?parentId=${task.id}`)
@@ -576,6 +581,7 @@ Bądź wspierający i konkretny.
             className="text-3xl font-semibold"
             placeholder="Tytuł zadania"
             aria-label="Tytuł zadania"
+            aria-describedby="ai-understanding-panel"
           />
           <div className="flex flex-wrap gap-2 text-sm text-gray-600">
             {dueDate && (
@@ -615,7 +621,10 @@ Bądź wspierający i konkretny.
                   Odśwież
                 </Button>
               </div>
-              <div className="rounded-xl bg-white/80 border border-purple-100 p-4 text-sm text-purple-900 min-h-[96px]">
+              <div
+                id="ai-understanding-panel"
+                className="rounded-xl bg-white/80 border border-purple-100 p-4 text-sm text-purple-900 min-h-[96px]"
+              >
                 {loadingAI ? 'Analizuję zadanie…' : aiUnderstanding || 'AI przygotowuje interpretację zadania.'}
               </div>
             </Card>
