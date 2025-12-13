@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Textarea from '@/components/ui/Textarea'
 import Badge from '@/components/ui/Badge'
 import Separator from '@/components/ui/Separator'
-import { CheckCircle, Trash, Pencil, CalendarBlank, Flag, FolderOpen, Clock, Copy, CheckSquare, Timer, Brain } from '@phosphor-icons/react'
+import { CheckCircle, Trash, Pencil, CalendarBlank, Flag, FolderOpen, Clock, Copy, CheckSquare, Timer, Brain, Sparkle, Tag } from '@phosphor-icons/react'
 import { format, parseISO } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { AITaskBreakdownModal } from './AITaskBreakdownModal'
@@ -64,11 +64,14 @@ export function TaskDetailsModal({
   const [editedPriority, setEditedPriority] = useState<1 | 2 | 3 | 4>(4)
   const [editedProjectId, setEditedProjectId] = useState('')
   const [editedDuration, setEditedDuration] = useState(0)
-  const [isEditing, setIsEditing] = useState(false)
+  const [editedLabels, setEditedLabels] = useState<string[]>([])
+  const [isEditing, setIsEditing] = useState(true) // Default to editing mode
   const [loading, setLoading] = useState(false)
   const [projects, setProjects] = useState<Project[]>([])
   const [showAIBreakdown, setShowAIBreakdown] = useState(false)
   const [isCreatingSubtasks, setIsCreatingSubtasks] = useState(false)
+  const [aiSuggestions, setAiSuggestions] = useState<any>(null)
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false)
   
   const { startTimer } = useTaskTimer()
   
@@ -105,11 +108,113 @@ export function TaskDetailsModal({
       setEditedPriority(task. priority || 4)
       setEditedProjectId(task.project_id || '')
       setEditedDuration(task.duration || 0)
+      setEditedLabels(task.labels || [])
+      setIsEditing(true) // Always start in edit mode
+      setAiSuggestions(null) // Reset suggestions
     }
   }, [task])
   
+  // Constants
+  const MIN_TITLE_LENGTH_FOR_SUGGESTIONS = 5
+  
+  // Fetch AI suggestions when title changes (with debounce)
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
+  useEffect(() => {
+    if (!isEditing || !editedTitle || editedTitle === task?.content) {
+      return
+    }
+    
+    // Clear previous timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+    
+    // Reset if too short
+    if (editedTitle.length < MIN_TITLE_LENGTH_FOR_SUGGESTIONS) {
+      setAiSuggestions(null)
+      return
+    }
+    
+    setLoadingSuggestions(true)
+    
+    // Debounce for 1 second
+    debounceTimerRef.current = setTimeout(() => {
+      (async () => {
+        try {
+          const userId = token || 'anonymous'
+          const response = await fetch('/api/ai/suggest-task', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              title: editedTitle,
+              userId,
+              userContext: {
+                projects: projects.map(p => ({ id: p.id, name: p.name }))
+              }
+            })
+          })
+          
+          if (response.ok) {
+            const data = await response.json()
+            setAiSuggestions(data)
+          }
+        } catch (err) {
+          console.error('Error fetching AI suggestions:', err)
+        } finally {
+          setLoadingSuggestions(false)
+        }
+      })()
+    }, 1000)
+    
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+    }
+  }, [editedTitle, isEditing, task?.content, token, projects])
+  
   if (!task) return null
   
+  const applySuggestion = (field: 'priority' | 'duration' | 'description' | 'project' | 'dueDate' | 'labels') => {
+    if (!aiSuggestions) return
+    
+    switch (field) {
+      case 'priority':
+        if (aiSuggestions.priority) {
+          setEditedPriority(aiSuggestions.priority as 1 | 2 | 3 | 4)
+        }
+        break
+      case 'duration':
+        if (aiSuggestions.estimatedMinutes) {
+          setEditedDuration(aiSuggestions.estimatedMinutes)
+        }
+        break
+      case 'description':
+        if (aiSuggestions.description) {
+          setEditedDescription(aiSuggestions.description)
+        }
+        break
+      case 'project':
+        if (aiSuggestions.suggestedProject) {
+          const project = projects.find(p => p.name === aiSuggestions.suggestedProject)
+          if (project) {
+            setEditedProjectId(project.id)
+          }
+        }
+        break
+      case 'dueDate':
+        if (aiSuggestions.suggestedDueDate) {
+          setEditedDueDate(aiSuggestions.suggestedDueDate)
+        }
+        break
+      case 'labels':
+        if (aiSuggestions.suggestedLabels && aiSuggestions.suggestedLabels.length > 0) {
+          setEditedLabels(aiSuggestions.suggestedLabels)
+        }
+        break
+    }
+  }
+
   const handleSave = async () => {
     if (!onUpdate) {
       setIsEditing(false)
@@ -134,6 +239,10 @@ export function TaskDetailsModal({
       
       if (editedDuration > 0) {
         updates.duration = editedDuration
+      }
+      
+      if (editedLabels.length > 0) {
+        updates.labels = editedLabels
       }
       
       await onUpdate(task.id, updates)
@@ -264,17 +373,86 @@ export function TaskDetailsModal({
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-start justify-between gap-4">
-            {isEditing ? (
-              <Input 
-                value={editedTitle}
-                onChange={(e) => setEditedTitle(e.target.value)}
-                className="text-xl font-semibold flex-1"
-                disabled={loading}
-                placeholder="Tytuł zadania..."
-              />
-            ) : (
-              <DialogTitle className="text-2xl flex-1 leading-tight">{task.content}</DialogTitle>
-            )}
+            <div className="flex-1">
+              {isEditing ? (
+                <>
+                  <Input 
+                    value={editedTitle}
+                    onChange={(e) => setEditedTitle(e.target.value)}
+                    className="text-xl font-semibold w-full"
+                    disabled={loading}
+                    placeholder="Tytuł zadania..."
+                  />
+                  
+                  {/* AI Suggestions */}
+                  {loadingSuggestions && (
+                    <div className="mt-2 flex items-center gap-2 text-sm text-gray-500">
+                      <div className="w-3 h-3 border-2 border-brand-purple border-t-transparent rounded-full animate-spin" />
+                      <span>Generuję sugestie AI...</span>
+                    </div>
+                  )}
+                  
+                  {aiSuggestions && !loadingSuggestions && (
+                    <div className="mt-2 p-2 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-start gap-2 mb-1.5">
+                        <Sparkle size={14} weight="fill" className="text-blue-600 mt-0.5" />
+                        <p className="text-xs text-blue-800 font-medium">AI Suggestions:</p>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {aiSuggestions.priority && aiSuggestions.priority !== editedPriority && (
+                          <Badge
+                            className="cursor-pointer hover:bg-blue-200 transition-colors gap-1 text-xs py-0.5"
+                            onClick={() => applySuggestion('priority')}
+                          >
+                            <Flag size={12} />
+                            P{aiSuggestions.priority}
+                          </Badge>
+                        )}
+                        {aiSuggestions.estimatedMinutes && (
+                          <Badge
+                            className="cursor-pointer hover:bg-blue-200 transition-colors gap-1 text-xs py-0.5"
+                            onClick={() => applySuggestion('duration')}
+                          >
+                            <Clock size={12} />
+                            {aiSuggestions.estimatedMinutes}min
+                          </Badge>
+                        )}
+                        {aiSuggestions.suggestedDueDate && (
+                          <Badge
+                            className="cursor-pointer hover:bg-blue-200 transition-colors gap-1 text-xs py-0.5"
+                            onClick={() => applySuggestion('dueDate')}
+                          >
+                            <CalendarBlank size={12} />
+                            {aiSuggestions.suggestedDueDate}
+                          </Badge>
+                        )}
+                        {aiSuggestions.suggestedProject && (
+                          <Badge
+                            className="cursor-pointer hover:bg-blue-200 transition-colors gap-1 text-xs py-0.5"
+                            onClick={() => applySuggestion('project')}
+                          >
+                            <FolderOpen size={12} />
+                            {aiSuggestions.suggestedProject}
+                          </Badge>
+                        )}
+                        {aiSuggestions.suggestedLabels?.length > 0 && (
+                          <Badge
+                            className="cursor-pointer hover:bg-blue-200 transition-colors gap-1 text-xs py-0.5"
+                            onClick={() => applySuggestion('labels')}
+                            title={aiSuggestions.suggestedLabels.join(', ')}
+                          >
+                            <Tag size={12} />
+                            {aiSuggestions.suggestedLabels.length} labels
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <DialogTitle className="text-2xl leading-tight">{task.content}</DialogTitle>
+              )}
+            </div>
             
             <div className="flex gap-1 flex-shrink-0">
               {! isEditing ? (
