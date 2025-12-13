@@ -254,7 +254,7 @@ export function TaskCard({
             </div>
           )}
           
-          {/* Footer badges and actions */}
+          {/* Footer badges */}
           <div className="flex gap-2 mt-3 flex-wrap items-center">
             {hasActiveTimer && (
               <Badge className="gap-1 text-xs bg-red-500 text-white animate-pulse">
@@ -279,87 +279,78 @@ export function TaskCard({
               </Badge>
             )}
           </div>
-          
-          {/* Quick Action Buttons */}
-          <div className="flex gap-2 mt-3">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleChatClick}
-              className="gap-1.5 text-xs flex-1"
-              title="Czat o zadaniu"
-            >
-              <ChatCircle size={16} weight="bold" />
-              Czat
-            </Button>
-            
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleBreakdownClick}
-              className="gap-1.5 text-xs flex-1"
-              title="AI Breakdown"
-            >
-              <Brain size={16} weight="bold" />
-              Breakdown
-            </Button>
-            
-            <Button
-              size="sm"
-              variant={hasActiveTimer ? 'destructive' : 'default'}
-              onClick={handleStartStopTimer}
-              className="gap-1.5 text-xs flex-1"
-              title={hasActiveTimer ? 'Stop Timer' : 'Start Timer'}
-            >
-              {hasActiveTimer ? (
-                <>
-                  <Stop size={16} weight="fill" />
-                  Stop
-                </>
-              ) : (
-                <>
-                  <TimerIcon size={16} weight="fill" />
-                  Timer
-                </>
-              )}
-            </Button>
-          </div>
         </div>
         
-        {/* Actions (visible on hover) */}
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+        {/* Minimalistic Actions on the Right (always visible, no hover needed) */}
+        <div className="flex flex-col gap-1 flex-shrink-0 ml-2">
+          <Button 
+            size="sm" 
+            variant="ghost"
+            onClick={handleChatClick}
+            title="Czat"
+            className="p-1.5 h-auto"
+          >
+            <ChatCircle size={18} weight="bold" className="text-blue-600" />
+          </Button>
+          
+          <Button 
+            size="sm" 
+            variant="ghost"
+            onClick={handleStartStopTimer}
+            title={hasActiveTimer ? 'Stop Timer' : 'Start Timer'}
+            className="p-1.5 h-auto"
+          >
+            {hasActiveTimer ? (
+              <Stop size={18} weight="fill" className="text-red-600" />
+            ) : (
+              <TimerIcon size={18} weight="fill" className="text-purple-600" />
+            )}
+          </Button>
+          
           <Button 
             size="sm" 
             variant="ghost"
             onClick={(e) => {
               e.stopPropagation()
-              onDetails(task)
+              // Show context menu with more options
+              const menu = document.createElement('div')
+              menu.className = 'fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 p-2 space-y-1'
+              menu.style.left = e.clientX + 'px'
+              menu.style.top = e.clientY + 'px'
+              
+              const menuItems = [
+                { label: 'Doprecyzuj', icon: Brain, onClick: handleBreakdownClick, color: 'text-purple-600' },
+                { label: 'Ukończ', icon: CheckCircle, onClick: handleComplete, color: 'text-green-600' },
+                { label: 'Usuń', icon: Trash, onClick: handleDelete, color: 'text-red-600' }
+              ]
+              
+              menuItems.forEach(item => {
+                const btn = document.createElement('button')
+                btn.className = `flex items-center gap-2 w-full px-3 py-2 text-sm rounded hover:bg-gray-100 transition-colors ${item.color}`
+                btn.innerHTML = `<span class="icon"></span><span>${item.label}</span>`
+                btn.onclick = (event) => {
+                  event.stopPropagation()
+                  item.onClick(event as any)
+                  document.body.removeChild(menu)
+                }
+                menu.appendChild(btn)
+              })
+              
+              // Close menu on click outside
+              const closeMenu = () => {
+                if (document.body.contains(menu)) {
+                  document.body.removeChild(menu)
+                }
+                document.removeEventListener('click', closeMenu)
+              }
+              setTimeout(() => document.addEventListener('click', closeMenu), 100)
+              
+              document.body.appendChild(menu)
             }}
-            title="Szczegóły"
+            title="Więcej opcji"
+            className="p-1.5 h-auto"
           >
-            <DotsThree size={18} weight="bold" />
-          </Button>
-          
-          <Button 
-            size="sm" 
-            variant="ghost"
-            onClick={handleComplete}
-            disabled={loading}
-            title="Ukończ"
-            className="text-green-600 hover:bg-green-50 hover:text-green-700"
-          >
-            <CheckCircle size={18} weight={loading ? 'regular' : 'bold'} />
-          </Button>
-          
-          <Button 
-            size="sm" 
-            variant="ghost"
-            onClick={handleDelete}
-            disabled={deleting}
-            title="Usuń"
-            className="text-red-600 hover:bg-red-50 hover:text-red-700"
-          >
-            <Trash size={18} weight="bold" />
+            <DotsThree size={18} weight="bold" className="text-gray-600" />
           </Button>
         </div>
       </div>
