@@ -9,10 +9,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing taskContent' }, { status: 400 })
     }
     
+    const descriptionPart = taskDescription ? `\nOpis: "${taskDescription}"` : ''
+    
     const prompt = `Jesteś asystentem AI wspierającym osoby z ADHD.
 
-Zadanie: "${taskContent}"
-${taskDescription ? `Opis: "${taskDescription}"` : ''}
+Zadanie: "${taskContent}"${descriptionPart}
 
 Wygeneruj:
 1. **4-7 konkretnych subtasków** (kroków do wykonania)

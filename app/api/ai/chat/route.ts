@@ -11,15 +11,11 @@ export async function POST(req: Request) {
     
     const openai = getOpenAIClient()
     
-    const completionOptions: any = {
-      model: 'gpt-4o-mini',
+    const completionOptions = {
+      model: 'gpt-4o-mini' as const,
       messages: messages,
       temperature: 0.7,
-    }
-    
-    // Add JSON mode if requested
-    if (jsonMode) {
-      completionOptions.response_format = { type: 'json_object' }
+      ...(jsonMode && { response_format: { type: 'json_object' as const } })
     }
     
     const completion = await openai.chat.completions.create(completionOptions)
