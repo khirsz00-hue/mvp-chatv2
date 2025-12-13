@@ -93,8 +93,17 @@ export function SevenDaysBoardView({
     
     const container = scrollContainerRef.current
     const rect = container.getBoundingClientRect()
-    const activatorEvent = event.activatorEvent as MouseEvent
-    const x = event.delta.x + activatorEvent.clientX
+    
+    // Get client position from either MouseEvent or TouchEvent
+    let clientX = 0
+    const activatorEvent = event.activatorEvent
+    if ('clientX' in activatorEvent) {
+      clientX = activatorEvent.clientX
+    } else if ('touches' in activatorEvent && activatorEvent.touches.length > 0) {
+      clientX = activatorEvent.touches[0].clientX
+    }
+    
+    const x = event.delta.x + clientX
     
     // Auto-scroll threshold (50px from edge)
     const scrollThreshold = 50
@@ -195,10 +204,16 @@ export function SevenDaysBoardView({
     }
   }
 
+  const [canScrollRight, setCanScrollRight] = useState(false)
+
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      const container = scrollContainerRef.current
+      setCanScrollRight(scrollPosition < container.scrollWidth - container.clientWidth)
+    }
+  }, [scrollPosition])
+
   const canScrollLeft = scrollPosition > 0
-  const canScrollRight = scrollContainerRef.current 
-    ? scrollPosition < scrollContainerRef.current.scrollWidth - scrollContainerRef.current.clientWidth 
-    : false
 
   return (
     <DndContext
@@ -240,7 +255,6 @@ export function SevenDaysBoardView({
           ref={scrollContainerRef}
           onScroll={handleScroll}
           className="overflow-x-auto scrollbar-hide"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
           {/* Fixed 5-column grid on desktop, responsive on mobile */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 min-w-min lg:w-max">
