@@ -533,29 +533,7 @@ function MiniTaskCard({
             </p>
           </div>
           
-          {/* Quick actions - shown on hover */}
-          <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-            {onComplete && (
-              <button
-                onClick={handleComplete}
-                disabled={loading}
-                className="p-0.5 hover:bg-green-100 rounded text-green-600 transition-colors"
-                title="Ukończ"
-              >
-                <CheckCircle size={12} weight="bold" />
-              </button>
-            )}
-            {onDelete && (
-              <button
-                onClick={handleDelete}
-                disabled={loading}
-                className="p-0.5 hover:bg-red-100 rounded text-red-600 transition-colors"
-                title="Usuń"
-              >
-                <Trash size={12} weight="bold" />
-              </button>
-            )}
-          </div>
+
         </div>
       </div>
       

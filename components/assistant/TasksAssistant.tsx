@@ -6,8 +6,8 @@ import Badge from '@/components/ui/Badge'
 import Card from '@/components/ui/Card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs'
 import { useToast } from '@/components/ui/Toast'
-import { Plus, List, Kanban, CalendarBlank, SortAscending, Timer as TimerIcon } from '@phosphor-icons/react'
-import { startOfDay, addDays, parseISO, isSameDay, isBefore, isWithinInterval } from 'date-fns'
+import { Plus, List, Kanban, CalendarBlank, SortAscending, Timer as TimerIcon, CheckSquare, Trash, ArrowRight } from '@phosphor-icons/react'
+import { startOfDay, addDays, parseISO, isSameDay, isBefore, isWithinInterval, format } from 'date-fns'
 import { CreateTaskModal } from './CreateTaskModal'
 import { TaskDetailsModal } from './TaskDetailsModal'
 import { TaskCard } from './TaskCard'
@@ -54,6 +54,8 @@ export function TasksAssistant() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [showPomodoro, setShowPomodoro] = useState(false)
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
+  const [bulkActionLoading, setBulkActionLoading] = useState(false)
   
   const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
   
@@ -488,6 +490,117 @@ export function TasksAssistant() {
     }
   }
   
+  // Bulk action handlers
+  const toggleTaskSelection = (taskId: string) => {
+    setSelectedTaskIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(taskId)) {
+        newSet.delete(taskId)
+      } else {
+        newSet.add(taskId)
+      }
+      return newSet
+    })
+  }
+  
+  const toggleAllTasksSelection = () => {
+    if (selectedTaskIds.size === sortedTasks.length) {
+      setSelectedTaskIds(new Set())
+    } else {
+      setSelectedTaskIds(new Set(sortedTasks.map(t => t.id)))
+    }
+  }
+  
+  const handleBulkComplete = async () => {
+    if (selectedTaskIds.size === 0) return
+    
+    const confirmed = confirm(`Czy na pewno chcesz ukończyć ${selectedTaskIds.size} zadań?`)
+    if (!confirmed) return
+    
+    setBulkActionLoading(true)
+    let successCount = 0
+    let errorCount = 0
+    
+    for (const taskId of selectedTaskIds) {
+      try {
+        await handleComplete(taskId)
+        successCount++
+      } catch (err) {
+        errorCount++
+        console.error(`Error completing task ${taskId}:`, err)
+      }
+    }
+    
+    setBulkActionLoading(false)
+    setSelectedTaskIds(new Set())
+    
+    if (successCount > 0) {
+      showToast(`Ukończono ${successCount} zadań`, 'success')
+    }
+    if (errorCount > 0) {
+      showToast(`Nie udało się ukończyć ${errorCount} zadań`, 'error')
+    }
+  }
+  
+  const handleBulkDelete = async () => {
+    if (selectedTaskIds.size === 0) return
+    
+    const confirmed = confirm(`Czy na pewno chcesz usunąć ${selectedTaskIds.size} zadań?`)
+    if (!confirmed) return
+    
+    setBulkActionLoading(true)
+    let successCount = 0
+    let errorCount = 0
+    
+    for (const taskId of selectedTaskIds) {
+      try {
+        await handleDelete(taskId)
+        successCount++
+      } catch (err) {
+        errorCount++
+        console.error(`Error deleting task ${taskId}:`, err)
+      }
+    }
+    
+    setBulkActionLoading(false)
+    setSelectedTaskIds(new Set())
+    
+    if (successCount > 0) {
+      showToast(`Usunięto ${successCount} zadań`, 'success')
+    }
+    if (errorCount > 0) {
+      showToast(`Nie udało się usunąć ${errorCount} zadań`, 'error')
+    }
+  }
+  
+  const handleBulkMove = async (newDate: string) => {
+    if (selectedTaskIds.size === 0) return
+    
+    setBulkActionLoading(true)
+    let successCount = 0
+    let errorCount = 0
+    
+    for (const taskId of selectedTaskIds) {
+      try {
+        await handleMove(taskId, newDate)
+        successCount++
+      } catch (err) {
+        errorCount++
+        console.error(`Error moving task ${taskId}:`, err)
+      }
+    }
+    
+    setBulkActionLoading(false)
+    setSelectedTaskIds(new Set())
+    
+    if (successCount > 0) {
+      showToast(`Przeniesiono ${successCount} zadań`, 'success')
+    }
+    if (errorCount > 0) {
+      showToast(`Nie udało się przenieść ${errorCount} zadań`, 'error')
+    }
+  }
+  
   // OAuth Connection Screen
   if (! token) {
     const handleOAuthConnect = () => {
@@ -647,6 +760,76 @@ export function TasksAssistant() {
         </Tabs>
       )}
       
+      {/* Bulk Actions Bar */}
+      {view === 'list' && sortedTasks.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={selectedTaskIds.size === sortedTasks.length && sortedTasks.length > 0}
+                onChange={toggleAllTasksSelection}
+                className="w-4 h-4 text-brand-purple border-gray-300 rounded focus:ring-brand-purple cursor-pointer"
+                title="Zaznacz wszystkie"
+              />
+              <span className="text-sm font-medium text-gray-700">
+                {selectedTaskIds.size > 0 ? `Zaznaczono ${selectedTaskIds.size}` : 'Zaznacz wszystkie'}
+              </span>
+            </div>
+            
+            {selectedTaskIds.size > 0 && (
+              <>
+                <div className="h-6 w-px bg-gray-300 hidden sm:block" />
+                
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleBulkComplete}
+                    disabled={bulkActionLoading}
+                    className="gap-2"
+                  >
+                    <CheckSquare size={16} weight="bold" />
+                    Ukończ
+                  </Button>
+                  
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleBulkDelete}
+                    disabled={bulkActionLoading}
+                    className="gap-2 text-red-600 hover:bg-red-50"
+                  >
+                    <Trash size={16} weight="bold" />
+                    Usuń
+                  </Button>
+                  
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">Przenieś na:</span>
+                    <select
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          handleBulkMove(e.target.value)
+                          e.target.value = ''
+                        }
+                      }}
+                      disabled={bulkActionLoading}
+                      className="text-sm px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-purple"
+                    >
+                      <option value="">Wybierz datę...</option>
+                      <option value={format(new Date(), 'yyyy-MM-dd')}>Dziś</option>
+                      <option value={format(addDays(new Date(), 1), 'yyyy-MM-dd')}>Jutro</option>
+                      <option value={format(addDays(new Date(), 3), 'yyyy-MM-dd')}>Za 3 dni</option>
+                      <option value={format(addDays(new Date(), 7), 'yyyy-MM-dd')}>Za tydzień</option>
+                    </select>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+      
       {/* Content */}
       <div className="mt-6">
         {loading && tasks.length === 0 ? (
@@ -685,6 +868,9 @@ export function TasksAssistant() {
                     setSelectedTask(t)
                     setShowDetailsModal(true)
                   }}
+                  selectable={selectedTaskIds.size > 0 || false}
+                  selected={selectedTaskIds.has(task.id)}
+                  onToggleSelection={toggleTaskSelection}
                 />
               ))}
             </div>
