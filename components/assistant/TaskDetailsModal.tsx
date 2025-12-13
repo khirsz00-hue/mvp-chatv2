@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Dialog, DialogContent } from '@/components/ui/Dialog'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -41,6 +41,16 @@ interface Task {
   labels?: string[]
 }
 
+interface TaskDetailsModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  task: Task | null
+  onUpdate: (taskId: string, updates: Partial<Task>) => void | Promise<void>
+  onDelete: (taskId: string) => void | Promise<void>
+  onComplete: (taskId: string) => void | Promise<void>
+  onDuplicate?: (task: Task) => void | Promise<void>
+}
+
 /* =======================
    COMPONENT
 ======================= */
@@ -52,7 +62,7 @@ export function TaskDetailsModal({
   onUpdate,
   onDelete,
   onComplete
-}: any) {
+}: TaskDetailsModalProps) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [dueDate, setDueDate] = useState('')
@@ -62,33 +72,19 @@ export function TaskDetailsModal({
 
   const [aiUnderstanding, setAiUnderstanding] = useState('')
   const [loadingAI, setLoadingAI] = useState(false)
+  const fetchedTaskIdRef = useRef<string | null>(null)
 
   const { startTimer, stopTimer, getActiveTimer } = useTaskTimer()
-
-  /* =======================
-     INIT TASK
-  ======================= */
-
-  useEffect(() => {
-    if (!task?.id) return
-
-    setTitle(task.content || '')
-    setDescription(task.description || '')
-    setDueDate(typeof task.due === 'string' ? task.due : task.due?.date || '')
-    setPriority(task.priority)
-
-    setAiUnderstanding('')
-    fetchAIUnderstanding(task)
-
-  }, [task?.id])
 
   /* =======================
      AI UNDERSTANDING
   ======================= */
 
-  const fetchAIUnderstanding = async (task: Task) => {
-    if (!task || aiUnderstanding) return
+  const fetchAIUnderstanding = useCallback(async (task: Task) => {
+    // Prevent duplicate fetches for the same task
+    if (!task || !task.id || fetchedTaskIdRef.current === task.id) return
 
+    fetchedTaskIdRef.current = task.id
     setLoadingAI(true)
 
     const prompt = `
@@ -110,17 +106,55 @@ Bądź wspierający i konkretny.
 
       const data = await res.json()
       setAiUnderstanding(data.response || '')
+    } catch (error) {
+      console.error('Error fetching AI understanding:', error)
+      setAiUnderstanding('Nie udało się pobrać analizy AI.')
     } finally {
       setLoadingAI(false)
     }
-  }
+  }, [])
+
+  /* =======================
+     INIT TASK
+  ======================= */
+
+  useEffect(() => {
+    if (!task?.id) {
+      // Reset state when modal closes
+      setAiUnderstanding('')
+      fetchedTaskIdRef.current = null
+      return
+    }
+
+    setTitle(task.content || '')
+    setDescription(task.description || '')
+    setDueDate(typeof task.due === 'string' ? task.due : task.due?.date || '')
+    setPriority(task.priority)
+
+    // Reset AI understanding only if it's a different task
+    if (fetchedTaskIdRef.current !== task.id) {
+      setAiUnderstanding('')
+      fetchAIUnderstanding(task)
+    }
+
+  }, [task, fetchAIUnderstanding])
 
   /* =======================
      AUTO SAVE
   ======================= */
 
   useEffect(() => {
-    if (!task || !onUpdate) return
+    if (!task?.id || !onUpdate) return
+
+    // Skip auto-save on initial load (when values match task)
+    if (
+      title === (task.content || '') &&
+      description === (task.description || '') &&
+      priority === task.priority &&
+      dueDate === (typeof task.due === 'string' ? task.due : task.due?.date || '')
+    ) {
+      return
+    }
 
     const timeout = setTimeout(() => {
       onUpdate(task.id, {
@@ -132,7 +166,7 @@ Bądź wspierający i konkretny.
     }, 800)
 
     return () => clearTimeout(timeout)
-  }, [title, description, priority, dueDate])
+  }, [title, description, priority, dueDate, task, onUpdate])
 
   if (!task) return null
 
@@ -157,7 +191,13 @@ Bądź wspierający i konkretny.
           {dueDate && (
             <Badge variant="outline">
               <CalendarBlank size={14} />
-              {format(parseISO(dueDate), 'dd MMM yyyy', { locale: pl })}
+              {(() => {
+                try {
+                  return format(parseISO(dueDate), 'dd MMM yyyy', { locale: pl })
+                } catch {
+                  return dueDate
+                }
+              })()}
             </Badge>
           )}
           <Badge variant="secondary">
