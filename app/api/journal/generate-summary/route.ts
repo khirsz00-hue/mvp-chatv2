@@ -1,4 +1,4 @@
-import type { NextApiRequest, NextApiResponse } from 'next'
+import { NextResponse } from 'next/server'
 import { getOpenAIClient } from '@/lib/openai'
 
 interface GenerateSummaryRequest {
@@ -11,15 +11,10 @@ interface GenerateSummaryRequest {
   plannedTasks: string
 }
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' })
-  }
-
+export async function POST(req: Request) {
   try {
+    const body = (await req.json()) as GenerateSummaryRequest
+
     const {
       energy,
       motivation,
@@ -28,7 +23,7 @@ export default async function handler(
       notes,
       completedTasks,
       plannedTasks,
-    } = req.body as GenerateSummaryRequest
+    } = body
 
     // Validate input
     if (
@@ -37,13 +32,17 @@ export default async function handler(
       sleepQuality === undefined ||
       hoursSlept === undefined
     ) {
-      return res.status(400).json({ error: 'Missing required fields' })
+      return NextResponse.json(
+        { error: 'Missing required fields' },
+        { status: 400 }
+      )
     }
 
     const openai = getOpenAIClient()
 
     // Create context for AI
-    const notesText = notes && notes.length > 0 ? notes.join('\n- ') : 'Brak notatek'
+    const notesText =
+      notes && notes.length > 0 ? notes.join('\n- ') : 'Brak notatek'
     const tasksText =
       completedTasks && completedTasks.length > 0
         ? completedTasks.join('\n- ')
@@ -96,15 +95,21 @@ Podsumowanie (3-4 zdania):`
     const summary = completion.choices[0]?.message?.content?.trim() || ''
 
     if (!summary) {
-      return res.status(500).json({ error: 'Failed to generate summary' })
+      return NextResponse.json(
+        { error: 'Failed to generate summary' },
+        { status: 500 }
+      )
     }
 
-    return res.status(200).json({ summary })
+    return NextResponse.json({ summary })
   } catch (error: any) {
     console.error('Error generating summary:', error)
-    return res.status(500).json({
-      error: 'Failed to generate summary',
-      details: error.message,
-    })
+    return NextResponse.json(
+      {
+        error: 'Failed to generate summary',
+        details: error.message,
+      },
+      { status: 500 }
+    )
   }
 }

@@ -122,20 +122,16 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
         return
       }
 
-      const response = await fetch('/api/todoist/tasks', {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
+      const response = await fetch(`/api/todoist/tasks?token=${encodeURIComponent(token)}&filter=all`)
 
       if (!response.ok) {
         throw new Error('Failed to fetch tasks')
       }
 
       const data = await response.json()
-      const completed = (data.tasks || []).filter((task: TodoistTask) => task.completed)
-      setCompletedTasks(completed)
+      // Note: The existing API doesn't filter completed tasks, so we get all tasks
+      // For now, we'll show all tasks as the Todoist API doesn't have a completed filter
+      setCompletedTasks(data.tasks || [])
     } catch (error: any) {
       console.error('Error fetching Todoist tasks:', error)
       showToast('Błąd pobierania zadań z Todoist', 'error')
@@ -586,7 +582,7 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
           </div>
         ) : (
           <p className="text-gray-500 text-sm">
-            Kliknij "Generuj", aby utworzyć podsumowanie dnia
+            Kliknij &quot;Generuj&quot;, aby utworzyć podsumowanie dnia
           </p>
         )}
       </Card>
