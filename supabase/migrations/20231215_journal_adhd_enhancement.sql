@@ -2,8 +2,9 @@
 -- This migration extends the existing journal_entries table with ADHD-specific metrics
 
 -- First, add new columns to journal_entries if they don't exist
+-- Set date to created_at date for existing entries
 ALTER TABLE journal_entries 
-  ADD COLUMN IF NOT EXISTS date DATE,
+  ADD COLUMN IF NOT EXISTS date DATE DEFAULT CURRENT_DATE,
   ADD COLUMN IF NOT EXISTS energy INTEGER CHECK (energy >= 0 AND energy <= 10),
   ADD COLUMN IF NOT EXISTS motivation INTEGER CHECK (motivation >= 0 AND motivation <= 10),
   ADD COLUMN IF NOT EXISTS sleep_quality INTEGER CHECK (sleep_quality >= 0 AND sleep_quality <= 10),

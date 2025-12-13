@@ -178,8 +178,14 @@ export function JournalArchiveView({ onBack }: JournalArchiveViewProps) {
     )
   }
 
-  // Get current view data
-  const getCurrentData = () => {
+  // Get current view data with proper typing
+  type CurrentDataType =
+    | ArchiveHierarchy[]
+    | { month: number; weeks?: any[]; stats: JournalStats }[]
+    | { week: number; days?: any[]; stats: JournalStats }[]
+    | { day: string; entry: JournalEntry }[]
+
+  const getCurrentData = (): CurrentDataType => {
     if (!selectedYear) {
       // Years view
       return hierarchy

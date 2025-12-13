@@ -88,6 +88,22 @@ export async function deleteJournalEntry(
 }
 
 /**
+ * Check if entry has valid metrics
+ */
+function hasValidMetrics(entry: JournalEntry): boolean {
+  return (
+    entry.energy !== null &&
+    entry.energy !== undefined &&
+    entry.motivation !== null &&
+    entry.motivation !== undefined &&
+    entry.sleep_quality !== null &&
+    entry.sleep_quality !== undefined &&
+    entry.hours_slept !== null &&
+    entry.hours_slept !== undefined
+  )
+}
+
+/**
  * Calculate statistics for a set of entries
  */
 export function calculateStats(entries: JournalEntry[]): JournalStats {
@@ -101,9 +117,7 @@ export function calculateStats(entries: JournalEntry[]): JournalStats {
     }
   }
 
-  const validEntries = entries.filter(
-    (e) => e.energy !== null && e.energy !== undefined
-  )
+  const validEntries = entries.filter(hasValidMetrics)
 
   if (validEntries.length === 0) {
     return {

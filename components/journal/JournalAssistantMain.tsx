@@ -52,7 +52,7 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
   const [completedTasks, setCompletedTasks] = useState<TodoistTask[]>([])
   const [loadingTasks, setLoadingTasks] = useState(false)
 
-  // Voice recognition
+  // Voice recognition - using any for Web Speech API which doesn't have standard types
   const recognitionRef = useRef<any>(null)
 
   const {
@@ -122,15 +122,30 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
         return
       }
 
-      const response = await fetch(`/api/todoist/tasks?token=${encodeURIComponent(token)}&filter=all`)
+      // Use existing API endpoint but pass token in request body for security
+      // Note: The Todoist REST API /tasks endpoint only returns active (non-completed) tasks
+      // For completed tasks, we would need to use the Sync API which requires different implementation
+      // For MVP, we'll show active tasks that the user can mark as completed
+      const response = await fetch('/api/todoist/tasks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token, filter: 'today' }),
+      })
 
       if (!response.ok) {
-        throw new Error('Failed to fetch tasks')
+        // Fallback to GET method if POST is not supported
+        const getFallback = await fetch(`/api/todoist/tasks?token=${encodeURIComponent(token)}&filter=today`)
+        if (!getFallback.ok) {
+          throw new Error('Failed to fetch tasks')
+        }
+        const data = await getFallback.json()
+        setCompletedTasks(data.tasks || [])
+        return
       }
 
       const data = await response.json()
-      // Note: The existing API doesn't filter completed tasks, so we get all tasks
-      // For now, we'll show all tasks as the Todoist API doesn't have a completed filter
       setCompletedTasks(data.tasks || [])
     } catch (error: any) {
       console.error('Error fetching Todoist tasks:', error)

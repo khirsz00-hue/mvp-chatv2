@@ -38,6 +38,23 @@ export async function POST(req: Request) {
       )
     }
 
+    // Validate ranges
+    if (
+      energy < 0 ||
+      energy > 10 ||
+      motivation < 0 ||
+      motivation > 10 ||
+      sleepQuality < 0 ||
+      sleepQuality > 10 ||
+      hoursSlept < 0 ||
+      hoursSlept > 24
+    ) {
+      return NextResponse.json(
+        { error: 'Metric values out of valid range' },
+        { status: 400 }
+      )
+    }
+
     const openai = getOpenAIClient()
 
     // Create context for AI
