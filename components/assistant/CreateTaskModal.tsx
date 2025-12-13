@@ -122,7 +122,6 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
           
           if (response.ok) {
             const data = await response.json()
-            console.log('AI Suggestions received:', data)
             setAiSuggestions(data)
           }
         } catch (err) {
@@ -169,10 +168,7 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
             suggestedName.includes(p.name.toLowerCase())
           )
           if (project) {
-            console.log('Applying suggested project:', project.name)
             setProjectId(project.id)
-          } else {
-            console.warn('Could not find project matching:', aiSuggestions.suggestedProject, 'in', projects.map(p => p.name))
           }
         }
         break

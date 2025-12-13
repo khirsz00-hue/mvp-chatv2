@@ -40,6 +40,14 @@ type FilterType = 'today' | 'tomorrow' | 'week' | 'month' | 'overdue' | 'all' | 
 type ViewType = 'list' | 'board'
 type SortType = 'date' | 'priority' | 'name'
 
+// Helper function to format elapsed time
+const formatElapsedTime = (seconds: number): string => {
+  const hrs = Math.floor(seconds / 3600)
+  const mins = Math.floor((seconds % 3600) / 60)
+  const secs = seconds % 60
+  return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+}
+
 export function TasksAssistant() {
   const { showToast } = useToast()
   const [tasks, setTasks] = useState<Task[]>([])
@@ -696,7 +704,7 @@ export function TasksAssistant() {
               <div className="text-right">
                 <p className="text-xs opacity-75">Czas</p>
                 <p className="text-lg font-mono font-bold">
-                  {Math.floor(activeTimerInfo.elapsedSeconds / 3600)}:{String(Math.floor((activeTimerInfo.elapsedSeconds % 3600) / 60)).padStart(2, '0')}:{String(activeTimerInfo.elapsedSeconds % 60).padStart(2, '0')}
+                  {formatElapsedTime(activeTimerInfo.elapsedSeconds)}
                 </p>
               </div>
             )}
