@@ -35,7 +35,12 @@ export async function GET(req: Request) {
       if (!dueStr) return filter === 'all'
 
       let dueDate: Date
-      try { dueDate = parseISO(dueStr) } catch { dueDate = new Date(dueStr) }
+      try { 
+        dueDate = parseISO(dueStr) 
+      } catch (e) { 
+        console.warn('⚠️ Failed to parse date with parseISO, falling back to Date constructor:', dueStr, e)
+        dueDate = new Date(dueStr) 
+      }
 
       switch (filter) {
         case 'today':
@@ -64,6 +69,6 @@ export async function GET(req: Request) {
     return NextResponse.json({ tasks: simplified })
   } catch (error: any) {
     console.error('❌ Błąd w /api/todoist/tasks:', error)
-    return NextResponse.json({ error: 'Błąd serwera' }, { status: 500 })
+    return NextResponse.json({ error: 'Nie udało się pobrać zadań' }, { status: 500 })
   }
 }
