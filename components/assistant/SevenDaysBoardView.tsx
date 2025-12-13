@@ -261,7 +261,7 @@ export function SevenDaysBoardView({
           style={{ scrollBehavior: 'smooth' }}
         >
           {/* Single row flex layout for carousel behavior */}
-          <div className="flex gap-3 w-max min-w-full">
+          <div className="flex gap-3 w-max">
             {days.map(day => (
               <div key={day.id} className="w-64 sm:w-72 md:w-80 flex-shrink-0 snap-start">
                 <DayColumnComponent
