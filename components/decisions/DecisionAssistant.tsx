@@ -7,25 +7,39 @@ import DecisionList from './DecisionList'
 import DecisionForm from './DecisionForm'
 import DecisionDetail from './DecisionDetail'
 import type { Decision, DecisionWithOptions } from '@/lib/types/decisions'
-
-// Mock user ID - in production, this should come from auth context
-const MOCK_USER_ID = 'mock-user-id'
+import { supabase } from '@/lib/supabaseClient'
 
 export default function DecisionAssistant() {
   const [decisions, setDecisions] = useState<Decision[]>([])
   const [selectedDecision, setSelectedDecision] = useState<DecisionWithOptions | null>(null)
   const [isCreating, setIsCreating] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [userId, setUserId] = useState<string | null>(null)
+
+  // Get user ID
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        setUserId(user.id)
+      }
+    }
+    getUser()
+  }, [])
 
   // Load decisions on mount
   useEffect(() => {
-    loadDecisions()
-  }, [])
+    if (userId) {
+      loadDecisions()
+    }
+  }, [userId])
 
   const loadDecisions = async () => {
+    if (!userId) return
+    
     try {
       setIsLoading(true)
-      const response = await fetch(`/api/decisions?userId=${MOCK_USER_ID}`)
+      const response = await fetch(`/api/decisions?userId=${userId}`)
       const data = await response.json()
       setDecisions(data.decisions || [])
     } catch (error) {
@@ -36,12 +50,14 @@ export default function DecisionAssistant() {
   }
 
   const handleCreateDecision = async (input: { title: string; description?: string; context?: string }) => {
+    if (!userId) return
+    
     try {
       const response = await fetch('/api/decisions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: MOCK_USER_ID,
+          userId,
           ...input,
         }),
       })
