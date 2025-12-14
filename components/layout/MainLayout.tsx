@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import { User } from '@supabase/supabase-js'
 import { TasksAssistant } from '@/components/assistant/TasksAssistant'
-import { JournalAssistant } from '@/components/journal/JournalAssistant'
+import { JournalAssistantWrapper } from '@/components/journal/JournalAssistantWrapper'
 import { DecisionAssistant } from '@/src/features/decision-assistant/components/DecisionAssistant'
 
 interface MainLayoutProps {
@@ -68,7 +68,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         return <TasksAssistant />
       
       case 'journal':
-        return <JournalAssistant />
+        return <JournalAssistantWrapper />
       
       case 'decisions':
         return <DecisionAssistant />
