@@ -13,6 +13,8 @@ interface SubscriptionWallProps {
 
 // Supabase error code for "no rows returned"
 const SUPABASE_NO_ROWS_CODE = 'PGRST116'
+// Timeout for subscription check (10 seconds)
+const SUBSCRIPTION_CHECK_TIMEOUT = 10000
 
 export default function SubscriptionWall({ children }: SubscriptionWallProps) {
   const [loading, setLoading] = useState(true)
@@ -23,17 +25,22 @@ export default function SubscriptionWall({ children }: SubscriptionWallProps) {
     let isMounted = true
     let timeoutId: NodeJS.Timeout | undefined
 
+    // Helper function to clear timeout safely
+    const clearTimeoutIfExists = () => {
+      if (timeoutId) clearTimeout(timeoutId)
+    }
+
     const checkSubscription = async () => {
       console.log('🔍 [SubscriptionWall] Starting subscription check...')
       
-      // Create a timeout to ensure loading doesn't hang forever (10 seconds max)
+      // Create a timeout to ensure loading doesn't hang forever
       timeoutId = setTimeout(() => {
         if (isMounted) {
           console.error('⏱️ [SubscriptionWall] Timeout after 10 seconds - showing subscription wall')
           setHasActiveSubscription(false)
           setLoading(false)
         }
-      }, 10000) // 10 seconds timeout
+      }, SUBSCRIPTION_CHECK_TIMEOUT)
 
       try {
         const { data: { user } } = await supabase.auth.getUser()
@@ -41,7 +48,7 @@ export default function SubscriptionWall({ children }: SubscriptionWallProps) {
         
         if (!user) {
           console.log('⚠️ [SubscriptionWall] No user found, redirecting to login')
-          if (timeoutId) clearTimeout(timeoutId)
+          clearTimeoutIfExists()
           if (isMounted) {
             setLoading(false)
             router.push('/login')
@@ -68,7 +75,7 @@ export default function SubscriptionWall({ children }: SubscriptionWallProps) {
           } else {
             console.error('❌ [SubscriptionWall] Failed to create profile')
           }
-          if (timeoutId) clearTimeout(timeoutId)
+          clearTimeoutIfExists()
           if (isMounted) {
             setHasActiveSubscription(false)
             setLoading(false)
@@ -79,7 +86,7 @@ export default function SubscriptionWall({ children }: SubscriptionWallProps) {
         // Handle other errors
         if (error) {
           console.error('❌ [SubscriptionWall] Error fetching profile:', error)
-          if (timeoutId) clearTimeout(timeoutId)
+          clearTimeoutIfExists()
           if (isMounted) {
             setHasActiveSubscription(false)
             setLoading(false)
@@ -90,7 +97,7 @@ export default function SubscriptionWall({ children }: SubscriptionWallProps) {
         // Admin always has access
         if (profile?.is_admin) {
           console.log('✅ [SubscriptionWall] User is admin, granting access')
-          if (timeoutId) clearTimeout(timeoutId)
+          clearTimeoutIfExists()
           if (isMounted) {
             setHasActiveSubscription(true)
             setLoading(false)
@@ -102,14 +109,14 @@ export default function SubscriptionWall({ children }: SubscriptionWallProps) {
         const activeStatuses = ['active', 'trialing']
         const hasAccess = activeStatuses.includes(profile?.subscription_status || '')
         console.log('🔍 [SubscriptionWall] Subscription status:', profile?.subscription_status, '| Has access:', hasAccess)
-        if (timeoutId) clearTimeout(timeoutId)
+        clearTimeoutIfExists()
         if (isMounted) {
           setHasActiveSubscription(hasAccess)
           setLoading(false)
         }
       } catch (error) {
         console.error('❌ [SubscriptionWall] Unexpected error:', error)
-        if (timeoutId) clearTimeout(timeoutId)
+        clearTimeoutIfExists()
         if (isMounted) {
           setHasActiveSubscription(false)
           setLoading(false)
@@ -122,7 +129,7 @@ export default function SubscriptionWall({ children }: SubscriptionWallProps) {
     // Cleanup function to prevent state updates on unmounted component
     return () => {
       isMounted = false
-      if (timeoutId) clearTimeout(timeoutId)
+      clearTimeoutIfExists()
     }
   }, [])
 
