@@ -183,6 +183,41 @@ export function DecisionProcess({ decisionId, onBack }: DecisionProcessProps) {
         throw new Error('Not authenticated')
       }
 
+      // Get all saved events to check if user provided real answers
+      const events = await DecisionService.getEvents(decisionId)
+      
+      // Check if user provided ANY real answers
+      const hasRealAnswers = events.some((e: any) => {
+        if (e.event_type !== 'user_input') return false
+        if (!e.content) return false
+        
+        try {
+          const content = JSON.parse(e.content)
+          
+          // Check if has any non-empty answers
+          const hasAnswers = content.questions?.some((q: any) => q.answer?.trim()) 
+            || content.additionalThoughts?.trim()
+          
+          return hasAnswers
+        } catch {
+          return false
+        }
+      })
+      
+      // If NO answers at all, show error message
+      if (!hasRealAnswers) {
+        setSummary({
+          noAnswers: true,
+          message: 'Nie udzieliłeś odpowiedzi na żadne pytania. Aby otrzymać analizę, wróć i odpowiedz przynajmniej na kilka pytań.',
+          perspectives: [],
+          insights: [],
+          recommendation: ''
+        })
+        setShowSummary(true)
+        setIsGeneratingSummary(false)
+        return
+      }
+
       const response = await fetch(`/api/decision/${decisionId}/generate-summary`, {
         method: 'POST',
         headers: {

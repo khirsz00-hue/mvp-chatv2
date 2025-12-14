@@ -73,12 +73,44 @@ export async function POST(
       throw new Error(`Failed to get events: ${eventsError.message}`)
     }
 
-    // Generate summary using AI
+    // Filter only events with REAL user input
+    const userInputEvents = (events || []).filter((e: any) => {
+      if (e.event_type !== 'user_input') return false
+      if (!e.content) return false
+      
+      try {
+        const content = JSON.parse(e.content)
+        
+        // Must have at least one non-empty answer
+        const hasAnswers = content.questions?.some((q: any) => q.answer?.trim()) 
+          || content.additionalThoughts?.trim()
+        
+        return hasAnswers
+      } catch {
+        return false
+      }
+    })
+
+    // CRITICAL: If no real answers, return error
+    if (userInputEvents.length === 0) {
+      return NextResponse.json({ 
+        error: 'No user responses',
+        summary: {
+          noAnswers: true,
+          message: 'Brak odpowiedzi od użytkownika',
+          perspectives: [],
+          insights: [],
+          recommendation: ''
+        }
+      }, { status: 400 })
+    }
+
+    // Generate summary using AI - pass ONLY real answers
     const summary = await AIService.generateSummary(
       decision.title,
       decision.description,
       options || [],
-      events || []
+      userInputEvents
     )
 
     // Save summary as a synthesis event

@@ -25,6 +25,8 @@ interface RecommendedOption {
 }
 
 interface SummaryData {
+  noAnswers?: boolean
+  message?: string
   perspectives: Perspective[]
   insights: string[]
   options_analysis?: OptionAnalysis[]
@@ -57,6 +59,25 @@ export function DecisionSummary({
               <p className="text-gray-600">AI analizuje wszystkie perspektywy i przygotowuje finalne wnioski</p>
             </div>
           </div>
+        </Card>
+      </div>
+    )
+  }
+
+  // Handle NO ANSWERS case
+  if (summary.noAnswers) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <Card className="p-12 text-center bg-yellow-50 border-2 border-yellow-300">
+          <div className="text-6xl mb-4">⚠️</div>
+          <h1 className="text-3xl font-bold mb-4">Brak odpowiedzi</h1>
+          <p className="text-lg mb-6">
+            {summary.message || 'Nie można wygenerować analizy, ponieważ nie udzieliłeś odpowiedzi na żadne pytania.'}
+          </p>
+          <p className="text-gray-600 mb-8">
+            Wróć i odpowiedz przynajmniej na kilka pytań z różnych perspektyw.
+          </p>
+          <Button onClick={onBack}>Powrót</Button>
         </Card>
       </div>
     )
