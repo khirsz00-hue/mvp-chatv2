@@ -242,7 +242,7 @@ export function DecisionAssistant() {
               <Brain className="w-16 h-16 text-gray-300 mx-auto mb-4" weight="duotone" />
               <p className="text-muted-foreground">Nie masz jeszcze żadnych decyzji</p>
               <p className="text-sm text-muted-foreground mt-2">
-                Kliknij "Nowa decyzja" aby rozpocząć
+                Kliknij &quot;Nowa decyzja&quot; aby rozpocząć
               </p>
             </div>
           ) : (
