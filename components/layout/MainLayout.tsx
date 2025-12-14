@@ -11,6 +11,9 @@ import { JournalAssistantWrapper } from '@/components/journal/JournalAssistantWr
 import { DecisionAssistant } from '@/src/features/decision-assistant/components/DecisionAssistant'
 import SubscriptionWall from '@/components/subscription/SubscriptionWall'
 
+// Toggle this to disable subscription wall if it causes issues
+const ENABLE_SUBSCRIPTION_WALL = true
+
 interface MainLayoutProps {
   children?: ReactNode
 }
@@ -173,19 +176,36 @@ export default function MainLayout({ children }: MainLayoutProps) {
   }
 
   return (
-    <SubscriptionWall>
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 overflow-x-hidden">
-        <Header 
-          user={user ? { email: user.email, name: user.user_metadata?.full_name } : null}
-          onSignOut={handleSignOut}
-        />
-        <div className="flex">
-          <Sidebar activeView={activeView} onNavigate={handleNavigate} isAdmin={isAdmin} />
-          <main className="flex-1 p-6 overflow-x-hidden">
-            {children || renderAssistant()}
-          </main>
+    <>
+      {ENABLE_SUBSCRIPTION_WALL ? (
+        <SubscriptionWall>
+          <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 overflow-x-hidden">
+            <Header 
+              user={user ? { email: user.email, name: user.user_metadata?.full_name } : null}
+              onSignOut={handleSignOut}
+            />
+            <div className="flex">
+              <Sidebar activeView={activeView} onNavigate={handleNavigate} isAdmin={isAdmin} />
+              <main className="flex-1 p-6 overflow-x-hidden">
+                {children || renderAssistant()}
+              </main>
+            </div>
+          </div>
+        </SubscriptionWall>
+      ) : (
+        <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 overflow-x-hidden">
+          <Header 
+            user={user ? { email: user.email, name: user.user_metadata?.full_name } : null}
+            onSignOut={handleSignOut}
+          />
+          <div className="flex">
+            <Sidebar activeView={activeView} onNavigate={handleNavigate} isAdmin={isAdmin} />
+            <main className="flex-1 p-6 overflow-x-hidden">
+              {children || renderAssistant()}
+            </main>
+          </div>
         </div>
-      </div>
-    </SubscriptionWall>
+      )}
+    </>
   )
 }
