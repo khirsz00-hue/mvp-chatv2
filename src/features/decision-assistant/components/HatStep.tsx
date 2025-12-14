@@ -70,6 +70,12 @@ export function HatStep({
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [additionalThoughts, setAdditionalThoughts] = useState('')
 
+  // Reset answers when hat color changes (new hat)
+  useEffect(() => {
+    setAnswers({})
+    setAdditionalThoughts('')
+  }, [hatColor])
+
   const handleAnswerChange = (index: number, value: string) => {
     setAnswers(prev => ({ ...prev, [index]: value }))
   }
