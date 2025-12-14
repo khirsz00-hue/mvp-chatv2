@@ -214,12 +214,11 @@ export function SevenDaysBoardView({
       autoScrollIntervalRef.current = null
     }
     
-    const wasDragging = isDragging
     setActiveTask(null)
     setDragStartPos(null)
     setIsDragging(false)
     
-    if (!over || !wasDragging) return
+    if (!over) return
     
     const taskId = active.id as string
     const newDateStr = over.id as string
