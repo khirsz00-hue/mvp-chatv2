@@ -4,10 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Brain, 
-  Sparkle, 
-  Question, 
-  ChatCircle, 
-  Lightning,
+  Sparkle,
   ListChecks,
   Clock,
   Check,
@@ -15,10 +12,7 @@ import {
   ArrowRight,
   CalendarPlus,
   Lightbulb,
-  PaperPlaneRight,
-  Robot,
-  User,
-  ArrowLeft
+  Robot
 } from '@phosphor-icons/react'
 
 interface Task {
@@ -50,13 +44,7 @@ interface Subtask {
   selected: boolean
 }
 
-interface Message {
-  role: 'user' | 'assistant'
-  content: string
-  timestamp: string
-}
-
-type ViewMode = 'init' | 'questions' | 'chat' | 'subtasks'
+type ViewMode = 'questions' | 'understanding' | 'subtasks'
 
 export function AITaskBreakdownModal({
   open,
@@ -64,7 +52,7 @@ export function AITaskBreakdownModal({
   task,
   onCreateSubtasks
 }: AITaskBreakdownModalProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>('init')
+  const [viewMode, setViewMode] = useState<ViewMode>('questions')
   
   // AI Summary
   const [aiSummary, setAiSummary] = useState('')
@@ -76,11 +64,6 @@ export function AITaskBreakdownModal({
   const [answers, setAnswers] = useState<string[]>([])
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false)
   
-  // Chat Mode
-  const [messages, setMessages] = useState<Message[]>([])
-  const [chatInput, setChatInput] = useState('')
-  const [isLoadingChat, setIsLoadingChat] = useState(false)
-  
   // Subtasks
   const [subtasks, setSubtasks] = useState<Subtask[]>([])
   const [totalEstimation, setTotalEstimation] = useState<number | undefined>()
@@ -91,13 +74,11 @@ export function AITaskBreakdownModal({
   const [isCreatingSubtasks, setIsCreatingSubtasks] = useState(false)
   
   const resetModal = useCallback(() => {
-    setViewMode('init')
+    setViewMode('questions')
     setAiSummary('')
     setClarifyQuestions([])
     setCurrentQuestion(0)
     setAnswers([])
-    setMessages([])
-    setChatInput('')
     setSubtasks([])
     setTotalEstimation(undefined)
     setBestDayOfWeek(undefined)
@@ -106,16 +87,23 @@ export function AITaskBreakdownModal({
     setTips([])
   }, [])
   
-  // AI Summary Generation
-  const generateAISummary = useCallback(async () => {
+  // AI Summary Generation (based on answers)
+  const generateAISummary = useCallback(async (allAnswers: string[]) => {
     setIsLoadingSummary(true)
     try {
+      const qaContext = clarifyQuestions
+        .map((q, i) => `Q:  ${q}\nA: ${allAnswers[i]}`)
+        .join('\n\n')
+
       const prompt = `Jesteś asystentem AI wspierającym osoby z ADHD w zarządzaniu zadaniami. 
 
 Zadanie użytkownika:  "${task.content}"
 ${task.description ? `Opis: "${task.description}"` : ''}
 
-Napisz krótkie podsumowanie (2-3 zdania) jak rozumiesz to zadanie. 
+Użytkownik odpowiedział na pytania doprecyzowujące:
+${qaContext}
+
+Na podstawie tych odpowiedzi napisz krótkie podsumowanie (2-3 zdania) jak rozumiesz to zadanie. 
 Pokaż użytkownikowi, że rozumiesz jego intencje i jesteś gotowy pomóc. 
 Bądź ciepły, wspierający i konkretny.`
 
@@ -133,28 +121,32 @@ Bądź ciepły, wspierający i konkretny.`
       if (!res.ok) throw new Error('Failed to generate summary')
       
       const data = await res.json()
-      setAiSummary(data. response || 'Rozumiem - chcesz zająć się tym zadaniem.  Pomogę Ci je doprecyzować i rozłożyć na kroki.')
+      setAiSummary(data.response || 'Rozumiem - chcesz zająć się tym zadaniem.  Pomogę Ci je doprecyzować i rozłożyć na kroki.')
     } catch (err) {
       console.error('Error generating AI summary:', err)
       setAiSummary('Rozumiem - chcesz zająć się tym zadaniem.  Pomogę Ci je doprecyzować i rozłożyć na kroki.')
     } finally {
       setIsLoadingSummary(false)
     }
-  }, [task])
+  }, [task, clarifyQuestions])
   
-  // Initialize - fetch AI summary
+  // Initialize - start generating questions immediately
   useEffect(() => {
-    if (open && ! aiSummary) {
-      generateAISummary()
+    if (open && clarifyQuestions.length === 0) {
+      handleStartQuestions()
     }
     
-    if (! open) {
+    if (!open) {
       resetModal()
     }
-  }, [open, aiSummary, generateAISummary, resetModal])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
   
   // Questions Mode - Generate Questions
-  const handleStartQuestions = async () => {
+  const handleStartQuestions = useCallback(async () => {
+    // Avoid duplicate calls
+    if (isLoadingQuestions || clarifyQuestions.length > 0) return
+    
     setIsLoadingQuestions(true)
     setViewMode('questions')
     
@@ -163,8 +155,6 @@ Bądź ciepły, wspierający i konkretny.`
 
 Zadanie:  "${task.content}"
 ${task.description ? `Opis: "${task.description}"` : ''}
-
-Twoje zrozumienie:  ${aiSummary}
 
 Wygeneruj 3-4 KONKRETNE pytania doprecyzowujące, które dotyczą BEZPOŚREDNIO tego zadania i pomogą Ci rozbić je na kroki. 
 
@@ -222,11 +212,11 @@ Zwróć JSON:
     } finally {
       setIsLoadingQuestions(false)
     }
-  }
+  }, [task, isLoadingQuestions, clarifyQuestions.length])
   
   // Answer Question
   const handleAnswerQuestion = (answer: string) => {
-    if (! answer.trim()) return
+    if (!answer.trim()) return
     
     const newAnswers = [...answers, answer]
     setAnswers(newAnswers)
@@ -234,8 +224,9 @@ Zwróć JSON:
     if (currentQuestion < clarifyQuestions.length - 1) {
       setCurrentQuestion(currentQuestion + 1)
     } else {
-      // Last question answered - generate subtasks
-      generateSubtasksFromQuestions(newAnswers)
+      // Last question answered - show AI understanding
+      setViewMode('understanding')
+      generateAISummary(newAnswers)
     }
   }
   
@@ -321,126 +312,7 @@ Zwróć JSON:
     }
   }
   
-  // Chat Mode
-  const handleStartChat = () => {
-    setViewMode('chat')
-    const welcomeMsg:  Message = {
-      role: 'assistant',
-      content: `Rozmawiajmy o zadaniu:  **${task.content}**\n\n${aiSummary}\n\nO czym chcesz porozmawiać?  Możesz zapytać o szczegóły, podzielić się swoimi pomysłami, lub zasięgnąć rady jak do tego podejść. `,
-      timestamp: new Date().toISOString()
-    }
-    setMessages([welcomeMsg])
-  }
-  
-  const handleSendChatMessage = async () => {
-    if (!chatInput.trim() || isLoadingChat) return
-    
-    const userMsg: Message = {
-      role:  'user',
-      content:  chatInput,
-      timestamp: new Date().toISOString()
-    }
-    
-    setMessages(prev => [...prev, userMsg])
-    const currentInput = chatInput
-    setChatInput('')
-    setIsLoadingChat(true)
-    
-    try {
-      const conversationHistory = messages
-        .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
-        .join('\n\n')
 
-      const prompt = `Jesteś asystentem AI wspierającym osoby z ADHD.
-
-Zadanie: "${task.content}"
-${task.description ? `Opis: "${task.description}"` : ''}
-
-Twoje zrozumienie:  ${aiSummary}
-
-Historia rozmowy:
-${conversationHistory}
-
-Nowa wiadomość:  "${currentInput}"
-
-Prowadź naturalną rozmowę o tym zadaniu. Możesz: 
-- Odpowiadać na pytania
-- Sugerować różne podejścia
-- Dopytywać o szczegóły
-- Doradzać jak podejść do zadania
-
-Bądź konkretny, wspierający i naturalny.  Odpowiedz w 2-4 zdaniach.`
-
-      const res = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type':  'application/json' },
-        body: JSON.stringify({
-          messages: [
-            { role: 'system', content: 'Jesteś wspierającym asystentem ADHD.' },
-            { role: 'user', content: prompt }
-          ]
-        })
-      })
-      
-      if (!res.ok) throw new Error('Failed to send message')
-      
-      const data = await res.json()
-      
-      const assistantMsg: Message = {
-        role: 'assistant',
-        content: data.response || 'Rozumiem.  Jak mogę jeszcze pomóc?',
-        timestamp: new Date().toISOString()
-      }
-      
-      setMessages(prev => [... prev, assistantMsg])
-    } catch (err) {
-      console.error('Error in chat:', err)
-    } finally {
-      setIsLoadingChat(false)
-    }
-  }
-  
-  // Generate Directly (skip questions/chat)
-  const handleGenerateDirectly = async () => {
-    setIsLoadingQuestions(true)
-    setViewMode('subtasks')
-    
-    try {
-      const res = await fetch('/api/ai/breakdown-task', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:  JSON.stringify({
-          taskContent: task.content,
-          taskDescription: task.description
-        })
-      })
-      
-      if (!res.ok) throw new Error('Failed to generate')
-      
-      const data = await res.json()
-      
-      if (data.steps && data.steps.length > 0) {
-        const generatedSubtasks: Subtask[] = data.steps.map((st: any, idx: number) => ({
-          id: `subtask-${Date.now()}-${idx}`,
-          title: st.title,
-          description: st.description,
-          estimatedMinutes: st.estimatedMinutes || 30,
-          selected: true
-        }))
-        
-        setSubtasks(generatedSubtasks)
-        setTotalEstimation(data.totalEstimation)
-        setBestDayOfWeek(data.bestDayOfWeek)
-        setBestTimeOfDay(data.bestTimeOfDay)
-        setSchedulingReasoning(data.schedulingReasoning || '')
-        setTips(data.tips || [])
-      }
-    } catch (err) {
-      console.error('Error generating:', err)
-    } finally {
-      setIsLoadingQuestions(false)
-    }
-  }
   
   // Toggle Subtask Selection
   const toggleSubtask = (id: string, selected: boolean) => {
@@ -515,7 +387,7 @@ Bądź konkretny, wspierający i naturalny.  Odpowiedz w 2-4 zdaniach.`
                   className="shrink-0"
                 >
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">
-                    <Lightning size={24} weight="duotone" className="text-purple-600" />
+                    <Brain size={24} weight="duotone" className="text-purple-600" />
                   </div>
                 </motion.div>
                 <div className="flex-1 min-w-0">
@@ -539,97 +411,83 @@ Bądź konkretny, wspierający i naturalny.  Odpowiedz w 2-4 zdaniach.`
             
             {/* Content */}
             <div className="flex-1 overflow-y-auto">
-              {/* INIT VIEW - AI Summary + Options */}
-              {viewMode === 'init' && (
+              {/* UNDERSTANDING VIEW - Show AI understanding after questions */}
+              {viewMode === 'understanding' && (
                 <div className="p-6 space-y-6">
-                  {/* AI Summary Card */}
+                  {/* AI Understanding Card */}
                   {isLoadingSummary ? (
-                    <div className="p-6 border border-purple-200 rounded-xl bg-gradient-to-br from-purple-50 to-pink-50">
-                      <div className="flex items-center gap-3">
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                        >
-                          <Robot size={32} className="text-purple-600" weight="duotone" />
-                        </motion.div>
-                        <div>
-                          <h3 className="font-semibold">Analizuję zadanie... </h3>
-                          <p className="text-sm text-gray-600">Przygotowuję plan działania</p>
-                        </div>
-                      </div>
+                    <div className="flex flex-col items-center justify-center py-12">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                        className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center mb-4"
+                      >
+                        <Brain size={32} className="text-purple-600" weight="duotone" />
+                      </motion.div>
+                      <h3 className="font-semibold text-lg">Analizuję twoje odpowiedzi...</h3>
+                      <p className="text-sm text-gray-600">Przygotowuję zrozumienie zadania</p>
                     </div>
                   ) : (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                    >
-                      <div className="p-6 border border-purple-200 rounded-xl bg-gradient-to-br from-purple-50/50 to-pink-50/50">
-                        <div className="flex items-start gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
-                            <Brain size={20} className="text-purple-600" weight="duotone" />
+                    <>
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                      >
+                        <div className="p-6 border-2 border-purple-300 rounded-xl bg-gradient-to-br from-purple-50 to-pink-50 shadow-lg">
+                          <div className="flex items-start gap-3">
+                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shrink-0">
+                              <Brain size={24} className="text-white" weight="fill" />
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="font-bold text-lg mb-3 text-purple-900">
+                                💡 Jak AI rozumie to zadanie
+                              </h3>
+                              <p className="text-sm text-gray-800 leading-relaxed">
+                                {aiSummary}
+                              </p>
+                            </div>
                           </div>
-                          <div className="flex-1">
-                            <h3 className="font-semibold mb-2 text-purple-900">
-                              Jak rozumiem to zadanie: 
-                            </h3>
-                            <p className="text-sm text-gray-700 leading-relaxed">
-                              {aiSummary}
-                            </p>
-                          </div>
                         </div>
-                      </div>
-                    </motion.div>
-                  )}
-                  
-                  {/* Action Buttons */}
-                  {! isLoadingSummary && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.2 }}
-                      className="grid grid-cols-1 md: grid-cols-3 gap-3"
-                    >
-                      <button
-                        onClick={handleStartQuestions}
-                        disabled={isLoadingQuestions}
-                        className="group h-auto py-5 px-4 border-2 border-gray-200 rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all text-left"
-                      >
-                        <div className="flex items-center gap-3 mb-2">
-                          <Question size={24} className="text-purple-600 group-hover:scale-110 transition" weight="duotone" />
-                          <span className="font-semibold text-gray-900">Zadaj pytania</span>
-                        </div>
-                        <span className="text-xs text-gray-600 block">
-                          AI zada 3-4 pytania o szczegóły zadania
-                        </span>
-                      </button>
+                      </motion.div>
                       
-                      <button
-                        onClick={handleStartChat}
-                        className="group h-auto py-5 px-4 border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all text-left"
+                      {/* Create Plan Button */}
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 }}
+                        className="flex gap-3"
                       >
-                        <div className="flex items-center gap-3 mb-2">
-                          <ChatCircle size={24} className="text-blue-600 group-hover:scale-110 transition" weight="duotone" />
-                          <span className="font-semibold text-gray-900">Rozmawiaj z AI</span>
-                        </div>
-                        <span className="text-xs text-gray-600 block">
-                          Naturalny dialog o zadaniu
-                        </span>
-                      </button>
-                      
-                      <button
-                        onClick={handleGenerateDirectly}
-                        disabled={isLoadingQuestions}
-                        className="group h-auto py-5 px-4 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all text-left text-white shadow-lg"
-                      >
-                        <div className="flex items-center gap-3 mb-2">
-                          <Lightning size={24} className="group-hover:scale-110 transition" weight="fill" />
-                          <span className="font-semibold">Generuj od razu</span>
-                        </div>
-                        <span className="text-xs text-white/90 block">
-                          Stwórz plan bez pytań
-                        </span>
-                      </button>
-                    </motion.div>
+                        <button
+                          onClick={onClose}
+                          className="flex-1 px-6 py-4 border-2 border-gray-300 rounded-xl hover:bg-gray-50 transition font-medium text-gray-700 flex items-center justify-center gap-2"
+                        >
+                          <X size={20} />
+                          Zamknij
+                        </button>
+                        <button
+                          onClick={() => generateSubtasksFromQuestions(answers)}
+                          disabled={isLoadingQuestions}
+                          className="flex-[2] px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-700 hover:to-pink-700 transition disabled:opacity-50 font-bold shadow-xl flex items-center justify-center gap-3 text-lg"
+                        >
+                          {isLoadingQuestions ? (
+                            <>
+                              <motion.div
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                              >
+                                <Sparkle size={24} />
+                              </motion.div>
+                              Tworzę plan...
+                            </>
+                          ) : (
+                            <>
+                              <ListChecks size={24} weight="bold" />
+                              Utwórz plan
+                            </>
+                          )}
+                        </button>
+                      </motion.div>
+                    </>
                   )}
                 </div>
               )}
@@ -781,147 +639,9 @@ Bądź konkretny, wspierający i naturalny.  Odpowiedz w 2-4 zdaniach.`
                         })}
                       </div>
                       
-                      {/* Back Button */}
-                      <div className="pt-4">
-                        <button
-                          onClick={() => setViewMode('init')}
-                          className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-2"
-                        >
-                          <ArrowLeft size={16} />
-                          Wróć do wyboru
-                        </button>
-                      </div>
+
                     </>
                   )}
-                </div>
-              )}
-              
-              {/* CHAT VIEW */}
-              {viewMode === 'chat' && (
-                <div className="flex flex-col h-[500px]">
-                  {/* Chat Header */}
-                  <div className="px-6 py-4 border-b bg-gradient-to-r from-purple-50 to-pink-50 shrink-0">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                          <ChatCircle size={20} className="text-white" weight="duotone" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold">Rozmowa o zadaniu</h3>
-                          <p className="text-xs text-gray-600">Zadaj pytanie lub podziel się pomysłem</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => setViewMode('init')}
-                        className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-2"
-                      >
-                        <ArrowLeft size={16} />
-                        Wróć
-                      </button>
-                    </div>
-                  </div>
-                  
-                  {/* Messages */}
-                  <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-                    {messages.map((msg, idx) => (
-                      <motion.div
-                        key={idx}
-                        initial={{ opacity:  0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                      >
-                        {msg.role === 'assistant' && (
-                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shrink-0">
-                            <Robot size={16} className="text-white" weight="duotone" />
-                          </div>
-                        )}
-                        
-                        <div className={`max-w-[80%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                          <div className={`p-3 rounded-xl ${
-                            msg.role === 'user' 
-                              ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white' 
-                              : 'bg-gray-100 text-gray-900'
-                          }`}>
-                            <div className="text-sm whitespace-pre-wrap">
-                              {msg.content. split('**').map((part, i) => 
-                                i % 2 === 0 ?  part : <strong key={i}>{part}</strong>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {msg.role === 'user' && (
-                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shrink-0">
-                            <User size={16} className="text-white" weight="duotone" />
-                          </div>
-                        )}
-                      </motion.div>
-                    ))}
-                    
-                    {isLoadingChat && (
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity:  1 }}
-                        className="flex gap-3"
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                          <Robot size={16} className="text-white" />
-                        </div>
-                        <div className="bg-gray-100 p-3 rounded-xl">
-                          <div className="flex gap-1">
-                            {[0, 1, 2].map(i => (
-                              <motion.div
-                                key={i}
-                                className="w-2 h-2 rounded-full bg-purple-600"
-                                animate={{ y: [0, -8, 0], opacity: [0.4, 1, 0.4] }}
-                                transition={{ duration: 1, repeat: Infinity, delay: i * 0.15 }}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </div>
-                  
-                  {/* Input */}
-                  <div className="px-6 py-4 border-t bg-gray-50 shrink-0">
-                    {messages.length > 2 && (
-                      <div className="mb-3">
-                        <button
-                          onClick={handleGenerateDirectly}
-                          disabled={isLoadingQuestions}
-                          className="w-full px-4 py-2 border-2 border-purple-300 rounded-lg hover:bg-purple-50 transition text-sm font-medium text-purple-900 flex items-center justify-center gap-2"
-                        >
-                          <ListChecks size={16} />
-                          Wygeneruj plan na podstawie rozmowy
-                        </button>
-                      </div>
-                    )}
-                    
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Napisz wiadomość..."
-                        value={chatInput}
-                        onChange={(e) => setChatInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault()
-                            handleSendChatMessage()
-                          }
-                        }}
-                        disabled={isLoadingChat}
-                        className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      />
-                      <button
-                        onClick={handleSendChatMessage}
-                        disabled={isLoadingChat || !chatInput.trim()}
-                        className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition disabled:opacity-50 flex items-center justify-center"
-                      >
-                        <PaperPlaneRight size={18} weight="fill" />
-                      </button>
-                    </div>
-                  </div>
                 </div>
               )}
               
@@ -1178,16 +898,7 @@ Bądź konkretny, wspierający i naturalny.  Odpowiedz w 2-4 zdaniach.`
                         </button>
                       </div>
                       
-                      {/* Back to Options */}
-                      <div className="pt-2 text-center">
-                        <button
-                          onClick={() => setViewMode('init')}
-                          className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-2 mx-auto"
-                        >
-                          <ArrowLeft size={16} />
-                          Wróć do wyboru opcji
-                        </button>
-                      </div>
+
                     </>
                   )}
                 </div>
