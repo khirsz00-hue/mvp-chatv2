@@ -13,13 +13,20 @@ export default function AuthCallbackPage() {
 
   useEffect(() => {
     const handleCallback = async () => {
+      console.log('🔍 [AuthCallback] Starting callback handling')
+      console.log('🔍 [AuthCallback] URL:', window.location.href)
+      
       try {
         // Check for error in URL
         const params = new URLSearchParams(window.location.search)
         const errorParam = params.get('error')
         const errorDescription = params.get('error_description')
         
+        console.log('🔍 [AuthCallback] Error param:', errorParam)
+        console.log('🔍 [AuthCallback] Error description:', errorDescription)
+        
         if (errorParam) {
+          console.error('❌ [AuthCallback] Error in URL params')
           setError(errorDescription || errorParam)
           setTimeout(() => router.replace('/login'), ERROR_REDIRECT_DELAY)
           return
@@ -28,23 +35,28 @@ export default function AuthCallbackPage() {
         // The Supabase client with PKCE flow will automatically handle the callback
         // and exchange the code for a session via detectSessionInUrl
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        
+        console.log('🔍 [AuthCallback] Session:', session?.user?.id || 'NULL')
+        console.log('🔍 [AuthCallback] Session error:', sessionError)
 
         if (sessionError) {
-          console.error('Session error:', sessionError)
+          console.error('❌ [AuthCallback] Session error:', sessionError)
           setError(sessionError.message)
           setTimeout(() => router.replace('/login'), ERROR_REDIRECT_DELAY)
           return
         }
 
         if (session) {
-          // Successfully authenticated, redirect to home
+          console.log('✅ [AuthCallback] Session found, redirecting to /')
+          // Dodaj małe opóźnienie aby sesja została zapisana
+          await new Promise(resolve => setTimeout(resolve, 500))
           router.replace('/')
         } else {
-          // No session found, redirect to login
+          console.log('⚠️ [AuthCallback] No session, redirecting to login')
           setTimeout(() => router.replace('/login'), SUCCESS_REDIRECT_DELAY)
         }
       } catch (err: unknown) {
-        console.error('Error handling auth callback:', err)
+        console.error('❌ [AuthCallback] Error:', err)
         const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred'
         setError(errorMessage)
         setTimeout(() => router.replace('/login'), ERROR_REDIRECT_DELAY)
