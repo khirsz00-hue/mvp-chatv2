@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { startOfDay, endOfDay, addDays, isWithinInterval, parseISO, isBefore } from 'date-fns'
 
+export const dynamic = 'force-dynamic'
+
 // Shared function to process tasks with filtering
 async function fetchAndFilterTasks(token: any, filter: string) {
   // Better token validation - return empty array for invalid tokens
