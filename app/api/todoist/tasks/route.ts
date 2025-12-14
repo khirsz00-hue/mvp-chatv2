@@ -6,8 +6,9 @@ export async function GET(req: Request) {
   const token = searchParams.get('token')
   const filter = (searchParams.get('filter') || 'all').toLowerCase()
 
-  if (!token) {
-    return NextResponse.json({ error: 'Brak tokenu Todoist' }, { status: 401 })
+  // Better token validation - return empty array for invalid tokens
+  if (!token || token === 'null' || token === 'undefined' || token.trim() === '') {
+    return NextResponse.json({ tasks: [] })
   }
 
   try {
@@ -17,8 +18,9 @@ export async function GET(req: Request) {
     })
 
     if (!res.ok) {
-      const err = await res.text()
-      return NextResponse.json({ error: `Błąd Todoist API: ${err}` }, { status: res.status })
+      console.error(`Todoist API error: ${res.status}`)
+      // Return empty array instead of error to avoid breaking the UI
+      return NextResponse.json({ tasks: [] })
     }
 
     const allTasks = await res.json()
@@ -76,6 +78,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ tasks: simplified })
   } catch (error: any) {
     console.error('❌ Błąd w /api/todoist/tasks:', error)
-    return NextResponse.json({ error: 'Nie udało się pobrać zadań' }, { status: 500 })
+    // Return empty array instead of error to avoid breaking the UI
+    return NextResponse.json({ tasks: [] })
   }
 }

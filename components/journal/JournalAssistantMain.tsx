@@ -51,6 +51,7 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)
   const [completedTasks, setCompletedTasks] = useState<TodoistTask[]>([])
   const [loadingTasks, setLoadingTasks] = useState(false)
+  const [todoistToken, setTodoistToken] = useState<string | null>(null)
 
   // Voice recognition - using any for Web Speech API which doesn't have standard types
   const recognitionRef = useRef<any>(null)
@@ -110,38 +111,98 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
     }
   }, [currentEntry])
 
-  // Fetch completed Todoist tasks
-  const fetchCompletedTasks = useCallback(async () => {
-    if (!userId) return
+  // Fetch user profile and Todoist token
+  useEffect(() => {
+    let isMounted = true
+
+    const fetchUserProfile = async () => {
+      if (!userId) return
+
+      try {
+        const { data, error } = await supabase
+          .from('user_profiles')
+          .select('todoist_token')
+          .eq('id', userId)
+          .single()
+
+        if (error) {
+          console.error('Error fetching user profile:', error)
+          return
+        }
+
+        if (isMounted && data?.todoist_token) {
+          setTodoistToken(data.todoist_token)
+        }
+      } catch (err) {
+        console.error('Error fetching user profile:', err)
+        // Don't show toast - this is just a fetch operation
+      }
+    }
+
+    if (userId) {
+      fetchUserProfile()
+    }
+
+    return () => {
+      isMounted = false
+    }
+  }, [userId])
+
+  // Fetch Todoist tasks when token is available
+  useEffect(() => {
+    let isMounted = true
+
+    const fetchTodoistTasks = async () => {
+      if (!todoistToken) return
+
+      setLoadingTasks(true)
+      try {
+        const response = await fetch(`/api/todoist/tasks?token=${encodeURIComponent(todoistToken)}&filter=today`)
+
+        if (!response.ok) {
+          console.error('Failed to fetch Todoist tasks:', response.status)
+          if (isMounted) {
+            setCompletedTasks([])
+          }
+          return
+        }
+
+        const data = await response.json()
+        if (isMounted) {
+          setCompletedTasks(data.tasks || [])
+        }
+      } catch (error: any) {
+        console.error('Error fetching Todoist tasks:', error)
+        if (isMounted) {
+          setCompletedTasks([])
+        }
+      } finally {
+        if (isMounted) {
+          setLoadingTasks(false)
+        }
+      }
+    }
+
+    if (todoistToken) {
+      fetchTodoistTasks()
+    }
+
+    return () => {
+      isMounted = false
+    }
+  }, [todoistToken, selectedDate])
+
+  // Refresh Todoist tasks
+  const handleRefreshTodoistTasks = async () => {
+    if (!todoistToken) return
 
     setLoadingTasks(true)
     try {
-      const token = await getTodoistToken(userId)
-      if (!token) {
-        showToast('Nie znaleziono tokenu Todoist', 'error')
-        return
-      }
-
-      // Use existing API endpoint but pass token in request body for security
-      // Note: The Todoist REST API /tasks endpoint only returns active (non-completed) tasks
-      // For completed tasks, we would need to use the Sync API which requires different implementation
-      // For MVP, we'll show active tasks that the user can mark as completed
-      const response = await fetch('/api/todoist/tasks', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token, filter: 'today' }),
-      })
+      const response = await fetch(`/api/todoist/tasks?token=${encodeURIComponent(todoistToken)}&filter=today`)
 
       if (!response.ok) {
-        // Fallback to GET method if POST is not supported
-        const getFallback = await fetch(`/api/todoist/tasks?token=${encodeURIComponent(token)}&filter=today`)
-        if (!getFallback.ok) {
-          throw new Error('Failed to fetch tasks')
-        }
-        const data = await getFallback.json()
-        setCompletedTasks(data.tasks || [])
+        console.error('Failed to fetch Todoist tasks:', response.status)
+        setCompletedTasks([])
         return
       }
 
@@ -149,18 +210,11 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
       setCompletedTasks(data.tasks || [])
     } catch (error: any) {
       console.error('Error fetching Todoist tasks:', error)
-      showToast('Błąd pobierania zadań z Todoist', 'error')
+      setCompletedTasks([])
     } finally {
       setLoadingTasks(false)
     }
-  }, [userId, showToast])
-
-  // Load Todoist tasks on mount
-  useEffect(() => {
-    if (userId) {
-      fetchCompletedTasks()
-    }
-  }, [userId, fetchCompletedTasks])
+  }
 
   // Add note
   const handleAddNote = () => {
@@ -464,28 +518,41 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
 
       {/* Completed Tasks from Todoist */}
       <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold">Ukończone zadania (Todoist)</h2>
-          <Button
-            onClick={fetchCompletedTasks}
-            variant="outline"
-            size="sm"
-            disabled={loadingTasks}
-          >
-            {loadingTasks ? 'Ładowanie...' : 'Odśwież'}
-          </Button>
-        </div>
-        {completedTasks.length === 0 ? (
-          <p className="text-gray-500 text-sm">Brak ukończonych zadań</p>
+        <h3 className="text-lg font-semibold mb-4">📋 Zadania Todoist</h3>
+
+        {!todoistToken ? (
+          <div className="text-sm text-gray-500 p-4 border border-dashed border-gray-300 rounded-lg bg-gray-50">
+            💡 <strong>Wskazówka:</strong> Chcesz połączyć z Todoist?
+            Dodaj token API w ustawieniach profilu, aby automatycznie śledzić wykonane zadania.
+          </div>
         ) : (
-          <ul className="space-y-2">
-            {completedTasks.map((task) => (
-              <li key={task.id} className="flex items-start gap-2 text-sm">
-                <span className="text-green-600">✓</span>
-                <span>{task.content}</span>
-              </li>
-            ))}
-          </ul>
+          <>
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="font-medium text-sm text-gray-700">
+                Zaplanowane na dziś
+              </h4>
+              <Button
+                onClick={handleRefreshTodoistTasks}
+                variant="outline"
+                size="sm"
+                disabled={loadingTasks}
+              >
+                {loadingTasks ? 'Ładowanie...' : 'Odśwież'}
+              </Button>
+            </div>
+            {completedTasks.length === 0 ? (
+              <p className="text-sm text-gray-500">Brak zadań na dziś</p>
+            ) : (
+              <ul className="space-y-2">
+                {completedTasks.map((task) => (
+                  <li key={task.id} className="text-sm flex items-center gap-2">
+                    <span className="text-gray-400">□</span>
+                    {task.content}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
         )}
       </Card>
 
