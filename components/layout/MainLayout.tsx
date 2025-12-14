@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { User } from '@supabase/supabase-js'
 import { TasksAssistant } from '@/components/assistant/TasksAssistant'
 import { JournalAssistant } from '@/components/journal/JournalAssistant'
-import DecisionAssistant from '@/src/features/decision-assistant/components/DecisionAssistant'
+import { DecisionAssistant } from '@/src/features/decision-assistant/components/DecisionAssistant'
 
 interface MainLayoutProps {
   children?: ReactNode
@@ -25,7 +25,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     const checkAuth = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       
-      if (!user) {
+      if (! user) {
         router.push('/login')
         return
       }
@@ -37,7 +37,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     checkAuth()
 
     // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    const { data: { subscription } } = supabase. auth.onAuthStateChange(
       async (event, session) => {
         if (event === 'SIGNED_IN' && session) {
           setUser(session.user)
@@ -119,7 +119,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 overflow-x-hidden">
       <Header 
-        user={user ? { email: user.email, name: user.user_metadata?.full_name } : null}
+        user={user ?  { email: user.email, name: user.user_metadata?. full_name } : null}
         onSignOut={handleSignOut}
       />
       <div className="flex">
