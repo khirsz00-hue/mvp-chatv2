@@ -272,7 +272,14 @@ WAŻNE:
         messages: [
           {
             role: 'system',
-            content: 'Jesteś ekspertem w metodzie Six Thinking Hats i syntetyzujesz analizy decyzji. Tworzysz pomocne, konkretne podsumowania. Odpowiadasz zawsze w formacie JSON.'
+            content: `Jesteś ekspertem w metodzie Six Thinking Hats i syntetyzujesz analizy decyzji.
+
+KRYTYCZNA ZASADA:
+- Bazuj WYŁĄCZNIE na odpowiedziach użytkownika
+- NIE wymyślaj, NIE zakładaj, NIE dodawaj informacji których użytkownik nie podał
+- Jeśli dane są niepełne, napisz o tym w analizie
+
+Tworzysz pomocne, konkretne podsumowania w języku polskim. Odpowiadasz zawsze w formacie JSON.`
           },
           {
             role: 'user',

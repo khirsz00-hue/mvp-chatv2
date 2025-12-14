@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { AIService } from '@/src/features/decision-assistant/services/aiService'
+import { filterRealUserInputEvents } from '@/src/features/decision-assistant/utils/validation'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -73,12 +74,29 @@ export async function POST(
       throw new Error(`Failed to get events: ${eventsError.message}`)
     }
 
-    // Generate summary using AI
+    // Filter only events with REAL user input
+    const userInputEvents = filterRealUserInputEvents(events || [])
+
+    // CRITICAL: If no real answers, return error
+    if (userInputEvents.length === 0) {
+      return NextResponse.json({ 
+        error: 'No user responses',
+        summary: {
+          noAnswers: true,
+          message: 'Brak odpowiedzi od użytkownika',
+          perspectives: [],
+          insights: [],
+          recommendation: ''
+        }
+      }, { status: 400 })
+    }
+
+    // Generate summary using AI - pass ONLY real answers
     const summary = await AIService.generateSummary(
       decision.title,
       decision.description,
       options || [],
-      events || []
+      userInputEvents
     )
 
     // Save summary as a synthesis event

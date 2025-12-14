@@ -8,6 +8,7 @@ import { ProgressBar } from './ProgressBar'
 import { HatStep } from './HatStep'
 import { DecisionSummary } from './DecisionSummary'
 import { DecisionService } from '../services/decisionService'
+import { hasAnyRealUserInput } from '../utils/validation'
 
 interface DecisionProcessProps {
   decisionId: string
@@ -181,6 +182,23 @@ export function DecisionProcess({ decisionId, onBack }: DecisionProcessProps) {
       
       if (!session) {
         throw new Error('Not authenticated')
+      }
+
+      // Get all saved events to check if user provided real answers
+      const events = await DecisionService.getEvents(decisionId)
+      
+      // Check if user provided ANY real answers
+      if (!hasAnyRealUserInput(events)) {
+        setSummary({
+          noAnswers: true,
+          message: 'Nie udzieliłeś odpowiedzi na żadne pytania. Aby otrzymać analizę, wróć i odpowiedz przynajmniej na kilka pytań.',
+          perspectives: [],
+          insights: [],
+          recommendation: ''
+        })
+        setShowSummary(true)
+        setIsGeneratingSummary(false)
+        return
       }
 
       const response = await fetch(`/api/decision/${decisionId}/generate-summary`, {
