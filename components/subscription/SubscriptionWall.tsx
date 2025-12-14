@@ -27,19 +27,14 @@ export default function SubscriptionWall({ children }: SubscriptionWallProps) {
     console.log('🔍 [SubscriptionWall] Starting subscription check...')
     
     // Create a timeout to ensure loading doesn't hang forever (10 seconds max)
-    let timeoutId: NodeJS.Timeout | null = null
     let isCompleted = false
-
-    const timeoutPromise = new Promise<void>((resolve) => {
-      timeoutId = setTimeout(() => {
-        if (!isCompleted) {
-          console.error('⏱️ [SubscriptionWall] Timeout after 10 seconds - showing subscription wall')
-          setHasActiveSubscription(false)
-          setLoading(false)
-          resolve()
-        }
-      }, 10000) // 10 seconds timeout
-    })
+    const timeoutId = setTimeout(() => {
+      if (!isCompleted) {
+        console.error('⏱️ [SubscriptionWall] Timeout after 10 seconds - showing subscription wall')
+        setHasActiveSubscription(false)
+        setLoading(false)
+      }
+    }, 10000) // 10 seconds timeout
 
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -48,7 +43,7 @@ export default function SubscriptionWall({ children }: SubscriptionWallProps) {
       if (!user) {
         console.log('⚠️ [SubscriptionWall] No user found, redirecting to login')
         isCompleted = true
-        if (timeoutId) clearTimeout(timeoutId)
+        clearTimeout(timeoutId)
         setLoading(false)
         router.push('/login')
         return
@@ -74,7 +69,7 @@ export default function SubscriptionWall({ children }: SubscriptionWallProps) {
           console.error('❌ [SubscriptionWall] Failed to create profile')
         }
         isCompleted = true
-        if (timeoutId) clearTimeout(timeoutId)
+        clearTimeout(timeoutId)
         setHasActiveSubscription(false)
         setLoading(false)
         return
@@ -84,7 +79,7 @@ export default function SubscriptionWall({ children }: SubscriptionWallProps) {
       if (error) {
         console.error('❌ [SubscriptionWall] Error fetching profile:', error)
         isCompleted = true
-        if (timeoutId) clearTimeout(timeoutId)
+        clearTimeout(timeoutId)
         setHasActiveSubscription(false)
         setLoading(false)
         return
@@ -94,7 +89,7 @@ export default function SubscriptionWall({ children }: SubscriptionWallProps) {
       if (profile?.is_admin) {
         console.log('✅ [SubscriptionWall] User is admin, granting access')
         isCompleted = true
-        if (timeoutId) clearTimeout(timeoutId)
+        clearTimeout(timeoutId)
         setHasActiveSubscription(true)
         setLoading(false)
         return
@@ -105,13 +100,13 @@ export default function SubscriptionWall({ children }: SubscriptionWallProps) {
       const hasAccess = activeStatuses.includes(profile?.subscription_status || '')
       console.log('🔍 [SubscriptionWall] Subscription status:', profile?.subscription_status, '| Has access:', hasAccess)
       isCompleted = true
-      if (timeoutId) clearTimeout(timeoutId)
+      clearTimeout(timeoutId)
       setHasActiveSubscription(hasAccess)
       setLoading(false)
     } catch (error) {
       console.error('❌ [SubscriptionWall] Unexpected error:', error)
       isCompleted = true
-      if (timeoutId) clearTimeout(timeoutId)
+      clearTimeout(timeoutId)
       setHasActiveSubscription(false)
       setLoading(false)
     }
