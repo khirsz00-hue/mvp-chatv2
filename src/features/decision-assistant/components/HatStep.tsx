@@ -20,9 +20,9 @@ interface HatStepProps {
   decisionTitle: string
   decisionDescription: string
   onNext: (responses: { questions: Question[]; additionalThoughts: string }) => void
-  onSkip: () => void
   isGeneratingQuestions: boolean
   questions: string[]
+  isLastHat?: boolean
 }
 
 const hatColors: Record<HatColor, string> = {
@@ -63,12 +63,15 @@ export function HatStep({
   decisionTitle,
   decisionDescription,
   onNext,
-  onSkip,
   isGeneratingQuestions,
-  questions
+  questions,
+  isLastHat
 }: HatStepProps) {
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [additionalThoughts, setAdditionalThoughts] = useState('')
+
+  // Check if user provided at least ONE answer
+  const hasAnyAnswer = Object.values(answers).some(a => a?.trim()) || additionalThoughts?.trim()
 
   // Reset answers when hat color changes (new hat)
   useEffect(() => {
@@ -131,7 +134,14 @@ export function HatStep({
         </Card>
       ) : (
         <Card className="p-6 space-y-6">
-          <h3 className="text-lg font-semibold">Pytania do rozważenia:</h3>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <p className="text-sm text-blue-800">
+              💡 <strong>Wskazówka:</strong> Odpowiedz przynajmniej na jedno pytanie lub wpisz 
+              dodatkowe przemyślenia, aby przejść do kolejnego etapu.
+            </p>
+          </div>
+          
+          <h3 className="text-lg font-semibold">ODPOWIEDZ NA PYTANIA:</h3>
           
           {questions.map((question, index) => (
             <div key={index} className="space-y-2">
@@ -163,12 +173,18 @@ export function HatStep({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex justify-end gap-3 pt-4">
-            <Button variant="outline" onClick={onSkip}>
-              Pomiń
-            </Button>
-            <Button onClick={handleNext}>
-              Następny kapelusz
+          <div className="flex flex-col items-end gap-3 pt-4">
+            {!hasAnyAnswer && (
+              <p className="text-sm text-red-600 font-medium">
+                ⚠️ Odpowiedz przynajmniej na jedno pytanie, aby przejść dalej
+              </p>
+            )}
+            <Button
+              onClick={handleNext}
+              disabled={!hasAnyAnswer}
+              className="w-full sm:w-auto"
+            >
+              {isLastHat ? 'Generuj podsumowanie' : 'Następny kapelusz'}
             </Button>
           </div>
         </Card>

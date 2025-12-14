@@ -74,16 +74,16 @@ export async function POST(
       throw new Error(`Failed to get events: ${eventsError.message}`)
     }
 
-    // Filter only events with REAL user input
+    // Filter only events with REAL user input (safety check)
     const userInputEvents = filterRealUserInputEvents(events || [])
 
-    // CRITICAL: If no real answers, return error
+    // Safety check (should not happen with frontend validation)
     if (userInputEvents.length === 0) {
       return NextResponse.json({ 
-        error: 'No user responses',
+        error: 'No user responses (this should not happen)',
         summary: {
           noAnswers: true,
-          message: 'Brak odpowiedzi od użytkownika',
+          message: 'Błąd: brak odpowiedzi',
           perspectives: [],
           insights: [],
           recommendation: ''
