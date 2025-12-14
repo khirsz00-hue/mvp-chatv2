@@ -111,12 +111,8 @@ export function DecisionProcess({ decisionId, onBack }: DecisionProcessProps) {
     } catch (error: any) {
       console.error('Error generating questions:', error)
       showToast(error.message || 'Nie udało się wygenerować pytań', 'error')
-      // Set default questions as fallback
-      setQuestions([
-        'Pytanie 1',
-        'Pytanie 2',
-        'Pytanie 3'
-      ])
+      // Set empty questions on error - user can skip or retry
+      setQuestions([])
     } finally {
       setIsGeneratingQuestions(false)
     }
@@ -240,7 +236,7 @@ export function DecisionProcess({ decisionId, onBack }: DecisionProcessProps) {
   if (isGeneratingSummary) {
     return (
       <DecisionSummary
-        summary={{} as any}
+        summary={{ perspectives: [], insights: [], recommendation: '' }}
         decisionTitle={decision.title}
         onBack={onBack}
         isLoading={true}

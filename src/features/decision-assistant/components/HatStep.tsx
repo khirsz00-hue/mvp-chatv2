@@ -43,6 +43,18 @@ const hatTextColors: Record<HatColor, string> = {
   green: 'text-green-900'
 }
 
+function getAdditionalThoughtsPlaceholder(hatColor: HatColor): string {
+  const placeholders: Record<HatColor, string> = {
+    blue: 'Jakie jeszcze aspekty procesu decyzyjnego chciałbyś rozważyć?',
+    white: 'Czy są jeszcze jakieś fakty lub dane, które warto uwzględnić?',
+    red: 'Jakie inne emocje lub intuicje towarzyszą Ci przy tej decyzji?',
+    black: 'Czy dostrzegasz inne potencjalne zagrożenia lub wątpliwości?',
+    yellow: 'Jakie inne korzyści lub pozytywne aspekty widzisz w tej decyzji?',
+    green: 'Czy masz inne kreatywne pomysły lub alternatywne rozwiązania?'
+  }
+  return placeholders[hatColor]
+}
+
 export function HatStep({
   hatColor,
   hatName,
@@ -138,7 +150,7 @@ export function HatStep({
             <Textarea
               value={additionalThoughts}
               onChange={(e) => setAdditionalThoughts(e.target.value)}
-              placeholder="Czy masz jakieś dodatkowe przemyślenia na ten temat?"
+              placeholder={getAdditionalThoughtsPlaceholder(hatColor)}
               rows={4}
               className="w-full"
             />
