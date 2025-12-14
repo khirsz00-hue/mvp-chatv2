@@ -9,7 +9,7 @@ import Textarea from '@/components/ui/Textarea'
 import { useToast } from '@/components/ui/Toast'
 import { Plus, Play, Trash, Eye, ArrowLeft } from '@phosphor-icons/react'
 import { Decision } from '../types'
-import { DecisionDetail } from './DecisionDetail'
+import { DecisionProcess } from './DecisionProcess'
 
 export function DecisionAssistant() {
   const { showToast } = useToast()
@@ -197,10 +197,10 @@ export function DecisionAssistant() {
     )
   }
 
-  // Show decision detail
+  // Show decision process
   if (selectedDecisionId) {
     return (
-      <DecisionDetail
+      <DecisionProcess
         decisionId={selectedDecisionId}
         onBack={() => {
           setSelectedDecisionId(null)
