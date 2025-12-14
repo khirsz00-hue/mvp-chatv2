@@ -157,7 +157,13 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
 
       setLoadingTasks(true)
       try {
-        const response = await fetch(`/api/todoist/tasks?token=${encodeURIComponent(todoistToken)}&filter=today`)
+        const response = await fetch('/api/todoist/tasks', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token: todoistToken, filter: 'today' }),
+        })
 
         if (!response.ok) {
           console.error('Failed to fetch Todoist tasks:', response.status)
@@ -198,7 +204,13 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
 
     setLoadingTasks(true)
     try {
-      const response = await fetch(`/api/todoist/tasks?token=${encodeURIComponent(todoistToken)}&filter=today`)
+      const response = await fetch('/api/todoist/tasks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token: todoistToken, filter: 'today' }),
+      })
 
       if (!response.ok) {
         console.error('Failed to fetch Todoist tasks:', response.status)
