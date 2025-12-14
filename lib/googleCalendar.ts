@@ -1,21 +1,5 @@
 import { google } from 'googleapis'
-
-// Interface dla Calendar Event
-export interface CalendarEvent {
-  id?: string
-  summary: string
-  description?: string
-  start: {
-    dateTime: string
-    timeZone?: string
-  }
-  end: {
-    dateTime: string
-    timeZone?: string
-  }
-  location?: string
-  attendees?: Array<{ email: string }>
-}
+import { CalendarEvent } from '@/types/googleCalendar'
 
 // Klasa serwisu Google Calendar
 export class GoogleCalendarService {
