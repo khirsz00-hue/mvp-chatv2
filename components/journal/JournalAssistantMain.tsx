@@ -130,8 +130,8 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
           return
         }
 
-        if (isMounted && data?.todoist_token) {
-          setTodoistToken(data.todoist_token)
+        if (isMounted) {
+          setTodoistToken(data?.todoist_token || null)
         }
       } catch (err) {
         console.error('Error fetching user profile:', err)
