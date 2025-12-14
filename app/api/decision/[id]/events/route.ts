@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { DecisionService } from '@/src/features/decision-assistant/services/decisionService'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(
   req: Request,
   { params }: { params: { id: string } }

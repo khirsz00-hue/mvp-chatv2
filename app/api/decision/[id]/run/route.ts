@@ -4,6 +4,8 @@ import { AIService } from '@/src/features/decision-assistant/services/aiService'
 import { HAT_PROMPTS } from '@/src/features/decision-assistant/prompts/hats'
 import type { HatColor } from '@/src/features/decision-assistant/types'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(
   req: Request,
   { params }: { params: { id: string } }

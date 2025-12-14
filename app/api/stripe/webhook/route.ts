@@ -3,6 +3,8 @@ import { stripe } from '@/lib/stripe'
 import { supabase } from '@/lib/supabaseClient'
 import Stripe from 'stripe'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(req: NextRequest) {
   const body = await req.text()
   const signature = req.headers.get('stripe-signature')
