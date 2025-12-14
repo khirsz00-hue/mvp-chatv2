@@ -4,6 +4,8 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+export const dynamic = 'force-dynamic'
+
 /**
  * Check Google Calendar connection status for authenticated user
  * Returns whether user has connected their Google Calendar and token expiry

@@ -1,12 +1,13 @@
-import { google } from 'googleapis'
+import { google, calendar_v3 } from 'googleapis'
+import { OAuth2Client } from 'google-auth-library'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export class GoogleCalendarService {
-  private oauth2Client: any
-  private calendar: any
+  private oauth2Client: OAuth2Client
+  private calendar: calendar_v3.Calendar
   private userId: string
 
   constructor(userId: string, accessToken: string, refreshToken: string, expiryDate: number) {
@@ -101,10 +102,26 @@ export class GoogleCalendarService {
   }
 
   /**
+   * Generic retry wrapper for calendar API calls
+   */
+  private async executeWithRetry<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      return await operation()
+    } catch (error: any) {
+      // If token is invalid, try refreshing and retry once
+      if (error.code === 401 || error.code === 403) {
+        await this.refreshAccessToken()
+        return await operation()
+      }
+      throw error
+    }
+  }
+
+  /**
    * List events from user's primary calendar
    */
   async listEvents(maxResults: number = 10): Promise<any[]> {
-    try {
+    return this.executeWithRetry(async () => {
       const response = await this.calendar.events.list({
         calendarId: 'primary',
         timeMin: new Date().toISOString(),
@@ -112,26 +129,8 @@ export class GoogleCalendarService {
         singleEvents: true,
         orderBy: 'startTime',
       })
-
       return response.data.items || []
-    } catch (error: any) {
-      // If token is invalid, try refreshing
-      if (error.code === 401 || error.code === 403) {
-        await this.refreshAccessToken()
-        // Retry the request
-        const response = await this.calendar.events.list({
-          calendarId: 'primary',
-          timeMin: new Date().toISOString(),
-          maxResults,
-          singleEvents: true,
-          orderBy: 'startTime',
-        })
-        return response.data.items || []
-      }
-      
-      console.error('Error listing events:', error)
-      throw error
-    }
+    })
   }
 
   /**
@@ -148,28 +147,13 @@ export class GoogleCalendarService {
       overrides?: { method: string; minutes: number }[]
     }
   }): Promise<any> {
-    try {
+    return this.executeWithRetry(async () => {
       const response = await this.calendar.events.insert({
         calendarId: 'primary',
         requestBody: eventData,
       })
-
       return response.data
-    } catch (error: any) {
-      // If token is invalid, try refreshing
-      if (error.code === 401 || error.code === 403) {
-        await this.refreshAccessToken()
-        // Retry the request
-        const response = await this.calendar.events.insert({
-          calendarId: 'primary',
-          requestBody: eventData,
-        })
-        return response.data
-      }
-
-      console.error('Error creating event:', error)
-      throw error
-    }
+    })
   }
 
   /**

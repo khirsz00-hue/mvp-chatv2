@@ -5,6 +5,8 @@ import { GoogleCalendarService } from '@/lib/googleCalendar'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+export const dynamic = 'force-dynamic'
+
 /**
  * Get user from authorization header
  */
@@ -30,6 +32,26 @@ async function getAuthenticatedUser(req: NextRequest) {
   }
 
   return { user, error: null }
+}
+
+/**
+ * Handle Google API errors with appropriate responses
+ */
+function handleGoogleApiError(error: any): NextResponse {
+  console.error('Google API error:', error)
+  
+  // Handle specific Google API errors
+  if (error.code === 401 || error.code === 403) {
+    return NextResponse.json(
+      { error: 'Token expired or invalid. Please reconnect your Google Calendar.' },
+      { status: 401 }
+    )
+  }
+
+  return NextResponse.json(
+    { error: error.message || 'Google Calendar API error' },
+    { status: 500 }
+  )
 }
 
 /**
@@ -61,20 +83,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ events })
   } catch (error: any) {
-    console.error('Error fetching events:', error)
-    
-    // Handle specific Google API errors
-    if (error.code === 401 || error.code === 403) {
-      return NextResponse.json(
-        { error: 'Token expired or invalid. Please reconnect your Google Calendar.' },
-        { status: 401 }
-      )
-    }
-
-    return NextResponse.json(
-      { error: error.message || 'Failed to fetch events' },
-      { status: 500 }
-    )
+    return handleGoogleApiError(error)
   }
 }
 
@@ -130,19 +139,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ event }, { status: 201 })
   } catch (error: any) {
-    console.error('Error creating event:', error)
-
-    // Handle specific Google API errors
-    if (error.code === 401 || error.code === 403) {
-      return NextResponse.json(
-        { error: 'Token expired or invalid. Please reconnect your Google Calendar.' },
-        { status: 401 }
-      )
-    }
-
-    return NextResponse.json(
-      { error: error.message || 'Failed to create event' },
-      { status: 500 }
-    )
+    return handleGoogleApiError(error)
   }
 }
