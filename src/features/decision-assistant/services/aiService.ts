@@ -1,16 +1,5 @@
-import OpenAI from 'openai'
+import { getOpenAIClient } from '@/lib/openai'
 import { HatColor } from '../types'
-
-let openai: OpenAI | null = null
-
-function getOpenAI(): OpenAI {
-  if (!openai) {
-    openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY || '',
-    })
-  }
-  return openai
-}
 
 export class AIService {
   static async analyzeWithHat(
@@ -35,7 +24,7 @@ ${optionsText}
 ${prompt}
 `
 
-      const response = await getOpenAI().chat.completions.create({
+      const response = await getOpenAIClient().chat.completions.create({
         model: 'gpt-4',
         messages: [
           {
