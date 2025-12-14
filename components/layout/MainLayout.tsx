@@ -18,6 +18,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [activeView, setActiveView] = useState<AssistantId>('tasks')
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isAdmin, setIsAdmin] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -31,6 +32,18 @@ export default function MainLayout({ children }: MainLayoutProps) {
       }
       
       setUser(user)
+
+      // Check if user is admin
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('is_admin')
+        .eq('id', user.id)
+        .single()
+
+      if (profile?.is_admin) {
+        setIsAdmin(true)
+      }
+      
       setLoading(false)
     }
 
@@ -41,9 +54,22 @@ export default function MainLayout({ children }: MainLayoutProps) {
       async (event, session) => {
         if (event === 'SIGNED_IN' && session) {
           setUser(session.user)
+
+          // Check if user is admin
+          const { data: profile } = await supabase
+            .from('user_profiles')
+            .select('is_admin')
+            .eq('id', session.user.id)
+            .single()
+
+          if (profile?.is_admin) {
+            setIsAdmin(true)
+          }
+
           setLoading(false)
         } else if (event === 'SIGNED_OUT') {
           setUser(null)
+          setIsAdmin(false)
           router.push('/login')
         }
       }
@@ -52,7 +78,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     // Odczytaj zapisaną preferencję widoku, jeśli istnieje
     try {
       const stored = localStorage.getItem('active_assistant') as AssistantId | null
-      if (stored && ['tasks', 'planning', 'journal', 'decisions', 'support'].includes(stored)) {
+      if (stored && ['tasks', 'planning', 'journal', 'decisions', 'support', 'admin'].includes(stored)) {
         setActiveView(stored)
       }
     } catch {}
@@ -72,6 +98,26 @@ export default function MainLayout({ children }: MainLayoutProps) {
       
       case 'decisions':
         return <DecisionAssistant />
+      
+      case 'admin':
+        if (!isAdmin) {
+          return (
+            <div className="glass p-8 rounded-2xl text-center">
+              <h2 className="text-2xl font-bold mb-4 text-red-500">Brak dostępu</h2>
+              <p className="text-muted-foreground">
+                Nie masz uprawnień do panelu administratora
+              </p>
+            </div>
+          )
+        }
+        // Redirect to admin page
+        router.push('/admin')
+        return (
+          <div className="glass p-8 rounded-2xl text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Przekierowywanie do panelu admina...</p>
+          </div>
+        )
       
       case 'planning':
       case 'support':
@@ -123,7 +169,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         onSignOut={handleSignOut}
       />
       <div className="flex">
-        <Sidebar activeView={activeView} onNavigate={handleNavigate} />
+        <Sidebar activeView={activeView} onNavigate={handleNavigate} isAdmin={isAdmin} />
         <main className="flex-1 p-6 overflow-x-hidden">
           {children || renderAssistant()}
         </main>
