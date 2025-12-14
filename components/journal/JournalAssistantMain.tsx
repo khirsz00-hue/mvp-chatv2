@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { getTodoistToken } from '@/lib/journal'
 import { useJournalEntries } from '@/hooks/useJournalEntries'
 import { JournalEntry, TodoistTask } from '@/types/journal'
 import Button from '@/components/ui/Button'

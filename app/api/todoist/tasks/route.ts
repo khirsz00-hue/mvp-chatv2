@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { startOfDay, endOfDay, addDays, isWithinInterval, parseISO, isBefore } from 'date-fns'
 
 // Shared function to process tasks with filtering
-async function fetchAndFilterTasks(token: string | null | undefined, filter: string) {
+async function fetchAndFilterTasks(token: any, filter: string) {
   // Better token validation - return empty array for invalid tokens
   if (!token || typeof token !== 'string' || token.trim() === '') {
     return []
