@@ -1,4 +1,4 @@
-import { DecisionEvent } from '../types'
+import { DecisionEvent, UserInputContent } from '../types'
 
 /**
  * Checks if a decision event contains real user input (non-empty answers)
@@ -10,13 +10,19 @@ export function hasRealUserInput(event: DecisionEvent): boolean {
   if (!event.content) return false
   
   try {
-    const content = JSON.parse(event.content)
+    const content: UserInputContent = JSON.parse(event.content)
     
-    // Check if has any non-empty answers
-    const hasAnswers = content.questions?.some((q: any) => q.answer?.trim()) 
-      || content.additionalThoughts?.trim()
+    // Check if has any non-empty answers in questions
+    const hasQuestionAnswers = content.questions?.some((q) => {
+      return q.answer && q.answer.trim().length > 0
+    }) ?? false
     
-    return hasAnswers
+    // Check if has additional thoughts
+    const hasAdditionalThoughts = content.additionalThoughts 
+      ? content.additionalThoughts.trim().length > 0 
+      : false
+    
+    return hasQuestionAnswers || hasAdditionalThoughts
   } catch {
     return false
   }

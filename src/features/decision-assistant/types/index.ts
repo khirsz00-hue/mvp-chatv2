@@ -4,6 +4,18 @@ export type HatColor = 'blue' | 'white' | 'red' | 'black' | 'yellow' | 'green'
 
 export type DecisionStatus = 'draft' | 'in_progress' | 'completed'
 
+export interface UserInputQuestion {
+  id: string
+  question: string
+  answer: string
+}
+
+export interface UserInputContent {
+  questions?: UserInputQuestion[]
+  additionalThoughts?: string
+  skipped?: boolean
+}
+
 export interface Decision {
   id: string
   user_id: string

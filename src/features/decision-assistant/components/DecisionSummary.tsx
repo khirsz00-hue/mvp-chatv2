@@ -48,23 +48,7 @@ export function DecisionSummary({
   onBack,
   isLoading = false
 }: DecisionSummaryProps) {
-  if (isLoading) {
-    return (
-      <div className="max-w-4xl mx-auto space-y-6">
-        <Card className="p-8 text-center">
-          <div className="flex flex-col items-center justify-center gap-4">
-            <div className="w-8 h-8 border-4 border-brand-purple border-t-transparent rounded-full animate-spin" />
-            <div>
-              <h3 className="text-lg font-semibold mb-2">Generuję podsumowanie...</h3>
-              <p className="text-gray-600">AI analizuje wszystkie perspektywy i przygotowuje finalne wnioski</p>
-            </div>
-          </div>
-        </Card>
-      </div>
-    )
-  }
-
-  // Handle NO ANSWERS case
+  // Handle NO ANSWERS case first (before loading check)
   if (summary.noAnswers) {
     return (
       <div className="max-w-4xl mx-auto">
@@ -78,6 +62,22 @@ export function DecisionSummary({
             Wróć i odpowiedz przynajmniej na kilka pytań z różnych perspektyw.
           </p>
           <Button onClick={onBack}>Powrót</Button>
+        </Card>
+      </div>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-6">
+        <Card className="p-8 text-center">
+          <div className="flex flex-col items-center justify-center gap-4">
+            <div className="w-8 h-8 border-4 border-brand-purple border-t-transparent rounded-full animate-spin" />
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Generuję podsumowanie...</h3>
+              <p className="text-gray-600">AI analizuje wszystkie perspektywy i przygotowuje finalne wnioski</p>
+            </div>
+          </div>
         </Card>
       </div>
     )
