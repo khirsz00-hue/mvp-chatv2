@@ -11,8 +11,13 @@ import { JournalAssistantWrapper } from '@/components/journal/JournalAssistantWr
 import { DecisionAssistant } from '@/src/features/decision-assistant/components/DecisionAssistant'
 import SubscriptionWall from '@/components/subscription/SubscriptionWall'
 
+/**
+ * UWAGA: SubscriptionWall jest tymczasowo wyłączony
+ * Powód: Infinite loading na głównej stronie pomimo aktywnej subskrypcji
+ * TODO: Naprawić logikę w SubscriptionWall.tsx i przywrócić
+ */
 // Toggle this to disable subscription wall if it causes issues
-const ENABLE_SUBSCRIPTION_WALL = true
+const ENABLE_SUBSCRIPTION_WALL = false
 
 interface MainLayoutProps {
   children?: ReactNode
