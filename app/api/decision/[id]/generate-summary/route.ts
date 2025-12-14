@@ -80,7 +80,7 @@ export async function POST(
     // Safety check (should not happen with frontend validation)
     if (userInputEvents.length === 0) {
       return NextResponse.json({ 
-        error: 'No user responses (this should not happen)',
+        error: 'Brak odpowiedzi użytkownika (to nie powinno się zdarzyć)',
         summary: {
           noAnswers: true,
           message: 'Błąd: brak odpowiedzi',

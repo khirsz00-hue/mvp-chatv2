@@ -141,7 +141,7 @@ export function HatStep({
             </p>
           </div>
           
-          <h3 className="text-lg font-semibold">ODPOWIEDZ NA PYTANIA:</h3>
+          <h3 className="text-lg font-semibold">Odpowiedz na pytania:</h3>
           
           {questions.map((question, index) => (
             <div key={index} className="space-y-2">
