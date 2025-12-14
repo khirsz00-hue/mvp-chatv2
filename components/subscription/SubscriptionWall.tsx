@@ -49,7 +49,11 @@ export default function SubscriptionWall({ children }: SubscriptionWallProps) {
         console.log('⚠️ [SubscriptionWall] Profile not found, creating...')
         const userEmail = user.email || 'unknown@example.com'
         const created = await createMissingProfile(user.id, userEmail)
-        console.log('✅ [SubscriptionWall] Profile created:', created)
+        if (created) {
+          console.log('✅ [SubscriptionWall] Profile created successfully')
+        } else {
+          console.error('❌ [SubscriptionWall] Failed to create profile')
+        }
         setHasActiveSubscription(false)
         setLoading(false)
         return
