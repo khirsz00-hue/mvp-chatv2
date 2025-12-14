@@ -11,9 +11,25 @@ interface Perspective {
   synthesis: string
 }
 
+interface OptionAnalysis {
+  option: string
+  pros: string[]
+  cons: string[]
+  score: string
+  summary: string
+}
+
+interface RecommendedOption {
+  option: string
+  reasoning: string
+}
+
 interface SummaryData {
   perspectives: Perspective[]
   insights: string[]
+  options_analysis?: OptionAnalysis[]
+  recommended_option?: RecommendedOption
+  next_steps?: string[]
   recommendation: string
 }
 
@@ -93,6 +109,81 @@ export function DecisionSummary({
           ))}
         </ul>
       </Card>
+
+      {/* Options Analysis */}
+      {summary.options_analysis && summary.options_analysis.length > 0 && (
+        <Card className="p-6">
+          <h2 className="text-2xl font-bold mb-4">Analiza opcji</h2>
+          <div className="space-y-4">
+            {summary.options_analysis.map((option, i) => (
+              <Card key={i} className="p-4 border-2">
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="font-bold text-lg">{option.option}</h3>
+                  <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full font-semibold">
+                    {option.score}
+                  </span>
+                </div>
+                <p className="text-gray-600 mb-3">{option.summary}</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="font-semibold text-green-700 mb-1">✓ Zalety:</p>
+                    <ul className="text-sm space-y-1">
+                      {option.pros.map((pro, j) => (
+                        <li key={j} className="text-gray-700">• {pro}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-red-700 mb-1">✗ Wady:</p>
+                    <ul className="text-sm space-y-1">
+                      {option.cons.map((con, j) => (
+                        <li key={j} className="text-gray-700">• {con}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Recommended Option */}
+      {summary.recommended_option && (
+        <Card className="p-6 bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300">
+          <div className="flex items-start gap-3">
+            <div className="text-4xl">🎯</div>
+            <div>
+              <h2 className="text-2xl font-bold text-green-800 mb-2">
+                Rekomendowana opcja
+              </h2>
+              <p className="text-xl font-semibold text-green-900 mb-3">
+                {summary.recommended_option.option}
+              </p>
+              <p className="text-gray-800 leading-relaxed">
+                {summary.recommended_option.reasoning}
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Next Steps */}
+      {summary.next_steps && summary.next_steps.length > 0 && (
+        <Card className="p-6 bg-blue-50">
+          <h2 className="text-2xl font-bold mb-4">🚀 Następne kroki</h2>
+          <ol className="space-y-3">
+            {summary.next_steps.map((step, i) => (
+              <li key={i} className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold">
+                  {i + 1}
+                </span>
+                <span className="pt-1">{step}</span>
+              </li>
+            ))}
+          </ol>
+        </Card>
+      )}
 
       {/* Final Recommendation */}
       <Card className="p-6 bg-gradient-to-r from-green-50 to-blue-50 border-green-200">
