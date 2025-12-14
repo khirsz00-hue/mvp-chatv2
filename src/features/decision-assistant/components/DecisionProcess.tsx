@@ -8,6 +8,7 @@ import { ProgressBar } from './ProgressBar'
 import { HatStep } from './HatStep'
 import { DecisionSummary } from './DecisionSummary'
 import { DecisionService } from '../services/decisionService'
+import { hasAnyRealUserInput } from '../utils/validation'
 
 interface DecisionProcessProps {
   decisionId: string
@@ -187,25 +188,7 @@ export function DecisionProcess({ decisionId, onBack }: DecisionProcessProps) {
       const events = await DecisionService.getEvents(decisionId)
       
       // Check if user provided ANY real answers
-      const hasRealAnswers = events.some((e: any) => {
-        if (e.event_type !== 'user_input') return false
-        if (!e.content) return false
-        
-        try {
-          const content = JSON.parse(e.content)
-          
-          // Check if has any non-empty answers
-          const hasAnswers = content.questions?.some((q: any) => q.answer?.trim()) 
-            || content.additionalThoughts?.trim()
-          
-          return hasAnswers
-        } catch {
-          return false
-        }
-      })
-      
-      // If NO answers at all, show error message
-      if (!hasRealAnswers) {
+      if (!hasAnyRealUserInput(events)) {
         setSummary({
           noAnswers: true,
           message: 'Nie udzieliłeś odpowiedzi na żadne pytania. Aby otrzymać analizę, wróć i odpowiedz przynajmniej na kilka pytań.',

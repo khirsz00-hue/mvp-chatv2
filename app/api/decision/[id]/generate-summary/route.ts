@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { AIService } from '@/src/features/decision-assistant/services/aiService'
+import { filterRealUserInputEvents } from '@/src/features/decision-assistant/utils/validation'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -74,22 +75,7 @@ export async function POST(
     }
 
     // Filter only events with REAL user input
-    const userInputEvents = (events || []).filter((e: any) => {
-      if (e.event_type !== 'user_input') return false
-      if (!e.content) return false
-      
-      try {
-        const content = JSON.parse(e.content)
-        
-        // Must have at least one non-empty answer
-        const hasAnswers = content.questions?.some((q: any) => q.answer?.trim()) 
-          || content.additionalThoughts?.trim()
-        
-        return hasAnswers
-      } catch {
-        return false
-      }
-    })
+    const userInputEvents = filterRealUserInputEvents(events || [])
 
     // CRITICAL: If no real answers, return error
     if (userInputEvents.length === 0) {
