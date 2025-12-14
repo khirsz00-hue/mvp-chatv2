@@ -60,3 +60,17 @@ export interface ArchiveHierarchy {
   }[]
   stats: JournalStats
 }
+
+export interface AggregatedPeriod {
+  period: string // "2025", "Styczeń 2025", "1-7 Sty 2025"
+  entriesCount: number
+  avgEnergy: number
+  avgMotivation: number
+  avgSleepQuality: number
+  avgHoursSlept: number
+  totalNotes: number
+  totalCompletedTasks: number
+  completionRate: number // 0-100%
+  entries: JournalEntry[]
+  key: string // unikalny klucz dla danego okresu
+}
