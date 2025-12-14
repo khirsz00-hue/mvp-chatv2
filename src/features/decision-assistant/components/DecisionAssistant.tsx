@@ -1,32 +1,32 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { Brain, Plus } from '@phosphor-icons/react'
-import { Card, CardHeader, CardTitle, CardDescription, Button, Input, Textarea } from '@/components/ui'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { Decision, DecisionOption } from '../types'
+import Button from '@/components/ui/Button'
+import Card from '@/components/ui/Card'
+import Input from '@/components/ui/Input'
+import Textarea from '@/components/ui/Textarea'
+import { useToast } from '@/components/ui/Toast'
+import { Plus, Play, Trash, Eye, ArrowLeft } from '@phosphor-icons/react'
+import { Decision } from '../types'
 import { DecisionDetail } from './DecisionDetail'
 
-interface Toast {
-  message: string
-  type: 'success' | 'error' | 'info'
-}
-
 export function DecisionAssistant() {
-  const [decisions, setDecisions] = useState<Decision[]>([])
-  const [selectedDecisionId, setSelectedDecisionId] = useState<string | null>(null)
-  const [showCreateForm, setShowCreateForm] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const { showToast } = useToast()
   const [userId, setUserId] = useState<string | null>(null)
-  const [toast, setToast] = useState<Toast | null>(null)
+  const [decisions, setDecisions] = useState<Decision[]>([])
+  const [loading, setLoading] = useState(false)
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [selectedDecisionId, setSelectedDecisionId] = useState<string | null>(null)
 
   // Form state
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [options, setOptions] = useState<Array<{ title: string; description: string }>>([
+  const [options, setOptions] = useState<Array<{ title: string; description:  string }>>([
     { title: '', description: '' }
   ])
 
+  // Get user ID
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -37,35 +37,47 @@ export function DecisionAssistant() {
     getUser()
   }, [])
 
+  // Fetch decisions
+  const fetchDecisions = async () => {
+    if (!userId) return
+
+    setLoading(true)
+    try {
+      // Get session token
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        throw new Error('Not authenticated')
+      }
+
+      const response = await fetch(`/api/decision/list`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
+      
+      const data = await response. json()
+
+      if (response. ok) {
+        setDecisions(data.decisions || [])
+      } else {
+        throw new Error(data.error)
+      }
+    } catch (err:  any) {
+      console.error('Error fetching decisions:', err)
+      showToast('Nie udało się pobrać decyzji', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (userId) {
       fetchDecisions()
     }
   }, [userId])
 
-  const showToast = (message: string, type: Toast['type']) => {
-    setToast({ message, type })
-    setTimeout(() => setToast(null), 3000)
-  }
-
-  const fetchDecisions = async () => {
-    if (!userId) return
-
-    try {
-      const { data, error } = await supabase
-        .from('decisions')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-      setDecisions(data || [])
-    } catch (error) {
-      console.error('Error fetching decisions:', error)
-      showToast('Nie udało się pobrać decyzji', 'error')
-    }
-  }
-
+  // Create decision
   const handleCreateDecision = async () => {
     if (!userId || !title.trim() || !description.trim()) {
       showToast('Wypełnij wszystkie wymagane pola', 'error')
@@ -75,12 +87,21 @@ export function DecisionAssistant() {
     setLoading(true)
     try {
       const validOptions = options.filter(opt => opt.title.trim())
+      
+      // Get session token
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        throw new Error('Not authenticated')
+      }
 
       const response = await fetch('/api/decision/create', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
         body: JSON.stringify({
-          userId,
           title: title.trim(),
           description: description.trim(),
           options: validOptions.length > 0 ? validOptions : undefined
@@ -110,20 +131,73 @@ export function DecisionAssistant() {
     }
   }
 
-  const handleAddOption = () => {
+  // Delete decision
+  const handleDeleteDecision = async (decisionId: string) => {
+    if (!confirm('Czy na pewno chcesz usunąć tę decyzję?')) return
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        throw new Error('Not authenticated')
+      }
+
+      const response = await fetch(`/api/decision/${decisionId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization':  `Bearer ${session.access_token}`
+        }
+      })
+
+      if (response.ok) {
+        setDecisions(prev => prev.filter(d => d. id !== decisionId))
+        showToast('Decyzja usunięta', 'success')
+      } else {
+        const data = await response.json()
+        throw new Error(data. error)
+      }
+    } catch (err: any) {
+      console.error('Error deleting decision:', err)
+      showToast('Nie udało się usunąć decyzji', 'error')
+    }
+  }
+
+  // Add option field
+  const addOptionField = () => {
     setOptions([...options, { title: '', description: '' }])
   }
 
-  const handleRemoveOption = (index: number) => {
+  // Remove option field
+  const removeOptionField = (index: number) => {
     setOptions(options.filter((_, i) => i !== index))
   }
 
-  const handleOptionChange = (index: number, field: 'title' | 'description', value: string) => {
+  // Update option
+  const updateOption = (index: number, field: 'title' | 'description', value: string) => {
     const newOptions = [...options]
     newOptions[index][field] = value
     setOptions(newOptions)
   }
 
+  // No user logged in
+  if (!userId) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold">Asystent Decyzji</h1>
+        <Card className="p-8 text-center space-y-4">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-brand-purple/10 to-brand-pink/10 flex items-center justify-center mb-4">
+            🧠
+          </div>
+          <h2 className="text-xl font-semibold">Zaloguj się</h2>
+          <p className="text-gray-600 max-w-md mx-auto">
+            Aby korzystać z asystenta decyzji, musisz być zalogowany
+          </p>
+        </Card>
+      </div>
+    )
+  }
+
+  // Show decision detail
   if (selectedDecisionId) {
     return (
       <DecisionDetail
@@ -136,154 +210,223 @@ export function DecisionAssistant() {
     )
   }
 
-  if (showCreateForm) {
-    return (
-      <div className="max-w-4xl mx-auto space-y-6">
-        <Card className="glass">
-          <CardHeader>
-            <CardTitle>Nowa Decyzja</CardTitle>
-            <CardDescription>Opisz decyzję, którą chcesz podjąć</CardDescription>
-          </CardHeader>
-          <div className="p-6 space-y-4">
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-pink bg-clip-text text-transparent">
+            Asystent Decyzji
+          </h1>
+          <p className="text-gray-600 mt-2 text-lg">
+            Podejmuj lepsze decyzje dzięki metodzie 6 kapeluszy myślowych
+          </p>
+        </div>
+
+        <Button
+          onClick={() => setShowCreateForm(!showCreateForm)}
+          className="gap-2"
+          disabled={loading}
+        >
+          <Plus size={20} weight="bold" />
+          Nowa decyzja
+        </Button>
+      </div>
+
+      {/* Create Form */}
+      {showCreateForm && (
+        <Card className="p-6">
+          <h2 className="text-xl font-semibold mb-4">Nowa decyzja</h2>
+          
+          <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-2">Tytuł *</label>
+              <label className="block text-sm font-medium mb-2">
+                Tytuł decyzji *
+              </label>
               <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Np. Zmiana pracy"
+                placeholder="np. Zmiana pracy"
               />
             </div>
+
             <div>
-              <label className="block text-sm font-medium mb-2">Opis *</label>
+              <label className="block text-sm font-medium mb-2">
+                Opis sytuacji *
+              </label>
               <Textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Opisz szczegóły decyzji..."
+                placeholder="Opisz szczegółowo sytuację decyzyjną..."
                 rows={4}
               />
             </div>
+
             <div>
-              <label className="block text-sm font-medium mb-2">Opcje (opcjonalne)</label>
+              <label className="block text-sm font-medium mb-2">
+                Opcje do rozważenia (opcjonalne)
+              </label>
               {options.map((option, index) => (
                 <div key={index} className="flex gap-2 mb-2">
                   <Input
                     value={option.title}
-                    onChange={(e) => handleOptionChange(index, 'title', e.target.value)}
+                    onChange={(e) => updateOption(index, 'title', e. target.value)}
                     placeholder={`Opcja ${index + 1}`}
+                    className="flex-1"
+                  />
+                  <Input
+                    value={option.description}
+                    onChange={(e) => updateOption(index, 'description', e.target.value)}
+                    placeholder="Opis (opcjonalny)"
                     className="flex-1"
                   />
                   {options.length > 1 && (
                     <Button
-                      onClick={() => handleRemoveOption(index)}
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
+                      onClick={() => removeOptionField(index)}
                     >
-                      Usuń
+                      <Trash size={16} />
                     </Button>
                   )}
                 </div>
               ))}
-              <Button onClick={handleAddOption} variant="outline" size="sm">
-                <Plus className="w-4 h-4 mr-2" />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={addOptionField}
+                className="gap-2 mt-2"
+              >
+                <Plus size={16} />
                 Dodaj opcję
               </Button>
             </div>
-            <div className="flex gap-2">
-              <Button onClick={handleCreateDecision} disabled={loading}>
-                {loading ? 'Tworzenie...' : 'Utwórz decyzję'}
-              </Button>
-              <Button onClick={() => setShowCreateForm(false)} variant="outline">
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowCreateForm(false)
+                  setTitle('')
+                  setDescription('')
+                  setOptions([{ title:  '', description: '' }])
+                }}
+                disabled={loading}
+              >
                 Anuluj
+              </Button>
+              <Button onClick={handleCreateDecision} disabled={loading}>
+                {loading ? 'Tworzenie.. .' : 'Utwórz decyzję'}
               </Button>
             </div>
           </div>
         </Card>
-      </div>
-    )
-  }
-
-  return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      {toast && (
-        <div className={`fixed top-4 right-4 p-4 rounded-lg shadow-lg ${
-          toast.type === 'success' ? 'bg-green-500' :
-          toast.type === 'error' ? 'bg-red-500' : 'bg-blue-500'
-        } text-white z-50`}>
-          {toast.message}
-        </div>
       )}
 
-      <Card className="glass">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-orange-100 rounded-xl">
-                <Brain className="w-8 h-8 text-orange-500" weight="duotone" />
-              </div>
-              <div>
-                <CardTitle className="text-2xl">Asystent Decyzji</CardTitle>
-                <CardDescription>
-                  AI pomaga Ci w podejmowaniu trudnych decyzji metodą Six Thinking Hats
-                </CardDescription>
-              </div>
-            </div>
-            <Button onClick={() => setShowCreateForm(true)} className="flex items-center gap-2">
-              <Plus weight="bold" />
-              Nowa decyzja
-            </Button>
-          </div>
-        </CardHeader>
-      </Card>
+      {/* Decisions List */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold">Twoje decyzje</h2>
 
-      <Card className="glass">
-        <div className="p-6">
-          {decisions.length === 0 ? (
-            <div className="text-center py-12">
-              <Brain className="w-16 h-16 text-gray-300 mx-auto mb-4" weight="duotone" />
-              <p className="text-muted-foreground">Nie masz jeszcze żadnych decyzji</p>
-              <p className="text-sm text-muted-foreground mt-2">
-                Kliknij &quot;Nowa decyzja&quot; aby rozpocząć
-              </p>
+        {loading ? (
+          <Card className="p-8 text-center">
+            <div className="flex items-center justify-center gap-2">
+              <div className="w-4 h-4 border-2 border-brand-purple border-t-transparent rounded-full animate-spin" />
+              <span className="text-gray-600">Ładowanie decyzji...</span>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {decisions.map((decision) => (
-                <div
-                  key={decision.id}
-                  onClick={() => setSelectedDecisionId(decision.id)}
-                  className="p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-lg">{decision.title}</h3>
-                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                        {decision.description}
-                      </p>
-                    </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      decision.status === 'draft' ? 'bg-gray-100 text-gray-700' :
-                      decision.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
-                      'bg-green-100 text-green-700'
-                    }`}>
-                      {decision.status === 'draft' ? 'Szkic' :
-                       decision.status === 'in_progress' ? 'W trakcie' :
-                       'Zakończone'}
+          </Card>
+        ) : decisions.length === 0 ? (
+          <Card className="p-12 text-center">
+            <div className="text-6xl mb-4">🧠</div>
+            <h3 className="text-lg font-semibold text-gray-600 mb-2">
+              Brak decyzji
+            </h3>
+            <p className="text-gray-500">
+              Utwórz swoją pierwszą decyzję i skorzystaj z pomocy AI
+            </p>
+          </Card>
+        ) : (
+          decisions.map((decision) => (
+            <Card key={decision.id} className="p-6">
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <h3 className="text-xl font-semibold mb-2">{decision.title}</h3>
+                  <p className="text-gray-600 mb-3 line-clamp-2">
+                    {decision.description}
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        decision.status === 'completed'
+                          ? 'bg-green-100 text-green-700'
+                          : decision.status === 'in_progress'
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      {decision.status === 'completed'
+                        ? 'Ukończono'
+                        : decision.status === 'in_progress'
+                        ? 'W trakcie'
+                        :  'Szkic'}
                     </span>
-                  </div>
-                  <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
-                    <span>Utworzono: {new Date(decision.created_at).toLocaleDateString('pl-PL')}</span>
                     {decision.current_hat && (
-                      <span>Aktualny kapelusz: {decision.current_hat}</span>
+                      <span className="text-sm text-gray-500">
+                        Aktualny etap: {getHatEmoji(decision.current_hat)} {getHatName(decision.current_hat)}
+                      </span>
                     )}
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </Card>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedDecisionId(decision.id)}
+                    className="gap-1"
+                  >
+                    <Eye size={16} weight="bold" />
+                    Szczegóły
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDeleteDecision(decision.id)}
+                    className="gap-1 text-red-600 hover:bg-red-50"
+                  >
+                    <Trash size={16} weight="bold" />
+                    Usuń
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          ))
+        )}
+      </div>
     </div>
   )
 }
 
-export default DecisionAssistant
+// Helper functions
+function getHatEmoji(hat:  string): string {
+  const emojis:  Record<string, string> = {
+    blue: '🔵',
+    white: '⚪',
+    red: '🔴',
+    black: '⚫',
+    yellow: '🟡',
+    green: '🟢'
+  }
+  return emojis[hat] || '🎩'
+}
+
+function getHatName(hat: string): string {
+  const names: Record<string, string> = {
+    blue: 'Start/Synteza',
+    white: 'Fakty',
+    red: 'Emocje',
+    black: 'Ryzyka',
+    yellow: 'Korzyści',
+    green: 'Pomysły'
+  }
+  return names[hat] || hat
+}
