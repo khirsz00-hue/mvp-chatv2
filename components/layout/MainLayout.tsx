@@ -42,6 +42,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
       if (profile?.is_admin) {
         setIsAdmin(true)
+      } else {
+        setIsAdmin(false)
       }
       
       setLoading(false)
@@ -64,6 +66,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
           if (profile?.is_admin) {
             setIsAdmin(true)
+          } else {
+            setIsAdmin(false)
           }
 
           setLoading(false)

@@ -35,7 +35,7 @@ export default function Sidebar({ activeView, onNavigate, isAdmin }: SidebarProp
   return (
     <aside className="w-64 min-h-screen bg-white/50 backdrop-blur-sm border-r border-white/20 p-4">
       <nav className="space-y-2">
-        {assistants.map((assistant) => {
+        {assistants.map((assistant, index) => {
           // Hide admin option if user is not admin
           if (assistant.adminOnly && !isAdmin) {
             return null
@@ -43,6 +43,7 @@ export default function Sidebar({ activeView, onNavigate, isAdmin }: SidebarProp
 
           const Icon = assistant.icon
           const isActive = activeView === assistant.id
+          const isFirstAdminItem = assistant.adminOnly && (index === 0 || !assistants[index - 1]?.adminOnly)
           
           return (
             <button
@@ -52,7 +53,7 @@ export default function Sidebar({ activeView, onNavigate, isAdmin }: SidebarProp
                 'w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all',
                 'hover:bg-white/10',
                 isActive && 'bg-gradient-to-r from-brand-purple/10 to-brand-pink/10 border border-brand-purple/20',
-                assistant.adminOnly && 'border-t border-gray-200 mt-4'
+                isFirstAdminItem && 'border-t border-gray-200 mt-4 pt-6'
               )}
             >
               <Icon size={24} className={assistant.color} weight={isActive ? 'fill' : 'regular'} />
