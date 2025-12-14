@@ -24,13 +24,13 @@ export default function SubscriptionWall({ children }: SubscriptionWallProps) {
   }, [])
 
   const checkSubscription = async () => {
-    console.log('[SubscriptionWall] Checking subscription...')
+    console.log('🔍 [SubscriptionWall] Starting subscription check...')
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      console.log('[SubscriptionWall] User:', user?.id)
+      console.log('🔍 [SubscriptionWall] User ID:', user?.id)
       
       if (!user) {
-        console.log('[SubscriptionWall] No user, redirecting to login')
+        console.log('⚠️ [SubscriptionWall] No user found, redirecting to login')
         router.push('/login')
         return
       }
@@ -41,35 +41,50 @@ export default function SubscriptionWall({ children }: SubscriptionWallProps) {
         .eq('id', user.id)
         .single()
 
-      console.log('[SubscriptionWall] Profile:', profile)
-      console.log('[SubscriptionWall] Error:', error)
+      console.log('🔍 [SubscriptionWall] Profile data:', profile)
+      console.log('🔍 [SubscriptionWall] Profile error:', error)
 
       // Handle missing profile
       if (error && error.code === SUPABASE_NO_ROWS_CODE) {
-        console.log('[SubscriptionWall] Creating missing profile...')
+        console.log('⚠️ [SubscriptionWall] Profile not found, creating...')
         const userEmail = user.email || 'unknown@example.com'
-        await createMissingProfile(user.id, userEmail)
+        const created = await createMissingProfile(user.id, userEmail)
+        if (created) {
+          console.log('✅ [SubscriptionWall] Profile created successfully')
+        } else {
+          console.error('❌ [SubscriptionWall] Failed to create profile')
+        }
         setHasActiveSubscription(false)
+        setLoading(false)
+        return
+      }
+
+      // Handle other errors
+      if (error) {
+        console.error('❌ [SubscriptionWall] Error fetching profile:', error)
+        setHasActiveSubscription(false)
+        setLoading(false)
         return
       }
 
       // Admin always has access
       if (profile?.is_admin) {
-        console.log('[SubscriptionWall] User is admin, granting access')
+        console.log('✅ [SubscriptionWall] User is admin, granting access')
         setHasActiveSubscription(true)
+        setLoading(false)
         return
       }
 
       // Check for active subscription statuses
       const activeStatuses = ['active', 'trialing']
       const hasAccess = activeStatuses.includes(profile?.subscription_status || '')
-      console.log('[SubscriptionWall] Subscription status:', profile?.subscription_status, 'Has access:', hasAccess)
+      console.log('🔍 [SubscriptionWall] Subscription status:', profile?.subscription_status, '| Has access:', hasAccess)
       setHasActiveSubscription(hasAccess)
     } catch (error) {
-      console.error('[SubscriptionWall] Error checking subscription:', error)
+      console.error('❌ [SubscriptionWall] Unexpected error:', error)
       setHasActiveSubscription(false)
     } finally {
-      console.log('[SubscriptionWall] Setting loading to false')
+      console.log('✅ [SubscriptionWall] Setting loading to false')
       setLoading(false)
     }
   }
