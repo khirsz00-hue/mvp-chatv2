@@ -24,29 +24,37 @@ export default function MainLayout({ children }: MainLayoutProps) {
   useEffect(() => {
     // Check authentication
     const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (! user) {
-        router.push('/login')
-        return
-      }
-      
-      setUser(user)
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (! user) {
+          router.push('/login')
+          return
+        }
+        
+        setUser(user)
 
-      // Check if user is admin
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('is_admin')
-        .eq('id', user.id)
-        .single()
+        // Check if user is admin
+        const { data: profile, error } = await supabase
+          .from('user_profiles')
+          .select('is_admin')
+          .eq('id', user.id)
+          .single()
 
-      if (profile?.is_admin) {
-        setIsAdmin(true)
-      } else {
-        setIsAdmin(false)
+        if (error) {
+          console.error('Error fetching user profile:', error)
+        }
+
+        if (profile?.is_admin) {
+          setIsAdmin(true)
+        } else {
+          setIsAdmin(false)
+        }
+      } catch (error) {
+        console.error('Error in checkAuth:', error)
+      } finally {
+        setLoading(false)
       }
-      
-      setLoading(false)
     }
 
     checkAuth()
