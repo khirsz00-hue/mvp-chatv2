@@ -29,7 +29,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
         const { data: { user } } = await supabase.auth.getUser()
         
         if (!user) {
-        if (! user) {
           router.push('/login')
           return
         }
@@ -37,24 +36,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
         setUser(user)
 
         // Check if user is admin
-        try {
-          const { data: profile } = await supabase
-            .from('user_profiles')
-            .select('is_admin')
-            .eq('id', user.id)
-            .single()
-
-          if (profile?.is_admin) {
-            setIsAdmin(true)
-          } else {
-            setIsAdmin(false)
-          }
-        } catch (profileError) {
-          console.error('Error fetching user profile:', profileError)
-          setIsAdmin(false)
-        }
-      } catch (error) {
-        console.error('Error checking auth:', error)
         const { data: profile, error } = await supabase
           .from('user_profiles')
           .select('is_admin')
@@ -63,12 +44,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
         if (error) {
           console.error('Error fetching user profile:', error)
-        }
-
-        if (profile?.is_admin) {
-          setIsAdmin(true)
-        } else {
           setIsAdmin(false)
+        } else {
+          setIsAdmin(profile?.is_admin ?? false)
         }
       } catch (error) {
         console.error('Error in checkAuth:', error)
@@ -80,7 +58,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     checkAuth()
 
     // Listen for auth state changes
-    const { data: { subscription } } = supabase. auth.onAuthStateChange(
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (event === 'SIGNED_IN' && session) {
           setUser(session.user)
@@ -198,7 +176,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     <SubscriptionWall>
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 overflow-x-hidden">
         <Header 
-          user={user ?  { email: user.email, name: user.user_metadata?. full_name } : null}
+          user={user ? { email: user.email, name: user.user_metadata?.full_name } : null}
           onSignOut={handleSignOut}
         />
         <div className="flex">

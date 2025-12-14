@@ -24,10 +24,13 @@ export default function SubscriptionWall({ children }: SubscriptionWallProps) {
   }, [])
 
   const checkSubscription = async () => {
+    console.log('[SubscriptionWall] Checking subscription...')
     try {
       const { data: { user } } = await supabase.auth.getUser()
+      console.log('[SubscriptionWall] User:', user?.id)
       
       if (!user) {
+        console.log('[SubscriptionWall] No user, redirecting to login')
         router.push('/login')
         return
       }
@@ -38,29 +41,35 @@ export default function SubscriptionWall({ children }: SubscriptionWallProps) {
         .eq('id', user.id)
         .single()
 
+      console.log('[SubscriptionWall] Profile:', profile)
+      console.log('[SubscriptionWall] Error:', error)
+
       // Handle missing profile
       if (error && error.code === SUPABASE_NO_ROWS_CODE) {
+        console.log('[SubscriptionWall] Creating missing profile...')
         const userEmail = user.email || 'unknown@example.com'
         await createMissingProfile(user.id, userEmail)
         setHasActiveSubscription(false)
-        setLoading(false)
         return
       }
 
       // Admin always has access
       if (profile?.is_admin) {
+        console.log('[SubscriptionWall] User is admin, granting access')
         setHasActiveSubscription(true)
-        setLoading(false)
         return
       }
 
       // Check for active subscription statuses
       const activeStatuses = ['active', 'trialing']
-      setHasActiveSubscription(activeStatuses.includes(profile?.subscription_status || ''))
+      const hasAccess = activeStatuses.includes(profile?.subscription_status || '')
+      console.log('[SubscriptionWall] Subscription status:', profile?.subscription_status, 'Has access:', hasAccess)
+      setHasActiveSubscription(hasAccess)
     } catch (error) {
-      console.error('Error checking subscription:', error)
+      console.error('[SubscriptionWall] Error checking subscription:', error)
       setHasActiveSubscription(false)
     } finally {
+      console.log('[SubscriptionWall] Setting loading to false')
       setLoading(false)
     }
   }
