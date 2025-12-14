@@ -1,13 +1,11 @@
 import { NextResponse } from 'next/server'
 import { startOfDay, endOfDay, addDays, isWithinInterval, parseISO, isBefore } from 'date-fns'
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url)
-  const token = searchParams.get('token')
-  const filter = (searchParams.get('filter') || 'all').toLowerCase()
-
-  if (!token) {
-    return NextResponse.json({ error: 'Brak tokenu Todoist' }, { status: 401 })
+// Shared function to process tasks with filtering
+async function fetchAndFilterTasks(token: any, filter: string) {
+  // Better token validation - return empty array for invalid tokens
+  if (!token || typeof token !== 'string' || token.trim() === '') {
+    return []
   }
 
   try {
@@ -17,8 +15,9 @@ export async function GET(req: Request) {
     })
 
     if (!res.ok) {
-      const err = await res.text()
-      return NextResponse.json({ error: `Błąd Todoist API: ${err}` }, { status: res.status })
+      console.error(`Todoist API error: ${res.status}`)
+      // Return empty array instead of error to avoid breaking the UI
+      return []
     }
 
     const allTasks = await res.json()
@@ -73,9 +72,34 @@ export async function GET(req: Request) {
       priority: t.priority,
     }))
 
-    return NextResponse.json({ tasks: simplified })
+    return simplified
   } catch (error: any) {
     console.error('❌ Błąd w /api/todoist/tasks:', error)
-    return NextResponse.json({ error: 'Nie udało się pobrać zadań' }, { status: 500 })
+    // Return empty array instead of error to avoid breaking the UI
+    return []
   }
+}
+
+// POST handler - more secure as token is in body
+export async function POST(req: Request) {
+  try {
+    const body = await req.json()
+    const { token, filter = 'all' } = body
+
+    const tasks = await fetchAndFilterTasks(token, filter.toLowerCase())
+    return NextResponse.json({ tasks })
+  } catch (error: any) {
+    console.error('❌ Błąd w /api/todoist/tasks POST:', error)
+    return NextResponse.json({ tasks: [] })
+  }
+}
+
+// GET handler - kept for backward compatibility
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url)
+  const token = searchParams.get('token') || ''
+  const filter = (searchParams.get('filter') || 'all').toLowerCase()
+
+  const tasks = await fetchAndFilterTasks(token, filter)
+  return NextResponse.json({ tasks })
 }
