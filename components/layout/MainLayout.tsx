@@ -9,6 +9,7 @@ import { User } from '@supabase/supabase-js'
 import { TasksAssistant } from '@/components/assistant/TasksAssistant'
 import { JournalAssistantWrapper } from '@/components/journal/JournalAssistantWrapper'
 import { DecisionAssistant } from '@/src/features/decision-assistant/components/DecisionAssistant'
+import SubscriptionWall from '@/components/subscription/SubscriptionWall'
 
 interface MainLayoutProps {
   children?: ReactNode
@@ -24,29 +25,38 @@ export default function MainLayout({ children }: MainLayoutProps) {
   useEffect(() => {
     // Check authentication
     const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (! user) {
-        router.push('/login')
-        return
-      }
-      
-      setUser(user)
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (!user) {
+          router.push('/login')
+          return
+        }
+        
+        setUser(user)
 
-      // Check if user is admin
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('is_admin')
-        .eq('id', user.id)
-        .single()
+        // Check if user is admin
+        try {
+          const { data: profile } = await supabase
+            .from('user_profiles')
+            .select('is_admin')
+            .eq('id', user.id)
+            .single()
 
-      if (profile?.is_admin) {
-        setIsAdmin(true)
-      } else {
-        setIsAdmin(false)
+          if (profile?.is_admin) {
+            setIsAdmin(true)
+          } else {
+            setIsAdmin(false)
+          }
+        } catch (profileError) {
+          console.error('Error fetching user profile:', profileError)
+          setIsAdmin(false)
+        }
+      } catch (error) {
+        console.error('Error checking auth:', error)
+      } finally {
+        setLoading(false)
       }
-      
-      setLoading(false)
     }
 
     checkAuth()
@@ -167,17 +177,19 @@ export default function MainLayout({ children }: MainLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 overflow-x-hidden">
-      <Header 
-        user={user ?  { email: user.email, name: user.user_metadata?. full_name } : null}
-        onSignOut={handleSignOut}
-      />
-      <div className="flex">
-        <Sidebar activeView={activeView} onNavigate={handleNavigate} isAdmin={isAdmin} />
-        <main className="flex-1 p-6 overflow-x-hidden">
-          {children || renderAssistant()}
-        </main>
+    <SubscriptionWall>
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 overflow-x-hidden">
+        <Header 
+          user={user ?  { email: user.email, name: user.user_metadata?. full_name } : null}
+          onSignOut={handleSignOut}
+        />
+        <div className="flex">
+          <Sidebar activeView={activeView} onNavigate={handleNavigate} isAdmin={isAdmin} />
+          <main className="flex-1 p-6 overflow-x-hidden">
+            {children || renderAssistant()}
+          </main>
+        </div>
       </div>
-    </div>
+    </SubscriptionWall>
   )
 }

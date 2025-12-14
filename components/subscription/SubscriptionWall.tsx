@@ -1,0 +1,193 @@
+'use client'
+
+import { useEffect, useState, ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabaseClient'
+import Button from '@/components/ui/Button'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card'
+import { CreditCard, Sparkle, Check } from '@phosphor-icons/react'
+
+interface SubscriptionWallProps {
+  children: ReactNode
+}
+
+export default function SubscriptionWall({ children }: SubscriptionWallProps) {
+  const [loading, setLoading] = useState(true)
+  const [hasActiveSubscription, setHasActiveSubscription] = useState(false)
+  const router = useRouter()
+
+  useEffect(() => {
+    checkSubscription()
+  }, [])
+
+  const checkSubscription = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        router.push('/login')
+        return
+      }
+
+      const { data: profile, error } = await supabase
+        .from('user_profiles')
+        .select('subscription_status, subscription_tier, is_admin')
+        .eq('id', user.id)
+        .single()
+
+      // Handle missing profile (PGRST116 is Supabase error code for no rows returned)
+      if (error && error.code === 'PGRST116') {
+        await createMissingProfile(user.id, user.email!)
+        setHasActiveSubscription(false)
+        setLoading(false)
+        return
+      }
+
+      // Admin always has access
+      if (profile?.is_admin) {
+        setHasActiveSubscription(true)
+        setLoading(false)
+        return
+      }
+
+      // Check for active subscription statuses
+      const activeStatuses = ['active', 'trialing']
+      setHasActiveSubscription(activeStatuses.includes(profile?.subscription_status || ''))
+    } catch (error) {
+      console.error('Error checking subscription:', error)
+      setHasActiveSubscription(false)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const createMissingProfile = async (userId: string, email: string) => {
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .insert({
+          id: userId,
+          email: email,
+          subscription_status: 'inactive',
+          subscription_tier: 'free',
+          is_admin: false
+        })
+
+      if (error) {
+        console.error('Error creating profile:', error)
+      }
+    } catch (error) {
+      console.error('Error creating missing profile:', error)
+    }
+  }
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Sprawdzanie subskrypcji...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!hasActiveSubscription) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 flex items-center justify-center p-6">
+        <Card className="max-w-2xl w-full">
+          <CardHeader className="text-center">
+            <div className="flex justify-center mb-4">
+              <div className="p-4 bg-purple-100 rounded-full">
+                <CreditCard size={48} className="text-brand-purple" weight="duotone" />
+              </div>
+            </div>
+            <CardTitle className="text-3xl mb-2">
+              🚀 Odblokuj pełny dostęp
+            </CardTitle>
+            <CardDescription className="text-base">
+              Aby korzystać z AI Assistants PRO potrzebujesz aktywnej subskrypcji
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-3">
+              <div className="flex items-start gap-3">
+                <Check size={24} className="text-green-600 mt-0.5 flex-shrink-0" weight="bold" />
+                <div>
+                  <p className="font-medium">Nielimitowane rozmowy z AI</p>
+                  <p className="text-sm text-muted-foreground">Bez limitów wiadomości i tokenów</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <Check size={24} className="text-green-600 mt-0.5 flex-shrink-0" weight="bold" />
+                <div>
+                  <p className="font-medium">Wszystkie asystenty AI</p>
+                  <p className="text-sm text-muted-foreground">Zadania, dziennik, decyzje i więcej</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <Check size={24} className="text-green-600 mt-0.5 flex-shrink-0" weight="bold" />
+                <div>
+                  <p className="font-medium">Zaawansowane analizy AI</p>
+                  <p className="text-sm text-muted-foreground">Inteligentne podsumowania i insights</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <Check size={24} className="text-green-600 mt-0.5 flex-shrink-0" weight="bold" />
+                <div>
+                  <p className="font-medium">Integracje z narzędziami</p>
+                  <p className="text-sm text-muted-foreground">Todoist, Calendar i więcej</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <Check size={24} className="text-green-600 mt-0.5 flex-shrink-0" weight="bold" />
+                <div>
+                  <p className="font-medium">Priorytetowe wsparcie</p>
+                  <p className="text-sm text-muted-foreground">Szybka pomoc techniczna</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <Check size={24} className="text-green-600 mt-0.5 flex-shrink-0" weight="bold" />
+                <div>
+                  <p className="font-medium">Nowe funkcje jako pierwszy</p>
+                  <p className="text-sm text-muted-foreground">Early access do nowości</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-4">
+              <Button
+                onClick={() => router.push('/subscription')}
+                className="w-full bg-gradient-to-r from-brand-purple to-brand-pink"
+                size="lg"
+              >
+                <Sparkle size={20} className="mr-2" weight="fill" />
+                Wybierz plan subskrypcji
+              </Button>
+              <Button
+                onClick={handleSignOut}
+                variant="ghost"
+                className="w-full"
+              >
+                Wyloguj się
+              </Button>
+            </div>
+
+            <div className="text-center pt-2 border-t">
+              <p className="text-sm text-muted-foreground">
+                💰 Pierwsze 7 dni za darmo • 🔒 Bezpieczne płatności Stripe
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  return <>{children}</>
+}
