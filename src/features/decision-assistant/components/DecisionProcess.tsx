@@ -8,7 +8,6 @@ import { ProgressBar } from './ProgressBar'
 import { HatStep } from './HatStep'
 import { DecisionSummary } from './DecisionSummary'
 import { DecisionService } from '../services/decisionService'
-import { hasAnyRealUserInput } from '../utils/validation'
 
 interface DecisionProcessProps {
   decisionId: string
@@ -165,15 +164,7 @@ export function DecisionProcess({ decisionId, onBack }: DecisionProcessProps) {
     }
   }
 
-  const handleSkip = async () => {
-    // Just move to next hat without saving
-    if (currentHatIndex < HATS.length - 1) {
-      setCurrentHatIndex(prev => prev + 1)
-    } else {
-      // All hats completed, generate summary
-      await generateSummary()
-    }
-  }
+
 
   const generateSummary = async () => {
     setIsGeneratingSummary(true)
@@ -184,23 +175,8 @@ export function DecisionProcess({ decisionId, onBack }: DecisionProcessProps) {
         throw new Error('Not authenticated')
       }
 
-      // Get all saved events to check if user provided real answers
-      const events = await DecisionService.getEvents(decisionId)
-      
-      // Check if user provided ANY real answers
-      if (!hasAnyRealUserInput(events)) {
-        setSummary({
-          noAnswers: true,
-          message: 'Nie udzieliłeś odpowiedzi na żadne pytania. Aby otrzymać analizę, wróć i odpowiedz przynajmniej na kilka pytań.',
-          perspectives: [],
-          insights: [],
-          recommendation: ''
-        })
-        setShowSummary(true)
-        setIsGeneratingSummary(false)
-        return
-      }
-
+      // Directly generate summary - no need to check for answers
+      // User was forced to answer at each step
       const response = await fetch(`/api/decision/${decisionId}/generate-summary`, {
         method: 'POST',
         headers: {
@@ -278,9 +254,9 @@ export function DecisionProcess({ decisionId, onBack }: DecisionProcessProps) {
         decisionTitle={decision.title}
         decisionDescription={decision.description}
         onNext={handleNext}
-        onSkip={handleSkip}
         isGeneratingQuestions={isGeneratingQuestions}
         questions={questions}
+        isLastHat={currentHatIndex === HATS.length - 1}
       />
     </div>
   )

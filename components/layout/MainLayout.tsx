@@ -29,6 +29,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         const { data: { user } } = await supabase.auth.getUser()
         
         if (!user) {
+        if (! user) {
           router.push('/login')
           return
         }
@@ -54,6 +55,23 @@ export default function MainLayout({ children }: MainLayoutProps) {
         }
       } catch (error) {
         console.error('Error checking auth:', error)
+        const { data: profile, error } = await supabase
+          .from('user_profiles')
+          .select('is_admin')
+          .eq('id', user.id)
+          .single()
+
+        if (error) {
+          console.error('Error fetching user profile:', error)
+        }
+
+        if (profile?.is_admin) {
+          setIsAdmin(true)
+        } else {
+          setIsAdmin(false)
+        }
+      } catch (error) {
+        console.error('Error in checkAuth:', error)
       } finally {
         setLoading(false)
       }
