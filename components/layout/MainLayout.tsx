@@ -12,12 +12,12 @@ import { DecisionAssistant } from '@/src/features/decision-assistant/components/
 import SubscriptionWall from '@/components/subscription/SubscriptionWall'
 
 /**
- * UWAGA: SubscriptionWall jest tymczasowo wyłączony
- * Powód: Infinite loading na głównej stronie pomimo aktywnej subskrypcji
- * TODO: Naprawić logikę w SubscriptionWall.tsx i przywrócić
+ * SubscriptionWall jest teraz aktywny
+ * Naprawiono: Dodano timeout 10 sekund i poprawiono obsługę błędów
+ * aby zapobiec infinite loading na głównej stronie
  */
 // Toggle this to disable subscription wall if it causes issues
-const ENABLE_SUBSCRIPTION_WALL = false
+const ENABLE_SUBSCRIPTION_WALL = true
 
 interface MainLayoutProps {
   children?: ReactNode
