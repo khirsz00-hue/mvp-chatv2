@@ -49,8 +49,10 @@ export default function Home() {
           window.history.replaceState({}, document.title, newPath)
         } catch {}
 
-        // Odśwież aby załadować UI z nową preferencją
-        window.location.reload()
+        // ❌ USUŃ window.location.reload() - powoduje infinite loading
+        // window.location.reload()
+        // ✅ React automatycznie zaktualizuje UI po zmianie localStorage
+        console.log('✅ Todoist token saved, no reload needed - React will re-render')
       }
     } catch (e) {
       // ignore

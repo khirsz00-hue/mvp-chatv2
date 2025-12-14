@@ -31,16 +31,29 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const router = useRouter()
 
   useEffect(() => {
+    // Timeout zabezpieczający - wymusza zakończenie loading po 10 sekundach
+    const timeoutId = setTimeout(() => {
+      console.error('⏱️ [MainLayout] TIMEOUT - forcing loading to false after 10 seconds')
+      setLoading(false)
+    }, 10000) // 10 sekund
+
     // Check authentication
     const checkAuth = async () => {
+      console.log('🔍 [MainLayout] checkAuth started')
+      
       try {
-        const { data: { user } } = await supabase.auth.getUser()
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        console.log('🔍 [MainLayout] User:', user?.id || 'NULL')
+        console.log('🔍 [MainLayout] User error:', userError)
         
         if (!user) {
+          console.log('⚠️ [MainLayout] No user found, redirecting to login')
+          setLoading(false)  // ✅ DODANO: setLoading(false) przed return
           router.push('/login')
           return
         }
         
+        console.log('✅ [MainLayout] User found:', user.email)
         setUser(user)
 
         // Check if user is admin
@@ -50,6 +63,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
           .eq('id', user.id)
           .single()
 
+        console.log('🔍 [MainLayout] Profile:', profile)
+        console.log('🔍 [MainLayout] Profile error:', error)
+
         if (error) {
           console.error('Error fetching user profile:', error)
           setIsAdmin(false)
@@ -57,8 +73,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
           setIsAdmin(profile?.is_admin ?? false)
         }
       } catch (error) {
-        console.error('Error in checkAuth:', error)
+        console.error('❌ [MainLayout] Error in checkAuth:', error)
+        setLoading(false)  // ✅ DODANO: setLoading(false) w catch
       } finally {
+        console.log('✅ [MainLayout] Setting loading to false')
         setLoading(false)
       }
     }
@@ -68,7 +86,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('🔍 [MainLayout] Auth state change:', event)
+        
         if (event === 'SIGNED_IN' && session) {
+          console.log('✅ [MainLayout] User signed in:', session.user.email)
           setUser(session.user)
 
           // Check if user is admin
@@ -86,6 +107,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
           setLoading(false)
         } else if (event === 'SIGNED_OUT') {
+          console.log('⚠️ [MainLayout] User signed out')
           setUser(null)
           setIsAdmin(false)
           router.push('/login')
@@ -101,7 +123,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
       }
     } catch {}
 
+    // Wyczyść timeout jeśli checkAuth się zakończył
     return () => {
+      clearTimeout(timeoutId)
       subscription.unsubscribe()
     }
   }, [router])
