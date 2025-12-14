@@ -20,97 +20,111 @@ export default function SubscriptionWall({ children }: SubscriptionWallProps) {
   const router = useRouter()
 
   useEffect(() => {
-    checkSubscription()
-  }, [])
+    let isMounted = true
+    let timeoutId: NodeJS.Timeout | undefined
 
-  const checkSubscription = async () => {
-    console.log('🔍 [SubscriptionWall] Starting subscription check...')
-    
-    // Create a timeout to ensure loading doesn't hang forever (10 seconds max)
-    let isCompleted = false
-    const timeoutId = setTimeout(() => {
-      if (!isCompleted) {
-        console.error('⏱️ [SubscriptionWall] Timeout after 10 seconds - showing subscription wall')
-        setHasActiveSubscription(false)
-        setLoading(false)
-      }
-    }, 10000) // 10 seconds timeout
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      console.log('🔍 [SubscriptionWall] User ID:', user?.id)
+    const checkSubscription = async () => {
+      console.log('🔍 [SubscriptionWall] Starting subscription check...')
       
-      if (!user) {
-        console.log('⚠️ [SubscriptionWall] No user found, redirecting to login')
-        isCompleted = true
-        clearTimeout(timeoutId)
-        setLoading(false)
-        router.push('/login')
-        return
-      }
-
-      const { data: profile, error } = await supabase
-        .from('user_profiles')
-        .select('subscription_status, subscription_tier, is_admin')
-        .eq('id', user.id)
-        .single()
-
-      console.log('🔍 [SubscriptionWall] Profile data:', profile)
-      console.log('🔍 [SubscriptionWall] Profile error:', error)
-
-      // Handle missing profile
-      if (error && error.code === SUPABASE_NO_ROWS_CODE) {
-        console.log('⚠️ [SubscriptionWall] Profile not found, creating...')
-        const userEmail = user.email || 'unknown@example.com'
-        const created = await createMissingProfile(user.id, userEmail)
-        if (created) {
-          console.log('✅ [SubscriptionWall] Profile created successfully')
-        } else {
-          console.error('❌ [SubscriptionWall] Failed to create profile')
+      // Create a timeout to ensure loading doesn't hang forever (10 seconds max)
+      timeoutId = setTimeout(() => {
+        if (isMounted) {
+          console.error('⏱️ [SubscriptionWall] Timeout after 10 seconds - showing subscription wall')
+          setHasActiveSubscription(false)
+          setLoading(false)
         }
-        isCompleted = true
-        clearTimeout(timeoutId)
-        setHasActiveSubscription(false)
-        setLoading(false)
-        return
-      }
+      }, 10000) // 10 seconds timeout
 
-      // Handle other errors
-      if (error) {
-        console.error('❌ [SubscriptionWall] Error fetching profile:', error)
-        isCompleted = true
-        clearTimeout(timeoutId)
-        setHasActiveSubscription(false)
-        setLoading(false)
-        return
-      }
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        console.log('🔍 [SubscriptionWall] User ID:', user?.id)
+        
+        if (!user) {
+          console.log('⚠️ [SubscriptionWall] No user found, redirecting to login')
+          if (timeoutId) clearTimeout(timeoutId)
+          if (isMounted) {
+            setLoading(false)
+            router.push('/login')
+          }
+          return
+        }
 
-      // Admin always has access
-      if (profile?.is_admin) {
-        console.log('✅ [SubscriptionWall] User is admin, granting access')
-        isCompleted = true
-        clearTimeout(timeoutId)
-        setHasActiveSubscription(true)
-        setLoading(false)
-        return
-      }
+        const { data: profile, error } = await supabase
+          .from('user_profiles')
+          .select('subscription_status, subscription_tier, is_admin')
+          .eq('id', user.id)
+          .single()
 
-      // Check for active subscription statuses
-      const activeStatuses = ['active', 'trialing']
-      const hasAccess = activeStatuses.includes(profile?.subscription_status || '')
-      console.log('🔍 [SubscriptionWall] Subscription status:', profile?.subscription_status, '| Has access:', hasAccess)
-      isCompleted = true
-      clearTimeout(timeoutId)
-      setHasActiveSubscription(hasAccess)
-      setLoading(false)
-    } catch (error) {
-      console.error('❌ [SubscriptionWall] Unexpected error:', error)
-      isCompleted = true
-      clearTimeout(timeoutId)
-      setHasActiveSubscription(false)
-      setLoading(false)
+        console.log('🔍 [SubscriptionWall] Profile data:', profile)
+        console.log('🔍 [SubscriptionWall] Profile error:', error)
+
+        // Handle missing profile
+        if (error && error.code === SUPABASE_NO_ROWS_CODE) {
+          console.log('⚠️ [SubscriptionWall] Profile not found, creating...')
+          const userEmail = user.email || 'unknown@example.com'
+          const created = await createMissingProfile(user.id, userEmail)
+          if (created) {
+            console.log('✅ [SubscriptionWall] Profile created successfully')
+          } else {
+            console.error('❌ [SubscriptionWall] Failed to create profile')
+          }
+          if (timeoutId) clearTimeout(timeoutId)
+          if (isMounted) {
+            setHasActiveSubscription(false)
+            setLoading(false)
+          }
+          return
+        }
+
+        // Handle other errors
+        if (error) {
+          console.error('❌ [SubscriptionWall] Error fetching profile:', error)
+          if (timeoutId) clearTimeout(timeoutId)
+          if (isMounted) {
+            setHasActiveSubscription(false)
+            setLoading(false)
+          }
+          return
+        }
+
+        // Admin always has access
+        if (profile?.is_admin) {
+          console.log('✅ [SubscriptionWall] User is admin, granting access')
+          if (timeoutId) clearTimeout(timeoutId)
+          if (isMounted) {
+            setHasActiveSubscription(true)
+            setLoading(false)
+          }
+          return
+        }
+
+        // Check for active subscription statuses
+        const activeStatuses = ['active', 'trialing']
+        const hasAccess = activeStatuses.includes(profile?.subscription_status || '')
+        console.log('🔍 [SubscriptionWall] Subscription status:', profile?.subscription_status, '| Has access:', hasAccess)
+        if (timeoutId) clearTimeout(timeoutId)
+        if (isMounted) {
+          setHasActiveSubscription(hasAccess)
+          setLoading(false)
+        }
+      } catch (error) {
+        console.error('❌ [SubscriptionWall] Unexpected error:', error)
+        if (timeoutId) clearTimeout(timeoutId)
+        if (isMounted) {
+          setHasActiveSubscription(false)
+          setLoading(false)
+        }
+      }
     }
-  }
+
+    checkSubscription()
+
+    // Cleanup function to prevent state updates on unmounted component
+    return () => {
+      isMounted = false
+      if (timeoutId) clearTimeout(timeoutId)
+    }
+  }, [])
 
   const createMissingProfile = async (userId: string, email: string): Promise<boolean> => {
     try {
