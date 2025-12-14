@@ -11,6 +11,9 @@ interface SubscriptionWallProps {
   children: ReactNode
 }
 
+// Supabase error code for "no rows returned"
+const SUPABASE_NO_ROWS_CODE = 'PGRST116'
+
 export default function SubscriptionWall({ children }: SubscriptionWallProps) {
   const [loading, setLoading] = useState(true)
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false)
@@ -35,9 +38,10 @@ export default function SubscriptionWall({ children }: SubscriptionWallProps) {
         .eq('id', user.id)
         .single()
 
-      // Handle missing profile (PGRST116 is Supabase error code for no rows returned)
-      if (error && error.code === 'PGRST116') {
-        await createMissingProfile(user.id, user.email!)
+      // Handle missing profile
+      if (error && error.code === SUPABASE_NO_ROWS_CODE) {
+        const userEmail = user.email || 'unknown@example.com'
+        await createMissingProfile(user.id, userEmail)
         setHasActiveSubscription(false)
         setLoading(false)
         return
@@ -61,7 +65,7 @@ export default function SubscriptionWall({ children }: SubscriptionWallProps) {
     }
   }
 
-  const createMissingProfile = async (userId: string, email: string) => {
+  const createMissingProfile = async (userId: string, email: string): Promise<boolean> => {
     try {
       const { error } = await supabase
         .from('user_profiles')
@@ -75,9 +79,12 @@ export default function SubscriptionWall({ children }: SubscriptionWallProps) {
 
       if (error) {
         console.error('Error creating profile:', error)
+        return false
       }
+      return true
     } catch (error) {
       console.error('Error creating missing profile:', error)
+      return false
     }
   }
 
