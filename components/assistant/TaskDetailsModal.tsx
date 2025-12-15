@@ -31,7 +31,8 @@ import {
   ClockClockwise,
   CaretDown,
   CaretUp,
-  X
+  X,
+  FileText
 } from '@phosphor-icons/react'
 import { format, parseISO } from 'date-fns'
 import { pl } from 'date-fns/locale'
@@ -1057,7 +1058,7 @@ W 1-2 zwięzłych zdaniach wyjaśnij jak rozumiesz to zadanie, bez dodatkowych k
               {/* Description Section - MOVED UP */}
               <Card className="p-4 md:p-6 space-y-3 shadow-lg border-gray-200">
                 <div className="flex items-center gap-2 font-bold text-base md:text-lg text-gray-800">
-                  <Clock size={20} weight="bold" /> Opis zadania
+                  <FileText size={20} weight="bold" /> Opis zadania
                 </div>
                 <Textarea
                   value={description}
