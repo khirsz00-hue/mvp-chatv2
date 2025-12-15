@@ -451,21 +451,30 @@ Zwróć JSON:
     }
   }
 
-  // Regenerate subtasks for Light Mode (when returning to saved progress)
-  const regenerateSubtasksForLightMode = async (existingProgress: AIAssistantProgress) => {
+  // Generic regeneration function for all modes
+  const regenerateSubtasksForMode = async (existingProgress: AIAssistantProgress) => {
     setIsGeneratingSubtasks(true)
     setViewMode('single-subtask')
     
     try {
+      const requestBody: any = {
+        taskContent: task.content,
+        taskDescription: task.description,
+        mode: existingProgress.mode,
+        maxSubtasks: existingProgress.total_steps
+      }
+      
+      // Add mode-specific parameters
+      if (existingProgress.mode === 'stuck' && existingProgress.qa_context) {
+        requestBody.qaContext = existingProgress.qa_context
+      } else if (existingProgress.mode === 'crisis') {
+        requestBody.maxMinutes = 5
+      }
+      
       const res = await fetch('/api/ai/breakdown-task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          taskContent: task.content,
-          taskDescription: task.description,
-          mode: 'light',
-          maxSubtasks: existingProgress.total_steps
-        })
+        body: JSON.stringify(requestBody)
       })
       
       if (!res.ok) throw new Error('Failed to regenerate subtasks')
@@ -473,11 +482,12 @@ Zwróć JSON:
       const data = await res.json()
       
       if (data.subtasks && data.subtasks.length > 0) {
+        const defaultMinutes = existingProgress.mode === 'crisis' ? 5 : 15
         const regeneratedSubtasks: Subtask[] = data.subtasks.map((st: any, idx: number) => ({
           id: `subtask-${Date.now()}-${idx}`,
           title: st.title,
           description: st.description,
-          estimatedMinutes: st.estimatedMinutes || 15,
+          estimatedMinutes: st.estimatedMinutes || defaultMinutes,
           completed: existingProgress.completed_step_indices.includes(idx)
         }))
         
@@ -493,89 +503,15 @@ Zwróć JSON:
     }
   }
 
-  // Regenerate subtasks for Stuck Mode (when returning to saved progress)
-  const regenerateSubtasksForStuckMode = async (existingProgress: AIAssistantProgress) => {
-    setIsGeneratingSubtasks(true)
-    setViewMode('single-subtask')
-    
-    try {
-      const res = await fetch('/api/ai/breakdown-task', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          taskContent: task.content,
-          taskDescription: task.description,
-          mode: 'stuck',
-          qaContext: existingProgress.qa_context,
-          maxSubtasks: existingProgress.total_steps
-        })
-      })
-      
-      if (!res.ok) throw new Error('Failed to regenerate subtask')
-      
-      const data = await res.json()
-      
-      if (data.subtasks && data.subtasks.length > 0) {
-        const regeneratedSubtasks: Subtask[] = data.subtasks.map((st: any, idx: number) => ({
-          id: `subtask-${Date.now()}-${idx}`,
-          title: st.title,
-          description: st.description,
-          estimatedMinutes: st.estimatedMinutes || 15,
-          completed: existingProgress.completed_step_indices.includes(idx)
-        }))
-        
-        setSubtasks(regeneratedSubtasks)
-        setCurrentSubtaskIndex(existingProgress.current_step_index)
-      }
-    } catch (err) {
-      console.error('Error regenerating subtask:', err)
-      setViewMode('mode-selection')
-    } finally {
-      setIsGeneratingSubtasks(false)
-    }
-  }
-
-  // Regenerate subtasks for Crisis Mode (when returning to saved progress)
-  const regenerateSubtasksForCrisisMode = async (existingProgress: AIAssistantProgress) => {
-    setIsGeneratingSubtasks(true)
-    setViewMode('single-subtask')
-    
-    try {
-      const res = await fetch('/api/ai/breakdown-task', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          taskContent: task.content,
-          taskDescription: task.description,
-          mode: 'crisis',
-          maxSubtasks: existingProgress.total_steps,
-          maxMinutes: 5
-        })
-      })
-      
-      if (!res.ok) throw new Error('Failed to regenerate subtask')
-      
-      const data = await res.json()
-      
-      if (data.subtasks && data.subtasks.length > 0) {
-        const regeneratedSubtasks: Subtask[] = data.subtasks.map((st: any, idx: number) => ({
-          id: `subtask-${Date.now()}-${idx}`,
-          title: st.title,
-          description: st.description,
-          estimatedMinutes: st.estimatedMinutes || 5,
-          completed: existingProgress.completed_step_indices.includes(idx)
-        }))
-        
-        setSubtasks(regeneratedSubtasks)
-        setCurrentSubtaskIndex(existingProgress.current_step_index)
-      }
-    } catch (err) {
-      console.error('Error regenerating subtask:', err)
-      setViewMode('mode-selection')
-    } finally {
-      setIsGeneratingSubtasks(false)
-    }
-  }
+  // Convenience wrappers for backward compatibility
+  const regenerateSubtasksForLightMode = (existingProgress: AIAssistantProgress) => 
+    regenerateSubtasksForMode(existingProgress)
+  
+  const regenerateSubtasksForStuckMode = (existingProgress: AIAssistantProgress) => 
+    regenerateSubtasksForMode(existingProgress)
+  
+  const regenerateSubtasksForCrisisMode = (existingProgress: AIAssistantProgress) => 
+    regenerateSubtasksForMode(existingProgress)
 
   // Handle "Done" button - mark current step as completed and advance
   const handleMarkStepDone = async () => {
