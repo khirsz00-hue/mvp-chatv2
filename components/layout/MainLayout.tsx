@@ -160,8 +160,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
               Zarządzaj ustawieniami i treścią aplikacji
             </p>
             <button
+              type="button"
               onClick={() => router.push('/admin')}
               className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-medium hover:opacity-90 transition-opacity"
+              aria-label="Przejdź do panelu administratora"
             >
               Przejdź do panelu administratora
             </button>
