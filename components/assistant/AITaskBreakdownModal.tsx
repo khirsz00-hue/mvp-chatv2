@@ -9,7 +9,6 @@ import {
   Check,
   X,
   ArrowRight,
-  ArrowLeft,
   Lightning,
   Question,
   Fire,
@@ -151,12 +150,17 @@ export function AITaskBreakdownModal({
         setSelectedMode(existingProgress.mode)
         setCurrentSubtaskIndex(existingProgress.current_step_index)
         
-        // If we have subtasks, we need to regenerate them or load from somewhere
-        // For now, we'll start fresh but keep the progress tracking
-        // TODO: Store subtask details in progress or refetch them
-        
-        setViewMode('mode-selection')  // Let user continue or restart
+        // Regenerate subtasks based on saved mode
         showToast(`Witaj z powrotem! Ostatnio byłeś na kroku ${existingProgress.current_step_index + 1} z ${existingProgress.total_steps}`, 'info')
+        
+        // Regenerate subtasks and jump directly to the current step
+        if (existingProgress.mode === 'light') {
+          await regenerateSubtasksForLightMode(existingProgress)
+        } else if (existingProgress.mode === 'stuck') {
+          await regenerateSubtasksForStuckMode(existingProgress)
+        } else if (existingProgress.mode === 'crisis') {
+          await regenerateSubtasksForCrisisMode(existingProgress)
+        }
       }
     } catch (err) {
       console.error('Error loading progress:', err)
@@ -447,6 +451,132 @@ Zwróć JSON:
     }
   }
 
+  // Regenerate subtasks for Light Mode (when returning to saved progress)
+  const regenerateSubtasksForLightMode = async (existingProgress: AIAssistantProgress) => {
+    setIsGeneratingSubtasks(true)
+    setViewMode('single-subtask')
+    
+    try {
+      const res = await fetch('/api/ai/breakdown-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskContent: task.content,
+          taskDescription: task.description,
+          mode: 'light',
+          maxSubtasks: existingProgress.total_steps
+        })
+      })
+      
+      if (!res.ok) throw new Error('Failed to regenerate subtasks')
+      
+      const data = await res.json()
+      
+      if (data.subtasks && data.subtasks.length > 0) {
+        const regeneratedSubtasks: Subtask[] = data.subtasks.map((st: any, idx: number) => ({
+          id: `subtask-${Date.now()}-${idx}`,
+          title: st.title,
+          description: st.description,
+          estimatedMinutes: st.estimatedMinutes || 15,
+          completed: existingProgress.completed_step_indices.includes(idx)
+        }))
+        
+        setSubtasks(regeneratedSubtasks)
+        setCurrentSubtaskIndex(existingProgress.current_step_index)
+      }
+    } catch (err) {
+      console.error('Error regenerating subtasks:', err)
+      // Fall back to mode selection if regeneration fails
+      setViewMode('mode-selection')
+    } finally {
+      setIsGeneratingSubtasks(false)
+    }
+  }
+
+  // Regenerate subtasks for Stuck Mode (when returning to saved progress)
+  const regenerateSubtasksForStuckMode = async (existingProgress: AIAssistantProgress) => {
+    setIsGeneratingSubtasks(true)
+    setViewMode('single-subtask')
+    
+    try {
+      const res = await fetch('/api/ai/breakdown-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskContent: task.content,
+          taskDescription: task.description,
+          mode: 'stuck',
+          qaContext: existingProgress.qa_context,
+          maxSubtasks: existingProgress.total_steps
+        })
+      })
+      
+      if (!res.ok) throw new Error('Failed to regenerate subtask')
+      
+      const data = await res.json()
+      
+      if (data.subtasks && data.subtasks.length > 0) {
+        const regeneratedSubtasks: Subtask[] = data.subtasks.map((st: any, idx: number) => ({
+          id: `subtask-${Date.now()}-${idx}`,
+          title: st.title,
+          description: st.description,
+          estimatedMinutes: st.estimatedMinutes || 15,
+          completed: existingProgress.completed_step_indices.includes(idx)
+        }))
+        
+        setSubtasks(regeneratedSubtasks)
+        setCurrentSubtaskIndex(existingProgress.current_step_index)
+      }
+    } catch (err) {
+      console.error('Error regenerating subtask:', err)
+      setViewMode('mode-selection')
+    } finally {
+      setIsGeneratingSubtasks(false)
+    }
+  }
+
+  // Regenerate subtasks for Crisis Mode (when returning to saved progress)
+  const regenerateSubtasksForCrisisMode = async (existingProgress: AIAssistantProgress) => {
+    setIsGeneratingSubtasks(true)
+    setViewMode('single-subtask')
+    
+    try {
+      const res = await fetch('/api/ai/breakdown-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskContent: task.content,
+          taskDescription: task.description,
+          mode: 'crisis',
+          maxSubtasks: existingProgress.total_steps,
+          maxMinutes: 5
+        })
+      })
+      
+      if (!res.ok) throw new Error('Failed to regenerate subtask')
+      
+      const data = await res.json()
+      
+      if (data.subtasks && data.subtasks.length > 0) {
+        const regeneratedSubtasks: Subtask[] = data.subtasks.map((st: any, idx: number) => ({
+          id: `subtask-${Date.now()}-${idx}`,
+          title: st.title,
+          description: st.description,
+          estimatedMinutes: st.estimatedMinutes || 5,
+          completed: existingProgress.completed_step_indices.includes(idx)
+        }))
+        
+        setSubtasks(regeneratedSubtasks)
+        setCurrentSubtaskIndex(existingProgress.current_step_index)
+      }
+    } catch (err) {
+      console.error('Error regenerating subtask:', err)
+      setViewMode('mode-selection')
+    } finally {
+      setIsGeneratingSubtasks(false)
+    }
+  }
+
   // Handle "Done" button - mark current step as completed and advance
   const handleMarkStepDone = async () => {
     const currentSubtask = subtasks[currentSubtaskIndex]
@@ -504,20 +634,11 @@ Zwróć JSON:
     onClose()
   }
 
-  // Handle "Cancel" - delete progress and close
-  const handleCancel = async () => {
-    if (progress) {
-      await deleteProgress(progress.id)
-    }
-    resetModal()
+  // Handle "Anuluj" (Cancel) - save progress and close (same as X button)
+  const handleCancel = () => {
+    // Progress is already saved automatically, just close
+    showToast('Postęp zapisany. Możesz wrócić później!', 'info')
     onClose()
-  }
-
-  // Navigate back to previous step
-  const handlePreviousStep = () => {
-    if (currentSubtaskIndex > 0) {
-      setCurrentSubtaskIndex(currentSubtaskIndex - 1)
-    }
   }
 
   // Generate next subtask after completing current one (for dynamic generation)
@@ -959,15 +1080,6 @@ Zwróć JSON:
                       
                       {/* Actions */}
                       <div className="flex gap-3 pt-2">
-                        {currentSubtaskIndex > 0 && (
-                          <button
-                            onClick={handlePreviousStep}
-                            className="px-4 py-3 border-2 border-gray-300 rounded-xl hover:bg-gray-50 transition font-medium text-gray-700 flex items-center gap-2"
-                          >
-                            <ArrowLeft size={16} />
-                            Cofnij
-                          </button>
-                        )}
                         <button
                           onClick={handleCancel}
                           className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-xl hover:bg-gray-50 transition font-medium text-gray-700"
