@@ -26,6 +26,7 @@ import {
   AIAssistantProgress 
 } from '@/lib/services/aiAssistantProgressService'
 import { useToast } from '@/components/ui/Toast'
+import { supabase } from '@/lib/supabaseClient'
 
 interface Task {
   id: string
@@ -77,10 +78,11 @@ export function AITaskBreakdownModal({
   onClose,
   task,
   onCreateSubtasks,
-  userId = 'default-user'  // TODO: Get from auth context
+  userId
 }: AITaskBreakdownModalProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('mode-selection')
   const [selectedMode, setSelectedMode] = useState<ModeType>('light')
+  const [currentUserId, setCurrentUserId] = useState<string | null>(userId || null)
   
   // Progress tracking
   const [progress, setProgress] = useState<AIAssistantProgress | null>(null)
@@ -112,21 +114,36 @@ export function AITaskBreakdownModal({
     setProgress(null)
   }, [])
   
+  // Get user ID from Supabase auth
+  useEffect(() => {
+    const getUserId = async () => {
+      if (!currentUserId) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          setCurrentUserId(user.id)
+        }
+      }
+    }
+    getUserId()
+  }, [currentUserId])
+  
   // Load existing progress when modal opens
   useEffect(() => {
-    if (open) {
+    if (open && currentUserId) {
       loadProgress()
     } else {
       // Don't reset on close - keep state for next open
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
+  }, [open, currentUserId])
   
   // Load progress from database
   const loadProgress = async () => {
+    if (!currentUserId) return
+    
     setIsLoadingProgress(true)
     try {
-      const existingProgress = await getProgress(userId, task.id)
+      const existingProgress = await getProgress(currentUserId, task.id)
       
       if (existingProgress) {
         // Restore progress
@@ -280,13 +297,15 @@ Zwróć JSON:
         setCurrentSubtaskIndex(0)
         
         // Create progress tracking
-        const newProgress = await createProgress(userId, task.id, 'light', generatedSubtasks.length)
-        if (newProgress) {
-          setProgress(newProgress)
+        if (currentUserId) {
+          const newProgress = await createProgress(currentUserId, task.id, 'light', generatedSubtasks.length)
+          if (newProgress) {
+            setProgress(newProgress)
+          }
+          
+          // Auto-create all subtasks in database
+          await autoCreateAllSubtasks(generatedSubtasks, newProgress?.id)
         }
-        
-        // Auto-create all subtasks in database
-        await autoCreateAllSubtasks(generatedSubtasks, newProgress?.id)
       }
     } catch (err) {
       console.error('Error generating subtasks:', err)
@@ -335,13 +354,15 @@ Zwróć JSON:
         setCurrentSubtaskIndex(0)
         
         // Create progress tracking
-        const newProgress = await createProgress(userId, task.id, 'stuck', 1, qaContext)
-        if (newProgress) {
-          setProgress(newProgress)
+        if (currentUserId) {
+          const newProgress = await createProgress(currentUserId, task.id, 'stuck', 1, qaContext)
+          if (newProgress) {
+            setProgress(newProgress)
+          }
+          
+          // Auto-create first subtask in database
+          await autoCreateAllSubtasks(generatedSubtasks, newProgress?.id)
         }
-        
-        // Auto-create first subtask in database
-        await autoCreateAllSubtasks(generatedSubtasks, newProgress?.id)
       }
     } catch (err) {
       console.error('Error generating subtask:', err)
@@ -386,13 +407,15 @@ Zwróć JSON:
         setCurrentSubtaskIndex(0)
         
         // Create progress tracking
-        const newProgress = await createProgress(userId, task.id, 'crisis', 1)
-        if (newProgress) {
-          setProgress(newProgress)
+        if (currentUserId) {
+          const newProgress = await createProgress(currentUserId, task.id, 'crisis', 1)
+          if (newProgress) {
+            setProgress(newProgress)
+          }
+          
+          // Auto-create first subtask in database
+          await autoCreateAllSubtasks(generatedSubtasks, newProgress?.id)
         }
-        
-        // Auto-create first subtask in database
-        await autoCreateAllSubtasks(generatedSubtasks, newProgress?.id)
       }
     } catch (err) {
       console.error('Error generating subtask:', err)
@@ -446,8 +469,9 @@ Zwróć JSON:
         setProgress(updatedProgress)
       }
       
-      // TODO: Mark subtask as completed in database via API
-      // For now, we'll just track in progress
+      // TODO: Mark subtask as completed via Todoist API
+      // Need to enhance onCreateSubtasks to return created subtask IDs
+      // Then we can call: await fetch('/api/todoist/complete', { method: 'POST', body: { id: subtaskId, token } })
       
       showToast('✓ Krok ukończony!', 'success')
       
