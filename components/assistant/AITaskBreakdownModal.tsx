@@ -9,12 +9,24 @@ import {
   Check,
   X,
   ArrowRight,
+  ArrowLeft,
   Lightning,
   Question,
   Fire,
   ThumbsUp,
   ThumbsDown
 } from '@phosphor-icons/react'
+import { 
+  getProgress, 
+  createProgress, 
+  updateProgress, 
+  completeStep,
+  deleteProgress,
+  addSubtaskToProgress,
+  AIAssistantProgress 
+} from '@/lib/services/aiAssistantProgressService'
+import { useToast } from '@/components/ui/Toast'
+import { supabase } from '@/lib/supabaseClient'
 
 interface Task {
   id: string
@@ -35,6 +47,7 @@ interface AITaskBreakdownModalProps {
     duration?: number
     duration_unit?: string
   }>) => Promise<void>
+  userId?: string  // Add userId to track progress
 }
 
 interface Subtask {
@@ -43,6 +56,8 @@ interface Subtask {
   description: string
   estimatedMinutes: number
   isBackup?: boolean
+  completed?: boolean
+  subtaskId?: string  // Database subtask ID after creation
 }
 
 type ModeType = 'light' | 'stuck' | 'crisis'
@@ -54,17 +69,24 @@ const ERROR_MESSAGES = {
   STUCK_MODE: 'Nie udało się wygenerować pierwszego kroku. Spróbuj ponownie.',
   CRISIS_MODE: 'Nie udało się wygenerować pierwszego kroku. Spróbuj ponownie.',
   NEXT_STEP: 'Nie udało się wygenerować następnego kroku',
-  CREATE_SUBTASK: 'Nie udało się utworzyć kroku'
+  CREATE_SUBTASK: 'Nie udało się utworzyć kroku',
+  COMPLETE_SUBTASK: 'Nie udało się oznaczyć kroku jako zrobiony'
 }
 
 export function AITaskBreakdownModal({
   open,
   onClose,
   task,
-  onCreateSubtasks
+  onCreateSubtasks,
+  userId
 }: AITaskBreakdownModalProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('mode-selection')
   const [selectedMode, setSelectedMode] = useState<ModeType>('light')
+  const [currentUserId, setCurrentUserId] = useState<string | null>(userId || null)
+  
+  // Progress tracking
+  const [progress, setProgress] = useState<AIAssistantProgress | null>(null)
+  const [isLoadingProgress, setIsLoadingProgress] = useState(false)
   
   // Questions Mode
   const [clarifyQuestions, setClarifyQuestions] = useState<string[]>([])
@@ -77,6 +99,9 @@ export function AITaskBreakdownModal({
   const [currentSubtaskIndex, setCurrentSubtaskIndex] = useState(0)
   const [isCreatingSubtasks, setIsCreatingSubtasks] = useState(false)
   const [isGeneratingSubtasks, setIsGeneratingSubtasks] = useState(false)
+  const [isCompletingStep, setIsCompletingStep] = useState(false)
+  
+  const { showToast } = useToast()
   
   const resetModal = useCallback(() => {
     setViewMode('mode-selection')
@@ -86,15 +111,59 @@ export function AITaskBreakdownModal({
     setAnswers([])
     setSubtasks([])
     setCurrentSubtaskIndex(0)
+    setProgress(null)
   }, [])
   
-  // Initialize - show mode selection
+  // Get user ID from Supabase auth
   useEffect(() => {
-    if (!open) {
-      resetModal()
+    const getUserId = async () => {
+      if (!currentUserId) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          setCurrentUserId(user.id)
+        }
+      }
+    }
+    getUserId()
+  }, [currentUserId])
+  
+  // Load existing progress when modal opens
+  useEffect(() => {
+    if (open && currentUserId) {
+      loadProgress()
+    } else {
+      // Don't reset on close - keep state for next open
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
+  }, [open, currentUserId])
+  
+  // Load progress from database
+  const loadProgress = async () => {
+    if (!currentUserId) return
+    
+    setIsLoadingProgress(true)
+    try {
+      const existingProgress = await getProgress(currentUserId, task.id)
+      
+      if (existingProgress) {
+        // Restore progress
+        setProgress(existingProgress)
+        setSelectedMode(existingProgress.mode)
+        setCurrentSubtaskIndex(existingProgress.current_step_index)
+        
+        // If we have subtasks, we need to regenerate them or load from somewhere
+        // For now, we'll start fresh but keep the progress tracking
+        // TODO: Store subtask details in progress or refetch them
+        
+        setViewMode('mode-selection')  // Let user continue or restart
+        showToast(`Witaj z powrotem! Ostatnio byłeś na kroku ${existingProgress.current_step_index + 1} z ${existingProgress.total_steps}`, 'info')
+      }
+    } catch (err) {
+      console.error('Error loading progress:', err)
+    } finally {
+      setIsLoadingProgress(false)
+    }
+  }
 
   // Mode Selection Handler
   const handleModeSelect = async (mode: ModeType) => {
@@ -220,11 +289,23 @@ Zwróć JSON:
           title: st.title,
           description: st.description,
           estimatedMinutes: st.estimatedMinutes || 15,
-          isBackup: idx > 0 // First is main, rest are backups
+          isBackup: idx > 0, // First is main, rest are backups
+          completed: false
         }))
         
         setSubtasks(generatedSubtasks)
         setCurrentSubtaskIndex(0)
+        
+        // Create progress tracking
+        if (currentUserId) {
+          const newProgress = await createProgress(currentUserId, task.id, 'light', generatedSubtasks.length)
+          if (newProgress) {
+            setProgress(newProgress)
+          }
+          
+          // Auto-create all subtasks in database
+          await autoCreateAllSubtasks(generatedSubtasks, newProgress?.id)
+        }
       }
     } catch (err) {
       console.error('Error generating subtasks:', err)
@@ -265,11 +346,23 @@ Zwróć JSON:
           id: `subtask-${Date.now()}-${idx}`,
           title: st.title,
           description: st.description,
-          estimatedMinutes: st.estimatedMinutes || 15
+          estimatedMinutes: st.estimatedMinutes || 15,
+          completed: false
         }))
         
         setSubtasks(generatedSubtasks)
         setCurrentSubtaskIndex(0)
+        
+        // Create progress tracking
+        if (currentUserId) {
+          const newProgress = await createProgress(currentUserId, task.id, 'stuck', 1, qaContext)
+          if (newProgress) {
+            setProgress(newProgress)
+          }
+          
+          // Auto-create first subtask in database
+          await autoCreateAllSubtasks(generatedSubtasks, newProgress?.id)
+        }
       }
     } catch (err) {
       console.error('Error generating subtask:', err)
@@ -306,11 +399,23 @@ Zwróć JSON:
           id: `subtask-${Date.now()}-${idx}`,
           title: st.title,
           description: st.description,
-          estimatedMinutes: st.estimatedMinutes || 5
+          estimatedMinutes: st.estimatedMinutes || 5,
+          completed: false
         }))
         
         setSubtasks(generatedSubtasks)
         setCurrentSubtaskIndex(0)
+        
+        // Create progress tracking
+        if (currentUserId) {
+          const newProgress = await createProgress(currentUserId, task.id, 'crisis', 1)
+          if (newProgress) {
+            setProgress(newProgress)
+          }
+          
+          // Auto-create first subtask in database
+          await autoCreateAllSubtasks(generatedSubtasks, newProgress?.id)
+        }
       }
     } catch (err) {
       console.error('Error generating subtask:', err)
@@ -320,35 +425,102 @@ Zwróć JSON:
     }
   }
 
-  // Create Current Subtask in Todoist
-  const handleCreateCurrentSubtask = async () => {
-    const currentSubtask = subtasks[currentSubtaskIndex]
-    
-    if (!currentSubtask) {
-      alert('Brak aktywnego kroku do utworzenia')
-      return
-    }
-    
-    setIsCreatingSubtasks(true)
-    
+  // Auto-create all subtasks in database when generated
+  const autoCreateAllSubtasks = async (subtasksToCreate: Subtask[], progressId?: string) => {
     try {
-      await onCreateSubtasks([{
-        content: currentSubtask.title,
-        description: currentSubtask.description,
-        duration: currentSubtask.estimatedMinutes,
+      const subtasksData = subtasksToCreate.map(st => ({
+        content: st.title,
+        description: st.description,
+        duration: st.estimatedMinutes,
         duration_unit: 'minute' as const
-      }])
+      }))
       
-      onClose()
+      await onCreateSubtasks(subtasksData)
+      
+      showToast(`Automatycznie utworzono ${subtasksToCreate.length} ${subtasksToCreate.length === 1 ? 'krok' : 'kroków'}`, 'success')
+      
+      // Note: We'd need to get the created subtask IDs back to store them in progress
+      // For now, we'll just track that they were created
     } catch (err) {
-      console.error('Error creating subtask:', err)
-      alert(ERROR_MESSAGES.CREATE_SUBTASK)
-    } finally {
-      setIsCreatingSubtasks(false)
+      console.error('Error auto-creating subtasks:', err)
+      showToast('Nie udało się automatycznie utworzyć kroków', 'error')
     }
   }
 
-  // Generate next subtask after completing current one
+  // Handle "Done" button - mark current step as completed and advance
+  const handleMarkStepDone = async () => {
+    const currentSubtask = subtasks[currentSubtaskIndex]
+    
+    if (!currentSubtask || !progress) {
+      return
+    }
+    
+    setIsCompletingStep(true)
+    
+    try {
+      // Mark subtask as completed in local state
+      const updatedSubtasks = [...subtasks]
+      updatedSubtasks[currentSubtaskIndex].completed = true
+      setSubtasks(updatedSubtasks)
+      
+      // Update progress in database
+      const updatedProgress = await completeStep(progress.id, currentSubtaskIndex, currentSubtask.subtaskId)
+      if (updatedProgress) {
+        setProgress(updatedProgress)
+      }
+      
+      // TODO: Mark subtask as completed via Todoist API
+      // Need to enhance onCreateSubtasks to return created subtask IDs
+      // Then we can call: await fetch('/api/todoist/complete', { method: 'POST', body: { id: subtaskId, token } })
+      
+      showToast('✓ Krok ukończony!', 'success')
+      
+      // Check if this was the last step
+      if (currentSubtaskIndex >= subtasks.length - 1) {
+        // Last step completed - show completion message and close
+        showToast('🎉 Wszystkie kroki ukończone!', 'success')
+        setTimeout(() => {
+          onClose()
+          resetModal()
+        }, 1500)
+      } else {
+        // Advance to next step
+        setTimeout(() => {
+          setCurrentSubtaskIndex(currentSubtaskIndex + 1)
+        }, 300)
+      }
+    } catch (err) {
+      console.error('Error completing step:', err)
+      showToast(ERROR_MESSAGES.COMPLETE_SUBTASK, 'error')
+    } finally {
+      setIsCompletingStep(false)
+    }
+  }
+
+  // Handle "Close and return later" - save progress and close
+  const handleSaveAndClose = () => {
+    // Progress is already saved, just close
+    showToast('Postęp zapisany. Możesz wrócić później!', 'info')
+    onClose()
+  }
+
+  // Handle "Cancel" - delete progress and close
+  const handleCancel = async () => {
+    if (progress) {
+      await deleteProgress(progress.id)
+    }
+    resetModal()
+    onClose()
+  }
+
+  // Navigate back to previous step
+  const handlePreviousStep = () => {
+    if (currentSubtaskIndex > 0) {
+      setCurrentSubtaskIndex(currentSubtaskIndex - 1)
+    }
+  }
+
+  // Generate next subtask after completing current one (for dynamic generation)
   const handleGenerateNextSubtask = async () => {
     // For light mode, show next backup if available
     if (selectedMode === 'light' && currentSubtaskIndex + 1 < subtasks.length) {
@@ -384,11 +556,21 @@ Zwróć JSON:
           id: `subtask-${Date.now()}`,
           title: data.subtasks[0].title,
           description: data.subtasks[0].description,
-          estimatedMinutes: data.subtasks[0].estimatedMinutes || 15
+          estimatedMinutes: data.subtasks[0].estimatedMinutes || 15,
+          completed: false
         }
         
-        setSubtasks([...subtasks, newSubtask])
+        const newSubtasks = [...subtasks, newSubtask]
+        setSubtasks(newSubtasks)
         setCurrentSubtaskIndex(subtasks.length)
+        
+        // Auto-create the new subtask
+        await autoCreateAllSubtasks([newSubtask], progress?.id)
+        
+        // Update progress with new total
+        if (progress) {
+          await updateProgress(progress.id, { current_step_index: subtasks.length })
+        }
       }
     } catch (err) {
       console.error('Error generating next subtask:', err)
@@ -445,10 +627,33 @@ Zwróć JSON:
                   <p className="text-sm text-gray-600 line-clamp-1">
                     {task.content}
                   </p>
+                  
+                  {/* Progress Bar */}
+                  {viewMode === 'single-subtask' && subtasks.length > 0 && (
+                    <div className="mt-3">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-xs font-semibold text-purple-700">
+                          Krok {currentSubtaskIndex + 1} z {subtasks.length}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {Math.round(((currentSubtaskIndex + 1) / subtasks.length) * 100)}%
+                        </span>
+                      </div>
+                      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <motion.div
+                          className="h-2 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${((currentSubtaskIndex + 1) / subtasks.length) * 100}%` }}
+                          transition={{ duration: 0.5, ease: "easeOut" }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <button
-                  onClick={onClose}
+                  onClick={handleSaveAndClose}
                   className="shrink-0 w-8 h-8 rounded-lg hover:bg-gray-200 transition flex items-center justify-center"
+                  title="Zamknij i wróć później"
                 >
                   <X size={20} weight="bold" />
                 </button>
@@ -682,7 +887,7 @@ Zwróć JSON:
                         <Sparkle size={40} className="text-purple-600" weight="duotone" />
                       </motion.div>
                       <h3 className="font-semibold text-lg mb-2">Analizuję zadanie...</h3>
-                      <p className="text-sm text-gray-600">AI przygotowuje pierwszy sensowny krok</p>
+                      <p className="text-sm text-gray-600">AI przygotowuje kroki do wykonania</p>
                     </div>
                   ) : currentSubtask ? (
                     <>
@@ -699,15 +904,41 @@ Zwróć JSON:
                         </motion.div>
                       )}
                       
-                      {/* Subtask Card */}
+                      {/* Completed Steps (if any) */}
+                      {currentSubtaskIndex > 0 && (
+                        <div className="space-y-2 mb-4">
+                          <h4 className="text-sm font-semibold text-gray-600 mb-2">Ukończone kroki:</h4>
+                          {subtasks.slice(0, currentSubtaskIndex).map((subtask, idx) => (
+                            <motion.div
+                              key={idx}
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: idx * 0.05 }}
+                              className="bg-green-50 border border-green-200 rounded-lg p-3"
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center shrink-0 mt-0.5">
+                                  <Check size={14} className="text-white" weight="bold" />
+                                </div>
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-gray-700 line-through">{subtask.title}</p>
+                                </div>
+                              </div>
+                            </motion.div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* Current Subtask Card */}
                       <motion.div
+                        key={currentSubtaskIndex}
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         className="border-2 border-purple-300 rounded-xl p-6 bg-gradient-to-br from-purple-50 to-pink-50"
                       >
                         <div className="flex items-start gap-4 mb-4">
                           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shrink-0">
-                            <span className="text-white font-bold text-lg">1</span>
+                            <span className="text-white font-bold text-lg">{currentSubtaskIndex + 1}</span>
                           </div>
                           <div className="flex-1">
                             <h3 className="font-bold text-xl text-gray-900 mb-2">
@@ -728,18 +959,27 @@ Zwróć JSON:
                       
                       {/* Actions */}
                       <div className="flex gap-3 pt-2">
+                        {currentSubtaskIndex > 0 && (
+                          <button
+                            onClick={handlePreviousStep}
+                            className="px-4 py-3 border-2 border-gray-300 rounded-xl hover:bg-gray-50 transition font-medium text-gray-700 flex items-center gap-2"
+                          >
+                            <ArrowLeft size={16} />
+                            Cofnij
+                          </button>
+                        )}
                         <button
-                          onClick={onClose}
+                          onClick={handleCancel}
                           className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-xl hover:bg-gray-50 transition font-medium text-gray-700"
                         >
                           Anuluj
                         </button>
                         <button
-                          onClick={handleCreateCurrentSubtask}
-                          disabled={isCreatingSubtasks}
-                          className="flex-[2] px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-700 hover:to-pink-700 transition disabled:opacity-50 font-semibold shadow-lg flex items-center justify-center gap-2"
+                          onClick={handleMarkStepDone}
+                          disabled={isCompletingStep}
+                          className="flex-[2] px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition disabled:opacity-50 font-semibold shadow-lg flex items-center justify-center gap-2"
                         >
-                          {isCreatingSubtasks ? (
+                          {isCompletingStep ? (
                             <>
                               <motion.div
                                 animate={{ rotate: 360 }}
@@ -747,12 +987,12 @@ Zwróć JSON:
                               >
                                 <Sparkle size={18} />
                               </motion.div>
-                              Tworzę...
+                              Zapisuję...
                             </>
                           ) : (
                             <>
                               <Check size={18} weight="bold" />
-                              Dodaj do zadań
+                              ✓ Zrobione
                             </>
                           )}
                         </button>
