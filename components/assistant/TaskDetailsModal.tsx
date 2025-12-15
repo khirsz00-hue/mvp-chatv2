@@ -721,7 +721,8 @@ W 1-2 zwięzłych zdaniach wyjaśnij jak rozumiesz to zadanie, bez dodatkowych k
         return
       }
 
-      await Promise.all(
+      // Create all subtasks and check responses
+      const responses = await Promise.all(
         aiSubtasks.map(sub =>
           fetch('/api/todoist/tasks/add', {
             method: 'POST',
@@ -738,7 +739,21 @@ W 1-2 zwięzłych zdaniach wyjaśnij jak rozumiesz to zadanie, bez dodatkowych k
         )
       )
 
-      showToast(`Utworzono ${aiSubtasks.length} podzadań`, 'success')
+      // Check if any requests failed
+      const failedCount = responses.filter(r => !r.ok).length
+      if (failedCount > 0) {
+        console.warn(`${failedCount} subtasks failed to create`)
+      }
+
+      const successCount = responses.length - failedCount
+      if (successCount > 0) {
+        showToast(`Utworzono ${successCount} podzadań`, 'success')
+      }
+      if (failedCount > 0) {
+        showToast(`Nie udało się utworzyć ${failedCount} podzadań`, 'error')
+      }
+
+      // Refresh subtasks list to show newly created ones
       const res = await fetch(`/api/todoist/subtasks?parentId=${task.id}`)
       if (res.ok) {
         const data = await res.json()

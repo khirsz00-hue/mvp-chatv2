@@ -9,7 +9,6 @@ import {
   Check,
   X,
   ArrowRight,
-  ArrowLeft,
   Lightning,
   Question,
   Fire,
@@ -58,6 +57,26 @@ interface Subtask {
   isBackup?: boolean
   completed?: boolean
   subtaskId?: string  // Database subtask ID after creation
+}
+
+interface BreakdownRequestBody {
+  taskContent: string
+  taskDescription?: string
+  mode: 'light' | 'stuck' | 'crisis'
+  maxSubtasks: number
+  qaContext?: string
+  maxMinutes?: number
+  completedContext?: string
+}
+
+interface AISubtaskResponse {
+  title: string
+  description: string
+  estimatedMinutes?: number
+}
+
+interface BreakdownAPIResponse {
+  subtasks: AISubtaskResponse[]
 }
 
 type ModeType = 'light' | 'stuck' | 'crisis'
@@ -151,12 +170,13 @@ export function AITaskBreakdownModal({
         setSelectedMode(existingProgress.mode)
         setCurrentSubtaskIndex(existingProgress.current_step_index)
         
-        // If we have subtasks, we need to regenerate them or load from somewhere
-        // For now, we'll start fresh but keep the progress tracking
-        // TODO: Store subtask details in progress or refetch them
+        // Regenerate subtasks and jump directly to the current step
+        const success = await regenerateSubtasksForMode(existingProgress)
         
-        setViewMode('mode-selection')  // Let user continue or restart
-        showToast(`Witaj z powrotem! Ostatnio byłeś na kroku ${existingProgress.current_step_index + 1} z ${existingProgress.total_steps}`, 'info')
+        // Show welcome toast only after successful regeneration
+        if (success) {
+          showToast(`Witaj z powrotem! Ostatnio byłeś na kroku ${existingProgress.current_step_index + 1} z ${existingProgress.total_steps}`, 'info')
+        }
       }
     } catch (err) {
       console.error('Error loading progress:', err)
@@ -281,10 +301,10 @@ Zwróć JSON:
       
       if (!res.ok) throw new Error('Failed to generate subtasks')
       
-      const data = await res.json()
+      const data: BreakdownAPIResponse = await res.json()
       
       if (data.subtasks && data.subtasks.length > 0) {
-        const generatedSubtasks: Subtask[] = data.subtasks.map((st: any, idx: number) => ({
+        const generatedSubtasks: Subtask[] = data.subtasks.map((st: AISubtaskResponse, idx: number) => ({
           id: `subtask-${Date.now()}-${idx}`,
           title: st.title,
           description: st.description,
@@ -339,10 +359,10 @@ Zwróć JSON:
       
       if (!res.ok) throw new Error('Failed to generate subtask')
       
-      const data = await res.json()
+      const data: BreakdownAPIResponse = await res.json()
       
       if (data.subtasks && data.subtasks.length > 0) {
-        const generatedSubtasks: Subtask[] = data.subtasks.map((st: any, idx: number) => ({
+        const generatedSubtasks: Subtask[] = data.subtasks.map((st: AISubtaskResponse, idx: number) => ({
           id: `subtask-${Date.now()}-${idx}`,
           title: st.title,
           description: st.description,
@@ -392,10 +412,10 @@ Zwróć JSON:
       
       if (!res.ok) throw new Error('Failed to generate subtask')
       
-      const data = await res.json()
+      const data: BreakdownAPIResponse = await res.json()
       
       if (data.subtasks && data.subtasks.length > 0) {
-        const generatedSubtasks: Subtask[] = data.subtasks.map((st: any, idx: number) => ({
+        const generatedSubtasks: Subtask[] = data.subtasks.map((st: AISubtaskResponse, idx: number) => ({
           id: `subtask-${Date.now()}-${idx}`,
           title: st.title,
           description: st.description,
@@ -444,6 +464,80 @@ Zwróć JSON:
     } catch (err) {
       console.error('Error auto-creating subtasks:', err)
       showToast('Nie udało się automatycznie utworzyć kroków', 'error')
+    }
+  }
+
+  /**
+   * Regenerate subtasks when user returns to saved progress
+   * 
+   * This function calls the AI API to regenerate the step-by-step breakdown
+   * based on the saved progress. It handles mode-specific parameters and
+   * restores the user's position (current step and completed steps).
+   * 
+   * @param existingProgress - The saved progress including mode, step count, and completion status
+   * @returns Promise<boolean> - true if regeneration succeeded, false if it failed
+   * 
+   * Behavior:
+   * - For 'stuck' mode: includes Q&A context if available
+   * - For 'crisis' mode: sets maxMinutes to 5
+   * - For 'light' mode: uses default parameters
+   * - On failure: falls back to mode selection screen and returns false
+   * - On success: restores subtasks with completion status and current position, returns true
+   */
+  const regenerateSubtasksForMode = async (existingProgress: AIAssistantProgress): Promise<boolean> => {
+    setIsGeneratingSubtasks(true)
+    setViewMode('single-subtask')
+    
+    try {
+      const requestBody: BreakdownRequestBody = {
+        taskContent: task.content,
+        taskDescription: task.description,
+        mode: existingProgress.mode,
+        maxSubtasks: existingProgress.total_steps
+      }
+      
+      // Add mode-specific parameters
+      if (existingProgress.mode === 'stuck' && existingProgress.qa_context) {
+        requestBody.qaContext = existingProgress.qa_context
+      } else if (existingProgress.mode === 'crisis') {
+        requestBody.maxMinutes = 5
+      }
+      
+      const res = await fetch('/api/ai/breakdown-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      })
+      
+      if (!res.ok) {
+        const errorText = await res.text().catch(() => 'Unknown error')
+        throw new Error(`Failed to regenerate subtasks (HTTP ${res.status}): ${errorText}`)
+      }
+      
+      const data: BreakdownAPIResponse = await res.json()
+      
+      if (data.subtasks && data.subtasks.length > 0) {
+        const defaultMinutes = existingProgress.mode === 'crisis' ? 5 : 15
+        const regeneratedSubtasks: Subtask[] = data.subtasks.map((st: AISubtaskResponse, idx: number) => ({
+          id: `subtask-${Date.now()}-${idx}`,
+          title: st.title,
+          description: st.description,
+          estimatedMinutes: st.estimatedMinutes || defaultMinutes,
+          completed: existingProgress.completed_step_indices.includes(idx)
+        }))
+        
+        setSubtasks(regeneratedSubtasks)
+        setCurrentSubtaskIndex(existingProgress.current_step_index)
+        return true
+      }
+      return false
+    } catch (err) {
+      console.error('Error regenerating subtasks:', err)
+      // Fall back to mode selection if regeneration fails
+      setViewMode('mode-selection')
+      return false
+    } finally {
+      setIsGeneratingSubtasks(false)
     }
   }
 
@@ -504,20 +598,12 @@ Zwróć JSON:
     onClose()
   }
 
-  // Handle "Cancel" - delete progress and close
-  const handleCancel = async () => {
-    if (progress) {
-      await deleteProgress(progress.id)
-    }
-    resetModal()
+  // Handle "Anuluj" (Cancel) button - save progress and close
+  // Note: This has the same behavior as handleSaveAndClose (used by X button in header)
+  // Progress is automatically saved after each step completion, so we just close the modal
+  const handleCancel = () => {
+    showToast('Postęp zapisany. Możesz wrócić później!', 'info')
     onClose()
-  }
-
-  // Navigate back to previous step
-  const handlePreviousStep = () => {
-    if (currentSubtaskIndex > 0) {
-      setCurrentSubtaskIndex(currentSubtaskIndex - 1)
-    }
   }
 
   // Generate next subtask after completing current one (for dynamic generation)
@@ -959,15 +1045,6 @@ Zwróć JSON:
                       
                       {/* Actions */}
                       <div className="flex gap-3 pt-2">
-                        {currentSubtaskIndex > 0 && (
-                          <button
-                            onClick={handlePreviousStep}
-                            className="px-4 py-3 border-2 border-gray-300 rounded-xl hover:bg-gray-50 transition font-medium text-gray-700 flex items-center gap-2"
-                          >
-                            <ArrowLeft size={16} />
-                            Cofnij
-                          </button>
-                        )}
                         <button
                           onClick={handleCancel}
                           className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-xl hover:bg-gray-50 transition font-medium text-gray-700"
