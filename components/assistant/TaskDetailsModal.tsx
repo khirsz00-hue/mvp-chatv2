@@ -616,9 +616,11 @@ W 1-2 zwięzłych zdaniach wyjaśnij jak rozumiesz to zadanie, bez dodatkowych k
     }
 
     syncTimer()
+    const interval = setInterval(syncTimer, 1000) // Update every second
     window.addEventListener('timerStateChanged', syncTimer)
     window.addEventListener('storage', syncTimer)
     return () => {
+      clearInterval(interval)
       window.removeEventListener('timerStateChanged', syncTimer)
       window.removeEventListener('storage', syncTimer)
     }
