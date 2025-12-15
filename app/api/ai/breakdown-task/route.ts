@@ -38,30 +38,32 @@ export async function POST(req: Request) {
     
     let modeInstructions = ''
     let maxCandidates = maxSubtasks * 2 // Generate more candidates for evaluation
+    let timeConstraint = `Czas: 5-${maxMinutes} minut każdy`
     
     if (mode === 'light') {
       modeInstructions = `
 TRYB: LEKKI
 - Wygeneruj ${maxSubtasks} subtaski (pierwszy główny + ${maxSubtasks - 1} zapasowe)
-- Czas: 5-20 minut każdy
+- ${timeConstraint}
 - NIE zadawaj pytań
 - Jeden subtask = jeden sensowny krok do przodu`
     } else if (mode === 'stuck') {
       modeInstructions = `
 TRYB: NIE WIEM JAK ZACZĄĆ
 - Wygeneruj TYLKO 1 konkretny pierwszy ruch
-- Czas: 10-20 minut
+- Czas: 10-${maxMinutes} minut
 - Na podstawie odpowiedzi użytkownika
 - NIE generuj planu, tylko pierwszy krok`
       maxCandidates = 3
     } else if (mode === 'crisis') {
       modeInstructions = `
 TRYB: KRYZYSOWY
-- Wygeneruj TYLKO 1 krok ≤ 5 minut
+- Wygeneruj TYLKO 1 krok ≤ ${maxMinutes} minut
 - Maksymalnie prosty i łatwy
 - Bez presji, bez oceniania
 - To tylko pierwszy mikro-ruch`
       maxCandidates = 3
+      timeConstraint = `Czas: MAKSYMALNIE ${maxMinutes} minut`
     }
     
     // STAGE 1: Generate candidate subtasks
@@ -104,7 +106,14 @@ Zwróć JSON:
       response_format: { type: 'json_object' }
     })
     
-    const generationResponse = JSON.parse(generationCompletion.choices[0].message.content || '{"candidates":[]}')
+    let generationResponse
+    try {
+      generationResponse = JSON.parse(generationCompletion.choices[0].message.content || '{"candidates":[]}')
+    } catch (parseErr) {
+      console.error('Failed to parse generation response:', parseErr)
+      throw new Error('AI returned invalid JSON for subtask generation')
+    }
+    
     let candidates = generationResponse.candidates || []
     
     // Filter out forbidden patterns
@@ -149,7 +158,15 @@ Zwróć JSON:
       response_format: { type: 'json_object' }
     })
     
-    const evaluationResponse = JSON.parse(evaluationCompletion.choices[0].message.content || '{"selected":[]}')
+    let evaluationResponse
+    try {
+      evaluationResponse = JSON.parse(evaluationCompletion.choices[0].message.content || '{"selected":[]}')
+    } catch (parseErr) {
+      console.error('Failed to parse evaluation response:', parseErr)
+      // Fallback to selecting first candidates if evaluation fails
+      evaluationResponse = { selected: Array.from({ length: Math.min(maxSubtasks, candidates.length) }, (_, i) => i + 1) }
+    }
+    
     const selectedIndices = evaluationResponse.selected || []
     
     // Get final subtasks
