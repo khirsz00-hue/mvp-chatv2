@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import Dialog from '@/components/ui/Dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/Dialog'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { useToast } from '@/components/ui/Toast'
@@ -131,14 +131,14 @@ export function SubtaskModal({
   const totalDuration = generatedSubtasks.reduce((sum, s) => sum + s.estimated_duration, 0)
 
   return (
-    <Dialog open onClose={onClose}>
-      <Dialog.Content className="max-w-2xl">
-        <Dialog.Header>
-          <Dialog.Title>Generuj kroki dla zadania</Dialog.Title>
-          <Dialog.Description>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Generuj kroki dla zadania</DialogTitle>
+          <DialogDescription>
             {task.title}
-          </Dialog.Description>
-        </Dialog.Header>
+          </DialogDescription>
+        </DialogHeader>
 
         <div className="space-y-6">
           {/* Detail Level Selector */}
@@ -234,17 +234,17 @@ export function SubtaskModal({
 
           {/* Generate Button */}
           {!showFeedbackButtons && (
-            <Dialog.Footer>
+            <DialogFooter>
               <Button variant="ghost" onClick={onClose}>
                 Anuluj
               </Button>
               <Button onClick={handleGenerate} disabled={loading}>
                 {loading ? 'Generuję...' : '🧠 Generuj kroki'}
               </Button>
-            </Dialog.Footer>
+            </DialogFooter>
           )}
         </div>
-      </Dialog.Content>
+      </DialogContent>
     </Dialog>
   )
 }

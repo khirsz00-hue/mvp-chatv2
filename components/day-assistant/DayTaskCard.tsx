@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import Card from '@/components/ui/Card'
+import { Card, CardContent } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import { 
@@ -56,7 +56,7 @@ export function DayTaskCard({
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
     >
-      <Card.Content className="p-4">
+      <CardContent className="p-4">
         <div className="flex items-start justify-between gap-4">
           {/* Task Info */}
           <div className="flex-1">
@@ -197,7 +197,7 @@ export function DayTaskCard({
             )}
           </div>
         </div>
-      </Card.Content>
+      </CardContent>
     </Card>
   )
 }
