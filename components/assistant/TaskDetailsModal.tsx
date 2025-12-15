@@ -219,6 +219,9 @@ export function TaskDetailsModal({
   const [loadingAISuggestions, setLoadingAISuggestions] = useState(false)
   const [timeTrackingExpanded, setTimeTrackingExpanded] = useState(false)
   const [activeTimeTab, setActiveTimeTab] = useState<'manual' | 'pomodoro'>('manual')
+  const [historyExpanded, setHistoryExpanded] = useState(false)
+  const [showClarifyModal, setShowClarifyModal] = useState(false)
+  const [clarificationText, setClarificationText] = useState('')
 
   const [aiUnderstanding, setAiUnderstanding] = useState('')
   const [loadingAI, setLoadingAI] = useState(false)
@@ -307,14 +310,13 @@ Opis: ${currentTask.description || ''}
 
 Kontekst doprecyzowania: ${clarificationContext}
 
-Zaktualizuj swoją analizę zadania uwzględniając nowy kontekst. Bądź wspierający i konkretny (2-3 zdania).
+Zaktualizuj swoją analizę zadania uwzględniając nowy kontekst. Odpowiedz w 1-2 zwięzłych zdaniach, jak rozumiesz to zadanie.
 `
       : `
 Zadanie: ${currentTask.content}
 Opis: ${currentTask.description || ''}
 
-W 2–3 zdaniach wyjaśnij jak rozumiesz to zadanie.
-Bądź wspierający i konkretny.
+W 1-2 zwięzłych zdaniach wyjaśnij jak rozumiesz to zadanie, bez dodatkowych komentarzy o tym jak chcesz pomóc.
 `
 
     try {
@@ -747,9 +749,14 @@ Bądź wspierający i konkretny.
   }
 
   const handleClarify = async () => {
-    const clarification = prompt('Napisz, co chcesz doprecyzować w tym zadaniu:')
-    if (clarification && task) {
-      await fetchAIUnderstanding(task, true, clarification)
+    setShowClarifyModal(true)
+  }
+
+  const handleSubmitClarification = async () => {
+    if (clarificationText && task) {
+      await fetchAIUnderstanding(task, true, clarificationText)
+      setShowClarifyModal(false)
+      setClarificationText('')
     }
   }
 
@@ -882,101 +889,170 @@ Bądź wspierający i konkretny.
               aria-label="Tytuł zadania"
               aria-describedby="ai-understanding-panel"
             />
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex flex-wrap gap-2 text-xs md:text-sm flex-1">
-                {dueDate && (
-                  <Badge variant="outline" className="gap-1">
-                    <CalendarBlank size={14} />
-                    <span className="hidden sm:inline">{formatDateSafely(dueDate)}</span>
-                    <span className="sm:hidden">{format(parseISO(dueDate), 'dd MMM', { locale: pl })}</span>
-                  </Badge>
-                )}
-                <Badge variant="secondary" className="gap-1">
-                  <Flag size={14} /> P{priority}
+            <div className="flex flex-wrap gap-2 text-xs md:text-sm">
+              {dueDate && (
+                <Badge variant="outline" className="gap-1">
+                  <CalendarBlank size={14} />
+                  <span className="hidden sm:inline">{formatDateSafely(dueDate)}</span>
+                  <span className="sm:hidden">{format(parseISO(dueDate), 'dd MMM', { locale: pl })}</span>
                 </Badge>
-                {projectName && (
-                  <Badge variant="outline" className="gap-1">
-                    <FolderOpen size={14} />
-                    <span className="max-w-[100px] md:max-w-none truncate">
-                      {projectName}
-                    </span>
-                  </Badge>
-                )}
-                {labels.map(label => (
-                  <Badge key={label} className="bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 border border-purple-200">
-                    <Tag size={12} />
-                    {label}
-                  </Badge>
-                ))}
-                {estimatedMinutes > 0 && (
-                  <Badge variant="outline" className="gap-1">
-                    <Clock size={14} />
-                    {estimatedMinutes}min
-                  </Badge>
-                )}
-              </div>
-              <Button
-                size="sm"
-                onClick={handleAISuggestions}
-                disabled={loadingAISuggestions || !title}
-                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shrink-0"
-              >
-                <Sparkle size={14} weight="fill" />
-                <span className="hidden sm:inline">Sugestie AI</span>
-              </Button>
+              )}
+              <Badge variant="secondary" className="gap-1">
+                <Flag size={14} /> P{priority}
+              </Badge>
+              {projectName && (
+                <Badge variant="outline" className="gap-1">
+                  <FolderOpen size={14} />
+                  <span className="max-w-[100px] md:max-w-none truncate">
+                    {projectName}
+                  </span>
+                </Badge>
+              )}
+              {labels.map(label => (
+                <Badge key={label} className="bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 border border-purple-200">
+                  <Tag size={12} />
+                  {label}
+                </Badge>
+              ))}
+              {estimatedMinutes > 0 && (
+                <Badge variant="outline" className="gap-1">
+                  <Clock size={14} />
+                  {estimatedMinutes}min
+                </Badge>
+              )}
             </div>
           </div>
 
           {/* Main Content - Single Column Layout */}
           <div className="space-y-4 md:space-y-6">
-              {/* AI Understanding Section */}
-              <Card className="p-4 md:p-6 bg-gradient-to-br from-purple-50 via-white to-pink-50 border-purple-200 shadow-lg">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                  <div className="flex items-center gap-2 text-purple-800">
-                    <Brain size={24} weight="fill" />
-                    <span className="font-bold text-base md:text-lg">Jak AI rozumie to zadanie</span>
+              {/* Properties - MOVED TO TOP */}
+              <Card className="p-4 md:p-6 shadow-lg border-gray-200">
+                <div className="flex items-center justify-between gap-2 mb-4">
+                  <div className="flex items-center gap-2 font-bold text-base md:text-lg">
+                    <Flag size={20} weight="bold" /> Właściwości
                   </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      onClick={handleClarify} 
-                      disabled={loadingAI}
-                      className="border-purple-300 hover:bg-purple-100 text-purple-700"
-                    >
-                      <Sparkle size={14} />
-                      <span className="hidden sm:inline">Doprecyzuj</span>
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      onClick={() => setShowChat(true)} 
-                      disabled={loadingAI}
-                      className="border-purple-300 hover:bg-purple-100 text-purple-700"
-                    >
-                      <ChatCircle size={14} />
-                      <span className="hidden sm:inline">Rozmowa</span>
-                    </Button>
-                  </div>
+                  <Button
+                    size="sm"
+                    onClick={handleAISuggestions}
+                    disabled={loadingAISuggestions || !title}
+                    variant="ghost"
+                    className="text-xs text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                  >
+                    <Sparkle size={12} weight="fill" />
+                    Sugestie AI
+                  </Button>
                 </div>
-                <div
-                  id="ai-understanding-panel"
-                  className="rounded-xl bg-white/90 border-2 border-purple-200 p-5 md:p-6 text-sm md:text-base text-purple-900 min-h-[120px] shadow-inner"
-                >
-                  {loadingAI ? (
-                    <div className="flex items-center gap-2 text-purple-600">
-                      <ArrowClockwise size={16} className="animate-spin" />
-                      Analizuję zadanie…
+                
+                {/* Compact Grid Layout */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                    <p className="text-xs text-gray-600 mb-2 flex items-center gap-1 font-medium">
+                      <CalendarBlank size={12} /> Termin
+                    </p>
+                    <Input 
+                      type="date" 
+                      value={dueDate} 
+                      onChange={e => setDueDate(e.target.value)}
+                      className="text-sm"
+                    />
+                  </div>
+                  
+                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                    <p className="text-xs text-gray-600 mb-2 flex items-center gap-1 font-medium">
+                      <Flag size={12} /> Priorytet
+                    </p>
+                    <Select
+                      value={String(priority)}
+                      onChange={e => {
+                        const next = Number(e.target.value)
+                        if ([1, 2, 3, 4].includes(next)) {
+                          setPriority(next as 1 | 2 | 3 | 4)
+                        }
+                      }}
+                      className="text-sm"
+                    >
+                      <SelectOption value="1">P1 - 🔴 Krytyczne</SelectOption>
+                      <SelectOption value="2">P2 - 🟠 Wysokie</SelectOption>
+                      <SelectOption value="3">P3 - 🟡 Normalne</SelectOption>
+                      <SelectOption value="4">P4 - 🔵 Niskie</SelectOption>
+                    </Select>
+                  </div>
+                  
+                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                    <p className="text-xs text-gray-600 mb-2 flex items-center gap-1 font-medium">
+                      <FolderOpen size={12} /> Projekt
+                    </p>
+                    <Select
+                      value={projectId}
+                      onChange={e => {
+                        const selectedProject = projects.find(p => p.id === e.target.value)
+                        setProjectId(e.target.value)
+                        setProjectName(selectedProject?.name || '')
+                      }}
+                      className="text-sm"
+                    >
+                      <SelectOption value="">Brak projektu</SelectOption>
+                      {projects.map(project => (
+                        <SelectOption key={project.id} value={project.id}>
+                          {project.name}
+                        </SelectOption>
+                      ))}
+                    </Select>
+                  </div>
+
+                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                    <p className="text-xs text-gray-600 mb-2 flex items-center gap-1 font-medium">
+                      <Clock size={12} /> Estymowany czas (min)
+                    </p>
+                    <Input
+                      type="number"
+                      value={estimatedMinutes || ''}
+                      onChange={e => setEstimatedMinutes(Number(e.target.value) || 0)}
+                      placeholder="0"
+                      min="0"
+                      className="text-sm"
+                    />
+                  </div>
+                  
+                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-100 sm:col-span-2">
+                    <p className="text-xs text-gray-600 mb-2 flex items-center gap-1 font-medium">
+                      <Tag size={12} /> Etykiety
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {labels.map(label => (
+                        <Badge 
+                          key={label} 
+                          variant="outline" 
+                          className="text-xs border-purple-200 bg-purple-50 text-purple-700 flex items-center gap-1 cursor-pointer hover:bg-purple-100"
+                          onClick={() => handleRemoveLabel(label)}
+                        >
+                          {label}
+                          <X size={12} />
+                        </Badge>
+                      ))}
                     </div>
-                  ) : aiUnderstanding ? (
-                    <p className="leading-relaxed">{aiUnderstanding}</p>
-                  ) : (
-                    <p className="text-purple-600 italic">AI przygotowuje interpretację zadania...</p>
-                  )}
+                    <div className="flex gap-2">
+                      <Input
+                        value={newLabel}
+                        onChange={e => setNewLabel(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleAddLabel()}
+                        placeholder="Nowa etykieta..."
+                        className="text-xs flex-1"
+                      />
+                      <Button
+                        size="sm"
+                        onClick={handleAddLabel}
+                        disabled={!newLabel.trim()}
+                        className="bg-purple-600 hover:bg-purple-700"
+                      >
+                        <Plus size={12} />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </Card>
 
-              {/* Description Section */}
+              {/* Description Section - MOVED UP */}
               <Card className="p-4 md:p-6 space-y-3 shadow-lg border-gray-200">
                 <div className="flex items-center gap-2 font-bold text-base md:text-lg text-gray-800">
                   <Clock size={20} weight="bold" /> Opis zadania
@@ -985,9 +1061,56 @@ Bądź wspierający i konkretny.
                   value={description}
                   onChange={e => setDescription(e.target.value)}
                   placeholder="Dodaj szczegółowy kontekst, linki, checklistę lub notatki…"
-                  rows={6}
+                  rows={4}
                   className="resize-none focus:ring-2 focus:ring-purple-500 text-sm md:text-base"
                 />
+              </Card>
+
+              {/* AI Understanding Section - MADE MORE COMPACT */}
+              <Card className="p-4 md:p-5 bg-gradient-to-br from-purple-50 via-white to-pink-50 border-purple-200 shadow-lg">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-2 text-purple-800">
+                    <Brain size={20} weight="fill" />
+                    <span className="font-bold text-sm md:text-base">Jak AI rozumie to zadanie</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={handleClarify} 
+                      disabled={loadingAI}
+                      className="border-purple-300 hover:bg-purple-100 text-purple-700 text-xs"
+                    >
+                      <Sparkle size={12} />
+                      <span className="hidden sm:inline">Doprecyzuj</span>
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => setShowBreakdown(true)} 
+                      disabled={loadingAI}
+                      className="border-purple-300 hover:bg-purple-100 text-purple-700 text-xs"
+                    >
+                      <Brain size={12} />
+                      <span className="hidden sm:inline">Wygeneruj plan</span>
+                    </Button>
+                  </div>
+                </div>
+                <div
+                  id="ai-understanding-panel"
+                  className="rounded-lg bg-white/90 border border-purple-200 p-3 md:p-4 text-xs md:text-sm text-purple-900 min-h-[60px] shadow-inner"
+                >
+                  {loadingAI ? (
+                    <div className="flex items-center gap-2 text-purple-600">
+                      <ArrowClockwise size={14} className="animate-spin" />
+                      Analizuję zadanie…
+                    </div>
+                  ) : aiUnderstanding ? (
+                    <p className="leading-relaxed">{aiUnderstanding}</p>
+                  ) : (
+                    <p className="text-purple-600 italic">AI przygotowuje interpretację zadania...</p>
+                  )}
+                </div>
               </Card>
 
               {/* Subtasks Section */}
@@ -1068,315 +1191,209 @@ Bądź wspierający i konkretny.
                 </div>
               </Card>
 
-              {/* Timer & Pomodoro */}
+              {/* Timer & Pomodoro - COLLAPSED BY DEFAULT */}
               <Card className="p-4 md:p-6 shadow-lg border-gray-200 bg-gradient-to-br from-blue-50 to-cyan-50">
-                <div className="flex items-center justify-between mb-4">
+                <button
+                  onClick={() => setTimeTrackingExpanded(!timeTrackingExpanded)}
+                  className="w-full flex items-center justify-between mb-3"
+                >
                   <div className="flex items-center gap-2 font-bold text-base md:text-lg">
                     <Timer size={20} weight="bold" /> Mierzenie czasu
                   </div>
-                  <Badge 
-                    variant={isTimerActiveForTask ? 'default' : 'outline'} 
-                    className={isTimerActiveForTask ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white' : ''}
-                  >
-                    {isTimerActiveForTask ? (timerInfo.isPomodoro ? '🍅' : '⏱️') : '⏸️'}
-                  </Badge>
-                </div>
-                
-                {/* Timer Display */}
-                <div className="bg-white rounded-xl p-5 md:p-6 mb-4 shadow-inner border-2 border-blue-200">
-                  <div className="text-center">
-                    <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">
-                      {isTimerActiveForTask ? (timerInfo.isPomodoro ? 'Pomodoro Aktywne' : 'Timer Aktywny') : 'Czas pracy'}
-                    </p>
-                    <p className="text-3xl md:text-4xl font-bold text-gray-900 font-mono mb-1">
-                      {formatStopwatch(totalTimeWorked)}
-                    </p>
-                    {timerInfo.isPomodoro && timerInfo.pomodoroPhase && (
-                      <p className="text-xs text-gray-600">
-                        {timerInfo.pomodoroPhase === 'work' ? '🎯 Praca' : 
-                         timerInfo.pomodoroPhase === 'shortBreak' ? '☕ Krótka przerwa' : 
-                         '🌴 Długa przerwa'}
-                        {timerInfo.pomodoroRemaining !== undefined && 
-                          ` · ${formatStopwatch(timerInfo.pomodoroRemaining)} pozostało`
-                        }
-                      </p>
-                    )}
-                  </div>
-                </div>
-                
-                {/* Timer Controls */}
-                <div className="grid grid-cols-2 gap-2 mb-3">
-                  <Button
-                    size="sm"
-                    variant={isTimerActiveForTask && !timerInfo.isPomodoro ? 'outline' : 'default'}
-                    onClick={() => startTimer(task.id, title || task.content)}
-                    className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
-                  >
-                    <Play size={16} weight="fill" /> Start
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    onClick={() => stopTimer()}
-                    disabled={!isTimerActiveForTask}
-                  >
-                    <Stop size={16} weight="fill" /> Stop
-                  </Button>
-                </div>
-                
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  onClick={() => setShowPomodoro(true)}
-                  className="w-full border-blue-300 hover:bg-blue-100 text-blue-700 mb-3"
-                >
-                  <Lightning size={14} weight="fill" /> Uruchom Pomodoro
-                </Button>
-
-                {/* Time Tracking History - Collapsible */}
-                <div className="border-t-2 border-blue-200 pt-3">
-                  <button
-                    onClick={() => setTimeTrackingExpanded(!timeTrackingExpanded)}
-                    className="w-full flex items-center justify-between text-sm font-semibold text-blue-800 hover:text-blue-900 transition-colors"
-                  >
-                    <span>Śledzenie czasu</span>
+                  <div className="flex items-center gap-2">
+                    <Badge 
+                      variant={isTimerActiveForTask ? 'default' : 'outline'} 
+                      className={isTimerActiveForTask ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white' : ''}
+                    >
+                      {isTimerActiveForTask ? (timerInfo.isPomodoro ? '🍅' : '⏱️') : '⏸️'}
+                    </Badge>
                     {timeTrackingExpanded ? <CaretUp size={16} /> : <CaretDown size={16} />}
-                  </button>
+                  </div>
+                </button>
 
-                  {timeTrackingExpanded && (
-                    <div className="mt-3 space-y-3">
-                      {/* Tabs */}
-                      <div className="flex gap-2 border-b border-blue-200">
-                        <button
-                          onClick={() => setActiveTimeTab('manual')}
-                          className={`px-3 py-2 text-xs font-medium transition-colors ${
-                            activeTimeTab === 'manual'
-                              ? 'border-b-2 border-blue-600 text-blue-800'
-                              : 'text-gray-600 hover:text-blue-700'
-                          }`}
-                        >
-                          Manualny
-                        </button>
-                        <button
-                          onClick={() => setActiveTimeTab('pomodoro')}
-                          className={`px-3 py-2 text-xs font-medium transition-colors ${
-                            activeTimeTab === 'pomodoro'
-                              ? 'border-b-2 border-blue-600 text-blue-800'
-                              : 'text-gray-600 hover:text-blue-700'
-                          }`}
-                        >
-                          Pomodoro
-                        </button>
-                      </div>
-
-                      {/* Tab Content */}
-                      <div className="bg-white rounded-lg p-3 max-h-48 overflow-y-auto">
-                        {activeTimeTab === 'manual' ? (
-                          <div className="space-y-2">
-                            {getTimerSessions().length === 0 ? (
-                              <p className="text-xs text-gray-500 text-center py-4">
-                                Brak sesji manualnych
-                              </p>
-                            ) : (
-                              getTimerSessions().map((session: any, idx: number) => (
-                                <div
-                                  key={idx}
-                                  className="flex items-center justify-between text-xs border-b border-gray-100 pb-2"
-                                >
-                                  <div>
-                                    <p className="font-medium text-gray-800">
-                                      {formatStopwatch(session.durationSeconds)}
-                                    </p>
-                                    <p className="text-gray-500">
-                                      {format(parseISO(session.startTime), 'dd MMM HH:mm', { locale: pl })}
-                                    </p>
-                                  </div>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            {getPomodoroSessions().length === 0 ? (
-                              <p className="text-xs text-gray-500 text-center py-4">
-                                Brak sesji pomodoro
-                              </p>
-                            ) : (
-                              getPomodoroSessions().map((session: any, idx: number) => (
-                                <div
-                                  key={idx}
-                                  className="flex items-center justify-between text-xs border-b border-gray-100 pb-2"
-                                >
-                                  <div>
-                                    <p className="font-medium text-gray-800">
-                                      🍅 {formatStopwatch(session.durationSeconds)}
-                                    </p>
-                                    <p className="text-gray-500">
-                                      {format(parseISO(session.startTime), 'dd MMM HH:mm', { locale: pl })}
-                                    </p>
-                                  </div>
-                                </div>
-                              ))
-                            )}
-                          </div>
+                {timeTrackingExpanded && (
+                  <>
+                    {/* Timer Display */}
+                    <div className="bg-white rounded-xl p-5 md:p-6 mb-4 shadow-inner border-2 border-blue-200">
+                      <div className="text-center">
+                        <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">
+                          {isTimerActiveForTask ? (timerInfo.isPomodoro ? 'Pomodoro Aktywne' : 'Timer Aktywny') : 'Czas pracy'}
+                        </p>
+                        <p className="text-3xl md:text-4xl font-bold text-gray-900 font-mono mb-1">
+                          {formatStopwatch(totalTimeWorked)}
+                        </p>
+                        {timerInfo.isPomodoro && timerInfo.pomodoroPhase && (
+                          <p className="text-xs text-gray-600">
+                            {timerInfo.pomodoroPhase === 'work' ? '🎯 Praca' : 
+                             timerInfo.pomodoroPhase === 'shortBreak' ? '☕ Krótka przerwa' : 
+                             '🌴 Długa przerwa'}
+                            {timerInfo.pomodoroRemaining !== undefined && 
+                              ` · ${formatStopwatch(timerInfo.pomodoroRemaining)} pozostało`
+                            }
+                          </p>
                         )}
                       </div>
                     </div>
-                  )}
-                </div>
-              </Card>
-
-              {/* Properties */}
-              <Card className="p-4 md:p-6 shadow-lg border-gray-200">
-                <div className="flex items-center gap-2 font-bold text-base md:text-lg mb-4">
-                  <Flag size={20} weight="bold" /> Właściwości
-                </div>
-                
-                <div className="space-y-3">
-                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                    <p className="text-xs text-gray-600 mb-2 flex items-center gap-1 font-medium">
-                      <CalendarBlank size={12} /> Termin
-                    </p>
-                    <Input 
-                      type="date" 
-                      value={dueDate} 
-                      onChange={e => setDueDate(e.target.value)}
-                      className="text-sm"
-                    />
-                  </div>
-                  
-                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                    <p className="text-xs text-gray-600 mb-2 flex items-center gap-1 font-medium">
-                      <Flag size={12} /> Priorytet
-                    </p>
-                    <Select
-                      value={String(priority)}
-                      onChange={e => {
-                        const next = Number(e.target.value)
-                        if ([1, 2, 3, 4].includes(next)) {
-                          setPriority(next as 1 | 2 | 3 | 4)
-                        }
-                      }}
-                      className="text-sm"
-                    >
-                      <SelectOption value="1">P1 - 🔴 Krytyczne</SelectOption>
-                      <SelectOption value="2">P2 - 🟠 Wysokie</SelectOption>
-                      <SelectOption value="3">P3 - 🟡 Normalne</SelectOption>
-                      <SelectOption value="4">P4 - 🔵 Niskie</SelectOption>
-                    </Select>
-                  </div>
-                  
-                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                    <p className="text-xs text-gray-600 mb-2 flex items-center gap-1 font-medium">
-                      <FolderOpen size={12} /> Projekt
-                    </p>
-                    <Select
-                      value={projectId}
-                      onChange={e => {
-                        const selectedProject = projects.find(p => p.id === e.target.value)
-                        setProjectId(e.target.value)
-                        setProjectName(selectedProject?.name || '')
-                      }}
-                      className="text-sm"
-                    >
-                      <SelectOption value="">Brak projektu</SelectOption>
-                      {projects.map(project => (
-                        <SelectOption key={project.id} value={project.id}>
-                          {project.name}
-                        </SelectOption>
-                      ))}
-                    </Select>
-                  </div>
-                  
-                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                    <p className="text-xs text-gray-600 mb-2 flex items-center gap-1 font-medium">
-                      <Tag size={12} /> Etykiety
-                    </p>
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      {labels.map(label => (
-                        <Badge 
-                          key={label} 
-                          variant="outline" 
-                          className="text-xs border-purple-200 bg-purple-50 text-purple-700 flex items-center gap-1 cursor-pointer hover:bg-purple-100"
-                          onClick={() => handleRemoveLabel(label)}
-                        >
-                          {label}
-                          <X size={12} />
-                        </Badge>
-                      ))}
-                    </div>
-                    <div className="flex gap-2">
-                      <Input
-                        value={newLabel}
-                        onChange={e => setNewLabel(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && handleAddLabel()}
-                        placeholder="Nowa etykieta..."
-                        className="text-xs flex-1"
-                      />
+                    
+                    {/* Timer Controls */}
+                    <div className="grid grid-cols-2 gap-2 mb-3">
                       <Button
                         size="sm"
-                        onClick={handleAddLabel}
-                        disabled={!newLabel.trim()}
-                        className="bg-purple-600 hover:bg-purple-700"
+                        variant={isTimerActiveForTask && !timerInfo.isPomodoro ? 'outline' : 'default'}
+                        onClick={() => startTimer(task.id, title || task.content)}
+                        className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
                       >
-                        <Plus size={12} />
+                        <Play size={16} weight="fill" /> Start
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => stopTimer()}
+                        disabled={!isTimerActiveForTask}
+                      >
+                        <Stop size={16} weight="fill" /> Stop
                       </Button>
                     </div>
-                  </div>
+                    
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => setShowPomodoro(true)}
+                      className="w-full border-blue-300 hover:bg-blue-100 text-blue-700 mb-3"
+                    >
+                      <Lightning size={14} weight="fill" /> Uruchom Pomodoro
+                    </Button>
 
-                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                    <p className="text-xs text-gray-600 mb-2 flex items-center gap-1 font-medium">
-                      <Clock size={12} /> Estymowany czas (minuty)
-                    </p>
-                    <Input
-                      type="number"
-                      value={estimatedMinutes || ''}
-                      onChange={e => setEstimatedMinutes(Number(e.target.value) || 0)}
-                      placeholder="0"
-                      min="0"
-                      className="text-sm"
-                    />
-                  </div>
-                </div>
-              </Card>
-
-              {/* Change History */}
-              <Card className="p-4 md:p-6 shadow-lg border-gray-200">
-                <div className="flex items-center gap-2 font-bold text-base md:text-lg mb-3">
-                  <ClockClockwise size={20} weight="bold" /> Historia zmian
-                </div>
-                
-                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                  {changeHistory.length === 0 ? (
-                    <div className="text-center py-6 text-gray-400">
-                      <ClockClockwise size={28} weight="light" className="mx-auto mb-2" />
-                      <p className="text-xs">Brak historii zmian</p>
-                    </div>
-                  ) : (
-                    changeHistory.map((change, idx) => (
-                      <div 
-                        key={idx}
-                        className="bg-gray-50 rounded-lg p-3 border border-gray-200 text-xs"
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-semibold text-gray-700">{change.field}</span>
-                          <span className="text-gray-500">
-                            {format(parseISO(change.timestamp), 'HH:mm', { locale: pl })}
-                          </span>
+                    {/* Time Tracking History */}
+                    <div className="border-t-2 border-blue-200 pt-3">
+                      <div className="space-y-3">
+                        {/* Tabs */}
+                        <div className="flex gap-2 border-b border-blue-200">
+                          <button
+                            onClick={() => setActiveTimeTab('manual')}
+                            className={`px-3 py-2 text-xs font-medium transition-colors ${
+                              activeTimeTab === 'manual'
+                                ? 'border-b-2 border-blue-600 text-blue-800'
+                                : 'text-gray-600 hover:text-blue-700'
+                            }`}
+                          >
+                            Manualny
+                          </button>
+                          <button
+                            onClick={() => setActiveTimeTab('pomodoro')}
+                            className={`px-3 py-2 text-xs font-medium transition-colors ${
+                              activeTimeTab === 'pomodoro'
+                                ? 'border-b-2 border-blue-600 text-blue-800'
+                                : 'text-gray-600 hover:text-blue-700'
+                            }`}
+                          >
+                            Pomodoro
+                          </button>
                         </div>
-                        <div className="flex items-center gap-2 text-gray-600">
-                          <span className="line-through text-red-600 truncate max-w-[100px]">
-                            {change.oldValue}
-                          </span>
-                          →
-                          <span className="text-green-600 truncate max-w-[100px]">
-                            {change.newValue}
-                          </span>
+
+                        {/* Tab Content */}
+                        <div className="bg-white rounded-lg p-3 max-h-48 overflow-y-auto">
+                          {activeTimeTab === 'manual' ? (
+                            <div className="space-y-2">
+                              {getTimerSessions().length === 0 ? (
+                                <p className="text-xs text-gray-500 text-center py-4">
+                                  Brak sesji manualnych
+                                </p>
+                              ) : (
+                                getTimerSessions().map((session: any, idx: number) => (
+                                  <div
+                                    key={idx}
+                                    className="flex items-center justify-between text-xs border-b border-gray-100 pb-2"
+                                  >
+                                    <div>
+                                      <p className="font-medium text-gray-800">
+                                        {formatStopwatch(session.durationSeconds)}
+                                      </p>
+                                      <p className="text-gray-500">
+                                        {format(parseISO(session.startTime), 'dd MMM HH:mm', { locale: pl })}
+                                      </p>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              {getPomodoroSessions().length === 0 ? (
+                                <p className="text-xs text-gray-500 text-center py-4">
+                                  Brak sesji pomodoro
+                                </p>
+                              ) : (
+                                getPomodoroSessions().map((session: any, idx: number) => (
+                                  <div
+                                    key={idx}
+                                    className="flex items-center justify-between text-xs border-b border-gray-100 pb-2"
+                                  >
+                                    <div>
+                                      <p className="font-medium text-gray-800">
+                                        🍅 {formatStopwatch(session.durationSeconds)}
+                                      </p>
+                                      <p className="text-gray-500">
+                                        {format(parseISO(session.startTime), 'dd MMM HH:mm', { locale: pl })}
+                                      </p>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
-                    ))
-                  )}
-                </div>
+                    </div>
+                  </>
+                )}
+              </Card>
+
+              {/* Change History - COLLAPSED BY DEFAULT */}
+              <Card className="p-4 md:p-6 shadow-lg border-gray-200">
+                <button
+                  onClick={() => setHistoryExpanded(!historyExpanded)}
+                  className="w-full flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-2 font-bold text-base md:text-lg">
+                    <ClockClockwise size={20} weight="bold" /> Historia zmian
+                  </div>
+                  {historyExpanded ? <CaretUp size={16} /> : <CaretDown size={16} />}
+                </button>
+                
+                {historyExpanded && (
+                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1 mt-3">
+                    {changeHistory.length === 0 ? (
+                      <div className="text-center py-6 text-gray-400">
+                        <ClockClockwise size={28} weight="light" className="mx-auto mb-2" />
+                        <p className="text-xs">Brak historii zmian</p>
+                      </div>
+                    ) : (
+                      changeHistory.map((change, idx) => (
+                        <div 
+                          key={idx}
+                          className="bg-gray-50 rounded-lg p-3 border border-gray-200 text-xs"
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-semibold text-gray-700">{change.field}</span>
+                            <span className="text-gray-500">
+                              {format(parseISO(change.timestamp), 'HH:mm', { locale: pl })}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-gray-600">
+                            <span className="line-through text-red-600 truncate max-w-[100px]">
+                              {change.oldValue}
+                            </span>
+                            →
+                            <span className="text-green-600 truncate max-w-[100px]">
+                              {change.newValue}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
               </Card>
           </div>
         </div>
@@ -1406,6 +1423,49 @@ Bądź wspierający i konkretny.
           task={task}
         />
       )}
+
+      {/* Clarification Modal */}
+      <Dialog open={showClarifyModal} onOpenChange={setShowClarifyModal}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-purple-800">
+              <Sparkle size={20} weight="fill" />
+              Doprecyzuj zadanie
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-gray-600">
+              Opisz, co chcesz doprecyzować lub co wymaga wyjaśnienia w tym zadaniu:
+            </p>
+            <Textarea
+              value={clarificationText}
+              onChange={e => setClarificationText(e.target.value)}
+              placeholder="Np. 'Czy to zadanie dotyczy tylko backend czy również frontend?'"
+              rows={4}
+              className="resize-none focus:ring-2 focus:ring-purple-500"
+            />
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowClarifyModal(false)
+                  setClarificationText('')
+                }}
+              >
+                Anuluj
+              </Button>
+              <Button
+                onClick={handleSubmitClarification}
+                disabled={!clarificationText.trim() || loadingAI}
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+              >
+                <Sparkle size={14} weight="fill" />
+                {loadingAI ? 'Analizuję...' : 'Doprecyzuj'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   )
 }
