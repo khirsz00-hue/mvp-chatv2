@@ -29,6 +29,7 @@ interface JournalAssistantMainProps {
 export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProps) {
   const { showToast } = useToast()
   const [userId, setUserId] = useState<string | null>(null)
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'))
 
   // Metrics state
@@ -65,12 +66,14 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
   // Get user ID
   useEffect(() => {
     const getUser = async () => {
+      setIsCheckingAuth(true)
       const {
         data: { user },
       } = await supabase.auth.getUser()
       if (user) {
         setUserId(user.id)
       }
+      setIsCheckingAuth(false)
     }
     getUser()
   }, [])
@@ -357,6 +360,17 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
       console.error('Error saving entry:', error)
       showToast('Błąd zapisywania wpisu', 'error')
     }
+  }
+
+  if (isCheckingAuth) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold">Journal Assistant</h1>
+        <div className="flex items-center justify-center p-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+        </div>
+      </div>
+    )
   }
 
   if (!userId) {

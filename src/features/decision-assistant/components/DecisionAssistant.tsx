@@ -14,6 +14,7 @@ import { DecisionProcess } from './DecisionProcess'
 export function DecisionAssistant() {
   const { showToast } = useToast()
   const [userId, setUserId] = useState<string | null>(null)
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const [decisions, setDecisions] = useState<Decision[]>([])
   const [loading, setLoading] = useState(false)
   const [showCreateForm, setShowCreateForm] = useState(false)
@@ -29,10 +30,12 @@ export function DecisionAssistant() {
   // Get user ID
   useEffect(() => {
     const getUser = async () => {
+      setIsCheckingAuth(true)
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         setUserId(user.id)
       }
+      setIsCheckingAuth(false)
     }
     getUser()
   }, [])
@@ -177,6 +180,18 @@ export function DecisionAssistant() {
     const newOptions = [...options]
     newOptions[index][field] = value
     setOptions(newOptions)
+  }
+
+  // Check auth loading state
+  if (isCheckingAuth) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold">Asystent Decyzji</h1>
+        <div className="flex items-center justify-center p-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+        </div>
+      </div>
+    )
   }
 
   // No user logged in
