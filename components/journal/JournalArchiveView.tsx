@@ -29,6 +29,7 @@ interface JournalArchiveViewProps {
 export function JournalArchiveView({ onBack }: JournalArchiveViewProps) {
   const { showToast } = useToast()
   const [userId, setUserId] = useState<string | null>(null)
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const [hierarchy, setHierarchy] = useState<ArchiveHierarchy[]>([])
   const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([
     { level: 'years', label: 'Lata' },
@@ -42,12 +43,14 @@ export function JournalArchiveView({ onBack }: JournalArchiveViewProps) {
   // Get user ID
   useEffect(() => {
     const getUser = async () => {
+      setIsCheckingAuth(true)
       const {
         data: { user },
       } = await supabase.auth.getUser()
       if (user) {
         setUserId(user.id)
       }
+      setIsCheckingAuth(false)
     }
     getUser()
   }, [])
@@ -210,6 +213,17 @@ export function JournalArchiveView({ onBack }: JournalArchiveViewProps) {
     // Days view
     const weekData = monthData.weeks?.find((w) => w.week === selectedWeek)
     return weekData?.days || []
+  }
+
+  if (isCheckingAuth) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold">Archiwum Dziennika</h1>
+        <div className="flex items-center justify-center p-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+        </div>
+      </div>
+    )
   }
 
   if (!userId) {

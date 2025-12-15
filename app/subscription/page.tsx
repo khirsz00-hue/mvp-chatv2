@@ -127,6 +127,11 @@ function SubscriptionContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 p-6">
       <div className="max-w-6xl mx-auto space-y-8">
+        <div className="flex items-center justify-between mb-4">
+          <Button onClick={() => router.push('/')} variant="ghost">
+            ← Wróć do asystentów
+          </Button>
+        </div>
         <div className="text-center space-y-2">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-pink bg-clip-text text-transparent">
             Wybierz swój plan
