@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useToast } from '@/components/ui/Toast'
-import Card from '@/components/ui/Card'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import { Fire, Snowflake, PushPin, ArrowsClockwise, Plus } from '@phosphor-icons/react'
 import { EnergyModeSwitcher } from './EnergyModeSwitcher'
@@ -237,11 +237,11 @@ export function DayAssistantView() {
       <div className="flex-1 overflow-y-auto space-y-4">
         {/* NOW Section */}
         <Card className="border-2 border-brand-purple">
-          <Card.Header>
+          <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <Card.Title className="text-xl">NOW - Teraz</Card.Title>
-                <Card.Description>Aktywne zadanie</Card.Description>
+                <CardTitle className="text-xl">NOW - Teraz</CardTitle>
+                <CardDescription>Aktywne zadanie</CardDescription>
               </div>
               {queueState.now && (
                 <Button
@@ -253,8 +253,8 @@ export function DayAssistantView() {
                 </Button>
               )}
             </div>
-          </Card.Header>
-          <Card.Content>
+          </CardHeader>
+          <CardContent>
             {queueState.now ? (
               <DayTaskCard
                 task={queueState.now}
@@ -271,18 +271,18 @@ export function DayAssistantView() {
                 <p className="text-sm">Wybierz zadanie z kolejki NEXT lub dodaj nowe</p>
               </div>
             )}
-          </Card.Content>
+          </CardContent>
         </Card>
 
         {/* NEXT Section */}
         <Card className="border-2 border-green-500/50">
-          <Card.Header>
-            <Card.Title className="text-xl">NEXT - Następne</Card.Title>
-            <Card.Description>
+          <CardHeader>
+            <CardTitle className="text-xl">NEXT - Następne</CardTitle>
+            <CardDescription>
               {queueState.next.length} zadań w kolejce
-            </Card.Description>
-          </Card.Header>
-          <Card.Content>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
             {queueState.next.length > 0 ? (
               <div className="space-y-3">
                 {queueState.next.map((task) => (
@@ -303,16 +303,16 @@ export function DayAssistantView() {
                 <p>Brak zadań w kolejce</p>
               </div>
             )}
-          </Card.Content>
+          </CardContent>
         </Card>
 
         {/* LATER Section */}
         <Card className="border-2 border-gray-300/50">
-          <Card.Header>
+          <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <Card.Title className="text-xl">LATER - Później</Card.Title>
-                <Card.Description>
+                <CardTitle className="text-xl">LATER - Później</CardTitle>
+                <CardDescription>
                   {queueState.laterCount > 0 ? (
                     <span className="text-brand-purple font-semibold">
                       +{queueState.laterCount} zadań
@@ -320,7 +320,7 @@ export function DayAssistantView() {
                   ) : (
                     'Brak zadań'
                   )}
-                </Card.Description>
+                </CardDescription>
               </div>
               {queueState.laterCount > 0 && (
                 <Button
@@ -331,9 +331,9 @@ export function DayAssistantView() {
                 </Button>
               )}
             </div>
-          </Card.Header>
+          </CardHeader>
           {showLaterExpanded && queueState.laterCount > 0 && (
-            <Card.Content>
+            <CardContent>
               <div className="space-y-3">
                 {queueState.later.map((task) => (
                   <DayTaskCard
@@ -348,7 +348,7 @@ export function DayAssistantView() {
                   />
                 ))}
               </div>
-            </Card.Content>
+            </CardContent>
           )}
         </Card>
       </div>

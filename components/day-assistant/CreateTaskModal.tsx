@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import Dialog from '@/components/ui/Dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/Dialog'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
+import Textarea from '@/components/ui/Textarea'
 import { useToast } from '@/components/ui/Toast'
 
 interface CreateTaskModalProps {
@@ -63,14 +63,14 @@ export function CreateTaskModal({ userId, onClose, onCreated }: CreateTaskModalP
   }
 
   return (
-    <Dialog open onClose={onClose}>
-      <Dialog.Content className="max-w-md">
-        <Dialog.Header>
-          <Dialog.Title>Dodaj nowe zadanie</Dialog.Title>
-          <Dialog.Description>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Dodaj nowe zadanie</DialogTitle>
+          <DialogDescription>
             Utwórz nowe zadanie dla asystenta dnia
-          </Dialog.Description>
-        </Dialog.Header>
+          </DialogDescription>
+        </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -111,7 +111,7 @@ export function CreateTaskModal({ userId, onClose, onCreated }: CreateTaskModalP
             />
           </div>
 
-          <Dialog.Footer>
+          <DialogFooter>
             <Button
               type="button"
               variant="ghost"
@@ -123,9 +123,9 @@ export function CreateTaskModal({ userId, onClose, onCreated }: CreateTaskModalP
             <Button type="submit" disabled={loading}>
               {loading ? 'Tworzenie...' : 'Dodaj zadanie'}
             </Button>
-          </Dialog.Footer>
+          </DialogFooter>
         </form>
-      </Dialog.Content>
+      </DialogContent>
     </Dialog>
   )
 }

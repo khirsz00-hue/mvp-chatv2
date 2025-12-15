@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Button from '../ui/Button'
-import { User, SignOut, CreditCard, UserCircle } from '@phosphor-icons/react'
+import { User, SignOut, CreditCard, UserCircle, List, X } from '@phosphor-icons/react'
 import { useRouter } from 'next/navigation'
 
 interface HeaderProps {
@@ -12,9 +12,11 @@ interface HeaderProps {
   } | null
   onSignIn?: () => void
   onSignOut?: () => void
+  onMenuToggle?: () => void
+  isMobileMenuOpen?: boolean
 }
 
-export default function Header({ user, onSignIn, onSignOut }: HeaderProps) {
+export default function Header({ user, onSignIn, onSignOut, onMenuToggle, isMobileMenuOpen }: HeaderProps) {
   const [showMenu, setShowMenu] = useState(false)
   const router = useRouter()
 
@@ -28,6 +30,21 @@ export default function Header({ user, onSignIn, onSignOut }: HeaderProps) {
     <header className="sticky top-0 z-50 glass shadow-glow border-b border-white/20">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center gap-3">
+          {/* Hamburger menu button for mobile */}
+          {user && onMenuToggle && (
+            <button
+              onClick={onMenuToggle}
+              className="lg:hidden p-2 hover:bg-white/10 rounded-lg transition-colors"
+              aria-label={isMobileMenuOpen ? "Zamknij menu" : "Otwórz menu"}
+            >
+              {isMobileMenuOpen ? (
+                <X size={24} className="text-gray-700" />
+              ) : (
+                <List size={24} className="text-gray-700" />
+              )}
+            </button>
+          )}
+          
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-purple to-brand-pink flex items-center justify-center">
             <span className="text-white font-bold text-xl">AI</span>
           </div>

@@ -28,11 +28,17 @@ interface SidebarProps {
   activeView: AssistantId
   onNavigate: (view: AssistantId) => void
   isAdmin?: boolean
+  isMobileMenuOpen?: boolean
 }
 
-export default function Sidebar({ activeView, onNavigate, isAdmin }: SidebarProps) {
+export default function Sidebar({ activeView, onNavigate, isAdmin, isMobileMenuOpen }: SidebarProps) {
   return (
-    <aside className="w-64 min-h-screen bg-white/50 backdrop-blur-sm border-r border-white/20 p-4">
+    <aside className={cn(
+      "w-64 min-h-screen bg-white/50 backdrop-blur-sm border-r border-white/20 p-4 transition-transform duration-300 ease-in-out",
+      "lg:translate-x-0", // Always visible on large screens
+      "fixed lg:relative z-50 lg:z-auto", // Fixed on mobile, relative on desktop
+      isMobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0" // Slide in/out on mobile
+    )}>
       <nav className="space-y-2">
         {assistants.map((assistant, index) => {
           // Hide admin option if user is not admin
