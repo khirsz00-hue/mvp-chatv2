@@ -59,6 +59,26 @@ interface Subtask {
   subtaskId?: string  // Database subtask ID after creation
 }
 
+interface BreakdownRequestBody {
+  taskContent: string
+  taskDescription?: string
+  mode: 'light' | 'stuck' | 'crisis'
+  maxSubtasks: number
+  qaContext?: string
+  maxMinutes?: number
+  completedContext?: string
+}
+
+interface AISubtaskResponse {
+  title: string
+  description: string
+  estimatedMinutes?: number
+}
+
+interface BreakdownAPIResponse {
+  subtasks: AISubtaskResponse[]
+}
+
 type ModeType = 'light' | 'stuck' | 'crisis'
 type ViewMode = 'mode-selection' | 'questions' | 'single-subtask'
 
@@ -279,10 +299,10 @@ Zwróć JSON:
       
       if (!res.ok) throw new Error('Failed to generate subtasks')
       
-      const data = await res.json()
+      const data: BreakdownAPIResponse = await res.json()
       
       if (data.subtasks && data.subtasks.length > 0) {
-        const generatedSubtasks: Subtask[] = data.subtasks.map((st: any, idx: number) => ({
+        const generatedSubtasks: Subtask[] = data.subtasks.map((st: AISubtaskResponse, idx: number) => ({
           id: `subtask-${Date.now()}-${idx}`,
           title: st.title,
           description: st.description,
@@ -337,10 +357,10 @@ Zwróć JSON:
       
       if (!res.ok) throw new Error('Failed to generate subtask')
       
-      const data = await res.json()
+      const data: BreakdownAPIResponse = await res.json()
       
       if (data.subtasks && data.subtasks.length > 0) {
-        const generatedSubtasks: Subtask[] = data.subtasks.map((st: any, idx: number) => ({
+        const generatedSubtasks: Subtask[] = data.subtasks.map((st: AISubtaskResponse, idx: number) => ({
           id: `subtask-${Date.now()}-${idx}`,
           title: st.title,
           description: st.description,
@@ -390,10 +410,10 @@ Zwróć JSON:
       
       if (!res.ok) throw new Error('Failed to generate subtask')
       
-      const data = await res.json()
+      const data: BreakdownAPIResponse = await res.json()
       
       if (data.subtasks && data.subtasks.length > 0) {
-        const generatedSubtasks: Subtask[] = data.subtasks.map((st: any, idx: number) => ({
+        const generatedSubtasks: Subtask[] = data.subtasks.map((st: AISubtaskResponse, idx: number) => ({
           id: `subtask-${Date.now()}-${idx}`,
           title: st.title,
           description: st.description,
@@ -466,15 +486,6 @@ Zwróć JSON:
     setViewMode('single-subtask')
     
     try {
-      interface BreakdownRequestBody {
-        taskContent: string
-        taskDescription?: string
-        mode: 'light' | 'stuck' | 'crisis'
-        maxSubtasks: number
-        qaContext?: string
-        maxMinutes?: number
-      }
-      
       const requestBody: BreakdownRequestBody = {
         taskContent: task.content,
         taskDescription: task.description,
@@ -500,11 +511,11 @@ Zwróć JSON:
         throw new Error(`Failed to regenerate subtasks (HTTP ${res.status}): ${errorText}`)
       }
       
-      const data = await res.json()
+      const data: BreakdownAPIResponse = await res.json()
       
       if (data.subtasks && data.subtasks.length > 0) {
         const defaultMinutes = existingProgress.mode === 'crisis' ? 5 : 15
-        const regeneratedSubtasks: Subtask[] = data.subtasks.map((st: any, idx: number) => ({
+        const regeneratedSubtasks: Subtask[] = data.subtasks.map((st: AISubtaskResponse, idx: number) => ({
           id: `subtask-${Date.now()}-${idx}`,
           title: st.title,
           description: st.description,
@@ -581,9 +592,10 @@ Zwróć JSON:
     onClose()
   }
 
-  // Handle "Anuluj" (Cancel) - save progress and close (same as X button)
+  // Handle "Anuluj" (Cancel) button - save progress and close
+  // Note: This has the same behavior as handleSaveAndClose (used by X button in header)
+  // Progress is automatically saved after each step completion, so we just close the modal
   const handleCancel = () => {
-    // Progress is already saved automatically, just close
     showToast('Postęp zapisany. Możesz wrócić później!', 'info')
     onClose()
   }
