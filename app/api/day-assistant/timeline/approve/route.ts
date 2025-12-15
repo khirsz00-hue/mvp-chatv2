@@ -37,16 +37,29 @@ export async function POST(req: Request) {
 
     // Update linked tasks if any
     if (data.task_ids && data.task_ids.length > 0) {
-      await supabase
+      // Fetch existing tasks to merge metadata
+      const { data: tasks } = await supabase
         .from('day_assistant_tasks')
-        .update({ 
-          metadata: { 
-            scheduled_at: data.start_time,
-            block_id: data.id 
-          } 
-        })
+        .select('id, metadata')
         .in('id', data.task_ids)
         .eq('user_id', userId)
+
+      // Update each task with merged metadata
+      if (tasks) {
+        for (const task of tasks) {
+          await supabase
+            .from('day_assistant_tasks')
+            .update({ 
+              metadata: { 
+                ...(task.metadata || {}),
+                scheduled_at: data.start_time,
+                block_id: data.id 
+              } 
+            })
+            .eq('id', task.id)
+            .eq('user_id', userId)
+        }
+      }
     }
 
     return NextResponse.json({ success: true, event: data })

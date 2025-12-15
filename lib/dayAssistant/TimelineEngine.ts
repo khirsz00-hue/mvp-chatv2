@@ -187,7 +187,8 @@ export function createTaskBlock(
 
   if (!slot) return null
 
-  const blockTitle = `${taskTitles[0]}${taskIds.length > 1 ? ` + ${taskIds.length - 1} więcej` : ''}`
+  const MORE_TEXT = 'więcej'  // TODO: Extract to i18n
+  const blockTitle = `${taskTitles[0]}${taskIds.length > 1 ? ` + ${taskIds.length - 1} ${MORE_TEXT}` : ''}`
 
   return {
     id: `block_${Date.now()}`,
