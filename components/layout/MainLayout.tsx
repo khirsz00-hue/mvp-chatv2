@@ -12,9 +12,9 @@ import { DecisionAssistant } from '@/src/features/decision-assistant/components/
 import SubscriptionWall from '@/components/subscription/SubscriptionWall'
 
 /**
- * SubscriptionWall jest teraz aktywny
- * Naprawiono: Dodano timeout 10 sekund i poprawiono obsługę błędów
- * aby zapobiec infinite loading na głównej stronie
+ * SubscriptionWall jest teraz WYŁĄCZONY
+ * Wyłączono na stałe z powodu powtarzających się problemów z blokowaniem użytkowników
+ * SubscriptionWall miał wcześniej: timeout 10 sekund i poprawioną obsługę błędów
  */
 // Toggle this to disable subscription wall if it causes issues
 const ENABLE_SUBSCRIPTION_WALL = false
