@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import { User } from '@supabase/supabase-js'
 import { TasksAssistant } from '@/components/assistant/TasksAssistant'
+import { DayAssistantView } from '@/components/day-assistant/DayAssistantView'
 import { JournalAssistantWrapper } from '@/components/journal/JournalAssistantWrapper'
 import { DecisionAssistant } from '@/src/features/decision-assistant/components/DecisionAssistant'
 import SubscriptionWall from '@/components/subscription/SubscriptionWall'
@@ -118,7 +119,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     // Odczytaj zapisaną preferencję widoku, jeśli istnieje
     try {
       const stored = localStorage.getItem('active_assistant') as AssistantId | null
-      if (stored && ['tasks', 'planning', 'journal', 'decisions', 'support', 'admin'].includes(stored)) {
+      if (stored && ['tasks', 'day-assistant', 'planning', 'journal', 'decisions', 'support', 'admin'].includes(stored)) {
         setActiveView(stored)
       }
     } catch {}
@@ -134,6 +135,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
     switch (activeView) {
       case 'tasks':
         return <TasksAssistant />
+      
+      case 'day-assistant':
+        return <DayAssistantView />
       
       case 'journal':
         return <JournalAssistantWrapper />

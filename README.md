@@ -5,11 +5,11 @@ Modularna platforma AI zbudowana w **Next.js 14 + Supabase + OpenAI + Tailwind +
 ## 🎯 Asystenci AI
 
 1. 📝 **Todoist Helper** - Zarządzaj zadaniami z AI (w pełni zaimplementowany)
-2. 📅 **AI Planner** - Inteligentne planowanie dnia (w przygotowaniu)
-3. 📔 **Journal** - Codzienny dziennik refleksji (w pełni zaimplementowany)
-4. 🧠 **Decision Assistant** - AI wspierający podejmowanie decyzji (w pełni zaimplementowany)
-4. 🧠 **Decision Assistant** - Framework decyzyjny Six Thinking Hats (w pełni zaimplementowany)
-5. 💬 **Chat Support** - Coaching dla ADHD (w pełni zaimplementowany)
+2. ☀️ **Day Assistant (Asystent Dnia)** - NOW/NEXT/LATER workflow z trybami energii (w pełni zaimplementowany MVP)
+3. 📅 **AI Planner** - Inteligentne planowanie dnia (w przygotowaniu)
+4. 📔 **Journal** - Codzienny dziennik refleksji (w pełni zaimplementowany)
+5. 🧠 **Decision Assistant** - Framework decyzyjny Six Thinking Hats (w pełni zaimplementowany)
+6. 💬 **Chat Support** - Coaching dla ADHD (w pełni zaimplementowany)
 
 ---
 
@@ -29,10 +29,11 @@ Aplikacja wykorzystuje nową strukturę layoutu z glassmorphism i nawigacją:
 ├──────────┬──────────────────────────────────────┤
 │          │                                      │
 │ 📝 Todoist│                                     │
-│ 📅 Planner│     Content Area                    │
-│ 📔 Journal│     (TodoistTasksView lub Chat)     │
-│ 🎩 6 Hats │                                     │
-│ 💬 Chat   │                                     │
+│ ☀️ Day    │     Content Area                    │
+│ 📅 Planner│     (DayAssistantView, Tasks, etc)  │
+│ 📔 Journal│                                     │
+│ 🧠 Decisions                                   │
+│ 💬 Support│                                     │
 │          │                                      │
 │ Sidebar  │                                      │
 │ (glass)  │                                      │
@@ -83,6 +84,57 @@ Dostępne w `components/ui/`:
 - `.shimmer` - efekt shimmer na elementach
 
 Szczegóły w `theme.json` i `tailwind.config.ts`.
+
+---
+
+## ☀️ Asystent Dnia (Day Assistant) - MVP
+
+Asystent Dnia to system zarządzania zadaniami oparty na współpracy z AI w trybie "współpilot". System używa frameworku NOW/NEXT/LATER z trybami energii.
+
+### Główne Funkcje
+- ✅ **NOW/NEXT/LATER** - 3-sekcyjny interfejs kolejki zadań
+- ✅ **Tryby energii** (🔴 Zjazd / 🟡 Normalnie / 🟢 Flow) - ręczny przełącznik
+- ✅ **Akcje użytkownika** - 📌 Musi dziś / 🧊 Nie dziś / 🔥 Mega ważne
+- ✅ **Generator kroków AI** - Automatyczne rozbicie zadań na subtaski z feedbackiem
+- ✅ **Historia decyzji** - Możliwość cofnięcia ostatniej zmiany
+- ✅ **Persystencja w Supabase** - Wszystkie dane bezpiecznie zapisane
+
+### Zasady Działania
+
+**Shared Control:**
+- **Agent** rekomenduje, porządkuje, proponuje następny ruch
+- **Użytkownik** widzi plan, wybiera, nadpisuje, przełącza tryby
+- Agent **nigdy nie zabiera kierownicy**
+
+**NOW (Teraz):**
+- 1 aktywne zadanie + aktualny krok
+- Użytkownik wie dokładnie, co robi teraz
+
+**NEXT (Następne):**
+- 2-5 zadań w kolejce (zależnie od trybu energii)
+- Krótka lista tego, co jest zaplanowane
+
+**LATER (Później):**
+- Reszta zadań (zwinięta, tylko licznik)
+- Użytkownik nie jest zalany listą
+
+### Tryby Energii
+
+- 🔴 **Zjazd (kryzys)**: Kroki ≤5 min, NEXT max 2 pozycje
+- 🟡 **Normalnie**: Kroki 5-20 min, NEXT 2-5 pozycji
+- 🟢 **Flow**: Kroki do 25 min, możliwe bloki podobnych zadań
+
+### Dokumentacja
+Pełna dokumentacja: [docs/DAY_ASSISTANT.md](./docs/DAY_ASSISTANT.md)
+
+### Setup
+```bash
+# Uruchom migrację bazy danych
+# W Supabase SQL Editor: supabase/migrations/20231217_day_assistant.sql
+
+# Lub używając Supabase CLI
+supabase db push
+```
 
 ---
 
