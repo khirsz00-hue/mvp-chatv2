@@ -88,7 +88,19 @@ export async function updateEnergyMode(userId: string, mode: EnergyMode): Promis
 export async function getUserTasks(userId: string, includeCompleted = false): Promise<DayTask[]> {
   let query = supabase
     .from('day_assistant_tasks')
-    .select('*, subtasks:day_assistant_subtasks(*)')
+    .select(`
+      *,
+      day_assistant_subtasks (
+        id,
+        task_id,
+        content,
+        estimated_duration,
+        completed,
+        completed_at,
+        position,
+        created_at
+      )
+    `)
     .eq('user_id', userId)
     .order('position', { ascending: true })
 
@@ -103,7 +115,13 @@ export async function getUserTasks(userId: string, includeCompleted = false): Pr
     return []
   }
 
-  return data as DayTask[]
+  // Transform the data to match DayTask interface
+  const tasks = (data || []).map(task => ({
+    ...task,
+    subtasks: task.day_assistant_subtasks || []
+  }))
+
+  return tasks as DayTask[]
 }
 
 /**
@@ -113,6 +131,8 @@ export async function getQueueState(userId: string, includeLater = false): Promi
   const energyState = await getUserEnergyState(userId)
   const tasks = await getUserTasks(userId)
   
+  console.log(`[getQueueState] userId: ${userId}, tasks count: ${tasks.length}`)
+  
   const mode = energyState?.current_mode || 'normal'
   const constraints = ENERGY_MODE_CONSTRAINTS[mode]
 
@@ -120,6 +140,8 @@ export async function getQueueState(userId: string, includeLater = false): Promi
   const nowTasks = tasks.filter(t => t.priority === 'now')
   const nextTasks = tasks.filter(t => t.priority === 'next')
   const laterTasks = tasks.filter(t => t.priority === 'later')
+
+  console.log(`[getQueueState] Priority distribution - NOW: ${nowTasks.length}, NEXT: ${nextTasks.length}, LATER: ${laterTasks.length}`)
 
   // Take only the first task from NOW
   const now = nowTasks[0] || null

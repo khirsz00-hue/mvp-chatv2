@@ -29,6 +29,10 @@ interface ChatRecommendation {
   type: 'GROUP_TASKS' | 'MOVE_TASK' | 'SIMPLIFY' | 'SCHEDULE_SLOT' | 'ENERGY_CHANGE'
   title: string
   reason: string
+  taskDetails?: Array<{
+    taskId: string
+    title: string
+  }>
   actions: Array<{
     op: string
     [key: string]: any
@@ -241,6 +245,20 @@ export function DayChat({ userId, onActionApply }: DayChatProps) {
                             <p className="text-xs text-muted-foreground mt-1">
                               {rec.reason}
                             </p>
+                            {/* Show task details if available */}
+                            {rec.taskDetails && rec.taskDetails.length > 0 && (
+                              <div className="mt-2 space-y-1">
+                                <p className="text-xs font-semibold text-brand-purple">Zadania:</p>
+                                <ul className="text-xs space-y-0.5 ml-2">
+                                  {rec.taskDetails.map((task, idx) => (
+                                    <li key={task.taskId} className="flex items-start gap-1">
+                                      <span className="text-muted-foreground">•</span>
+                                      <span>{task.title}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
                           </div>
                           <Button
                             size="sm"
