@@ -152,12 +152,19 @@ export default function MainLayout({ children }: MainLayoutProps) {
             </div>
           )
         }
-        // Redirect to admin page
-        router.push('/admin')
+        // Show admin panel navigation instead of auto-redirect
         return (
           <div className="glass p-8 rounded-2xl text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Przekierowywanie do panelu admina...</p>
+            <h2 className="text-2xl font-bold mb-4">Panel Administratora</h2>
+            <p className="text-muted-foreground mb-6">
+              Zarządzaj ustawieniami i treścią aplikacji
+            </p>
+            <button
+              onClick={() => router.push('/admin')}
+              className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-medium hover:opacity-90 transition-opacity"
+            >
+              Przejdź do panelu administratora
+            </button>
           </div>
         )
       
