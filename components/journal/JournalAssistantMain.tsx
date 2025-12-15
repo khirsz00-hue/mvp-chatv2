@@ -7,11 +7,9 @@ import { JournalEntry, TodoistTask } from '@/types/journal'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import Input from '@/components/ui/Input'
-import Textarea from '@/components/ui/Textarea'
 import { useToast } from '@/components/ui/Toast'
 import {
   Calendar,
-  Sparkle,
   Microphone,
   ChartLine,
   FloppyDisk,
@@ -19,8 +17,7 @@ import {
   X,
   Archive as ArchiveIcon,
 } from '@phosphor-icons/react'
-import { format, parseISO } from 'date-fns'
-import { pl } from 'date-fns/locale'
+import { format } from 'date-fns'
 
 interface JournalAssistantMainProps {
   onShowArchive: () => void
@@ -37,18 +34,11 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
   const [motivation, setMotivation] = useState<number>(5)
   const [sleepQuality, setSleepQuality] = useState<number>(5)
   const [hoursSlept, setHoursSlept] = useState<number>(7)
-  const [sleepTime, setSleepTime] = useState<string>('')
-  const [wakeTime, setWakeTime] = useState<string>('')
-  const [plannedTasks, setPlannedTasks] = useState<string>('')
   const [notes, setNotes] = useState<string[]>([])
-  const [comments, setComments] = useState<string[]>([])
-  const [aiSummary, setAiSummary] = useState<string>('')
 
   // UI state
   const [newNote, setNewNote] = useState<string>('')
-  const [newComment, setNewComment] = useState<string>('')
   const [isRecording, setIsRecording] = useState(false)
-  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)
   const [completedTasks, setCompletedTasks] = useState<TodoistTask[]>([])
   const [loadingTasks, setLoadingTasks] = useState(false)
   const [todoistToken, setTodoistToken] = useState<string | null>(null)
@@ -92,24 +82,14 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
       setMotivation(currentEntry.motivation || 5)
       setSleepQuality(currentEntry.sleep_quality || 5)
       setHoursSlept(currentEntry.hours_slept || 7)
-      setSleepTime(currentEntry.sleep_time || '')
-      setWakeTime(currentEntry.wake_time || '')
-      setPlannedTasks(currentEntry.planned_tasks || '')
       setNotes(currentEntry.notes || [])
-      setComments(currentEntry.comments || [])
-      setAiSummary(currentEntry.ai_summary || '')
     } else {
       // Reset to defaults for new entry
       setEnergy(5)
       setMotivation(5)
       setSleepQuality(5)
       setHoursSlept(7)
-      setSleepTime('')
-      setWakeTime('')
-      setPlannedTasks('')
       setNotes([])
-      setComments([])
-      setAiSummary('')
     }
   }, [currentEntry])
 
@@ -242,18 +222,6 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
     setNotes((prev) => prev.filter((_, i) => i !== index))
   }
 
-  // Add comment
-  const handleAddComment = () => {
-    if (!newComment.trim()) return
-    setComments((prev) => [...prev, newComment.trim()])
-    setNewComment('')
-  }
-
-  // Remove comment
-  const handleRemoveComment = (index: number) => {
-    setComments((prev) => prev.filter((_, i) => i !== index))
-  }
-
   // Voice recording
   const startVoiceRecording = () => {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -299,41 +267,6 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
     }
   }
 
-  // Generate AI summary
-  const handleGenerateSummary = async () => {
-    setIsGeneratingSummary(true)
-    try {
-      const response = await fetch('/api/journal/generate-summary', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          energy,
-          motivation,
-          sleepQuality,
-          hoursSlept,
-          notes,
-          completedTasks: completedTasks.map((t) => t.content),
-          plannedTasks,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to generate summary')
-      }
-
-      const data = await response.json()
-      setAiSummary(data.summary)
-      showToast('Podsumowanie wygenerowane', 'success')
-    } catch (error: any) {
-      console.error('Error generating summary:', error)
-      showToast('Błąd generowania podsumowania', 'error')
-    } finally {
-      setIsGeneratingSummary(false)
-    }
-  }
-
   // Save entry
   const handleSaveEntry = async () => {
     if (!userId) return
@@ -345,13 +278,8 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
         motivation,
         sleep_quality: sleepQuality,
         hours_slept: hoursSlept,
-        sleep_time: sleepTime || undefined,
-        wake_time: wakeTime || undefined,
-        planned_tasks: plannedTasks,
         completed_tasks_snapshot: completedTasks.map((t) => t.content),
         notes,
-        comments,
-        ai_summary: aiSummary || undefined,
       }
 
       await saveEntry(entryData)
@@ -503,42 +431,7 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
               className="w-full"
             />
           </div>
-
-          {/* Sleep Time */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Czas zaśnięcia
-            </label>
-            <Input
-              type="time"
-              value={sleepTime}
-              onChange={(e) => setSleepTime(e.target.value)}
-            />
-          </div>
-
-          {/* Wake Time */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Czas przebudzenia
-            </label>
-            <Input
-              type="time"
-              value={wakeTime}
-              onChange={(e) => setWakeTime(e.target.value)}
-            />
-          </div>
         </div>
-      </Card>
-
-      {/* Planned Tasks */}
-      <Card className="p-6">
-        <h2 className="text-xl font-semibold mb-4">Zaplanowane zadania</h2>
-        <Textarea
-          value={plannedTasks}
-          onChange={(e) => setPlannedTasks(e.target.value)}
-          placeholder="Wpisz swoje cele na dziś..."
-          rows={4}
-        />
       </Card>
 
       {/* Completed Tasks from Todoist */}
@@ -625,72 +518,6 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
               </li>
             ))}
           </ul>
-        )}
-      </Card>
-
-      {/* Comments */}
-      <Card className="p-6">
-        <h2 className="text-xl font-semibold mb-4">Komentarze</h2>
-
-        <div className="flex gap-2 mb-4">
-          <Input
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
-            placeholder="Dodaj komentarz..."
-            className="flex-1"
-          />
-          <Button onClick={handleAddComment} size="sm" className="gap-2">
-            <Plus size={16} weight="bold" />
-            Dodaj
-          </Button>
-        </div>
-
-        {comments.length > 0 && (
-          <ul className="space-y-2">
-            {comments.map((comment, index) => (
-              <li
-                key={index}
-                className="flex items-start gap-2 p-3 bg-gray-50 rounded-lg"
-              >
-                <span className="flex-1 text-sm">{comment}</span>
-                <button
-                  onClick={() => handleRemoveComment(index)}
-                  className="text-red-600 hover:text-red-800"
-                >
-                  <X size={16} weight="bold" />
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-
-      {/* AI Summary */}
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold flex items-center gap-2">
-            <Sparkle size={24} weight="bold" className="text-brand-purple" />
-            Podsumowanie AI
-          </h2>
-          <Button
-            onClick={handleGenerateSummary}
-            disabled={isGeneratingSummary}
-            className="gap-2"
-          >
-            <Sparkle size={16} weight="bold" />
-            {isGeneratingSummary ? 'Generowanie...' : 'Generuj'}
-          </Button>
-        </div>
-
-        {aiSummary ? (
-          <div className="p-4 bg-gradient-to-br from-brand-purple/5 to-brand-pink/5 rounded-lg">
-            <p className="text-gray-700 leading-relaxed">{aiSummary}</p>
-          </div>
-        ) : (
-          <p className="text-gray-500 text-sm">
-            Kliknij &quot;Generuj&quot;, aby utworzyć podsumowanie dnia
-          </p>
         )}
       </Card>
     </div>
