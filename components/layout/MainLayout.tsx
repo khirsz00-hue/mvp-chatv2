@@ -29,6 +29,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -84,38 +85,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
     checkAuth()
 
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('🔍 [MainLayout] Auth state change:', event)
-        
-        if (event === 'SIGNED_IN' && session) {
-          console.log('✅ [MainLayout] User signed in:', session.user.email)
-          setUser(session.user)
-
-          // Check if user is admin
-          const { data: profile } = await supabase
-            .from('user_profiles')
-            .select('is_admin')
-            .eq('id', session.user.id)
-            .single()
-
-          if (profile?.is_admin) {
-            setIsAdmin(true)
-          } else {
-            setIsAdmin(false)
-          }
-
-          setLoading(false)
-        } else if (event === 'SIGNED_OUT') {
-          console.log('⚠️ [MainLayout] User signed out')
-          setUser(null)
-          setIsAdmin(false)
-          router.push('/login')
-        }
-      }
-    )
-
     // Odczytaj zapisaną preferencję widoku, jeśli istnieje
     try {
       const stored = localStorage.getItem('active_assistant') as AssistantId | null
@@ -124,10 +93,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
       }
     } catch {}
 
-    // Wyczyść timeout jeśli checkAuth się zakończył
+    // Cleanup timeout
     return () => {
       clearTimeout(timeoutId)
-      subscription.unsubscribe()
     }
   }, [router])
   
@@ -199,6 +167,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   
   const handleNavigate = (view: AssistantId) => {
     setActiveView(view)
+    setIsMobileMenuOpen(false) // Close mobile menu after navigation
     try { localStorage.setItem('active_assistant', view) } catch {}
   }
 
@@ -225,9 +194,25 @@ export default function MainLayout({ children }: MainLayoutProps) {
             <Header 
               user={user ? { email: user.email, name: user.user_metadata?.full_name } : null}
               onSignOut={handleSignOut}
+              onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              isMobileMenuOpen={isMobileMenuOpen}
             />
-            <div className="flex">
-              <Sidebar activeView={activeView} onNavigate={handleNavigate} isAdmin={isAdmin} />
+            <div className="flex relative">
+              {/* Mobile overlay */}
+              {isMobileMenuOpen && (
+                <div 
+                  className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  aria-hidden="true"
+                />
+              )}
+              
+              <Sidebar 
+                activeView={activeView} 
+                onNavigate={handleNavigate} 
+                isAdmin={isAdmin}
+                isMobileMenuOpen={isMobileMenuOpen}
+              />
               <main className="flex-1 p-6 overflow-x-hidden">
                 {children || renderAssistant()}
               </main>
@@ -239,9 +224,25 @@ export default function MainLayout({ children }: MainLayoutProps) {
           <Header 
             user={user ? { email: user.email, name: user.user_metadata?.full_name } : null}
             onSignOut={handleSignOut}
+            onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            isMobileMenuOpen={isMobileMenuOpen}
           />
-          <div className="flex">
-            <Sidebar activeView={activeView} onNavigate={handleNavigate} isAdmin={isAdmin} />
+          <div className="flex relative">
+            {/* Mobile overlay */}
+            {isMobileMenuOpen && (
+              <div 
+                className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+                onClick={() => setIsMobileMenuOpen(false)}
+                aria-hidden="true"
+              />
+            )}
+            
+            <Sidebar 
+              activeView={activeView} 
+              onNavigate={handleNavigate} 
+              isAdmin={isAdmin}
+              isMobileMenuOpen={isMobileMenuOpen}
+            />
             <main className="flex-1 p-6 overflow-x-hidden">
               {children || renderAssistant()}
             </main>
