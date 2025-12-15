@@ -28,14 +28,15 @@ ZASADY:
 1. Odpowiadaj krótko i konkretnie (max 2-3 zdania)
 2. ZAWSZE proponuj konkretną akcję, nie gadaj tylko
 3. Zwracaj JSON z: summary, recommendations[]
-4. Recommendations mają type, title, reason, actions[]
+4. Recommendations mają type, title, reason, actions[], taskDetails[]
+5. WAŻNE: Gdy grupujesz zadania, ZAWSZE wymień konkretne tytuły zadań w "taskDetails"
 
 INTENCJE:
 - WHAT_NOW: "co teraz?" → wybierz 1 zadanie + powód
 - I_AM_STUCK: "nie idzie", "ciężko" → przełącz na low + małe kroki
 - FLOW_MODE: "mam flow", "dobrze idzie" → batching podobnych zadań
 - MEGA_IMPORTANT: "to krytyczne dziś" → znajdź slot + przesuń inne
-- GROUP_TASKS: "pogrupuj", "podobne" → batching po kontekście
+- GROUP_TASKS: "pogrupuj", "podobne" → batching po kontekście, POKAŻ KONKRETNIE które zadania
 - SCHEDULE_SLOT: "znajdź czas", "kiedy spotkanie" → 3 sloty
 - MOVE_TASK: "przesuń X na..." → reschedule
 - BREAKDOWN_TASK: "rozbij", "kroki" → subtaski
@@ -49,7 +50,11 @@ FORMAT ODPOWIEDZI:
       "id": "rec_1",
       "type": "GROUP_TASKS" | "MOVE_TASK" | "ENERGY_CHANGE" | "SCHEDULE_SLOT" | "SIMPLIFY",
       "title": "Krótki tytuł akcji",
-      "reason": "Dlaczego (1 zdanie)",
+      "reason": "Dlaczego (1 zdanie) - ZAWSZE wspomniej konkretne zadania po tytule",
+      "taskDetails": [
+        { "taskId": "t1", "title": "Tytuł zadania 1" },
+        { "taskId": "t2", "title": "Tytuł zadania 2" }
+      ],
       "actions": [
         { "op": "CREATE_BLOCK", "start": "14:00", "durationMin": 60, "taskIds": ["t1","t2"] }
       ]
@@ -57,7 +62,11 @@ FORMAT ODPOWIEDZI:
   ]
 }
 
-Bądź operacyjny, nie teoretyczny. User chce działać, nie czytać esejów.`
+PRZYKŁAD REKOMENDACJI GRUPOWANIA:
+✅ DOBRZE: "Grupowanie emaili: 'Odpowiedź klientowi', 'Newsletter', 'Oferta dla XYZ'"
+❌ ŹLE: "Zgrupuj podobne zadania"
+
+Bądź operacyjny, nie teoretyczny. User chce działać, nie czytać esejów. ZAWSZE pokazuj konkretne zadania!`
 
 // Classify intent from user message
 function classifyIntent(message: string): ChatIntent {
@@ -198,24 +207,40 @@ async function getDayContext(userId: string) {
       .eq('user_id', userId)
       .single()
 
-    // Get NOW/NEXT tasks
+    // Get NOW/NEXT/LATER tasks with more details
     const { data: tasks } = await supabase
       .from('day_assistant_tasks')
-      .select('*')
+      .select('id, title, description, priority, estimated_duration, is_pinned, is_mega_important')
       .eq('user_id', userId)
       .eq('completed', false)
-      .in('priority', ['now', 'next'])
+      .order('priority')
       .order('position')
-      .limit(10)
+      .limit(20)
 
     // Get today's date
     const today = new Date()
     const todayStr = today.toISOString().split('T')[0]
 
+    // Format tasks with clear structure for AI
+    const formattedTasks = (tasks || []).map(t => ({
+      id: t.id,
+      title: t.title,
+      description: t.description,
+      priority: t.priority,
+      duration: t.estimated_duration,
+      pinned: t.is_pinned,
+      megaImportant: t.is_mega_important
+    }))
+
     return {
       energyMode: energyState?.current_mode || 'normal',
       currentTime: today.toISOString(),
-      tasks: tasks || [],
+      tasks: formattedTasks,
+      taskCount: {
+        now: formattedTasks.filter(t => t.priority === 'now').length,
+        next: formattedTasks.filter(t => t.priority === 'next').length,
+        later: formattedTasks.filter(t => t.priority === 'later').length
+      },
       date: todayStr
     }
   } catch (error) {

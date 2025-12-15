@@ -5,6 +5,7 @@
  */
 
 import OpenAI from 'openai'
+import { getOpenAIClient } from '@/lib/openai'
 import {
   SubtaskGenerationRequest,
   SubtaskGenerationResponse,
@@ -15,9 +16,8 @@ import {
   ENERGY_MODE_CONSTRAINTS
 } from '@/lib/types/dayAssistant'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-})
+// Use lazy initialization via getOpenAIClient() instead of module-level initialization
+const getOpenAI = () => getOpenAIClient()
 
 /**
  * Generate subtasks for a task using AI
@@ -48,6 +48,7 @@ export async function generateSubtasks(
   )
 
   try {
+    const openai = getOpenAI()
     const response = await openai.chat.completions.create({
       model: 'gpt-4-turbo-preview',
       messages: [
@@ -202,6 +203,7 @@ Zwróć TYLKO JSON, bez dodatkowego tekstu.
 `.trim()
 
   try {
+    const openai = getOpenAI()
     const response = await openai.chat.completions.create({
       model: 'gpt-4-turbo-preview',
       messages: [
@@ -323,6 +325,7 @@ Zwróć JSON:
 `.trim()
 
   try {
+    const openai = getOpenAI()
     const response = await openai.chat.completions.create({
       model: 'gpt-4-turbo-preview',
       messages: [
