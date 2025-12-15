@@ -127,9 +127,9 @@ export async function POST(req: Request) {
     const contextData = await getDayContext(userId)
 
     // Build messages for OpenAI
-    const messages = [
-      { role: 'system' as const, content: SYSTEM_PROMPT },
-      { role: 'system' as const, content: `CONTEXT:\n${JSON.stringify(contextData, null, 2)}` }
+    const messages: Array<{role: 'system' | 'user' | 'assistant', content: string}> = [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: `CONTEXT:\n${JSON.stringify(contextData, null, 2)}` }
     ]
 
     // Add conversation history (last 5 messages)
@@ -145,7 +145,7 @@ export async function POST(req: Request) {
 
     // Add current user message
     messages.push({
-      role: 'user' as const,
+      role: 'user',
       content: `${message}\n\nDetected intent: ${intent}`
     })
 
