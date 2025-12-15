@@ -221,6 +221,7 @@ export function TaskDetailsModal({
   const [timeTrackingExpanded, setTimeTrackingExpanded] = useState(false)
   const [activeTimeTab, setActiveTimeTab] = useState<'manual' | 'pomodoro'>('manual')
   const [historyExpanded, setHistoryExpanded] = useState(false)
+  const [aiUnderstandingExpanded, setAiUnderstandingExpanded] = useState(false)
   const [showClarifyModal, setShowClarifyModal] = useState(false)
   const [clarificationText, setClarificationText] = useState('')
 
@@ -788,11 +789,25 @@ W 1-2 zwięzłych zdaniach wyjaśnij jak rozumiesz to zadanie, bez dodatkowych k
       if (res.ok) {
         const suggestions = await res.json()
         
+        let appliedSuggestions: string[] = []
+        
         // Apply suggestions
-        if (suggestions.priority) setPriority(suggestions.priority)
-        if (suggestions.estimatedMinutes) setEstimatedMinutes(suggestions.estimatedMinutes)
-        if (suggestions.suggestedDueDate) setDueDate(suggestions.suggestedDueDate)
-        if (suggestions.suggestedLabels) setLabels(prev => [...new Set([...prev, ...suggestions.suggestedLabels])])
+        if (suggestions.priority) {
+          setPriority(suggestions.priority)
+          appliedSuggestions.push(`Priorytet: P${suggestions.priority}`)
+        }
+        if (suggestions.estimatedMinutes) {
+          setEstimatedMinutes(suggestions.estimatedMinutes)
+          appliedSuggestions.push(`Czas: ${suggestions.estimatedMinutes}min`)
+        }
+        if (suggestions.suggestedDueDate) {
+          setDueDate(suggestions.suggestedDueDate)
+          appliedSuggestions.push(`Termin: ${suggestions.suggestedDueDate}`)
+        }
+        if (suggestions.suggestedLabels && suggestions.suggestedLabels.length > 0) {
+          setLabels(prev => [...new Set([...prev, ...suggestions.suggestedLabels])])
+          appliedSuggestions.push(`Etykiety: ${suggestions.suggestedLabels.join(', ')}`)
+        }
         
         // Find project by name
         if (suggestions.suggestedProject) {
@@ -800,10 +815,14 @@ W 1-2 zwięzłych zdaniach wyjaśnij jak rozumiesz to zadanie, bez dodatkowych k
           if (matchingProject) {
             setProjectId(matchingProject.id)
             setProjectName(matchingProject.name)
+            appliedSuggestions.push(`Projekt: ${matchingProject.name}`)
           }
         }
 
-        showToast(suggestions.reasoning || 'AI zasugerowało właściwości zadania', 'success')
+        const message = appliedSuggestions.length > 0 
+          ? `AI zasugerowało: ${appliedSuggestions.join(' • ')}`
+          : suggestions.reasoning || 'AI zasugerowało właściwości zadania'
+        showToast(message, 'success')
       }
     } catch (err) {
       console.error('Error fetching AI suggestions:', err)
@@ -827,142 +846,135 @@ W 1-2 zwięzłych zdaniach wyjaśnij jak rozumiesz to zadanie, bez dodatkowych k
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[98vw] md:max-w-5xl max-h-[95vh] overflow-hidden flex flex-col p-0">
-        {/* Header */}
-        <div className="px-4 md:px-6 py-4 border-b bg-gradient-to-br from-purple-50 via-white to-pink-50 shrink-0">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between gap-2">
-              <Badge className="bg-gradient-to-r from-purple-600 to-pink-600 text-white border-0 shadow-lg">
-                <Sparkle size={16} weight="fill" />
-                <span className="hidden sm:inline">Task Cockpit Pro</span>
-                <span className="sm:hidden">Cockpit</span>
-              </Badge>
-              <div className="flex flex-wrap gap-2">
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  onClick={() => fetchAIUnderstanding(task, true)} 
-                  title="Odśwież opis AI"
-                  className="hidden sm:flex"
-                >
-                  <ArrowClockwise size={16} />
-                  <span className="hidden lg:inline">AI</span>
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  onClick={() => setShowPomodoro(true)} 
-                  title="Pomodoro"
-                  className="hidden sm:flex"
-                >
-                  <Lightning size={16} />
-                  <span className="hidden lg:inline">Pomodoro</span>
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="destructive" 
-                  onClick={() => onDelete(task.id)} 
-                  title="Usuń"
-                >
-                  <Trash size={16} />
-                  <span className="hidden lg:inline">Usuń</span>
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => onComplete(task.id)}
-                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg"
-                  title="Ukończ"
-                >
-                  <CheckCircle size={18} />
-                  <span className="hidden lg:inline">Ukończ</span>
-                </Button>
-              </div>
+        {/* Header - COMPACT */}
+        <div className="px-3 md:px-4 py-2 border-b bg-gradient-to-br from-purple-50 via-white to-pink-50 shrink-0">
+          <div className="flex items-center justify-between gap-2">
+            <Badge className="bg-gradient-to-r from-purple-600 to-pink-600 text-white border-0 shadow-lg text-xs">
+              <Sparkle size={14} weight="fill" />
+              <span className="hidden sm:inline">Task Cockpit Pro</span>
+              <span className="sm:hidden">Cockpit</span>
+            </Badge>
+            <div className="flex flex-wrap gap-1.5">
+              <Button 
+                size="sm" 
+                variant="destructive" 
+                onClick={() => onDelete(task.id)} 
+                title="Usuń"
+                className="text-xs h-7"
+              >
+                <Trash size={14} />
+                <span className="hidden lg:inline">Usuń</span>
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => onComplete(task.id)}
+                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg text-xs h-7"
+                title="Ukończ"
+              >
+                <CheckCircle size={16} />
+                <span className="hidden lg:inline">Ukończ</span>
+              </Button>
             </div>
           </div>
         </div>
 
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4">
-          {/* Title and Metadata */}
-          <div className="space-y-3 mb-4">
+        {/* Scrollable Content - COMPACT */}
+        <div className="flex-1 overflow-y-auto px-3 md:px-4 py-2">
+          {/* Title and Metadata - COMPACT */}
+          <div className="space-y-2 mb-3">
             <Input
               value={title}
               onChange={e => setTitle(e.target.value)}
-              className="text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold border-0 border-b-2 border-gray-200 focus:border-purple-500 rounded-none px-0"
+              className="text-base md:text-lg font-bold border-0 border-b border-gray-200 focus:border-purple-500 rounded-none px-0 py-1"
               placeholder="Tytuł zadania"
               aria-label="Tytuł zadania"
               aria-describedby="ai-understanding-panel"
             />
-            <div className="flex flex-wrap gap-2 text-xs md:text-sm">
+            <div className="flex flex-wrap gap-1.5 text-xs">
               {dueDate && (
-                <Badge variant="outline" className="gap-1">
-                  <CalendarBlank size={14} />
+                <Badge variant="outline" className="gap-1 text-xs py-0 h-5">
+                  <CalendarBlank size={12} />
                   <span className="hidden sm:inline">{formatDateSafely(dueDate)}</span>
                   <span className="sm:hidden">{format(parseISO(dueDate), 'dd MMM', { locale: pl })}</span>
                 </Badge>
               )}
-              <Badge variant="secondary" className="gap-1">
-                <Flag size={14} /> P{priority}
+              <Badge variant="secondary" className="gap-1 text-xs py-0 h-5">
+                <Flag size={12} /> P{priority}
               </Badge>
               {projectName && (
-                <Badge variant="outline" className="gap-1">
-                  <FolderOpen size={14} />
+                <Badge variant="outline" className="gap-1 text-xs py-0 h-5">
+                  <FolderOpen size={12} />
                   <span className="max-w-[100px] md:max-w-none truncate">
                     {projectName}
                   </span>
                 </Badge>
               )}
               {labels.map(label => (
-                <Badge key={label} className="bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 border border-purple-200">
-                  <Tag size={12} />
+                <Badge key={label} className="bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 border border-purple-200 text-xs py-0 h-5">
+                  <Tag size={10} />
                   {label}
                 </Badge>
               ))}
               {estimatedMinutes > 0 && (
-                <Badge variant="outline" className="gap-1">
-                  <Clock size={14} />
+                <Badge variant="outline" className="gap-1 text-xs py-0 h-5">
+                  <Clock size={12} />
                   {estimatedMinutes}min
                 </Badge>
               )}
             </div>
           </div>
 
-          {/* Main Content - Single Column Layout */}
-          <div className="space-y-4 md:space-y-6">
-              {/* Properties - MOVED TO TOP */}
-              <Card className="p-4 md:p-6 shadow-lg border-gray-200">
-                <div className="flex items-center justify-between gap-2 mb-4">
-                  <div className="flex items-center gap-2 font-bold text-base md:text-lg">
-                    <Flag size={20} weight="bold" /> Właściwości
+          {/* Main Content - Single Column Layout - COMPACT */}
+          <div className="space-y-3">
+              {/* Description Section - MOVED DIRECTLY UNDER TITLE */}
+              <Card className="p-3 space-y-2 shadow-sm border-gray-200">
+                <div className="flex items-center gap-1.5 font-semibold text-sm text-gray-800">
+                  <FileText size={16} weight="bold" /> Opis zadania
+                </div>
+                <Textarea
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  placeholder="Dodaj szczegółowy kontekst, linki, checklistę lub notatki…"
+                  rows={3}
+                  className="resize-none focus:ring-2 focus:ring-purple-500 text-xs"
+                />
+              </Card>
+
+              {/* Properties - COMPACT */}
+              <Card className="p-3 shadow-sm border-gray-200">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-1.5 font-semibold text-sm">
+                    <Flag size={16} weight="bold" /> Właściwości
                   </div>
                   <Button
                     size="sm"
                     onClick={handleAISuggestions}
                     disabled={loadingAISuggestions || !title}
                     variant="ghost"
-                    className="text-xs text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                    className="text-xs text-purple-600 hover:text-purple-700 hover:bg-purple-50 h-6"
                   >
-                    <Sparkle size={12} weight="fill" />
+                    <Sparkle size={10} weight="fill" />
                     Sugestie AI
                   </Button>
                 </div>
                 
                 {/* Compact Grid Layout */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                    <p className="text-xs text-gray-600 mb-2 flex items-center gap-1 font-medium">
-                      <CalendarBlank size={12} /> Termin
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="bg-gray-50 rounded p-2 border border-gray-100">
+                    <p className="text-[10px] text-gray-600 mb-1 flex items-center gap-1 font-medium">
+                      <CalendarBlank size={10} /> Termin
                     </p>
                     <Input 
                       type="date" 
                       value={dueDate} 
                       onChange={e => setDueDate(e.target.value)}
-                      className="text-sm"
+                      className="text-xs h-7"
                     />
                   </div>
                   
-                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                    <p className="text-xs text-gray-600 mb-2 flex items-center gap-1 font-medium">
-                      <Flag size={12} /> Priorytet
+                  <div className="bg-gray-50 rounded p-2 border border-gray-100">
+                    <p className="text-[10px] text-gray-600 mb-1 flex items-center gap-1 font-medium">
+                      <Flag size={10} /> Priorytet
                     </p>
                     <Select
                       value={String(priority)}
@@ -972,7 +984,7 @@ W 1-2 zwięzłych zdaniach wyjaśnij jak rozumiesz to zadanie, bez dodatkowych k
                           setPriority(next as 1 | 2 | 3 | 4)
                         }
                       }}
-                      className="text-sm"
+                      className="text-xs h-7"
                     >
                       <SelectOption value="1">P1 - 🔴 Krytyczne</SelectOption>
                       <SelectOption value="2">P2 - 🟠 Wysokie</SelectOption>
@@ -981,9 +993,9 @@ W 1-2 zwięzłych zdaniach wyjaśnij jak rozumiesz to zadanie, bez dodatkowych k
                     </Select>
                   </div>
                   
-                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                    <p className="text-xs text-gray-600 mb-2 flex items-center gap-1 font-medium">
-                      <FolderOpen size={12} /> Projekt
+                  <div className="bg-gray-50 rounded p-2 border border-gray-100">
+                    <p className="text-[10px] text-gray-600 mb-1 flex items-center gap-1 font-medium">
+                      <FolderOpen size={10} /> Projekt
                     </p>
                     <Select
                       value={projectId}
@@ -992,7 +1004,7 @@ W 1-2 zwięzłych zdaniach wyjaśnij jak rozumiesz to zadanie, bez dodatkowych k
                         setProjectId(e.target.value)
                         setProjectName(selectedProject?.name || '')
                       }}
-                      className="text-sm"
+                      className="text-xs h-7"
                     >
                       <SelectOption value="">Brak projektu</SelectOption>
                       {projects.map(project => (
@@ -1003,9 +1015,9 @@ W 1-2 zwięzłych zdaniach wyjaśnij jak rozumiesz to zadanie, bez dodatkowych k
                     </Select>
                   </div>
 
-                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                    <p className="text-xs text-gray-600 mb-2 flex items-center gap-1 font-medium">
-                      <Clock size={12} /> Estymowany czas (min)
+                  <div className="bg-gray-50 rounded p-2 border border-gray-100">
+                    <p className="text-[10px] text-gray-600 mb-1 flex items-center gap-1 font-medium">
+                      <Clock size={10} /> Estymowany czas (min)
                     </p>
                     <Input
                       type="number"
@@ -1013,177 +1025,203 @@ W 1-2 zwięzłych zdaniach wyjaśnij jak rozumiesz to zadanie, bez dodatkowych k
                       onChange={e => setEstimatedMinutes(Number(e.target.value) || 0)}
                       placeholder="0"
                       min="0"
-                      className="text-sm"
+                      className="text-xs h-7"
                     />
                   </div>
                   
-                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-100 sm:col-span-2">
-                    <p className="text-xs text-gray-600 mb-2 flex items-center gap-1 font-medium">
-                      <Tag size={12} /> Etykiety
+                  <div className="bg-gray-50 rounded p-2 border border-gray-100 sm:col-span-2">
+                    <p className="text-[10px] text-gray-600 mb-1 flex items-center gap-1 font-medium">
+                      <Tag size={10} /> Etykiety
                     </p>
-                    <div className="flex flex-wrap gap-1.5 mb-2">
+                    <div className="flex flex-wrap gap-1 mb-1.5">
                       {labels.map(label => (
                         <Badge 
                           key={label} 
                           variant="outline" 
-                          className="text-xs border-purple-200 bg-purple-50 text-purple-700 flex items-center gap-1 cursor-pointer hover:bg-purple-100"
+                          className="text-[10px] border-purple-200 bg-purple-50 text-purple-700 flex items-center gap-1 cursor-pointer hover:bg-purple-100 py-0 h-4"
                           onClick={() => handleRemoveLabel(label)}
                         >
                           {label}
-                          <X size={12} />
+                          <X size={10} />
                         </Badge>
                       ))}
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1.5">
                       <Input
                         value={newLabel}
                         onChange={e => setNewLabel(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && handleAddLabel()}
                         placeholder="Nowa etykieta..."
-                        className="text-xs flex-1"
+                        className="text-xs flex-1 h-6"
                       />
                       <Button
                         size="sm"
                         onClick={handleAddLabel}
                         disabled={!newLabel.trim()}
-                        className="bg-purple-600 hover:bg-purple-700"
+                        className="bg-purple-600 hover:bg-purple-700 h-6 px-2"
                       >
-                        <Plus size={12} />
+                        <Plus size={10} />
                       </Button>
                     </div>
                   </div>
                 </div>
               </Card>
 
-              {/* Description Section - MOVED UP */}
-              <Card className="p-4 md:p-6 space-y-3 shadow-lg border-gray-200">
-                <div className="flex items-center gap-2 font-bold text-base md:text-lg text-gray-800">
-                  <FileText size={20} weight="bold" /> Opis zadania
-                </div>
-                <Textarea
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                  placeholder="Dodaj szczegółowy kontekst, linki, checklistę lub notatki…"
-                  rows={4}
-                  className="resize-none focus:ring-2 focus:ring-purple-500 text-sm md:text-base"
-                />
-              </Card>
-
-              {/* AI Understanding Section - MADE MORE COMPACT */}
-              <Card className="p-4 md:p-5 bg-gradient-to-br from-purple-50 via-white to-pink-50 border-purple-200 shadow-lg">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
-                  <div className="flex items-center gap-2 text-purple-800">
-                    <Brain size={20} weight="fill" />
-                    <span className="font-bold text-sm md:text-base">Jak AI rozumie to zadanie</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      onClick={handleClarify} 
-                      disabled={loadingAI}
-                      className="border-purple-300 hover:bg-purple-100 text-purple-700 text-xs"
-                    >
-                      <Sparkle size={12} />
-                      <span className="hidden sm:inline">Doprecyzuj</span>
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      onClick={() => setShowBreakdown(true)} 
-                      disabled={loadingAI}
-                      className="border-purple-300 hover:bg-purple-100 text-purple-700 text-xs"
-                    >
-                      <Brain size={12} />
-                      <span className="hidden sm:inline">Wygeneruj plan</span>
-                    </Button>
-                  </div>
-                </div>
-                <div
-                  id="ai-understanding-panel"
-                  className="rounded-lg bg-white/90 border border-purple-200 p-3 md:p-4 text-xs md:text-sm text-purple-900 min-h-[60px] shadow-inner"
+              {/* AI Understanding Section - COLLAPSED BY DEFAULT */}
+              <Card className="p-3 bg-gradient-to-br from-purple-50 via-white to-pink-50 border-purple-200 shadow-sm">
+                <button
+                  onClick={() => setAiUnderstandingExpanded(!aiUnderstandingExpanded)}
+                  className="w-full flex items-center justify-between mb-2"
                 >
-                  {loadingAI ? (
-                    <div className="flex items-center gap-2 text-purple-600">
-                      <ArrowClockwise size={14} className="animate-spin" />
-                      Analizuję zadanie…
+                  <div className="flex items-center gap-1.5 text-purple-800">
+                    <Brain size={16} weight="fill" />
+                    <span className="font-semibold text-sm">Jak AI rozumie to zadanie</span>
+                  </div>
+                  {aiUnderstandingExpanded ? <CaretUp size={14} /> : <CaretDown size={14} />}
+                </button>
+
+                {aiUnderstandingExpanded && (
+                  <>
+                    <div className="flex gap-1.5 mb-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={handleClarify} 
+                        disabled={loadingAI}
+                        className="border-purple-300 hover:bg-purple-100 text-purple-700 text-[10px] h-6 px-2"
+                      >
+                        <Sparkle size={10} />
+                        <span className="hidden sm:inline">Doprecyzuj</span>
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={async () => {
+                          // Generate plan directly without modal
+                          if (!task || !aiUnderstanding) return
+                          
+                          try {
+                            const prompt = `Zadanie: "${task.content}"
+Opis: "${task.description || ''}"
+
+Twoje zrozumienie: ${aiUnderstanding}
+
+Wygeneruj 4-7 konkretnych subtasków w JSON:
+{
+  "subtasks": [
+    {"title": "Krok 1", "description": "Dokładny opis", "estimatedMinutes": 30}
+  ]
+}`
+
+                            const res = await fetch('/api/ai/chat', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                messages: [
+                                  { role: 'system', content: 'Jesteś asystentem ADHD specjalizującym się w dekompozycji zadań.' },
+                                  { role: 'user', content: prompt }
+                                ],
+                                jsonMode: true
+                              })
+                            })
+
+                            if (res.ok) {
+                              const data = await res.json()
+                              const parsed = JSON.parse(data.response || '{}')
+                              
+                              if (parsed.subtasks && parsed.subtasks.length > 0) {
+                                await handleCreateSubtasks(parsed.subtasks)
+                                showToast(`Utworzono ${parsed.subtasks.length} podzadań`, 'success')
+                              }
+                            }
+                          } catch (err) {
+                            console.error('Error generating plan:', err)
+                            showToast('Nie udało się wygenerować planu', 'error')
+                          }
+                        }} 
+                        disabled={loadingAI || !aiUnderstanding}
+                        className="border-purple-300 hover:bg-purple-100 text-purple-700 text-[10px] h-6 px-2"
+                      >
+                        <Brain size={10} />
+                        <span className="hidden sm:inline">Wygeneruj plan</span>
+                      </Button>
                     </div>
-                  ) : aiUnderstanding ? (
-                    <p className="leading-relaxed">{aiUnderstanding}</p>
-                  ) : (
-                    <p className="text-purple-600 italic">AI przygotowuje interpretację zadania...</p>
-                  )}
-                </div>
+                    <div
+                      id="ai-understanding-panel"
+                      className="rounded bg-white/90 border border-purple-200 p-2 text-xs text-purple-900 min-h-[50px] shadow-inner"
+                    >
+                      {loadingAI ? (
+                        <div className="flex items-center gap-2 text-purple-600">
+                          <ArrowClockwise size={12} className="animate-spin" />
+                          Analizuję zadanie…
+                        </div>
+                      ) : aiUnderstanding ? (
+                        <p className="leading-relaxed">{aiUnderstanding}</p>
+                      ) : (
+                        <p className="text-purple-600 italic">AI przygotowuje interpretację zadania...</p>
+                      )}
+                    </div>
+                  </>
+                )}
               </Card>
 
-              {/* Subtasks Section */}
-              <Card className="p-4 md:p-6 space-y-3 shadow-lg border-gray-200">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 font-bold text-base md:text-lg text-gray-800">
-                    <ListChecks size={20} weight="bold" />
-                    Podzadania
-                    <Badge 
-                      variant="secondary" 
-                      className="ml-2 bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-800"
-                    >
-                      {completedSubtasksCount}/{totalSubtasksCount}
-                    </Badge>
-                  </div>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    onClick={() => setShowBreakdown(true)}
-                    className="border-purple-300 hover:bg-purple-50 text-purple-700"
+              {/* Subtasks Section - COMPACT, NO WYGENERUJ AI BUTTON */}
+              <Card className="p-3 space-y-2 shadow-sm border-gray-200">
+                <div className="flex items-center gap-1.5 font-semibold text-sm text-gray-800">
+                  <ListChecks size={16} weight="bold" />
+                  Podzadania
+                  <Badge 
+                    variant="secondary" 
+                    className="ml-1 bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-800 text-xs py-0 h-4"
                   >
-                    <Brain size={14} />
-                    <span className="hidden sm:inline">Wygeneruj AI</span>
-                  </Button>
+                    {completedSubtasksCount}/{totalSubtasksCount}
+                  </Badge>
                 </div>
                 
-                <div className="flex gap-2">
+                <div className="flex gap-1.5">
                   <Input
                     value={newSubtask}
                     onChange={e => setNewSubtask(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleAddSubtask()}
                     placeholder="Dodaj nowe podzadanie..."
-                    className="flex-1 text-sm md:text-base"
+                    className="flex-1 text-xs h-7"
                   />
                   <Button 
                     onClick={handleAddSubtask} 
                     disabled={subtasksLoading || !newSubtask.trim()}
-                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 h-7 px-2"
                   >
-                    <Plus size={16} />
-                    <span className="hidden sm:inline">Dodaj</span>
+                    <Plus size={12} />
+                    <span className="hidden sm:inline text-xs">Dodaj</span>
                   </Button>
                 </div>
                 
-                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                   {subtasksLoading && (
-                    <div className="flex items-center gap-2 text-gray-500 py-4">
-                      <ArrowClockwise size={16} className="animate-spin" />
+                    <div className="flex items-center gap-2 text-gray-500 py-3 text-xs">
+                      <ArrowClockwise size={14} className="animate-spin" />
                       Ładuję podzadania…
                     </div>
                   )}
                   {!subtasksLoading && subtasks.length === 0 && (
-                    <div className="text-center py-8 text-gray-400">
-                      <ListChecks size={32} weight="light" className="mx-auto mb-2" />
-                      <p className="text-sm">Brak podzadań — dodaj własne lub wygeneruj z AI</p>
+                    <div className="text-center py-6 text-gray-400">
+                      <ListChecks size={24} weight="light" className="mx-auto mb-1.5" />
+                      <p className="text-xs">Brak podzadań — dodaj własne</p>
                     </div>
                   )}
                   {subtasks.map(subtask => (
                     <label
                       key={subtask.id}
-                      className="flex items-start gap-3 rounded-lg border-2 border-gray-200 p-3 hover:border-purple-300 hover:bg-purple-50/30 cursor-pointer transition-all"
+                      className="flex items-start gap-2 rounded border border-gray-200 p-2 hover:border-purple-300 hover:bg-purple-50/30 cursor-pointer transition-all"
                     >
                       <input
                         type="checkbox"
-                        className="mt-0.5 h-5 w-5 rounded text-purple-600 focus:ring-2 focus:ring-purple-500"
+                        className="mt-0.5 h-4 w-4 rounded text-purple-600 focus:ring-2 focus:ring-purple-500"
                         checked={Boolean(subtask.completed)}
                         onChange={e => handleToggleSubtask(subtask.id, e.target.checked)}
                       />
                       <span
-                        className={`text-sm md:text-base leading-tight flex-1 ${
+                        className={`text-xs leading-tight flex-1 ${
                           subtask.completed ? 'line-through text-gray-400' : 'text-gray-800'
                         }`}
                       >
@@ -1194,39 +1232,39 @@ W 1-2 zwięzłych zdaniach wyjaśnij jak rozumiesz to zadanie, bez dodatkowych k
                 </div>
               </Card>
 
-              {/* Timer & Pomodoro - COLLAPSED BY DEFAULT */}
-              <Card className="p-4 md:p-6 shadow-lg border-gray-200 bg-gradient-to-br from-blue-50 to-cyan-50">
+              {/* Timer & Pomodoro - COLLAPSED BY DEFAULT - COMPACT */}
+              <Card className="p-3 shadow-sm border-gray-200 bg-gradient-to-br from-blue-50 to-cyan-50">
                 <button
                   onClick={() => setTimeTrackingExpanded(!timeTrackingExpanded)}
-                  className="w-full flex items-center justify-between mb-3"
+                  className="w-full flex items-center justify-between mb-2"
                 >
-                  <div className="flex items-center gap-2 font-bold text-base md:text-lg">
-                    <Timer size={20} weight="bold" /> Mierzenie czasu
+                  <div className="flex items-center gap-1.5 font-semibold text-sm">
+                    <Timer size={16} weight="bold" /> Mierzenie czasu
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     <Badge 
                       variant={isTimerActiveForTask ? 'default' : 'outline'} 
-                      className={isTimerActiveForTask ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white' : ''}
+                      className={`text-xs py-0 h-4 ${isTimerActiveForTask ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white' : ''}`}
                     >
                       {isTimerActiveForTask ? (timerInfo.isPomodoro ? '🍅' : '⏱️') : '⏸️'}
                     </Badge>
-                    {timeTrackingExpanded ? <CaretUp size={16} /> : <CaretDown size={16} />}
+                    {timeTrackingExpanded ? <CaretUp size={14} /> : <CaretDown size={14} />}
                   </div>
                 </button>
 
                 {timeTrackingExpanded && (
                   <>
-                    {/* Timer Display */}
-                    <div className="bg-white rounded-xl p-5 md:p-6 mb-4 shadow-inner border-2 border-blue-200">
+                    {/* Timer Display - COMPACT */}
+                    <div className="bg-white rounded p-3 mb-2 shadow-inner border border-blue-200">
                       <div className="text-center">
-                        <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">
+                        <p className="text-[10px] uppercase tracking-wide text-gray-500 mb-0.5">
                           {isTimerActiveForTask ? (timerInfo.isPomodoro ? 'Pomodoro Aktywne' : 'Timer Aktywny') : 'Czas pracy'}
                         </p>
-                        <p className="text-3xl md:text-4xl font-bold text-gray-900 font-mono mb-1">
+                        <p className="text-2xl font-bold text-gray-900 font-mono mb-0.5">
                           {formatStopwatch(totalTimeWorked)}
                         </p>
                         {timerInfo.isPomodoro && timerInfo.pomodoroPhase && (
-                          <p className="text-xs text-gray-600">
+                          <p className="text-[10px] text-gray-600">
                             {timerInfo.pomodoroPhase === 'work' ? '🎯 Praca' : 
                              timerInfo.pomodoroPhase === 'shortBreak' ? '☕ Krótka przerwa' : 
                              '🌴 Długa przerwa'}
@@ -1238,23 +1276,24 @@ W 1-2 zwięzłych zdaniach wyjaśnij jak rozumiesz to zadanie, bez dodatkowych k
                       </div>
                     </div>
                     
-                    {/* Timer Controls */}
-                    <div className="grid grid-cols-2 gap-2 mb-3">
+                    {/* Timer Controls - COMPACT */}
+                    <div className="grid grid-cols-2 gap-1.5 mb-2">
                       <Button
                         size="sm"
                         variant={isTimerActiveForTask && !timerInfo.isPomodoro ? 'outline' : 'default'}
                         onClick={() => startTimer(task.id, title || task.content)}
-                        className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
+                        className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white text-xs h-7"
                       >
-                        <Play size={16} weight="fill" /> Start
+                        <Play size={12} weight="fill" /> Start
                       </Button>
                       <Button 
                         size="sm" 
                         variant="outline" 
                         onClick={() => stopTimer()}
                         disabled={!isTimerActiveForTask}
+                        className="text-xs h-7"
                       >
-                        <Stop size={16} weight="fill" /> Stop
+                        <Stop size={12} weight="fill" /> Stop
                       </Button>
                     </div>
                     
@@ -1262,19 +1301,19 @@ W 1-2 zwięzłych zdaniach wyjaśnij jak rozumiesz to zadanie, bez dodatkowych k
                       size="sm" 
                       variant="outline" 
                       onClick={() => setShowPomodoro(true)}
-                      className="w-full border-blue-300 hover:bg-blue-100 text-blue-700 mb-3"
+                      className="w-full border-blue-300 hover:bg-blue-100 text-blue-700 mb-2 text-xs h-7"
                     >
-                      <Lightning size={14} weight="fill" /> Uruchom Pomodoro
+                      <Lightning size={12} weight="fill" /> Uruchom Pomodoro
                     </Button>
 
-                    {/* Time Tracking History */}
-                    <div className="border-t-2 border-blue-200 pt-3">
-                      <div className="space-y-3">
+                    {/* Time Tracking History - COMPACT */}
+                    <div className="border-t border-blue-200 pt-2">
+                      <div className="space-y-2">
                         {/* Tabs */}
-                        <div className="flex gap-2 border-b border-blue-200">
+                        <div className="flex gap-1.5 border-b border-blue-200">
                           <button
                             onClick={() => setActiveTimeTab('manual')}
-                            className={`px-3 py-2 text-xs font-medium transition-colors ${
+                            className={`px-2 py-1 text-[10px] font-medium transition-colors ${
                               activeTimeTab === 'manual'
                                 ? 'border-b-2 border-blue-600 text-blue-800'
                                 : 'text-gray-600 hover:text-blue-700'
@@ -1284,7 +1323,7 @@ W 1-2 zwięzłych zdaniach wyjaśnij jak rozumiesz to zadanie, bez dodatkowych k
                           </button>
                           <button
                             onClick={() => setActiveTimeTab('pomodoro')}
-                            className={`px-3 py-2 text-xs font-medium transition-colors ${
+                            className={`px-2 py-1 text-[10px] font-medium transition-colors ${
                               activeTimeTab === 'pomodoro'
                                 ? 'border-b-2 border-blue-600 text-blue-800'
                                 : 'text-gray-600 hover:text-blue-700'
@@ -1295,18 +1334,18 @@ W 1-2 zwięzłych zdaniach wyjaśnij jak rozumiesz to zadanie, bez dodatkowych k
                         </div>
 
                         {/* Tab Content */}
-                        <div className="bg-white rounded-lg p-3 max-h-48 overflow-y-auto">
+                        <div className="bg-white rounded p-2 max-h-32 overflow-y-auto">
                           {activeTimeTab === 'manual' ? (
-                            <div className="space-y-2">
+                            <div className="space-y-1.5">
                               {getTimerSessions().length === 0 ? (
-                                <p className="text-xs text-gray-500 text-center py-4">
+                                <p className="text-[10px] text-gray-500 text-center py-3">
                                   Brak sesji manualnych
                                 </p>
                               ) : (
                                 getTimerSessions().map((session: any, idx: number) => (
                                   <div
                                     key={idx}
-                                    className="flex items-center justify-between text-xs border-b border-gray-100 pb-2"
+                                    className="flex items-center justify-between text-[10px] border-b border-gray-100 pb-1.5"
                                   >
                                     <div>
                                       <p className="font-medium text-gray-800">
@@ -1321,16 +1360,16 @@ W 1-2 zwięzłych zdaniach wyjaśnij jak rozumiesz to zadanie, bez dodatkowych k
                               )}
                             </div>
                           ) : (
-                            <div className="space-y-2">
+                            <div className="space-y-1.5">
                               {getPomodoroSessions().length === 0 ? (
-                                <p className="text-xs text-gray-500 text-center py-4">
+                                <p className="text-[10px] text-gray-500 text-center py-3">
                                   Brak sesji pomodoro
                                 </p>
                               ) : (
                                 getPomodoroSessions().map((session: any, idx: number) => (
                                   <div
                                     key={idx}
-                                    className="flex items-center justify-between text-xs border-b border-gray-100 pb-2"
+                                    className="flex items-center justify-between text-[10px] border-b border-gray-100 pb-1.5"
                                   >
                                     <div>
                                       <p className="font-medium text-gray-800">
@@ -1352,43 +1391,43 @@ W 1-2 zwięzłych zdaniach wyjaśnij jak rozumiesz to zadanie, bez dodatkowych k
                 )}
               </Card>
 
-              {/* Change History - COLLAPSED BY DEFAULT */}
-              <Card className="p-4 md:p-6 shadow-lg border-gray-200">
+              {/* Change History - COLLAPSED BY DEFAULT - COMPACT */}
+              <Card className="p-3 shadow-sm border-gray-200">
                 <button
                   onClick={() => setHistoryExpanded(!historyExpanded)}
                   className="w-full flex items-center justify-between"
                 >
-                  <div className="flex items-center gap-2 font-bold text-base md:text-lg">
-                    <ClockClockwise size={20} weight="bold" /> Historia zmian
+                  <div className="flex items-center gap-1.5 font-semibold text-sm">
+                    <ClockClockwise size={16} weight="bold" /> Historia zmian
                   </div>
-                  {historyExpanded ? <CaretUp size={16} /> : <CaretDown size={16} />}
+                  {historyExpanded ? <CaretUp size={14} /> : <CaretDown size={14} />}
                 </button>
                 
                 {historyExpanded && (
-                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1 mt-3">
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1 mt-2">
                     {changeHistory.length === 0 ? (
-                      <div className="text-center py-6 text-gray-400">
-                        <ClockClockwise size={28} weight="light" className="mx-auto mb-2" />
-                        <p className="text-xs">Brak historii zmian</p>
+                      <div className="text-center py-4 text-gray-400">
+                        <ClockClockwise size={20} weight="light" className="mx-auto mb-1.5" />
+                        <p className="text-[10px]">Brak historii zmian</p>
                       </div>
                     ) : (
                       changeHistory.map((change, idx) => (
                         <div 
                           key={idx}
-                          className="bg-gray-50 rounded-lg p-3 border border-gray-200 text-xs"
+                          className="bg-gray-50 rounded p-2 border border-gray-200 text-[10px]"
                         >
-                          <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center justify-between mb-0.5">
                             <span className="font-semibold text-gray-700">{change.field}</span>
                             <span className="text-gray-500">
                               {format(parseISO(change.timestamp), 'HH:mm', { locale: pl })}
                             </span>
                           </div>
-                          <div className="flex items-center gap-2 text-gray-600">
-                            <span className="line-through text-red-600 truncate max-w-[100px]">
+                          <div className="flex items-center gap-1.5 text-gray-600">
+                            <span className="line-through text-red-600 truncate max-w-[80px]">
                               {change.oldValue}
                             </span>
                             →
-                            <span className="text-green-600 truncate max-w-[100px]">
+                            <span className="text-green-600 truncate max-w-[80px]">
                               {change.newValue}
                             </span>
                           </div>
@@ -1427,42 +1466,43 @@ W 1-2 zwięzłych zdaniach wyjaśnij jak rozumiesz to zadanie, bez dodatkowych k
         />
       )}
 
-      {/* Clarification Modal */}
+      {/* Clarification Modal - COMPACT */}
       <Dialog open={showClarifyModal} onOpenChange={setShowClarifyModal}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-purple-800">
-              <Sparkle size={20} weight="fill" />
+            <DialogTitle className="flex items-center gap-1.5 text-purple-800 text-base">
+              <Sparkle size={16} weight="fill" />
               Doprecyzuj zadanie
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <p className="text-sm text-gray-600">
+          <div className="space-y-3 py-3">
+            <p className="text-xs text-gray-600">
               Opisz, co chcesz doprecyzować lub co wymaga wyjaśnienia w tym zadaniu:
             </p>
             <Textarea
               value={clarificationText}
               onChange={e => setClarificationText(e.target.value)}
               placeholder="Np. 'Czy to zadanie dotyczy tylko backend czy również frontend?'"
-              rows={4}
-              className="resize-none focus:ring-2 focus:ring-purple-500"
+              rows={3}
+              className="resize-none focus:ring-2 focus:ring-purple-500 text-xs"
             />
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-1.5">
               <Button
                 variant="ghost"
                 onClick={() => {
                   setShowClarifyModal(false)
                   setClarificationText('')
                 }}
+                className="text-xs h-7"
               >
                 Anuluj
               </Button>
               <Button
                 onClick={handleSubmitClarification}
                 disabled={!clarificationText.trim() || loadingAI}
-                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs h-7"
               >
-                <Sparkle size={14} weight="fill" />
+                <Sparkle size={12} weight="fill" />
                 {loadingAI ? 'Analizuję...' : 'Doprecyzuj'}
               </Button>
             </div>

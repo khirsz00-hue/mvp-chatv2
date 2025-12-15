@@ -63,14 +63,19 @@ export function TaskTimer({ onClose }: TaskTimerProps) {
     }
   }, [timerState])
   
-  // Timer tick
+  // Timer tick - calculate elapsed time from startTime
   useEffect(() => {
-    if (timerState.isRunning && !timerState.isPaused) {
+    if (timerState.isRunning && !timerState.isPaused && timerState.startTime) {
       intervalRef.current = setInterval(() => {
-        setTimerState(prev => ({
-          ...prev,
-          elapsedSeconds: prev.elapsedSeconds + 1
-        }))
+        setTimerState(prev => {
+          if (!prev.startTime) return prev
+          const now = Date.now()
+          const elapsed = Math.floor((now - prev.startTime) / 1000)
+          return {
+            ...prev,
+            elapsedSeconds: elapsed
+          }
+        })
       }, 1000)
     } else {
       if (intervalRef.current) {
@@ -84,7 +89,7 @@ export function TaskTimer({ onClose }: TaskTimerProps) {
         clearInterval(intervalRef.current)
       }
     }
-  }, [timerState.isRunning, timerState.isPaused])
+  }, [timerState.isRunning, timerState.isPaused, timerState.startTime])
   
   const startTimer = (taskId: string, taskTitle: string) => {
     setTimerState({
@@ -99,10 +104,18 @@ export function TaskTimer({ onClose }: TaskTimerProps) {
   
   const pauseTimer = () => {
     setTimerState(prev => {
+      // Calculate final elapsed time before pausing
+      let finalElapsed = prev.elapsedSeconds
+      if (prev.isRunning && prev.startTime) {
+        const now = Date.now()
+        finalElapsed = Math.floor((now - prev.startTime) / 1000)
+      }
+      
       const newState = {
         ...prev,
         isPaused: true,
-        isRunning: false
+        isRunning: false,
+        elapsedSeconds: finalElapsed
       }
       // Dispatch custom event for same-tab updates
       window.dispatchEvent(new CustomEvent('timerStateChanged', { detail: newState }))
@@ -125,18 +138,28 @@ export function TaskTimer({ onClose }: TaskTimerProps) {
   }
   
   const stopTimer = () => {
-    if (timerState.taskId && timerState.taskTitle) {
-      // Save session to history
-      const sessions: TimerSession[] = JSON.parse(localStorage.getItem('timerSessions') || '[]')
-      const newSession: TimerSession = {
-        taskId: timerState.taskId,
-        taskTitle: timerState.taskTitle,
-        startTime: new Date(timerState.startTime!).toISOString(),
-        endTime: new Date().toISOString(),
-        durationSeconds: timerState.elapsedSeconds
+    if (timerState.taskId && timerState.taskTitle && timerState.startTime) {
+      // Calculate actual elapsed time
+      let actualElapsed = timerState.elapsedSeconds
+      if (timerState.isRunning) {
+        const now = Date.now()
+        actualElapsed = Math.floor((now - timerState.startTime) / 1000)
       }
-      sessions.push(newSession)
-      localStorage.setItem('timerSessions', JSON.stringify(sessions))
+      
+      // Only save if there's actual elapsed time
+      if (actualElapsed > 0) {
+        // Save session to history
+        const sessions: TimerSession[] = JSON.parse(localStorage.getItem('timerSessions') || '[]')
+        const newSession: TimerSession = {
+          taskId: timerState.taskId,
+          taskTitle: timerState.taskTitle,
+          startTime: new Date(timerState.startTime).toISOString(),
+          endTime: new Date().toISOString(),
+          durationSeconds: actualElapsed
+        }
+        sessions.push(newSession)
+        localStorage.setItem('timerSessions', JSON.stringify(sessions))
+      }
     }
     
     const newState = {
@@ -270,17 +293,28 @@ export function useTaskTimer() {
       const parsed = JSON.parse(stored)
       
       // Save session to history if timer was running
-      if (parsed.taskId && parsed.taskTitle) {
+      if (parsed.taskId && parsed.taskTitle && parsed.startTime) {
         const sessions: TimerSession[] = JSON.parse(localStorage.getItem('timerSessions') || '[]')
-        const newSession: TimerSession = {
-          taskId: parsed.taskId,
-          taskTitle: parsed.taskTitle,
-          startTime: new Date(parsed.startTime).toISOString(),
-          endTime: new Date().toISOString(),
-          durationSeconds: parsed.elapsedSeconds
+        
+        // Calculate actual elapsed time
+        let actualElapsed = parsed.elapsedSeconds || 0
+        if (parsed.isRunning && parsed.startTime) {
+          const now = Date.now()
+          actualElapsed = Math.floor((now - parsed.startTime) / 1000)
         }
-        sessions.push(newSession)
-        localStorage.setItem('timerSessions', JSON.stringify(sessions))
+        
+        // Only save if there's actual elapsed time
+        if (actualElapsed > 0) {
+          const newSession: TimerSession = {
+            taskId: parsed.taskId,
+            taskTitle: parsed.taskTitle,
+            startTime: new Date(parsed.startTime).toISOString(),
+            endTime: new Date().toISOString(),
+            durationSeconds: actualElapsed
+          }
+          sessions.push(newSession)
+          localStorage.setItem('timerSessions', JSON.stringify(sessions))
+        }
       }
     }
     
