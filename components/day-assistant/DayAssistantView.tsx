@@ -9,6 +9,8 @@ import { EnergyModeSwitcher } from './EnergyModeSwitcher'
 import { DayTaskCard } from './DayTaskCard'
 import { CreateTaskModal } from './CreateTaskModal'
 import { SubtaskModal } from './SubtaskModal'
+import { DayChat } from './DayChat'
+import { DayTimeline } from './DayTimeline'
 import {
   DayTask,
   QueueState,
@@ -37,6 +39,7 @@ export function DayAssistantView() {
   const [showSubtaskModal, setShowSubtaskModal] = useState(false)
   const [selectedTask, setSelectedTask] = useState<DayTask | null>(null)
   const [showLaterExpanded, setShowLaterExpanded] = useState(false)
+  const [activeTab, setActiveTab] = useState<'tasks' | 'timeline' | 'chat'>('tasks')
 
   // Get current user
   useEffect(() => {
@@ -203,6 +206,12 @@ export function DayAssistantView() {
     )
   }
 
+  const handleChatAction = (recommendation: any) => {
+    // Handle chat recommendation actions
+    showToast('Akcja zastosowana', 'success')
+    refreshQueue()
+  }
+
   return (
     <div className="h-full flex flex-col">
       {/* Header with Energy Mode Switcher */}
@@ -233,8 +242,32 @@ export function DayAssistantView() {
         </div>
       </div>
 
-      {/* Main Content: NOW / NEXT / LATER */}
-      <div className="flex-1 overflow-y-auto space-y-4">
+      {/* Tab Navigation */}
+      <div className="flex gap-2 mb-4">
+        <Button
+          variant={activeTab === 'tasks' ? 'default' : 'ghost'}
+          onClick={() => setActiveTab('tasks')}
+        >
+          📝 Zadania
+        </Button>
+        <Button
+          variant={activeTab === 'timeline' ? 'default' : 'ghost'}
+          onClick={() => setActiveTab('timeline')}
+        >
+          📅 Harmonogram
+        </Button>
+        <Button
+          variant={activeTab === 'chat' ? 'default' : 'ghost'}
+          onClick={() => setActiveTab('chat')}
+        >
+          💬 Czat
+        </Button>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 overflow-hidden">
+        {activeTab === 'tasks' && (
+          <div className="h-full overflow-y-auto space-y-4">
         {/* NOW Section */}
         <Card className="border-2 border-brand-purple">
           <CardHeader>
@@ -351,6 +384,28 @@ export function DayAssistantView() {
             </CardContent>
           )}
         </Card>
+          </div>
+        )}
+
+        {/* Timeline Tab */}
+        {activeTab === 'timeline' && userId && (
+          <div className="h-full">
+            <DayTimeline
+              userId={userId}
+              onRefresh={refreshQueue}
+            />
+          </div>
+        )}
+
+        {/* Chat Tab */}
+        {activeTab === 'chat' && userId && (
+          <div className="h-full">
+            <DayChat
+              userId={userId}
+              onActionApply={handleChatAction}
+            />
+          </div>
+        )}
       </div>
 
       {/* Modals */}
