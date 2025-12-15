@@ -8,13 +8,13 @@ export interface JournalEntry {
   motivation: number // 0-10
   sleep_quality: number // 0-10
   hours_slept: number
-  sleep_time?: string // HH:MM format
-  wake_time?: string // HH:MM format
-  planned_tasks: string
+  sleep_time?: string // HH:MM format (deprecated, kept for legacy data)
+  wake_time?: string // HH:MM format (deprecated, kept for legacy data)
+  planned_tasks?: string // deprecated, kept for legacy data
   completed_tasks_snapshot: string[]
   notes: string[]
-  comments: string[]
-  ai_summary?: string
+  comments?: string[] // deprecated, kept for legacy data
+  ai_summary?: string // deprecated, kept for legacy data
   created_at: string
   updated_at: string
   // Legacy fields for compatibility
