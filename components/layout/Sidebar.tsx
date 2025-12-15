@@ -1,12 +1,10 @@
 'use client'
 
-import { ListChecks, CalendarBlank, Notebook, Brain, HandHeart, GearSix } from '@phosphor-icons/react'
+import { ListChecks, CalendarBlank, Notebook, Brain, HandHeart, GearSix, Sun } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 
-// Etap 2A: Updated assistant IDs to match specification
-// Previous: 'todoist', 'planner', 'journal', '6hats', 'chat'
-// Current: 'tasks', 'planning', 'journal', 'decisions', 'support'
-export type AssistantId = 'tasks' | 'planning' | 'journal' | 'decisions' | 'support' | 'admin'
+// Updated assistant IDs to include Day Assistant
+export type AssistantId = 'tasks' | 'day-assistant' | 'planning' | 'journal' | 'decisions' | 'support' | 'admin'
 
 interface Assistant {
   id: AssistantId
@@ -18,6 +16,7 @@ interface Assistant {
 
 const assistants: Assistant[] = [
   { id: 'tasks', icon: ListChecks, label: 'Zadania', color: 'text-blue-500' },
+  { id: 'day-assistant', icon: Sun, label: 'Asystent Dnia', color: 'text-yellow-500' },
   { id: 'planning', icon: CalendarBlank, label: 'Planowanie', color: 'text-green-500' },
   { id: 'journal', icon: Notebook, label: 'Dziennik', color: 'text-purple-500' },
   { id: 'decisions', icon: Brain, label: 'Decyzje', color: 'text-orange-500' },
