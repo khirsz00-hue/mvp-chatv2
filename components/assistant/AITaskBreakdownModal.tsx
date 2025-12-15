@@ -445,13 +445,37 @@ Zwróć JSON:
     }
   }
 
-  // Generic regeneration function for all modes
+  /**
+   * Regenerate subtasks when user returns to saved progress
+   * 
+   * This function calls the AI API to regenerate the step-by-step breakdown
+   * based on the saved progress. It handles mode-specific parameters and
+   * restores the user's position (current step and completed steps).
+   * 
+   * @param existingProgress - The saved progress including mode, step count, and completion status
+   * 
+   * Behavior:
+   * - For 'stuck' mode: includes Q&A context if available
+   * - For 'crisis' mode: sets maxMinutes to 5
+   * - For 'light' mode: uses default parameters
+   * - On failure: falls back to mode selection screen
+   * - On success: restores subtasks with completion status and current position
+   */
   const regenerateSubtasksForMode = async (existingProgress: AIAssistantProgress) => {
     setIsGeneratingSubtasks(true)
     setViewMode('single-subtask')
     
     try {
-      const requestBody: any = {
+      interface BreakdownRequestBody {
+        taskContent: string
+        taskDescription?: string
+        mode: 'light' | 'stuck' | 'crisis'
+        maxSubtasks: number
+        qaContext?: string
+        maxMinutes?: number
+      }
+      
+      const requestBody: BreakdownRequestBody = {
         taskContent: task.content,
         taskDescription: task.description,
         mode: existingProgress.mode,
@@ -471,7 +495,10 @@ Zwróć JSON:
         body: JSON.stringify(requestBody)
       })
       
-      if (!res.ok) throw new Error('Failed to regenerate subtasks')
+      if (!res.ok) {
+        const errorText = await res.text().catch(() => 'Unknown error')
+        throw new Error(`Failed to regenerate subtasks (HTTP ${res.status}): ${errorText}`)
+      }
       
       const data = await res.json()
       
