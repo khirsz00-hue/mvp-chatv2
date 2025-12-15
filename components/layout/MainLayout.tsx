@@ -17,7 +17,7 @@ import SubscriptionWall from '@/components/subscription/SubscriptionWall'
  * aby zapobiec infinite loading na głównej stronie
  */
 // Toggle this to disable subscription wall if it causes issues
-const ENABLE_SUBSCRIPTION_WALL = true
+const ENABLE_SUBSCRIPTION_WALL = false
 
 interface MainLayoutProps {
   children?: ReactNode
