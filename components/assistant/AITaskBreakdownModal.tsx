@@ -154,13 +154,7 @@ export function AITaskBreakdownModal({
         showToast(`Witaj z powrotem! Ostatnio byłeś na kroku ${existingProgress.current_step_index + 1} z ${existingProgress.total_steps}`, 'info')
         
         // Regenerate subtasks and jump directly to the current step
-        if (existingProgress.mode === 'light') {
-          await regenerateSubtasksForLightMode(existingProgress)
-        } else if (existingProgress.mode === 'stuck') {
-          await regenerateSubtasksForStuckMode(existingProgress)
-        } else if (existingProgress.mode === 'crisis') {
-          await regenerateSubtasksForCrisisMode(existingProgress)
-        }
+        await regenerateSubtasksForMode(existingProgress)
       }
     } catch (err) {
       console.error('Error loading progress:', err)
@@ -502,16 +496,6 @@ Zwróć JSON:
       setIsGeneratingSubtasks(false)
     }
   }
-
-  // Convenience wrappers for backward compatibility
-  const regenerateSubtasksForLightMode = (existingProgress: AIAssistantProgress) => 
-    regenerateSubtasksForMode(existingProgress)
-  
-  const regenerateSubtasksForStuckMode = (existingProgress: AIAssistantProgress) => 
-    regenerateSubtasksForMode(existingProgress)
-  
-  const regenerateSubtasksForCrisisMode = (existingProgress: AIAssistantProgress) => 
-    regenerateSubtasksForMode(existingProgress)
 
   // Handle "Done" button - mark current step as completed and advance
   const handleMarkStepDone = async () => {
