@@ -2,14 +2,17 @@ import { NextResponse } from 'next/server'
 import { getOpenAIClient } from '@/lib/openai'
 
 // Forbidden subtask patterns
+// These patterns are filtered out because they don't represent concrete, actionable steps
+// that help people with ADHD make progress. Instead, they are vague meta-tasks that
+// can increase cognitive load and paralysis.
 const FORBIDDEN_PATTERNS = [
-  /^otwórz/i,
-  /^otwierz/i,
-  /^zastanów się/i,
-  /^przygotuj/i,
-  /^sprawdź/i,
-  /^zapisz/i,
-  /^zanotuj/i
+  /^otwórz/i,      // "open..." - too vague, not a real action
+  /^otwierz/i,     // alternative spelling of "open"
+  /^zastanów się/i, // "think about..." - not actionable, increases anxiety
+  /^przygotuj/i,   // "prepare..." - too vague, unclear completion criteria
+  /^sprawdź/i,     // "check..." - unclear what specifically to check
+  /^zapisz/i,      // "write down..." - meta-task, not the actual work
+  /^zanotuj/i      // "note..." - similar to "write down"
 ]
 
 function isForbiddenSubtask(title: string): boolean {
@@ -109,9 +112,9 @@ Zwróć JSON:
     let generationResponse
     try {
       generationResponse = JSON.parse(generationCompletion.choices[0].message.content || '{"candidates":[]}')
-    } catch (parseErr) {
+    } catch (parseErr: any) {
       console.error('Failed to parse generation response:', parseErr)
-      throw new Error('AI returned invalid JSON for subtask generation')
+      throw new Error(`AI returned invalid JSON for subtask generation: ${parseErr.message}`)
     }
     
     let candidates = generationResponse.candidates || []
@@ -161,8 +164,8 @@ Zwróć JSON:
     let evaluationResponse
     try {
       evaluationResponse = JSON.parse(evaluationCompletion.choices[0].message.content || '{"selected":[]}')
-    } catch (parseErr) {
-      console.error('Failed to parse evaluation response:', parseErr)
+    } catch (parseErr: any) {
+      console.error('Failed to parse evaluation response:', parseErr.message)
       // Fallback to selecting first candidates if evaluation fails
       evaluationResponse = { selected: Array.from({ length: Math.min(maxSubtasks, candidates.length) }, (_, i) => i + 1) }
     }

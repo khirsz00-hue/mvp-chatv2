@@ -48,6 +48,15 @@ interface Subtask {
 type ModeType = 'light' | 'stuck' | 'crisis'
 type ViewMode = 'mode-selection' | 'questions' | 'single-subtask'
 
+// Error messages
+const ERROR_MESSAGES = {
+  LIGHT_MODE: 'Nie udało się wygenerować kroków w trybie lekkim. Spróbuj ponownie lub wybierz inny tryb.',
+  STUCK_MODE: 'Nie udało się wygenerować pierwszego kroku. Spróbuj ponownie.',
+  CRISIS_MODE: 'Nie udało się wygenerować pierwszego kroku. Spróbuj ponownie.',
+  NEXT_STEP: 'Nie udało się wygenerować następnego kroku',
+  CREATE_SUBTASK: 'Nie udało się utworzyć kroku'
+}
+
 export function AITaskBreakdownModal({
   open,
   onClose,
@@ -219,7 +228,7 @@ Zwróć JSON:
       }
     } catch (err) {
       console.error('Error generating subtasks:', err)
-      alert('Nie udało się wygenerować kroków. Spróbuj ponownie.')
+      alert(ERROR_MESSAGES.LIGHT_MODE)
     } finally {
       setIsGeneratingSubtasks(false)
     }
@@ -264,7 +273,7 @@ Zwróć JSON:
       }
     } catch (err) {
       console.error('Error generating subtask:', err)
-      alert('Nie udało się wygenerować pierwszego kroku. Spróbuj ponownie.')
+      alert(ERROR_MESSAGES.STUCK_MODE)
     } finally {
       setIsGeneratingSubtasks(false)
     }
@@ -305,7 +314,7 @@ Zwróć JSON:
       }
     } catch (err) {
       console.error('Error generating subtask:', err)
-      alert('Nie udało się wygenerować pierwszego kroku. Spróbuj ponownie.')
+      alert(ERROR_MESSAGES.CRISIS_MODE)
     } finally {
       setIsGeneratingSubtasks(false)
     }
@@ -333,7 +342,7 @@ Zwróć JSON:
       onClose()
     } catch (err) {
       console.error('Error creating subtask:', err)
-      alert('Nie udało się utworzyć kroku')
+      alert(ERROR_MESSAGES.CREATE_SUBTASK)
     } finally {
       setIsCreatingSubtasks(false)
     }
@@ -352,7 +361,7 @@ Zwróć JSON:
     
     try {
       const completedSubtasks = subtasks.slice(0, currentSubtaskIndex + 1)
-      const completedContext = completedSubtasks.map(st => st.title).join(', ')
+      const completedContext = completedSubtasks.map(st => `${st.title} (${st.estimatedMinutes}min)`).join('; ')
       
       const res = await fetch('/api/ai/breakdown-task', {
         method: 'POST',
@@ -383,7 +392,7 @@ Zwróć JSON:
       }
     } catch (err) {
       console.error('Error generating next subtask:', err)
-      alert('Nie udało się wygenerować następnego kroku')
+      alert(ERROR_MESSAGES.NEXT_STEP)
     } finally {
       setIsGeneratingSubtasks(false)
     }
