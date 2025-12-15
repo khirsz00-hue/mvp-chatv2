@@ -80,11 +80,12 @@ export function DayAssistantView() {
     fetchData()
   }, [userId, showToast])
 
-  const refreshQueue = async () => {
+  const refreshQueue = async (includeLater = false) => {
     if (!userId) return
 
     try {
-      const response = await fetch(`/api/day-assistant/queue?userId=${userId}`)
+      const url = `/api/day-assistant/queue?userId=${userId}${includeLater ? '&includeLater=true' : ''}`
+      const response = await fetch(url)
       if (response.ok) {
         const queue = await response.json()
         setQueueState(queue)
@@ -92,6 +93,14 @@ export function DayAssistantView() {
     } catch (error) {
       console.error('Error refreshing queue:', error)
     }
+  }
+  
+  const handleExpandLater = async () => {
+    if (!showLaterExpanded) {
+      // Fetch LATER tasks when expanding
+      await refreshQueue(true)
+    }
+    setShowLaterExpanded(!showLaterExpanded)
   }
 
   const handleEnergyModeChange = async (newMode: EnergyMode) => {
@@ -316,7 +325,7 @@ export function DayAssistantView() {
               {queueState.laterCount > 0 && (
                 <Button
                   variant="ghost"
-                  onClick={() => setShowLaterExpanded(!showLaterExpanded)}
+                  onClick={handleExpandLater}
                 >
                   {showLaterExpanded ? 'Zwiń' : 'Rozwiń'}
                 </Button>

@@ -109,7 +109,7 @@ export async function getUserTasks(userId: string, includeCompleted = false): Pr
 /**
  * Get queue state (NOW/NEXT/LATER) based on current energy mode
  */
-export async function getQueueState(userId: string): Promise<QueueState> {
+export async function getQueueState(userId: string, includeLater = false): Promise<QueueState> {
   const energyState = await getUserEnergyState(userId)
   const tasks = await getUserTasks(userId)
   
@@ -137,7 +137,7 @@ export async function getQueueState(userId: string): Promise<QueueState> {
   return {
     now,
     next,
-    later: [],  // Don't return full list for performance
+    later: includeLater ? later : [],  // Only return if explicitly requested
     laterCount: later.length
   }
 }

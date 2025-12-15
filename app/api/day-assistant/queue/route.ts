@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
+    const includeLater = searchParams.get('includeLater') === 'true'
 
     if (!userId) {
       return NextResponse.json(
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const queueState = await getQueueState(userId)
+    const queueState = await getQueueState(userId, includeLater)
 
     return NextResponse.json(queueState)
   } catch (error) {
