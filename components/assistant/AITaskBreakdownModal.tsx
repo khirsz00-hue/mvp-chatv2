@@ -170,11 +170,13 @@ export function AITaskBreakdownModal({
         setSelectedMode(existingProgress.mode)
         setCurrentSubtaskIndex(existingProgress.current_step_index)
         
-        // Regenerate subtasks based on saved mode
-        showToast(`Witaj z powrotem! Ostatnio byłeś na kroku ${existingProgress.current_step_index + 1} z ${existingProgress.total_steps}`, 'info')
-        
         // Regenerate subtasks and jump directly to the current step
-        await regenerateSubtasksForMode(existingProgress)
+        const success = await regenerateSubtasksForMode(existingProgress)
+        
+        // Show welcome toast only after successful regeneration
+        if (success) {
+          showToast(`Witaj z powrotem! Ostatnio byłeś na kroku ${existingProgress.current_step_index + 1} z ${existingProgress.total_steps}`, 'info')
+        }
       }
     } catch (err) {
       console.error('Error loading progress:', err)
@@ -473,15 +475,16 @@ Zwróć JSON:
    * restores the user's position (current step and completed steps).
    * 
    * @param existingProgress - The saved progress including mode, step count, and completion status
+   * @returns Promise<boolean> - true if regeneration succeeded, false if it failed
    * 
    * Behavior:
    * - For 'stuck' mode: includes Q&A context if available
    * - For 'crisis' mode: sets maxMinutes to 5
    * - For 'light' mode: uses default parameters
-   * - On failure: falls back to mode selection screen
-   * - On success: restores subtasks with completion status and current position
+   * - On failure: falls back to mode selection screen and returns false
+   * - On success: restores subtasks with completion status and current position, returns true
    */
-  const regenerateSubtasksForMode = async (existingProgress: AIAssistantProgress) => {
+  const regenerateSubtasksForMode = async (existingProgress: AIAssistantProgress): Promise<boolean> => {
     setIsGeneratingSubtasks(true)
     setViewMode('single-subtask')
     
@@ -525,11 +528,14 @@ Zwróć JSON:
         
         setSubtasks(regeneratedSubtasks)
         setCurrentSubtaskIndex(existingProgress.current_step_index)
+        return true
       }
+      return false
     } catch (err) {
       console.error('Error regenerating subtasks:', err)
       // Fall back to mode selection if regeneration fails
       setViewMode('mode-selection')
+      return false
     } finally {
       setIsGeneratingSubtasks(false)
     }
