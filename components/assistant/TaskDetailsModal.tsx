@@ -789,11 +789,25 @@ W 1-2 zwięzłych zdaniach wyjaśnij jak rozumiesz to zadanie, bez dodatkowych k
       if (res.ok) {
         const suggestions = await res.json()
         
+        let appliedSuggestions: string[] = []
+        
         // Apply suggestions
-        if (suggestions.priority) setPriority(suggestions.priority)
-        if (suggestions.estimatedMinutes) setEstimatedMinutes(suggestions.estimatedMinutes)
-        if (suggestions.suggestedDueDate) setDueDate(suggestions.suggestedDueDate)
-        if (suggestions.suggestedLabels) setLabels(prev => [...new Set([...prev, ...suggestions.suggestedLabels])])
+        if (suggestions.priority) {
+          setPriority(suggestions.priority)
+          appliedSuggestions.push(`Priorytet: P${suggestions.priority}`)
+        }
+        if (suggestions.estimatedMinutes) {
+          setEstimatedMinutes(suggestions.estimatedMinutes)
+          appliedSuggestions.push(`Czas: ${suggestions.estimatedMinutes}min`)
+        }
+        if (suggestions.suggestedDueDate) {
+          setDueDate(suggestions.suggestedDueDate)
+          appliedSuggestions.push(`Termin: ${suggestions.suggestedDueDate}`)
+        }
+        if (suggestions.suggestedLabels && suggestions.suggestedLabels.length > 0) {
+          setLabels(prev => [...new Set([...prev, ...suggestions.suggestedLabels])])
+          appliedSuggestions.push(`Etykiety: ${suggestions.suggestedLabels.join(', ')}`)
+        }
         
         // Find project by name
         if (suggestions.suggestedProject) {
@@ -801,10 +815,14 @@ W 1-2 zwięzłych zdaniach wyjaśnij jak rozumiesz to zadanie, bez dodatkowych k
           if (matchingProject) {
             setProjectId(matchingProject.id)
             setProjectName(matchingProject.name)
+            appliedSuggestions.push(`Projekt: ${matchingProject.name}`)
           }
         }
 
-        showToast(suggestions.reasoning || 'AI zasugerowało właściwości zadania', 'success')
+        const message = appliedSuggestions.length > 0 
+          ? `AI zasugerowało: ${appliedSuggestions.join(' • ')}`
+          : suggestions.reasoning || 'AI zasugerowało właściwości zadania'
+        showToast(message, 'success')
       }
     } catch (err) {
       console.error('Error fetching AI suggestions:', err)
