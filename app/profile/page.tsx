@@ -8,7 +8,7 @@ import Badge from '@/components/ui/Badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs'
 import { useToast } from '@/components/ui/Toast'
 import { useRouter } from 'next/navigation'
-import { User, Notebook, Sparkle, CreditCard } from '@phosphor-icons/react'
+import { User, Notebook, Sparkle, CreditCard, Link as LinkIcon, CheckCircle, XCircle } from '@phosphor-icons/react'
 import { format } from 'date-fns'
 import { pl } from 'date-fns/locale'
 
@@ -21,6 +21,9 @@ interface UserProfile {
   subscription_start_date?: string
   subscription_end_date?: string
   created_at: string
+  todoist_token?: string
+  google_access_token?: string
+  google_token_expiry?: number
 }
 
 interface JournalEntry {
@@ -43,12 +46,80 @@ export default function ProfilePage() {
   const [insights, setInsights] = useState<AIInsight[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('journal')
+  const [connectingTodoist, setConnectingTodoist] = useState(false)
+  const [connectingGoogle, setConnectingGoogle] = useState(false)
   const { showToast } = useToast()
   const router = useRouter()
 
   useEffect(() => {
     loadData()
   }, [])
+
+  const handleConnectTodoist = async () => {
+    setConnectingTodoist(true)
+    try {
+      window.location.href = '/api/todoist/auth'
+    } catch (error) {
+      console.error('Error connecting to Todoist:', error)
+      showToast('Błąd podczas połączenia z Todoist', 'error')
+      setConnectingTodoist(false)
+    }
+  }
+
+  const handleConnectGoogle = async () => {
+    setConnectingGoogle(true)
+    try {
+      window.location.href = '/api/google/auth'
+    } catch (error) {
+      console.error('Error connecting to Google Calendar:', error)
+      showToast('Błąd podczas połączenia z Google Calendar', 'error')
+      setConnectingGoogle(false)
+    }
+  }
+
+  const handleDisconnectTodoist = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({ todoist_token: null })
+        .eq('id', user.id)
+
+      if (error) throw error
+
+      showToast('Todoist został odłączony', 'success')
+      loadData()
+    } catch (error) {
+      console.error('Error disconnecting Todoist:', error)
+      showToast('Błąd podczas odłączania Todoist', 'error')
+    }
+  }
+
+  const handleDisconnectGoogle = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({ 
+          google_access_token: null,
+          google_refresh_token: null,
+          google_token_expiry: null
+        })
+        .eq('id', user.id)
+
+      if (error) throw error
+
+      showToast('Google Calendar został odłączony', 'success')
+      loadData()
+    } catch (error) {
+      console.error('Error disconnecting Google Calendar:', error)
+      showToast('Błąd podczas odłączania Google Calendar', 'error')
+    }
+  }
 
   const loadData = async () => {
     try {
@@ -58,10 +129,10 @@ export default function ProfilePage() {
         return
       }
 
-      // Load profile
+      // Load profile with integration tokens
       const { data: profileData } = await supabase
         .from('user_profiles')
-        .select('*')
+        .select('*, todoist_token, google_access_token, google_token_expiry')
         .eq('id', user.id)
         .single()
 
@@ -178,7 +249,7 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
-        {/* Tabs for Journal and Insights */}
+        {/* Tabs for Journal, Insights, and Integrations */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
             <TabsTrigger value="journal">
@@ -188,6 +259,10 @@ export default function ProfilePage() {
             <TabsTrigger value="insights">
               <Sparkle size={20} className="mr-2" />
               Wnioski AI ({insights.length})
+            </TabsTrigger>
+            <TabsTrigger value="integrations">
+              <LinkIcon size={20} className="mr-2" />
+              Integracje
             </TabsTrigger>
           </TabsList>
 
@@ -261,6 +336,137 @@ export default function ProfilePage() {
                     ))}
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="integrations">
+            <Card>
+              <CardHeader>
+                <CardTitle>Integracje</CardTitle>
+                <CardDescription>
+                  Zarządzaj połączeniami z zewnętrznymi usługami
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  {/* Todoist Integration */}
+                  <div className="p-4 border border-gray-200 rounded-lg">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
+                            <CheckCircle size={24} className="text-red-600" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-lg">Todoist</h3>
+                            <p className="text-sm text-muted-foreground">
+                              Zarządzanie zadaniami i projektami
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-3">
+                          {profile?.todoist_token ? (
+                            <div className="flex items-center gap-2">
+                              <CheckCircle size={20} className="text-green-600" />
+                              <span className="text-sm text-green-600 font-medium">
+                                Połączono
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <XCircle size={20} className="text-gray-400" />
+                              <span className="text-sm text-gray-500">
+                                Nie połączono
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        {profile?.todoist_token ? (
+                          <Button
+                            onClick={handleDisconnectTodoist}
+                            variant="outline"
+                            className="text-red-600 hover:bg-red-50"
+                          >
+                            Odłącz
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={handleConnectTodoist}
+                            disabled={connectingTodoist}
+                            className="gap-2"
+                          >
+                            <LinkIcon size={20} />
+                            {connectingTodoist ? 'Łączenie...' : 'Połącz'}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Google Calendar Integration */}
+                  <div className="p-4 border border-gray-200 rounded-lg">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                            <CheckCircle size={24} className="text-blue-600" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-lg">Google Calendar</h3>
+                            <p className="text-sm text-muted-foreground">
+                              Synchronizacja wydarzeń z kalendarza
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-3">
+                          {profile?.google_access_token ? (
+                            <div className="flex items-center gap-2">
+                              <CheckCircle size={20} className="text-green-600" />
+                              <span className="text-sm text-green-600 font-medium">
+                                Połączono
+                              </span>
+                              {profile.google_token_expiry && profile.google_token_expiry < Date.now() && (
+                                <span className="text-xs text-orange-600 ml-2">
+                                  (Token wygasł - połącz ponownie)
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <XCircle size={20} className="text-gray-400" />
+                              <span className="text-sm text-gray-500">
+                                Nie połączono
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        {profile?.google_access_token ? (
+                          <Button
+                            onClick={handleDisconnectGoogle}
+                            variant="outline"
+                            className="text-red-600 hover:bg-red-50"
+                          >
+                            Odłącz
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={handleConnectGoogle}
+                            disabled={connectingGoogle}
+                            className="gap-2"
+                          >
+                            <LinkIcon size={20} />
+                            {connectingGoogle ? 'Łączenie...' : 'Połącz'}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
