@@ -131,7 +131,10 @@ export async function getQueueState(userId: string, includeLater = false): Promi
   const energyState = await getUserEnergyState(userId)
   const tasks = await getUserTasks(userId)
   
-  console.log(`[getQueueState] userId: ${userId}, tasks count: ${tasks.length}`)
+  // Debug logging (remove in production or use proper logging framework)
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[getQueueState] userId: ${userId}, tasks count: ${tasks.length}`)
+  }
   
   const mode = energyState?.current_mode || 'normal'
   const constraints = ENERGY_MODE_CONSTRAINTS[mode]
@@ -141,7 +144,9 @@ export async function getQueueState(userId: string, includeLater = false): Promi
   const nextTasks = tasks.filter(t => t.priority === 'next')
   const laterTasks = tasks.filter(t => t.priority === 'later')
 
-  console.log(`[getQueueState] Priority distribution - NOW: ${nowTasks.length}, NEXT: ${nextTasks.length}, LATER: ${laterTasks.length}`)
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[getQueueState] Priority distribution - NOW: ${nowTasks.length}, NEXT: ${nextTasks.length}, LATER: ${laterTasks.length}`)
+  }
 
   // Take only the first task from NOW
   const now = nowTasks[0] || null
