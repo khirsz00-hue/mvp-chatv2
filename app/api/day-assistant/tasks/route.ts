@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createAuthenticatedSupabaseClient, getAuthenticatedUser } from '@/lib/supabaseAuth'
 import { createTask, updateTask, deleteTask, getUserTasks } from '@/lib/services/dayAssistantService'
-import { supabaseServer } from '@/lib/supabaseServer'
 
 // Mark as dynamic route since we use request.url
 export const dynamic = 'force-dynamic'
@@ -8,26 +8,30 @@ export const dynamic = 'force-dynamic'
 /**
  * GET /api/day-assistant/tasks
  * 
- * Get all tasks for a user
+ * Get all tasks for authenticated user
  */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId')
     const includeCompleted = searchParams.get('includeCompleted') === 'true'
 
-    if (!userId) {
+    const supabase = await createAuthenticatedSupabaseClient()
+    const user = await getAuthenticatedUser(supabase)
+    
+    if (!user) {
       return NextResponse.json(
-        { error: 'userId is required' },
-        { status: 400 }
+        { error: 'Unauthorized - Please log in' },
+        { status: 401 }
       )
     }
 
-    const tasks = await getUserTasks(userId, includeCompleted, supabaseServer)
+    console.log(`[Tasks API] Fetching tasks for user: ${user.id}`)
+
+    const tasks = await getUserTasks(user.id, includeCompleted, supabase)
 
     return NextResponse.json({ tasks })
   } catch (error) {
-    console.error('Error in tasks GET route:', error)
+    console.error('[Tasks API] Error in tasks GET route:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -38,23 +42,36 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/day-assistant/tasks
  * 
- * Create a new task
+ * Create a new task for authenticated user
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { userId, task } = body
-
-    if (!userId || !task || !task.title) {
+    const supabase = await createAuthenticatedSupabaseClient()
+    const user = await getAuthenticatedUser(supabase)
+    
+    if (!user) {
       return NextResponse.json(
-        { error: 'userId and task.title are required' },
+        { error: 'Unauthorized - Please log in' },
+        { status: 401 }
+      )
+    }
+
+    const body = await request.json()
+    const { task } = body
+
+    if (!task || !task.title) {
+      return NextResponse.json(
+        { error: 'task.title is required' },
         { status: 400 }
       )
     }
 
-    const createdTask = await createTask(userId, task, supabaseServer)
+    console.log(`[Tasks API] Creating task for user: ${user.id}`)
+
+    const createdTask = await createTask(user.id, task, supabase)
 
     if (!createdTask) {
+      console.error('[Tasks API] Failed to create task')
       return NextResponse.json(
         { error: 'Failed to create task' },
         { status: 500 }
@@ -63,7 +80,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ task: createdTask }, { status: 201 })
   } catch (error) {
-    console.error('Error in tasks POST route:', error)
+    console.error('[Tasks API] Error in tasks POST route:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -74,10 +91,20 @@ export async function POST(request: NextRequest) {
 /**
  * PUT /api/day-assistant/tasks
  * 
- * Update a task
+ * Update a task (authenticated user owns task via RLS)
  */
 export async function PUT(request: NextRequest) {
   try {
+    const supabase = await createAuthenticatedSupabaseClient()
+    const user = await getAuthenticatedUser(supabase)
+    
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Please log in' },
+        { status: 401 }
+      )
+    }
+
     const body = await request.json()
     const { taskId, ...updates } = body
 
@@ -88,9 +115,12 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const updatedTask = await updateTask(taskId, updates, supabaseServer)
+    console.log(`[Tasks API] Updating task ${taskId} for user: ${user.id}`)
+
+    const updatedTask = await updateTask(taskId, updates, supabase)
 
     if (!updatedTask) {
+      console.error('[Tasks API] Failed to update task')
       return NextResponse.json(
         { error: 'Failed to update task' },
         { status: 500 }
@@ -99,7 +129,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ task: updatedTask })
   } catch (error) {
-    console.error('Error in tasks PUT route:', error)
+    console.error('[Tasks API] Error in tasks PUT route:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -110,10 +140,20 @@ export async function PUT(request: NextRequest) {
 /**
  * DELETE /api/day-assistant/tasks
  * 
- * Delete a task
+ * Delete a task (authenticated user owns task via RLS)
  */
 export async function DELETE(request: NextRequest) {
   try {
+    const supabase = await createAuthenticatedSupabaseClient()
+    const user = await getAuthenticatedUser(supabase)
+    
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Please log in' },
+        { status: 401 }
+      )
+    }
+
     const { searchParams } = new URL(request.url)
     const taskId = searchParams.get('taskId')
 
@@ -124,9 +164,12 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    const success = await deleteTask(taskId, supabaseServer)
+    console.log(`[Tasks API] Deleting task ${taskId} for user: ${user.id}`)
+
+    const success = await deleteTask(taskId, supabase)
 
     if (!success) {
+      console.error('[Tasks API] Failed to delete task')
       return NextResponse.json(
         { error: 'Failed to delete task' },
         { status: 500 }
@@ -135,7 +178,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error in tasks DELETE route:', error)
+    console.error('[Tasks API] Error in tasks DELETE route:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
