@@ -6,13 +6,6 @@
 
 import { createClient } from '@supabase/supabase-js'
 import type { SupabaseClient } from '@supabase/supabase-js'
-
-// Service role client that bypasses RLS - only for server-side use
-const supabaseService = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { persistSession: false } }
-)
 import {
   DayTask,
   DaySubtask,
@@ -27,6 +20,13 @@ import {
   ENERGY_MODE_CONSTRAINTS
 } from '@/lib/types/dayAssistant'
 import { syncTaskToTodoist } from './dayAssistantSync'
+
+// Service role client that bypasses RLS - only for server-side use
+const supabaseService = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  { auth: { persistSession: false } }
+)
 
 /**
  * Get user's energy state
