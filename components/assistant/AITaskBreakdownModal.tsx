@@ -1046,10 +1046,10 @@ Zwróć JSON:
                       {/* Actions */}
                       <div className="flex gap-3 pt-2">
                         <button
-                          onClick={handleCancel}
+                          onClick={handleSaveAndClose}
                           className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-xl hover:bg-gray-50 transition font-medium text-gray-700"
                         >
-                          Anuluj
+                          Zamknij
                         </button>
                         <button
                           onClick={handleMarkStepDone}
@@ -1069,7 +1069,7 @@ Zwróć JSON:
                           ) : (
                             <>
                               <Check size={18} weight="bold" />
-                              ✓ Zrobione
+                              Zrobione
                             </>
                           )}
                         </button>
