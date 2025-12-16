@@ -18,6 +18,7 @@ import {
   TaskActionType,
   ENERGY_MODE_CONSTRAINTS
 } from '@/lib/types/dayAssistant'
+import { syncTaskToTodoist } from './dayAssistantSync'
 
 /**
  * Get user's energy state
@@ -220,6 +221,13 @@ export async function updateTask(
     console.error('Error updating task:', error)
     return null
   }
+  
+  // Sync priority changes back to Todoist (background, non-blocking)
+  if (updates.priority) {
+    syncTaskToTodoist(taskId, updates.priority).catch(err => {
+      console.error('Background Todoist sync failed:', err)
+    })
+  }
 
   return data as DayTask
 }
@@ -254,6 +262,7 @@ export async function moveTask(
     updates.position = newPosition
   }
 
+  // This will also trigger Todoist sync via updateTask
   return await updateTask(taskId, updates)
 }
 

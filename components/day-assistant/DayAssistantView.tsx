@@ -18,6 +18,7 @@ import {
   ENERGY_MODE_EMOJI
 } from '@/lib/types/dayAssistant'
 import { supabase } from '@/lib/supabaseClient'
+import { syncWithTodoist, shouldSync } from '@/lib/services/dayAssistantSync'
 
 /**
  * Main Day Assistant View
@@ -52,13 +53,19 @@ export function DayAssistantView() {
     getCurrentUser()
   }, [])
 
-  // Fetch queue state and energy mode
+  // Fetch queue state and energy mode + auto-sync with Todoist
   useEffect(() => {
     if (!userId) return
 
     const fetchData = async () => {
       setLoading(true)
       try {
+        // Auto-sync with Todoist on mount (if needed)
+        if (shouldSync()) {
+          console.log('[DayAssistant] Auto-syncing with Todoist...')
+          await syncWithTodoist(userId)
+        }
+        
         // Fetch queue state
         const queueResponse = await fetch(`/api/day-assistant/queue?userId=${userId}`)
         if (queueResponse.ok) {
@@ -82,6 +89,24 @@ export function DayAssistantView() {
 
     fetchData()
   }, [userId, showToast])
+  
+  // Background polling sync (10-15s interval)
+  useEffect(() => {
+    if (!userId) return
+    
+    const syncInterval = setInterval(async () => {
+      if (shouldSync()) {
+        console.log('[DayAssistant] Background sync with Todoist...')
+        const result = await syncWithTodoist(userId)
+        if (result.success && result.taskCount > 0) {
+          // Refresh queue after successful sync
+          await refreshQueue()
+        }
+      }
+    }, 12000) // 12 seconds
+    
+    return () => clearInterval(syncInterval)
+  }, [userId])
 
   const refreshQueue = async (includeLater = false) => {
     if (!userId) return
