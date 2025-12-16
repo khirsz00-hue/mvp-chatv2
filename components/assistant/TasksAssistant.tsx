@@ -86,12 +86,13 @@ export function TasksAssistant() {
   
   const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
   
-  const fetchTasks = useCallback(async () => {
+  const fetchTasks = useCallback(async (filterType?: FilterType) => {
     setLoading(true)
     try {
       console.log('🔍 Fetching tasks with token:', token ?  'EXISTS' : 'MISSING')
       
-      const res = await fetch(`/api/todoist/tasks?token=${token}`)
+      const filterParam = filterType || filter
+      const res = await fetch(`/api/todoist/tasks?token=${token}&filter=${filterParam}`)
       
       console.log('📡 Response status:', res.status)
       
@@ -118,7 +119,7 @@ export function TasksAssistant() {
     } finally {
       setLoading(false)
     }
-  }, [token])
+  }, [token, filter])
   
   const fetchProjects = useCallback(async () => {
     try {
@@ -147,6 +148,12 @@ export function TasksAssistant() {
     
     return () => clearInterval(interval)
   }, [token, fetchTasks])
+  
+  // Refetch tasks when filter changes to/from completed
+  useEffect(() => {
+    if (!token) return
+    fetchTasks(filter)
+  }, [filter, token])
   
   // Fetch projects
   useEffect(() => {
@@ -827,17 +834,6 @@ export function TasksAssistant() {
           
           <div className="flex items-center gap-3">
             <Button 
-              onClick={() => setShowPomodoro(true)} 
-              variant="outline"
-              className="gap-2 hover:scale-105 transition-transform"
-              title="Pomodoro Timer"
-              size="lg"
-            >
-              <span className="text-xl">🍅</span>
-              <span className="hidden sm:inline">Pomodoro</span>
-            </Button>
-            
-            <Button 
               onClick={() => setShowCreateModal(true)} 
               className="gap-2 bg-gradient-to-r from-brand-purple to-brand-pink hover:shadow-lg transition-all hover:scale-105"
               size="lg"
@@ -941,14 +937,14 @@ export function TasksAssistant() {
       {/* Filters */}
       {view === 'list' && (
         <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterType)}>
-          <TabsList className="flex flex-wrap w-full max-w-3xl justify-start gap-1">
-            <TabsTrigger value="today" className="flex-1 min-w-[100px]">Dziś</TabsTrigger>
-            <TabsTrigger value="tomorrow" className="flex-1 min-w-[100px]">Jutro</TabsTrigger>
-            <TabsTrigger value="week" className="flex-1 min-w-[100px]">Tydzień</TabsTrigger>
-            <TabsTrigger value="month" className="flex-1 min-w-[100px]">Miesiąc</TabsTrigger>
-            <TabsTrigger value="overdue" className="flex-1 min-w-[140px]">Przeterminowane</TabsTrigger>
-            <TabsTrigger value="scheduled" className="flex-1 min-w-[120px]">Zaplanowane</TabsTrigger>
-            <TabsTrigger value="completed" className="flex-1 min-w-[120px]">Ukończone</TabsTrigger>
+          <TabsList className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 w-full gap-1">
+            <TabsTrigger value="today">Dziś</TabsTrigger>
+            <TabsTrigger value="tomorrow">Jutro</TabsTrigger>
+            <TabsTrigger value="week">Tydzień</TabsTrigger>
+            <TabsTrigger value="month">Miesiąc</TabsTrigger>
+            <TabsTrigger value="overdue">Przeterminowane</TabsTrigger>
+            <TabsTrigger value="scheduled">Do zaplanowania</TabsTrigger>
+            <TabsTrigger value="completed">Ukończone</TabsTrigger>
           </TabsList>
         </Tabs>
       )}
