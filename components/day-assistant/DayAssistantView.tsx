@@ -40,6 +40,7 @@ export function DayAssistantView() {
   const [showSubtaskModal, setShowSubtaskModal] = useState(false)
   const [selectedTask, setSelectedTask] = useState<DayTask | null>(null)
   const [showLaterExpanded, setShowLaterExpanded] = useState(false)
+  const [rightPanelView, setRightPanelView] = useState<'timeline' | 'chat'>('chat')
 
   // Get current user
   useEffect(() => {
@@ -384,14 +385,45 @@ export function DayAssistantView() {
         </Card>
         </div>
 
-        {/* Right: Timeline - The "Live Consequences Map" */}
-        <div className="w-1/2 h-full">
-          {userId && (
-            <DayTimeline
-              userId={userId}
-              onRefresh={refreshQueue}
-            />
-          )}
+        {/* Right: Timeline / Chat Switcher */}
+        <div className="w-1/2 h-full flex flex-col">
+          {/* Tab Switcher */}
+          <div className="glass p-2 rounded-t-2xl flex gap-2 mb-0">
+            <Button
+              variant={rightPanelView === 'chat' ? 'default' : 'ghost'}
+              onClick={() => setRightPanelView('chat')}
+              className="flex-1"
+            >
+              💬 Czat
+            </Button>
+            <Button
+              variant={rightPanelView === 'timeline' ? 'default' : 'ghost'}
+              onClick={() => setRightPanelView('timeline')}
+              className="flex-1"
+            >
+              📅 Harmonogram
+            </Button>
+          </div>
+
+          {/* Content Area */}
+          <div className="flex-1 overflow-hidden">
+            {rightPanelView === 'chat' && userId && (
+              <DayChat
+                userId={userId}
+                onActionApply={async (recommendation) => {
+                  // Handle applying recommendations from chat
+                  console.log('Applying recommendation:', recommendation)
+                  await refreshQueue()
+                }}
+              />
+            )}
+            {rightPanelView === 'timeline' && userId && (
+              <DayTimeline
+                userId={userId}
+                onRefresh={refreshQueue}
+              />
+            )}
+          </div>
         </div>
       </div>
 
