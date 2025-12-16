@@ -91,7 +91,7 @@ export function TasksAssistant() {
     try {
       console.log('🔍 Fetching tasks with token:', token ?  'EXISTS' : 'MISSING')
       
-      const filterParam = filterType || filter
+      const filterParam = filterType !== undefined ? filterType : filter
       const res = await fetch(`/api/todoist/tasks?token=${token}&filter=${filterParam}`)
       
       console.log('📡 Response status:', res.status)
@@ -119,7 +119,7 @@ export function TasksAssistant() {
     } finally {
       setLoading(false)
     }
-  }, [token, filter])
+  }, [token])
   
   const fetchProjects = useCallback(async () => {
     try {
@@ -136,24 +136,18 @@ export function TasksAssistant() {
     }
   }, [token])
   
-  // Fetch tasks
+  // Fetch tasks on mount and when filter or token changes
   useEffect(() => {
     if (! token) return
-    fetchTasks()
+    fetchTasks(filter)
     
-    // Poll every 45 seconds
+    // Poll every 45 seconds - always use current filter
     const interval = setInterval(() => {
-      fetchTasks()
+      fetchTasks(filter)
     }, 45000)
     
     return () => clearInterval(interval)
-  }, [token, fetchTasks])
-  
-  // Refetch tasks when filter changes to/from completed
-  useEffect(() => {
-    if (!token) return
-    fetchTasks(filter)
-  }, [filter, token])
+  }, [token, filter, fetchTasks])
   
   // Fetch projects
   useEffect(() => {
