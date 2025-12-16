@@ -13,6 +13,8 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET(request: NextRequest) {
   try {
+    console.log('[DayAssistant Queue GET] === Request received ===')
+    
     const { searchParams } = new URL(request.url)
     const includeLater = searchParams.get('includeLater') === 'true'
 
@@ -22,14 +24,14 @@ export async function GET(request: NextRequest) {
     
     // Return 401 if no authenticated user
     if (!user?.id) {
-      console.error('[Queue API] No authenticated user - session missing')
+      console.error('[DayAssistant Queue GET] ✗ No authenticated user - returning 401')
       return NextResponse.json(
         { error: 'Unauthorized - Please log in' },
         { status: 401 }
       )
     }
 
-    console.log(`[Queue API] Fetching queue for user: ${user.id}`)
+    console.log(`[DayAssistant Queue GET] ✓ Authenticated user: ${user.id}`)
     
     // Fetch queue state with authenticated client (RLS will filter by auth.uid())
     const queueState = await getQueueState(user.id, includeLater, supabase)

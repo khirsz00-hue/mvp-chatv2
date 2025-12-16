@@ -6,6 +6,7 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Textarea from '@/components/ui/Textarea'
 import { useToast } from '@/components/ui/Toast'
+import { apiPost } from '@/lib/api'
 
 interface CreateTaskModalProps {
   userId: string
@@ -33,18 +34,14 @@ export function CreateTaskModal({ userId, onClose, onCreated }: CreateTaskModalP
 
     setLoading(true)
     try {
-      const response = await fetch('/api/day-assistant/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          task: {
-            title: title.trim(),
-            description: description.trim() || undefined,
-            estimated_duration: estimatedDuration,
-            priority: 'later'
-          }
-        })
+      const response = await apiPost('/api/day-assistant/tasks', {
+        userId,
+        task: {
+          title: title.trim(),
+          description: description.trim() || undefined,
+          estimated_duration: estimatedDuration,
+          priority: 'later'
+        }
       })
 
       if (response.ok) {

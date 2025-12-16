@@ -12,6 +12,7 @@ import {
   DetailLevel,
   DETAIL_LEVEL_DESCRIPTIONS
 } from '@/lib/types/dayAssistant'
+import { apiPost } from '@/lib/api'
 
 interface SubtaskModalProps {
   task: DayTask
@@ -45,16 +46,12 @@ export function SubtaskModal({
   const handleGenerate = async () => {
     setLoading(true)
     try {
-      const response = await fetch('/api/day-assistant/subtasks/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          task_id: task.id,
-          task_title: task.title,
-          task_description: task.description,
-          detail_level: detailLevel,
-          energy_mode: energyMode
-        })
+      const response = await apiPost('/api/day-assistant/subtasks/generate', {
+        task_id: task.id,
+        task_title: task.title,
+        task_description: task.description,
+        detail_level: detailLevel,
+        energy_mode: energyMode
       })
 
       if (response.ok) {
@@ -76,26 +73,18 @@ export function SubtaskModal({
   const handleFeedback = async (feedback: 'ok' | 'simplify' | 'split_more' | 'nonsense') => {
     try {
       // Record feedback
-      await fetch('/api/day-assistant/subtasks/feedback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          task_id: task.id,
-          feedback_type: feedback,
-          feedback_stage: 'pre_completion',
-          detail_level: detailLevel
-        })
+      await apiPost('/api/day-assistant/subtasks/feedback', {
+        task_id: task.id,
+        feedback_type: feedback,
+        feedback_stage: 'pre_completion',
+        detail_level: detailLevel
       })
 
       if (feedback === 'ok') {
         // Accept and create subtasks
-        const response = await fetch('/api/day-assistant/subtasks', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            task_id: task.id,
-            subtasks: generatedSubtasks
-          })
+        const response = await apiPost('/api/day-assistant/subtasks', {
+          task_id: task.id,
+          subtasks: generatedSubtasks
         })
 
         if (response.ok) {

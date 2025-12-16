@@ -92,18 +92,21 @@ function classifyIntent(message: string): ChatIntent {
 // GET: Retrieve chat history for today
 export async function GET(req: Request) {
   try {
+    console.log('[DayAssistant Chat GET] === Request received ===')
+    
     // Get authenticated user
     const supabase = await createAuthenticatedSupabaseClient()
     const user = await getAuthenticatedUser(supabase)
     
     if (!user) {
+      console.error('[DayAssistant Chat GET] ✗ No authenticated user - returning 401')
       return NextResponse.json(
         { error: 'Unauthorized - Please log in' },
         { status: 401 }
       )
     }
 
-    console.log('🔍 [API Chat GET] User:', user.id)
+    console.log('[DayAssistant Chat GET] ✓ Authenticated user:', user.id)
 
     const today = new Date().toISOString().split('T')[0]
 
@@ -131,11 +134,14 @@ export async function GET(req: Request) {
 // POST: Send message and get AI response
 export async function POST(req: Request) {
   try {
+    console.log('[DayAssistant Chat POST] === Request received ===')
+    
     // Get authenticated user
     const supabase = await createAuthenticatedSupabaseClient()
     const user = await getAuthenticatedUser(supabase)
     
     if (!user) {
+      console.error('[DayAssistant Chat POST] ✗ No authenticated user - returning 401')
       return NextResponse.json(
         { error: 'Unauthorized - Please log in' },
         { status: 401 }
@@ -144,7 +150,7 @@ export async function POST(req: Request) {
 
     const { message, conversationHistory } = await req.json()
 
-    console.log('🔍 [API Chat POST] User:', user.id)
+    console.log('[DayAssistant Chat POST] ✓ Authenticated user:', user.id)
 
     if (!message) {
       return NextResponse.json(
