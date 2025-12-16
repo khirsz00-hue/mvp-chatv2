@@ -7,6 +7,9 @@ import { User } from '@supabase/supabase-js'
 import Header from '@/components/layout/Header'
 import Sidebar, { AssistantId } from '@/components/layout/Sidebar'
 
+// Timeout constant for authentication check
+const AUTH_CHECK_TIMEOUT_MS = 10000 // 10 seconds
+
 interface CommunityLayoutProps {
   children: ReactNode
 }
@@ -19,16 +22,16 @@ export default function CommunityLayout({ children }: CommunityLayoutProps) {
   const router = useRouter()
 
   useEffect(() => {
-    // Timeout zabezpieczający - wymusza zakończenie loading po 10 sekundach
-    const timeoutId = setTimeout(() => {
-      console.error('⏱️ [CommunityLayout] TIMEOUT - forcing loading to false after 10 seconds')
-      setLoading(false)
-    }, 10000) // 10 sekund
-
     // Check authentication
     const checkAuth = async () => {
       console.log('🔍 [CommunityLayout] checkAuth started')
       
+      // Timeout zabezpieczający - wymusza zakończenie loading po określonym czasie
+      const timeoutId = setTimeout(() => {
+        console.error(`⏱️ [CommunityLayout] TIMEOUT - forcing loading to false after ${AUTH_CHECK_TIMEOUT_MS}ms`)
+        setLoading(false)
+      }, AUTH_CHECK_TIMEOUT_MS)
+
       try {
         const { data: { user }, error: userError } = await supabase.auth.getUser()
         console.log('🔍 [CommunityLayout] User:', user?.id || 'NULL')
@@ -36,6 +39,7 @@ export default function CommunityLayout({ children }: CommunityLayoutProps) {
         
         if (!user) {
           console.log('⚠️ [CommunityLayout] No user found, redirecting to login')
+          clearTimeout(timeoutId)
           setLoading(false)
           router.push('/login')
           return
@@ -60,6 +64,9 @@ export default function CommunityLayout({ children }: CommunityLayoutProps) {
         } else {
           setIsAdmin(profile?.is_admin ?? false)
         }
+        
+        // Clear timeout on successful auth
+        clearTimeout(timeoutId)
       } catch (error) {
         console.error('❌ [CommunityLayout] Error in checkAuth:', error)
         setLoading(false)
@@ -70,11 +77,6 @@ export default function CommunityLayout({ children }: CommunityLayoutProps) {
     }
 
     checkAuth()
-
-    // Cleanup timeout
-    return () => {
-      clearTimeout(timeoutId)
-    }
   }, [router])
 
   const handleNavigate = (view: AssistantId) => {
@@ -87,7 +89,10 @@ export default function CommunityLayout({ children }: CommunityLayoutProps) {
     // Navigate to home and set the active assistant
     try { 
       localStorage.setItem('active_assistant', view) 
-    } catch {}
+    } catch (error) {
+      // Log localStorage errors (e.g., quota exceeded, disabled cookies)
+      console.warn('[CommunityLayout] Failed to save active_assistant to localStorage:', error)
+    }
     
     setIsMobileMenuOpen(false)
     router.push('/')
