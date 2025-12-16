@@ -26,6 +26,7 @@ interface Task {
   due?:  { date: string } | string
   completed?: boolean
   created_at?: string
+  completed_at?: string
   subtasks?: any[]
   duration?: number
   labels?: string[]
@@ -237,10 +238,11 @@ export function TasksAssistant() {
         if (task.completed !== true) return false
         
         // Apply time-based filtering for completed tasks
-        const completedAt = task.created_at ? parseISO(task.created_at) : null
-        if (!completedAt) return true // If no created_at, show it
+        // Use completed_at if available, fallback to created_at
+        const completedAtStr = task.completed_at || task.created_at
+        if (!completedAtStr) return true // If no timestamp, show it
         
-        const completedDate = startOfDay(completedAt)
+        const completedDate = startOfDay(parseISO(completedAtStr))
         
         switch (completedTimeFilter) {
           case 'today':
