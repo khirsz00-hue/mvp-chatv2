@@ -24,14 +24,22 @@ export async function createAuthenticatedSupabaseClient(): Promise<SupabaseClien
   const authCookies = allCookies.filter(c => c.name.startsWith('sb-') && c.name.includes('auth-token'))
   
   console.log(`[Auth] Total cookies received: ${allCookies.length}`)
-  console.log(`[Auth] Cookie names: ${allCookies.map(c => c.name).join(', ')}`)
+  
+  // Only log cookie names in development to avoid exposing info in production
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[Auth] Cookie names: ${allCookies.map(c => c.name).join(', ')}`)
+  }
   
   if (authCookies.length > 0) {
     console.log(`[Auth] ✓ Found ${authCookies.length} Supabase auth cookie(s) for session`)
-    console.log(`[Auth] Auth cookie names: ${authCookies.map(c => c.name).join(', ')}`)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[Auth] Auth cookie names: ${authCookies.map(c => c.name).join(', ')}`)
+    }
   } else {
     console.warn('[Auth] ✗ No Supabase auth cookies found - user likely not authenticated')
-    console.warn('[Auth] All cookie names present:', allCookies.map(c => c.name).join(', ') || 'NONE')
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[Auth] All cookie names present:', allCookies.map(c => c.name).join(', ') || 'NONE')
+    }
   }
   
   return createServerClient(

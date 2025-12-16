@@ -13,10 +13,6 @@
 export async function apiGet(path: string, init: RequestInit = {}) {
   const res = await fetch(path, {
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...init.headers,
-    },
     ...init,
   })
   return res
@@ -71,10 +67,6 @@ export async function apiDelete(path: string, init: RequestInit = {}) {
   const res = await fetch(path, {
     method: 'DELETE',
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...init.headers,
-    },
     ...init,
   })
   return res

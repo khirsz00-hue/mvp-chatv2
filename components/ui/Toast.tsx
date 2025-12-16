@@ -33,6 +33,7 @@ const TOAST_DEDUP_CLEANUP_DELAY = 10000 // 10 seconds
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
   const [activeMessages, setActiveMessages] = useState<Set<string>>(new Set())
+  const [cleanupTimers, setCleanupTimers] = useState<Map<string, NodeJS.Timeout>>(new Map())
 
   const showToast = (message: string, type: ToastType = 'info', duration: number = 3000) => {
     // Dedupe: prevent duplicate toasts for the same message within cleanup delay
@@ -52,13 +53,21 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       setTimeout(() => {
         removeToast(id)
         // Remove from active messages after cleanup delay to allow future toasts
-        setTimeout(() => {
+        const cleanupTimer = setTimeout(() => {
           setActiveMessages(prev => {
             const next = new Set(prev)
             next.delete(messageKey)
             return next
           })
+          setCleanupTimers(prev => {
+            const next = new Map(prev)
+            next.delete(messageKey)
+            return next
+          })
         }, TOAST_DEDUP_CLEANUP_DELAY)
+        
+        // Store cleanup timer for potential cleanup on unmount
+        setCleanupTimers(prev => new Map([...prev, [messageKey, cleanupTimer]]))
       }, duration)
     }
   }
@@ -66,6 +75,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const removeToast = (id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id))
   }
+  
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      cleanupTimers.forEach(timer => clearTimeout(timer))
+    }
+  }, [cleanupTimers])
 
   return (
     <ToastContext.Provider value={{ showToast }}>
