@@ -63,6 +63,9 @@ export function DayChat({ userId, onActionApply }: DayChatProps) {
         if (response.ok) {
           const data = await response.json()
           setMessages(data.messages || [])
+        } else {
+          const errorData = await response.json()
+          console.error('Error loading chat history:', errorData.error || response.statusText)
         }
       } catch (error) {
         console.error('Error loading chat history:', error)
@@ -110,6 +113,16 @@ export function DayChat({ userId, onActionApply }: DayChatProps) {
           recommendations: data.recommendations
         }
         setMessages(prev => [...prev, assistantMessage])
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('Error sending message:', errorData.error)
+        const errorMessage: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: `Przepraszam, wystąpił błąd: ${errorData.error || 'Spróbuj ponownie.'}`,
+          timestamp: new Date().toISOString()
+        }
+        setMessages(prev => [...prev, errorMessage])
       }
     } catch (error) {
       console.error('Error sending message:', error)

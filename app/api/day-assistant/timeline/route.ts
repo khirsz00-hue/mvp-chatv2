@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabaseClient'
 import { format, addMinutes, parseISO } from 'date-fns'
+import { validateUUID } from '@/lib/validation/uuid'
 
 // Mark as dynamic route since we use request.url
 export const dynamic = 'force-dynamic'
@@ -24,8 +25,13 @@ export async function GET(req: Request) {
     const userId = searchParams.get('userId')
     const date = searchParams.get('date') || format(new Date(), 'yyyy-MM-dd')
 
-    if (!userId) {
-      return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
+    console.log('🔍 [API Timeline GET] Received userId:', userId, 'date:', date)
+
+    // Validate userId
+    const validationError = validateUUID(userId)
+    if (validationError) {
+      console.error('❌ [API Timeline GET]', validationError)
+      return NextResponse.json({ error: validationError }, { status: 400 })
     }
 
     const events: TimelineEvent[] = []
@@ -110,9 +116,18 @@ export async function POST(req: Request) {
   try {
     const { userId, date, type, title, startTime, duration, taskIds, metadata } = await req.json()
 
-    if (!userId || !date || !type || !title || !startTime || !duration) {
+    console.log('🔍 [API Timeline POST] Received userId:', userId)
+
+    // Validate userId
+    const validationError = validateUUID(userId)
+    if (validationError) {
+      console.error('❌ [API Timeline POST]', validationError)
+      return NextResponse.json({ error: validationError }, { status: 400 })
+    }
+
+    if (!date || !type || !title || !startTime || !duration) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Missing required fields: date, type, title, startTime, or duration' },
         { status: 400 }
       )
     }

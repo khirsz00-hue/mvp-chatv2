@@ -7,6 +7,7 @@ import {
   calculateOverloadScore,
   DayContext 
 } from '@/lib/dayAssistant/DayContext'
+import { validateUUID } from '@/lib/validation/uuid'
 
 // Mark as dynamic route since we use request.url
 export const dynamic = 'force-dynamic'
@@ -21,8 +22,13 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const userId = searchParams.get('userId')
 
-    if (!userId) {
-      return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
+    console.log('🔍 [API Recommendations GET] Received userId:', userId)
+
+    // Validate userId
+    const validationError = validateUUID(userId)
+    if (validationError) {
+      console.error('❌ [API Recommendations GET]', validationError)
+      return NextResponse.json({ error: validationError }, { status: 400 })
     }
 
     // 1. Get user's energy mode
@@ -137,9 +143,18 @@ export async function POST(req: Request) {
   try {
     const { userId, durationMinutes, preferredHours } = await req.json()
 
-    if (!userId || !durationMinutes) {
+    console.log('🔍 [API Recommendations POST] Received userId:', userId)
+
+    // Validate userId
+    const validationError = validateUUID(userId)
+    if (validationError) {
+      console.error('❌ [API Recommendations POST]', validationError)
+      return NextResponse.json({ error: validationError }, { status: 400 })
+    }
+
+    if (!durationMinutes) {
       return NextResponse.json(
-        { error: 'Missing userId or durationMinutes' },
+        { error: 'durationMinutes is required' },
         { status: 400 }
       )
     }

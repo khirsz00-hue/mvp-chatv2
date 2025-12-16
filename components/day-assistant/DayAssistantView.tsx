@@ -46,12 +46,17 @@ export function DayAssistantView() {
   useEffect(() => {
     const getCurrentUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
+      console.log('🔍 [DayAssistant] Current user:', user?.id)
+      
+      if (user?.id) {
         setUserId(user.id)
+      } else {
+        console.error('❌ [DayAssistant] No user ID found')
+        showToast('Please log in to use Day Assistant', 'error')
       }
     }
     getCurrentUser()
-  }, [])
+  }, [showToast])
 
   // Fetch queue state and energy mode + auto-sync with Todoist
   useEffect(() => {
