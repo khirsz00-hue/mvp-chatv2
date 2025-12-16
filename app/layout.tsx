@@ -1,6 +1,7 @@
 import './globals.css'
 import type { Metadata } from 'next'
 import { ToastProvider } from '@/components/ui/Toast'
+import { AuthStateProvider } from '@/components/auth/AuthStateProvider'
 
 export const metadata: Metadata = {
   title: 'AI Assistants PRO',
@@ -11,9 +12,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="pl">
       <body>
-        <ToastProvider>
-          {children}
-        </ToastProvider>
+        <AuthStateProvider>
+          <ToastProvider>
+            {children}
+          </ToastProvider>
+        </AuthStateProvider>
       </body>
     </html>
   )

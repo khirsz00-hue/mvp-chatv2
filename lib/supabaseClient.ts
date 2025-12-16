@@ -1,42 +1,76 @@
-import { createClient } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/ssr'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key'
 
-// Custom storage adapter that gracefully handles SSR
-const customStorageAdapter = {
-  getItem: (key: string) => {
-    if (typeof window === 'undefined') return null
-    try {
-      return window.localStorage.getItem(key)
-    } catch {
-      return null
+/**
+ * Browser client for Supabase with cookie-based session persistence
+ * Uses @supabase/ssr for proper cookie handling in production
+ */
+export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey, {
+  cookies: {
+    get(name: string) {
+      if (typeof document === 'undefined') return undefined
+      
+      const cookies = document.cookie.split('; ')
+      const cookie = cookies.find(c => c.startsWith(`${name}=`))
+      const value = cookie?.split('=')[1]
+      
+      // Log cookie access in development
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[Client Cookie] Get: ${name} = ${value ? 'PRESENT' : 'ABSENT'}`)
+      }
+      
+      return value
+    },
+    set(name: string, value: string, options: any) {
+      if (typeof document === 'undefined') return
+      
+      let cookieString = `${name}=${value}`
+      
+      if (options?.maxAge) {
+        cookieString += `; max-age=${options.maxAge}`
+      }
+      if (options?.path) {
+        cookieString += `; path=${options.path}`
+      }
+      if (options?.domain) {
+        cookieString += `; domain=${options.domain}`
+      }
+      if (options?.sameSite) {
+        cookieString += `; samesite=${options.sameSite}`
+      }
+      if (options?.secure) {
+        cookieString += '; secure'
+      }
+      
+      document.cookie = cookieString
+      
+      // Log cookie set with warning if on non-localhost production host
+      console.log(`[Client Cookie] Set: ${name} on ${window.location.hostname}`)
+      
+      // Verify cookie was set
+      const wasSet = document.cookie.includes(`${name}=`)
+      if (!wasSet) {
+        console.warn(`[Client Cookie] ⚠️ Failed to set cookie: ${name}. Check browser settings and host.`)
+      }
+    },
+    remove(name: string, options: any) {
+      if (typeof document === 'undefined') return
+      
+      // Set with past expiration date
+      let cookieString = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+      
+      if (options?.path) {
+        cookieString += `; path=${options.path}`
+      }
+      if (options?.domain) {
+        cookieString += `; domain=${options.domain}`
+      }
+      
+      document.cookie = cookieString
+      
+      console.log(`[Client Cookie] Removed: ${name}`)
     }
-  },
-  setItem: (key: string, value: string) => {
-    if (typeof window === 'undefined') return
-    try {
-      window.localStorage.setItem(key, value)
-    } catch {
-      // Silently fail if localStorage is not available
-    }
-  },
-  removeItem: (key: string) => {
-    if (typeof window === 'undefined') return
-    try {
-      window.localStorage.removeItem(key)
-    } catch {
-      // Silently fail if localStorage is not available
-    }
-  },
-}
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    detectSessionInUrl: true,
-    flowType: 'pkce',
-    autoRefreshToken: true,
-    storage: customStorageAdapter
   }
 })
