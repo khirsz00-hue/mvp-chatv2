@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server'
 import { DecisionService } from '@/src/features/decision-assistant/services/decisionService'
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 export const dynamic = 'force-dynamic'
 
@@ -24,7 +28,55 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    await DecisionService.deleteDecision(params.id)
+    // Get auth token from header
+    const authHeader = req.headers.get('authorization')
+    if (!authHeader) {
+      return NextResponse.json(
+        { error: 'Missing authorization header' },
+        { status: 401 }
+      )
+    }
+
+    // Create Supabase client with user's token
+    const token = authHeader.replace('Bearer ', '')
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    })
+    
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    // Delete decision using authenticated client
+    // Explicitly check user ownership for better security
+    const { data, error } = await supabase
+      .from('decisions')
+      .delete()
+      .eq('id', params.id)
+      .eq('user_id', user.id)
+      .select()
+
+    if (error) {
+      throw new Error(`Failed to delete decision: ${error.message}`)
+    }
+
+    // Verify that a decision was actually deleted
+    if (!data || data.length === 0) {
+      return NextResponse.json(
+        { error: 'Decision not found or access denied' },
+        { status: 404 }
+      )
+    }
+
     return NextResponse.json({ success: true })
   } catch (err: any) {
     console.error('Error in /api/decision/[id] DELETE:', err)
