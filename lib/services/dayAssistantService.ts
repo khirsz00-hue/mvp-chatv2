@@ -4,9 +4,15 @@
  * Handles CRUD operations for Day Assistant tasks, queue management, and user state
  */
 
-import { supabase } from '@/lib/supabaseClient'
-import { supabaseServer } from '@/lib/supabaseServer'
+import { createClient } from '@supabase/supabase-js'
 import type { SupabaseClient } from '@supabase/supabase-js'
+
+// Service role client that bypasses RLS - only for server-side use
+const supabaseService = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  { auth: { persistSession: false } }
+)
 import {
   DayTask,
   DaySubtask,
@@ -26,7 +32,7 @@ import { syncTaskToTodoist } from './dayAssistantSync'
  * Get user's energy state
  */
 export async function getUserEnergyState(userId: string, client?: SupabaseClient): Promise<UserEnergyState | null> {
-  const db = client || supabase
+  const db = client || supabaseService
   const { data, error } = await db
     .from('user_energy_state')
     .select('*')
@@ -49,7 +55,7 @@ export async function getUserEnergyState(userId: string, client?: SupabaseClient
  * Create default energy state for user
  */
 async function createDefaultEnergyState(userId: string, client?: SupabaseClient): Promise<UserEnergyState | null> {
-  const db = client || supabase
+  const db = client || supabaseService
   const { data, error } = await db
     .from('user_energy_state')
     .insert({
@@ -71,7 +77,7 @@ async function createDefaultEnergyState(userId: string, client?: SupabaseClient)
  * Update user's energy mode
  */
 export async function updateEnergyMode(userId: string, mode: EnergyMode, client?: SupabaseClient): Promise<boolean> {
-  const db = client || supabase
+  const db = client || supabaseService
   const { error } = await db
     .from('user_energy_state')
     .upsert({
@@ -92,7 +98,7 @@ export async function updateEnergyMode(userId: string, mode: EnergyMode, client?
  * Get all tasks for a user with their subtasks
  */
 export async function getUserTasks(userId: string, includeCompleted = false, client?: SupabaseClient): Promise<DayTask[]> {
-  const db = client || supabase
+  const db = client || supabaseService
   let query = db
     .from('day_assistant_tasks')
     .select(`
@@ -184,7 +190,7 @@ export async function createTask(
   task: Partial<DayTask>,
   client?: SupabaseClient
 ): Promise<DayTask | null> {
-  const db = client || supabase
+  const db = client || supabaseService
   const { data, error } = await db
     .from('day_assistant_tasks')
     .insert({
@@ -219,7 +225,7 @@ export async function updateTask(
   updates: Partial<DayTask>,
   client?: SupabaseClient
 ): Promise<DayTask | null> {
-  const db = client || supabase
+  const db = client || supabaseService
   const { data, error } = await db
     .from('day_assistant_tasks')
     .update(updates)
@@ -246,7 +252,7 @@ export async function updateTask(
  * Delete a task
  */
 export async function deleteTask(taskId: string, client?: SupabaseClient): Promise<boolean> {
-  const db = client || supabase
+  const db = client || supabaseService
   const { error } = await db
     .from('day_assistant_tasks')
     .delete()
@@ -282,7 +288,7 @@ export async function moveTask(
  */
 export async function pinTaskToday(userId: string, taskId: string): Promise<DayTask | null> {
   // Get current task state for history
-  const { data: currentTask } = await supabase
+  const { data: currentTask } = await supabaseService
     .from('day_assistant_tasks')
     .select('*')
     .eq('id', taskId)
@@ -308,7 +314,7 @@ export async function pinTaskToday(userId: string, taskId: string): Promise<DayT
  * Postpone task to another day (🧊 NOT TODAY)
  */
 export async function postponeTask(userId: string, taskId: string): Promise<DayTask | null> {
-  const { data: currentTask } = await supabase
+  const { data: currentTask } = await supabaseService
     .from('day_assistant_tasks')
     .select('*')
     .eq('id', taskId)
@@ -332,7 +338,7 @@ export async function postponeTask(userId: string, taskId: string): Promise<DayT
  * Escalate task to highest priority (🔥 MEGA IMPORTANT)
  */
 export async function escalateTask(userId: string, taskId: string): Promise<DayTask | null> {
-  const { data: currentTask } = await supabase
+  const { data: currentTask } = await supabaseService
     .from('day_assistant_tasks')
     .select('*')
     .eq('id', taskId)
@@ -362,7 +368,7 @@ async function recordTaskAction(
   previousState: any,
   newState: any
 ): Promise<void> {
-  await supabase
+  await supabaseService
     .from('task_action_history')
     .insert({
       user_id: userId,
@@ -378,7 +384,7 @@ async function recordTaskAction(
  * Get task action history (for undo)
  */
 export async function getTaskHistory(userId: string, limit = 10): Promise<TaskActionHistory[]> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseService
     .from('task_action_history')
     .select('*')
     .eq('user_id', userId)
@@ -404,7 +410,7 @@ export async function undoLastAction(userId: string): Promise<boolean> {
   const previousState = lastAction.previous_state as Partial<DayTask>
 
   // Restore previous state
-  const { error } = await supabase
+  const { error } = await supabaseService
     .from('day_assistant_tasks')
     .update(previousState)
     .eq('id', lastAction.task_id)
@@ -415,7 +421,7 @@ export async function undoLastAction(userId: string): Promise<boolean> {
   }
 
   // Optionally delete the history entry
-  await supabase
+  await supabaseService
     .from('task_action_history')
     .delete()
     .eq('id', lastAction.id)
@@ -438,7 +444,7 @@ export async function createSubtasks(
     completed: false
   }))
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseService
     .from('day_assistant_subtasks')
     .insert(subtasksToInsert)
     .select()
@@ -463,7 +469,7 @@ export async function updateSubtaskCompletion(
     updates.completed_at = new Date().toISOString()
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseService
     .from('day_assistant_subtasks')
     .update(updates)
     .eq('id', subtaskId)
@@ -484,7 +490,7 @@ export async function updateSubtaskCompletion(
 export async function recordSubtaskFeedback(
   feedback: Omit<SubtaskFeedback, 'id' | 'created_at'>
 ): Promise<boolean> {
-  const { error } = await supabase
+  const { error } = await supabaseService
     .from('subtask_feedback')
     .insert(feedback)
 
@@ -500,7 +506,7 @@ export async function recordSubtaskFeedback(
  * Get user preferences
  */
 export async function getUserPreferences(userId: string): Promise<UserDayPreferences | null> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseService
     .from('user_day_preferences')
     .select('*')
     .eq('user_id', userId)
@@ -522,7 +528,7 @@ export async function getUserPreferences(userId: string): Promise<UserDayPrefere
  * Create default user preferences
  */
 async function createDefaultPreferences(userId: string): Promise<UserDayPreferences | null> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseService
     .from('user_day_preferences')
     .insert({
       user_id: userId,
@@ -548,7 +554,7 @@ export async function updateUserPreferences(
   userId: string,
   updates: Partial<UserDayPreferences>
 ): Promise<UserDayPreferences | null> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseService
     .from('user_day_preferences')
     .update(updates)
     .eq('user_id', userId)
@@ -578,7 +584,7 @@ export async function completeTask(taskId: string): Promise<DayTask | null> {
   if (!updatedTask) return null
 
   // Complete all subtasks
-  await supabase
+  await supabaseService
     .from('day_assistant_subtasks')
     .update({
       completed: true,
