@@ -43,13 +43,25 @@ export async function syncWithTodoist(userId: string): Promise<{ success: boolea
     const { tasks } = await response.json()
     
     if (!Array.isArray(tasks)) {
+      console.error('[syncWithTodoist] Invalid tasks response:', tasks)
       throw new Error('Invalid tasks response from Todoist API')
     }
     
+    console.log(`[syncWithTodoist] Fetched ${tasks.length} tasks from Todoist API`)
+    
     // 3. Upsert each task to day_assistant_tasks
+    let successCount = 0
+    let errorCount = 0
     for (const task of tasks) {
-      await upsertTaskFromTodoist(userId, task)
+      const result = await upsertTaskFromTodoist(userId, task)
+      if (result) {
+        successCount++
+      } else {
+        errorCount++
+      }
     }
+    
+    console.log(`[syncWithTodoist] Upserted ${successCount} tasks, ${errorCount} errors`)
     
     // 4. Remove tasks that no longer exist in Todoist
     const todoistTaskIds = tasks.map((t: any) => t.id)
@@ -72,7 +84,7 @@ export async function syncWithTodoist(userId: string): Promise<{ success: boolea
 /**
  * Upsert a single Todoist task to day_assistant_tasks
  */
-async function upsertTaskFromTodoist(userId: string, todoistTask: any): Promise<void> {
+async function upsertTaskFromTodoist(userId: string, todoistTask: any): Promise<boolean> {
   try {
     // Map Todoist task to Day Assistant priority
     const priority = mapTodoistPriorityToDayPriority(todoistTask)
@@ -113,8 +125,10 @@ async function upsertTaskFromTodoist(userId: string, todoistTask: any): Promise<
         .eq('id', existingTask.id)
       
       if (error) {
-        console.error('Error updating task:', error)
+        console.error(`[upsertTask] Error updating task ${todoistTask.id}:`, error)
+        return false
       }
+      console.log(`[upsertTask] Updated task: ${todoistTask.content} (priority: ${priority})`)
     } else {
       // Insert new task
       const { error } = await supabase
@@ -122,11 +136,15 @@ async function upsertTaskFromTodoist(userId: string, todoistTask: any): Promise<
         .insert(taskData)
       
       if (error) {
-        console.error('Error inserting task:', error)
+        console.error(`[upsertTask] Error inserting task ${todoistTask.id}:`, error)
+        return false
       }
+      console.log(`[upsertTask] Inserted task: ${todoistTask.content} (priority: ${priority})`)
     }
+    return true
   } catch (error) {
-    console.error('Error upserting task:', error)
+    console.error(`[upsertTask] Error upserting task ${todoistTask.id}:`, error)
+    return false
   }
 }
 
@@ -166,16 +184,37 @@ async function removeDeletedTasks(userId: string, todoistTaskIds: string[]): Pro
       return
     }
     
-    // Use Supabase's parameter binding to prevent SQL injection
-    const { error } = await supabase
+    // Get all existing Todoist tasks for this user
+    const { data: existingTasks, error: fetchError } = await supabase
       .from('day_assistant_tasks')
-      .delete()
+      .select('id, todoist_task_id')
       .eq('user_id', userId)
       .not('todoist_task_id', 'is', null)
-      .not('todoist_task_id', 'in', todoistTaskIds)
     
-    if (error) {
-      console.error('Error removing deleted tasks:', error)
+    if (fetchError) {
+      console.error('Error fetching existing tasks:', fetchError)
+      return
+    }
+    
+    // Find tasks that no longer exist in Todoist
+    const tasksToDelete = (existingTasks || []).filter(
+      task => !todoistTaskIds.includes(task.todoist_task_id!)
+    )
+    
+    // Delete them one by one (or in batches)
+    if (tasksToDelete.length > 0) {
+      console.log(`[removeDeletedTasks] Removing ${tasksToDelete.length} tasks that no longer exist in Todoist`)
+    }
+    
+    for (const task of tasksToDelete) {
+      const { error } = await supabase
+        .from('day_assistant_tasks')
+        .delete()
+        .eq('id', task.id)
+      
+      if (error) {
+        console.error(`[removeDeletedTasks] Error deleting task ${task.id}:`, error)
+      }
     }
   } catch (error) {
     console.error('Error in removeDeletedTasks:', error)

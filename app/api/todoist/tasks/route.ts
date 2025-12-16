@@ -69,9 +69,12 @@ async function fetchAndFilterTasks(token: any, filter: string) {
     const simplified = filtered.map((t: any) => ({
       id: t.id,
       content: t.content,
+      description: t.description || null,
       project_id: t.project_id,
       due: t.due ? { date: t.due.date || t.due } : null,
       priority: t.priority,
+      labels: t.labels || [],
+      duration: t.duration || null,
     }))
 
     return simplified
