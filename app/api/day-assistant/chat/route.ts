@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabaseClient'
 import { getOpenAIClient } from '@/lib/openai'
 
+// Mark as dynamic route since we use request.url
+export const dynamic = 'force-dynamic'
+
 // Chat intent types
 type ChatIntent = 
   | 'SCHEDULE_SLOT'
