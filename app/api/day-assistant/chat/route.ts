@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabaseClient'
 import { getOpenAIClient } from '@/lib/openai'
+import { validateUUID } from '@/lib/validation/uuid'
 
 // Mark as dynamic route since we use request.url
 export const dynamic = 'force-dynamic'
@@ -94,8 +95,13 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const userId = searchParams.get('userId')
 
-    if (!userId) {
-      return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
+    console.log('🔍 [API Chat GET] Received userId:', userId)
+
+    // Validate userId
+    const validationError = validateUUID(userId)
+    if (validationError) {
+      console.error('❌ [API Chat GET]', validationError)
+      return NextResponse.json({ error: validationError }, { status: 400 })
     }
 
     const today = new Date().toISOString().split('T')[0]
@@ -109,10 +115,11 @@ export async function GET(req: Request) {
       .order('created_at', { ascending: true })
 
     if (error) {
-      console.error('Error fetching chat messages:', error)
-      return NextResponse.json({ messages: [] })
+      console.error('❌ [API Chat GET] Supabase error:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    console.log(`✅ [API Chat GET] Found ${messages?.length || 0} messages`)
     return NextResponse.json({ messages: messages || [] })
   } catch (err: any) {
     console.error('Error in GET /api/day-assistant/chat:', err)
@@ -125,9 +132,18 @@ export async function POST(req: Request) {
   try {
     const { userId, message, conversationHistory } = await req.json()
 
-    if (!userId || !message) {
+    console.log('🔍 [API Chat POST] Received userId:', userId)
+
+    // Validate userId
+    const validationError = validateUUID(userId)
+    if (validationError) {
+      console.error('❌ [API Chat POST]', validationError)
+      return NextResponse.json({ error: validationError }, { status: 400 })
+    }
+
+    if (!message) {
       return NextResponse.json(
-        { error: 'Missing userId or message' },
+        { error: 'message is required' },
         { status: 400 }
       )
     }
@@ -173,10 +189,12 @@ export async function POST(req: Request) {
     const responseText = completion.choices[0].message.content || '{}'
     const response = JSON.parse(responseText)
 
+    console.log('✅ [API Chat POST] AI response generated successfully')
+
     // Save both messages to database
     const today = new Date().toISOString()
 
-    await supabase.from('day_chat_messages').insert([
+    const { error: insertError } = await supabase.from('day_chat_messages').insert([
       {
         user_id: userId,
         role: 'user',
@@ -192,6 +210,12 @@ export async function POST(req: Request) {
         created_at: new Date(Date.now() + 1000).toISOString()
       }
     ])
+
+    if (insertError) {
+      console.error('❌ [API Chat POST] Error saving messages:', insertError)
+    } else {
+      console.log('✅ [API Chat POST] Messages saved to database')
+    }
 
     return NextResponse.json(response)
   } catch (err: any) {

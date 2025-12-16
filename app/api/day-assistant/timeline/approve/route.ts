@@ -1,16 +1,26 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabaseClient'
+import { validateUUID } from '@/lib/validation/uuid'
 
 // POST: Approve a ghost proposal and convert it to a task-block
 export async function POST(req: Request) {
   try {
     const { userId, eventId } = await req.json()
 
-    if (!userId || !eventId) {
-      return NextResponse.json(
-        { error: 'Missing userId or eventId' },
-        { status: 400 }
-      )
+    console.log('🔍 [API Timeline Approve] Received userId:', userId, 'eventId:', eventId)
+
+    // Validate userId
+    const userIdError = validateUUID(userId)
+    if (userIdError) {
+      console.error('❌ [API Timeline Approve]', userIdError)
+      return NextResponse.json({ error: userIdError }, { status: 400 })
+    }
+
+    // Validate eventId
+    const eventIdError = validateUUID(eventId, 'eventId')
+    if (eventIdError) {
+      console.error('❌ [API Timeline Approve]', eventIdError)
+      return NextResponse.json({ error: eventIdError }, { status: 400 })
     }
 
     // Update the event type from ghost-proposal to task-block

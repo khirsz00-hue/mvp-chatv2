@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { pinTaskToday, postponeTask, escalateTask } from '@/lib/services/dayAssistantService'
+import { validateUUID } from '@/lib/validation/uuid'
 
 /**
  * POST /api/day-assistant/actions
@@ -11,9 +12,25 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { userId, taskId, action } = body
 
-    if (!userId || !taskId || !action) {
+    console.log('🔍 [API Actions] Received userId:', userId, 'taskId:', taskId, 'action:', action)
+
+    // Validate userId
+    const userIdError = validateUUID(userId)
+    if (userIdError) {
+      console.error('❌ [API Actions]', userIdError)
+      return NextResponse.json({ error: userIdError }, { status: 400 })
+    }
+
+    // Validate taskId
+    const taskIdError = validateUUID(taskId, 'taskId')
+    if (taskIdError) {
+      console.error('❌ [API Actions]', taskIdError)
+      return NextResponse.json({ error: taskIdError }, { status: 400 })
+    }
+
+    if (!action) {
       return NextResponse.json(
-        { error: 'userId, taskId, and action are required' },
+        { error: 'action is required' },
         { status: 400 }
       )
     }
@@ -38,12 +55,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (!updatedTask) {
+      console.error('❌ [API Actions] Failed to perform action')
       return NextResponse.json(
         { error: 'Failed to perform action' },
         { status: 500 }
       )
     }
 
+    console.log(`✅ [API Actions] Action '${action}' completed successfully`)
     return NextResponse.json({ task: updatedTask })
   } catch (error) {
     console.error('Error in actions route:', error)
