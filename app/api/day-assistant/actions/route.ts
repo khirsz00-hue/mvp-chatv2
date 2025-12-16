@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedSupabaseClient, getAuthenticatedUser } from '@/lib/supabaseAuth'
 import { pinTaskToday, postponeTask, escalateTask } from '@/lib/services/dayAssistantService'
-import { validateUUID } from '@/lib/validation/uuid'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,16 +28,9 @@ export async function POST(request: NextRequest) {
 
     console.log('🔍 [API Actions] User:', user.id, 'taskId:', taskId, 'action:', action)
 
-    // Validate taskId
-    const taskIdError = validateUUID(taskId, 'taskId')
-    if (taskIdError) {
-      console.error('❌ [API Actions]', taskIdError)
-      return NextResponse.json({ error: taskIdError }, { status: 400 })
-    }
-
-    if (!action) {
+    if (!taskId || !action) {
       return NextResponse.json(
-        { error: 'action is required' },
+        { error: 'taskId and action are required' },
         { status: 400 }
       )
     }

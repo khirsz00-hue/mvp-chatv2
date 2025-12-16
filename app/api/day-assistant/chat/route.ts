@@ -254,7 +254,17 @@ async function getDayContext(userId: string) {
     const todayStr = today.toISOString().split('T')[0]
 
     // Format tasks with clear structure for AI
-    const formattedTasks = (tasks || []).map((t: any) => ({
+    interface FormattedTask {
+      id: string
+      title: string
+      description: string | null
+      priority: string
+      duration: number
+      pinned: boolean
+      megaImportant: boolean
+    }
+
+    const formattedTasks: FormattedTask[] = (tasks || []).map((t: any) => ({
       id: t.id,
       title: t.title,
       description: t.description,
@@ -269,9 +279,9 @@ async function getDayContext(userId: string) {
       currentTime: today.toISOString(),
       tasks: formattedTasks,
       taskCount: {
-        now: formattedTasks.filter((t: any) => t.priority === 'now').length,
-        next: formattedTasks.filter((t: any) => t.priority === 'next').length,
-        later: formattedTasks.filter((t: any) => t.priority === 'later').length
+        now: formattedTasks.filter(t => t.priority === 'now').length,
+        next: formattedTasks.filter(t => t.priority === 'next').length,
+        later: formattedTasks.filter(t => t.priority === 'later').length
       },
       date: todayStr
     }
