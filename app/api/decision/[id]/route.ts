@@ -57,13 +57,24 @@ export async function DELETE(
     }
 
     // Delete decision using authenticated client
-    const { error } = await supabase
+    // Explicitly check user ownership for better security
+    const { data, error } = await supabase
       .from('decisions')
       .delete()
       .eq('id', params.id)
+      .eq('user_id', user.id)
+      .select()
 
     if (error) {
       throw new Error(`Failed to delete decision: ${error.message}`)
+    }
+
+    // Verify that a decision was actually deleted
+    if (!data || data.length === 0) {
+      return NextResponse.json(
+        { error: 'Decision not found or access denied' },
+        { status: 404 }
+      )
     }
 
     return NextResponse.json({ success: true })
