@@ -31,7 +31,7 @@ export async function syncWithTodoist(userId: string): Promise<{ success: boolea
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
-        token: token,
+        token,
         filter: 'all' 
       })
     })
@@ -261,7 +261,7 @@ export async function syncTaskToTodoist(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         id: task.todoist_task_id,
-        token: token,
+        token,
         labels
       })
     })
