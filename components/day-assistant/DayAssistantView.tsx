@@ -91,7 +91,7 @@ export function DayAssistantView() {
           setQueueState(queue)
         } else if (queueResponse.status === 401) {
           console.error('❌ [DayAssistant] Session missing - user not authenticated')
-          showToast('Please log in to use Day Assistant', 'error')
+          showToast('Zaloguj się, aby korzystać z Asystenta Dnia', 'error')
         } else {
           console.error('❌ [DayAssistant] Queue fetch failed:', await queueResponse.text())
           showToast('Błąd podczas ładowania kolejki', 'error')

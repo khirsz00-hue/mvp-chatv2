@@ -20,11 +20,12 @@ export async function createAuthenticatedSupabaseClient(): Promise<SupabaseClien
   const allCookies = cookieStore.getAll()
   
   // Defensive logging: confirm cookies present without leaking values
-  const authCookies = allCookies.filter(c => c.name.includes('auth-token'))
+  // Supabase uses 'sb-<project>-auth-token' pattern for auth cookies
+  const authCookies = allCookies.filter(c => c.name.startsWith('sb-') && c.name.includes('auth-token'))
   if (authCookies.length > 0) {
-    console.log(`[Auth] Found ${authCookies.length} auth cookie(s) for session`)
+    console.log(`[Auth] Found ${authCookies.length} Supabase auth cookie(s) for session`)
   } else {
-    console.warn('[Auth] No auth cookies found - user likely not authenticated')
+    console.warn('[Auth] No Supabase auth cookies found - user likely not authenticated')
   }
   
   return createServerClient(
@@ -66,8 +67,10 @@ export async function getAuthenticatedUser(supabase: SupabaseClient) {
     return null
   }
   
-  // Log successful auth without sensitive data
-  console.log(`[Auth] User authenticated: ${user.id.substring(0, 8)}...`)
+  // Log successful auth in development only
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[Auth] User authenticated: ${user.id.substring(0, 8)}...`)
+  }
   
   return user
 }
