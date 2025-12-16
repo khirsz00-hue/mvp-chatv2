@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabaseClient'
+import { createAuthenticatedSupabaseClient, getAuthenticatedUser } from '@/lib/supabaseAuth'
+import { supabaseServer } from '@/lib/supabaseServer'
 import { getOpenAIClient } from '@/lib/openai'
-import { validateUUID } from '@/lib/validation/uuid'
 
 // Mark as dynamic route since we use request.url
 export const dynamic = 'force-dynamic'
@@ -92,25 +92,26 @@ function classifyIntent(message: string): ChatIntent {
 // GET: Retrieve chat history for today
 export async function GET(req: Request) {
   try {
-    const { searchParams } = new URL(req.url)
-    const userId = searchParams.get('userId')
-
-    console.log('🔍 [API Chat GET] Received userId:', userId)
-
-    // Validate userId
-    const validationError = validateUUID(userId)
-    if (validationError) {
-      console.error('❌ [API Chat GET]', validationError)
-      return NextResponse.json({ error: validationError }, { status: 400 })
+    // Get authenticated user
+    const supabase = await createAuthenticatedSupabaseClient()
+    const user = await getAuthenticatedUser(supabase)
+    
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Please log in' },
+        { status: 401 }
+      )
     }
+
+    console.log('🔍 [API Chat GET] User:', user.id)
 
     const today = new Date().toISOString().split('T')[0]
 
-    // Get messages from day_chat_messages table (we'll create this)
+    // Get messages from day_chat_messages table
     const { data: messages, error } = await supabase
       .from('day_chat_messages')
       .select('*')
-      .eq('user_id', userId)
+      .eq('user_id', user.id)
       .gte('created_at', `${today}T00:00:00`)
       .order('created_at', { ascending: true })
 
@@ -130,16 +131,20 @@ export async function GET(req: Request) {
 // POST: Send message and get AI response
 export async function POST(req: Request) {
   try {
-    const { userId, message, conversationHistory } = await req.json()
-
-    console.log('🔍 [API Chat POST] Received userId:', userId)
-
-    // Validate userId
-    const validationError = validateUUID(userId)
-    if (validationError) {
-      console.error('❌ [API Chat POST]', validationError)
-      return NextResponse.json({ error: validationError }, { status: 400 })
+    // Get authenticated user
+    const supabase = await createAuthenticatedSupabaseClient()
+    const user = await getAuthenticatedUser(supabase)
+    
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Please log in' },
+        { status: 401 }
+      )
     }
+
+    const { message, conversationHistory } = await req.json()
+
+    console.log('🔍 [API Chat POST] User:', user.id)
 
     if (!message) {
       return NextResponse.json(
@@ -152,7 +157,7 @@ export async function POST(req: Request) {
     const intent = classifyIntent(message)
 
     // Get current context (tasks, energy mode, calendar)
-    const contextData = await getDayContext(userId)
+    const contextData = await getDayContext(user.id)
 
     // Build messages for OpenAI
     const messages: Array<{role: 'system' | 'user' | 'assistant', content: string}> = [
@@ -196,14 +201,14 @@ export async function POST(req: Request) {
 
     const { error: insertError } = await supabase.from('day_chat_messages').insert([
       {
-        user_id: userId,
+        user_id: user.id,
         role: 'user',
         content: message,
         intent: intent,
         created_at: today
       },
       {
-        user_id: userId,
+        user_id: user.id,
         role: 'assistant',
         content: response.summary || responseText,
         recommendations: response.recommendations || null,
@@ -228,14 +233,14 @@ export async function POST(req: Request) {
 async function getDayContext(userId: string) {
   try {
     // Get energy mode
-    const { data: energyState } = await supabase
+    const { data: energyState } = await supabaseServer
       .from('day_assistant_energy_state')
       .select('current_mode')
       .eq('user_id', userId)
       .single()
 
     // Get NOW/NEXT/LATER tasks with more details
-    const { data: tasks } = await supabase
+    const { data: tasks } = await supabaseServer
       .from('day_assistant_tasks')
       .select('id, title, description, priority, estimated_duration, is_pinned, is_mega_important')
       .eq('user_id', userId)
@@ -249,7 +254,7 @@ async function getDayContext(userId: string) {
     const todayStr = today.toISOString().split('T')[0]
 
     // Format tasks with clear structure for AI
-    const formattedTasks = (tasks || []).map(t => ({
+    const formattedTasks = (tasks || []).map((t: any) => ({
       id: t.id,
       title: t.title,
       description: t.description,
@@ -264,9 +269,9 @@ async function getDayContext(userId: string) {
       currentTime: today.toISOString(),
       tasks: formattedTasks,
       taskCount: {
-        now: formattedTasks.filter(t => t.priority === 'now').length,
-        next: formattedTasks.filter(t => t.priority === 'next').length,
-        later: formattedTasks.filter(t => t.priority === 'later').length
+        now: formattedTasks.filter((t: any) => t.priority === 'now').length,
+        next: formattedTasks.filter((t: any) => t.priority === 'next').length,
+        later: formattedTasks.filter((t: any) => t.priority === 'later').length
       },
       date: todayStr
     }
