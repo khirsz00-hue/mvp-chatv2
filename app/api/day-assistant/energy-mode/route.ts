@@ -63,18 +63,16 @@ export async function POST(request: NextRequest) {
     const supabase = await createAuthenticatedSupabaseClient()
     const user = await getAuthenticatedUser(supabase)
     
-    // Log auth status for debugging - don't block if user is null
-    // RLS policies will handle data access control at database level
-    if (user) {
-      console.log(`[Energy Mode API POST] Authenticated user: ${user.id}`)
-    } else {
+    // POST operations that modify data require authenticated user
+    if (!user) {
       console.log(`[Energy Mode API POST] No user in session - returning error`)
-      // For POST operations that modify data, we should return an error if no user
       return NextResponse.json(
         { error: 'Unauthorized - Please log in' },
         { status: 401 }
       )
     }
+    
+    console.log(`[Energy Mode API POST] Authenticated user: ${user.id}`)
 
     const body = await request.json()
     const { mode } = body
