@@ -20,21 +20,23 @@ export async function GET(request: NextRequest) {
     const supabase = await createAuthenticatedSupabaseClient()
     const user = await getAuthenticatedUser(supabase)
     
-    // Log auth status for debugging - don't block if user is null
-    // RLS policies will handle data access control at database level
-    if (user) {
-      console.log(`[Queue API] Authenticated user: ${user.id}`)
-    } else {
-      console.log(`[Queue API] No user in session - RLS will filter results`)
+    // Return empty queue if no authenticated user (don't pass empty string to DB)
+    if (!user?.id) {
+      console.error('[Queue API] No authenticated user')
+      return NextResponse.json({
+        now: null,
+        next: [],
+        later: [],
+        laterCount: 0
+      })
     }
 
-    // Use user.id if available, otherwise RLS will return empty results
-    const userId = user?.id || ''
-
+    console.log(`[Queue API] Fetching queue for user: ${user.id}`)
+    
     // Fetch queue state with authenticated client (RLS will filter by auth.uid())
-    const queueState = await getQueueState(userId, includeLater, supabase)
+    const queueState = await getQueueState(user.id, includeLater, supabase)
 
-    console.log(`[Queue API] Queue state fetched - laterCount: ${queueState.laterCount}`)
+    console.log(`✅ [Queue API] Queue state: laterCount: ${queueState.laterCount}`)
 
     return NextResponse.json(queueState)
   } catch (error) {
