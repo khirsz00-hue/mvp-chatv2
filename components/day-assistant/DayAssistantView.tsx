@@ -186,7 +186,7 @@ export function DayAssistantView() {
       const response = await fetch('/api/day-assistant/actions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, taskId, action })
+        body: JSON.stringify({ taskId, action })
       })
 
       if (response.ok) {
@@ -232,7 +232,7 @@ export function DayAssistantView() {
       const response = await fetch('/api/day-assistant/undo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId })
+        body: JSON.stringify({})
       })
 
       if (response.ok) {

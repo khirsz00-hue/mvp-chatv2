@@ -5,7 +5,7 @@
  * for Next.js App Router API routes with proper RLS context
  */
 
-import { createServerClient } from '@supabase/auth-helpers-nextjs'
+import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import type { SupabaseClient } from '@supabase/supabase-js'
 

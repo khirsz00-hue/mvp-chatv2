@@ -59,7 +59,7 @@ export function DayChat({ userId, onActionApply }: DayChatProps) {
   useEffect(() => {
     const loadChatHistory = async () => {
       try {
-        const response = await fetch(`/api/day-assistant/chat?userId=${userId}`)
+        const response = await fetch('/api/day-assistant/chat')
         if (response.ok) {
           const data = await response.json()
           setMessages(data.messages || [])
@@ -97,7 +97,6 @@ export function DayChat({ userId, onActionApply }: DayChatProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId,
           message: currentInput,
           conversationHistory: messages
         })

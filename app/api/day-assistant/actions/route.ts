@@ -1,36 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createAuthenticatedSupabaseClient, getAuthenticatedUser } from '@/lib/supabaseAuth'
 import { pinTaskToday, postponeTask, escalateTask } from '@/lib/services/dayAssistantService'
-import { validateUUID } from '@/lib/validation/uuid'
+
+export const dynamic = 'force-dynamic'
 
 /**
  * POST /api/day-assistant/actions
  * 
  * Perform task actions (pin, postpone, escalate)
+ * Uses authenticated user context via RLS
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { userId, taskId, action } = body
-
-    console.log('🔍 [API Actions] Received userId:', userId, 'taskId:', taskId, 'action:', action)
-
-    // Validate userId
-    const userIdError = validateUUID(userId)
-    if (userIdError) {
-      console.error('❌ [API Actions]', userIdError)
-      return NextResponse.json({ error: userIdError }, { status: 400 })
-    }
-
-    // Validate taskId
-    const taskIdError = validateUUID(taskId, 'taskId')
-    if (taskIdError) {
-      console.error('❌ [API Actions]', taskIdError)
-      return NextResponse.json({ error: taskIdError }, { status: 400 })
-    }
-
-    if (!action) {
+    // Get authenticated user
+    const supabase = await createAuthenticatedSupabaseClient()
+    const user = await getAuthenticatedUser(supabase)
+    
+    if (!user) {
       return NextResponse.json(
-        { error: 'action is required' },
+        { error: 'Unauthorized - Please log in' },
+        { status: 401 }
+      )
+    }
+
+    const body = await request.json()
+    const { taskId, action } = body
+
+    console.log('🔍 [API Actions] User:', user.id, 'taskId:', taskId, 'action:', action)
+
+    if (!taskId || !action) {
+      return NextResponse.json(
+        { error: 'taskId and action are required' },
         { status: 400 }
       )
     }
@@ -39,13 +39,13 @@ export async function POST(request: NextRequest) {
 
     switch (action) {
       case 'pin':
-        updatedTask = await pinTaskToday(userId, taskId)
+        updatedTask = await pinTaskToday(user.id, taskId)
         break
       case 'postpone':
-        updatedTask = await postponeTask(userId, taskId)
+        updatedTask = await postponeTask(user.id, taskId)
         break
       case 'escalate':
-        updatedTask = await escalateTask(userId, taskId)
+        updatedTask = await escalateTask(user.id, taskId)
         break
       default:
         return NextResponse.json(

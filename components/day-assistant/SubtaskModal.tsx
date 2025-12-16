@@ -53,8 +53,7 @@ export function SubtaskModal({
           task_title: task.title,
           task_description: task.description,
           detail_level: detailLevel,
-          energy_mode: energyMode,
-          userId
+          energy_mode: energyMode
         })
       })
 
@@ -81,7 +80,6 @@ export function SubtaskModal({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId,
           task_id: task.id,
           feedback_type: feedback,
           feedback_stage: 'pre_completion',
