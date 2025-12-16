@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import Input from '@/components/ui/Input'
 import { useToast } from '@/components/ui/Toast'
 import { useRouter } from 'next/navigation'
-import { Separator } from '@/components/ui/Separator'
+import Separator from '@/components/ui/Separator'
 
 type LoginMode = 'signin' | 'signup' | 'magic-link' | 'magic-link-sent'
 
