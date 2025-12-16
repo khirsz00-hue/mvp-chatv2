@@ -14,24 +14,24 @@ import { DayPriority } from '@/lib/types/dayAssistant'
  */
 export async function syncWithTodoist(userId: string): Promise<{ success: boolean; taskCount: number }> {
   try {
-    // 1. Fetch Todoist token from user profile
-    const { data: profile, error: profileError } = await supabase
-      .from('user_profiles')
-      .select('todoist_token')
-      .eq('id', userId)
-      .single()
+    // 1. Get token from localStorage (same as TasksAssistant)
+    const token = typeof window !== 'undefined' 
+      ? localStorage.getItem('todoist_token') 
+      : null
     
-    if (profileError || !profile?.todoist_token) {
-      console.warn('[syncWithTodoist] No Todoist token found for user:', userId)
+    if (!token) {
+      console.warn('❌ [syncWithTodoist] No Todoist token in localStorage for user:', userId)
       return { success: false, taskCount: 0 }
     }
+    
+    console.log('✅ [syncWithTodoist] Todoist token found, syncing...')
     
     // 2. Fetch tasks from Todoist
     const response = await fetch('/api/todoist/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
-        token: profile.todoist_token,
+        token,
         filter: 'all' 
       })
     })
@@ -47,7 +47,7 @@ export async function syncWithTodoist(userId: string): Promise<{ success: boolea
       throw new Error('Invalid tasks response from Todoist API')
     }
     
-    console.log(`[syncWithTodoist] Fetched ${tasks.length} tasks from Todoist API`)
+    console.log(`✅ [syncWithTodoist] Fetched ${tasks.length} tasks from Todoist API`)
     
     // 3. Upsert each task to day_assistant_tasks
     let successCount = 0
@@ -61,7 +61,7 @@ export async function syncWithTodoist(userId: string): Promise<{ success: boolea
       }
     }
     
-    console.log(`[syncWithTodoist] Upserted ${successCount} tasks, ${errorCount} errors`)
+    console.log(`✅ [syncWithTodoist] Upserted ${successCount} tasks, ${errorCount} errors`)
     
     // 4. Remove tasks that no longer exist in Todoist
     const todoistTaskIds = tasks.map((t: any) => t.id)
@@ -72,7 +72,7 @@ export async function syncWithTodoist(userId: string): Promise<{ success: boolea
       localStorage.setItem('day_assistant_last_sync', Date.now().toString())
     }
     
-    console.log(`✅ Synced ${tasks.length} tasks from Todoist for user ${userId}`)
+    console.log(`✅ [syncWithTodoist] Successfully synced ${tasks.length} tasks`)
     
     return { success: true, taskCount: tasks.length }
   } catch (error) {
@@ -243,15 +243,13 @@ export async function syncTaskToTodoist(
       return false
     }
     
-    // 2. Get user's Todoist token
-    const { data: profile, error: profileError } = await supabase
-      .from('user_profiles')
-      .select('todoist_token')
-      .eq('id', task.user_id)
-      .single()
+    // 2. Get Todoist token from localStorage
+    const token = typeof window !== 'undefined' 
+      ? localStorage.getItem('todoist_token') 
+      : null
     
-    if (profileError || !profile?.todoist_token) {
-      console.warn('[syncTaskToTodoist] No Todoist token found')
+    if (!token) {
+      console.warn('❌ [syncTaskToTodoist] No Todoist token in localStorage')
       return false
     }
     
@@ -263,7 +261,7 @@ export async function syncTaskToTodoist(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         id: task.todoist_task_id,
-        token: profile.todoist_token,
+        token,
         labels
       })
     })

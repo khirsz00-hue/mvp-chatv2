@@ -60,10 +60,23 @@ export function DayAssistantView() {
     const fetchData = async () => {
       setLoading(true)
       try {
+        console.log('🔍 [DayAssistant] Initializing sync for user:', userId)
+        
+        // Check if Todoist token exists
+        const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
+        console.log('🔍 [DayAssistant] Todoist token:', token ? 'FOUND' : 'MISSING')
+        
         // Auto-sync with Todoist on mount (if needed)
-        if (shouldSync()) {
-          console.log('[DayAssistant] Auto-syncing with Todoist...')
-          await syncWithTodoist(userId)
+        if (token && shouldSync()) {
+          console.log('🔍 [DayAssistant] Starting Todoist sync...')
+          const result = await syncWithTodoist(userId)
+          if (result.success) {
+            console.log('✅ [DayAssistant] Sync completed successfully')
+          } else {
+            console.warn('⚠️ [DayAssistant] Sync failed or returned no tasks')
+          }
+        } else if (!token) {
+          console.warn('⚠️ [DayAssistant] No Todoist token - skipping sync')
         }
         
         // Fetch queue state
@@ -80,7 +93,7 @@ export function DayAssistantView() {
           setEnergyMode(energy.current_mode || 'normal')
         }
       } catch (error) {
-        console.error('Error fetching data:', error)
+        console.error('❌ [DayAssistant] Error fetching data:', error)
         showToast('Błąd podczas ładowania danych', 'error')
       } finally {
         setLoading(false)

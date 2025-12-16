@@ -545,46 +545,52 @@ Zwróć JSON:
   const handleMarkStepDone = async () => {
     const currentSubtask = subtasks[currentSubtaskIndex]
     
-    if (!currentSubtask || !progress) {
+    if (!currentSubtask) {
+      console.error('❌ No current subtask')
       return
     }
     
     setIsCompletingStep(true)
     
     try {
-      // Mark subtask as completed in local state
+      console.log(`✅ Marking step ${currentSubtaskIndex + 1} as done`)
+      
+      // 1. Mark subtask as completed in local state
       const updatedSubtasks = [...subtasks]
       updatedSubtasks[currentSubtaskIndex].completed = true
       setSubtasks(updatedSubtasks)
       
-      // Update progress in database
-      const updatedProgress = await completeStep(progress.id, currentSubtaskIndex, currentSubtask.subtaskId)
-      if (updatedProgress) {
-        setProgress(updatedProgress)
+      // 2. Update progress in database (if progress exists)
+      if (progress) {
+        const updatedProgress = await completeStep(progress.id, currentSubtaskIndex, currentSubtask.subtaskId)
+        if (updatedProgress) {
+          setProgress(updatedProgress)
+        }
       }
       
-      // TODO: Mark subtask as completed via Todoist API
-      // Need to enhance onCreateSubtasks to return created subtask IDs
-      // Then we can call: await fetch('/api/todoist/complete', { method: 'POST', body: { id: subtaskId, token } })
-      
+      // 3. Show toast
       showToast('✓ Krok ukończony!', 'success')
       
-      // Check if this was the last step
-      if (currentSubtaskIndex >= subtasks.length - 1) {
-        // Last step completed - show completion message and close
+      // 4. ✅ AUTO-ADVANCE to next step
+      if (currentSubtaskIndex < subtasks.length - 1) {
+        // Not last step - advance to next
+        console.log(`✅ Advancing to step ${currentSubtaskIndex + 2}`)
+        setTimeout(() => {
+          setCurrentSubtaskIndex(currentSubtaskIndex + 1)
+        }, 500) // Small delay for UX
+      } else {
+        // Last step completed - show completion and close
+        console.log('✅ All steps completed!')
         showToast('🎉 Wszystkie kroki ukończone!', 'success')
+        
+        // Close modal after 1.5 seconds
         setTimeout(() => {
           onClose()
           resetModal()
         }, 1500)
-      } else {
-        // Advance to next step
-        setTimeout(() => {
-          setCurrentSubtaskIndex(currentSubtaskIndex + 1)
-        }, 300)
       }
     } catch (err) {
-      console.error('Error completing step:', err)
+      console.error('❌ Error completing step:', err)
       showToast(ERROR_MESSAGES.COMPLETE_SUBTASK, 'error')
     } finally {
       setIsCompletingStep(false)
