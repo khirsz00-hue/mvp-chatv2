@@ -26,7 +26,7 @@ interface Task {
   due?:  { date: string } | string
   completed?: boolean
   created_at?: string
-  completed_at?: string
+  completed_at?: string // Timestamp when task was completed (from Todoist API)
   subtasks?: any[]
   duration?: number
   labels?: string[]
@@ -64,6 +64,17 @@ const formatElapsedTime = (seconds: number): string => {
 const calculateElapsedSeconds = (startTime: number): number => {
   const now = Date.now()
   return Math.floor((now - startTime) / 1000)
+}
+
+/**
+ * Checks if a date is within the last N days
+ * @param date - Date to check
+ * @param days - Number of days to check
+ * @param referenceDate - Reference date (default: today)
+ * @returns True if date is within the last N days
+ */
+const isWithinLastNDays = (date: Date, days: number, referenceDate: Date): boolean => {
+  return isAfter(date, subDays(referenceDate, days)) || isSameDay(date, subDays(referenceDate, days))
 }
 
 export function TasksAssistant() {
@@ -250,9 +261,9 @@ export function TasksAssistant() {
           case 'yesterday':
             return isSameDay(completedDate, subDays(now, 1))
           case 'last7days':
-            return isAfter(completedDate, subDays(now, 7)) || isSameDay(completedDate, subDays(now, 7))
+            return isWithinLastNDays(completedDate, 7, now)
           case 'last30days':
-            return isAfter(completedDate, subDays(now, 30)) || isSameDay(completedDate, subDays(now, 30))
+            return isWithinLastNDays(completedDate, 30, now)
           case 'thisMonth':
             return isWithinInterval(completedDate, {
               start: startOfMonth(now),
