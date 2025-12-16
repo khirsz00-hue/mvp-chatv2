@@ -166,12 +166,13 @@ async function removeDeletedTasks(userId: string, todoistTaskIds: string[]): Pro
       return
     }
     
+    // Use Supabase's parameter binding to prevent SQL injection
     const { error } = await supabase
       .from('day_assistant_tasks')
       .delete()
       .eq('user_id', userId)
       .not('todoist_task_id', 'is', null)
-      .not('todoist_task_id', 'in', `(${todoistTaskIds.join(',')})`)
+      .not('todoist_task_id', 'in', todoistTaskIds)
     
     if (error) {
       console.error('Error removing deleted tasks:', error)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useToast } from '@/components/ui/Toast'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
@@ -40,7 +40,6 @@ export function DayAssistantView() {
   const [showSubtaskModal, setShowSubtaskModal] = useState(false)
   const [selectedTask, setSelectedTask] = useState<DayTask | null>(null)
   const [showLaterExpanded, setShowLaterExpanded] = useState(false)
-  const [activeTab, setActiveTab] = useState<'tasks' | 'timeline' | 'chat'>('tasks')
 
   // Get current user
   useEffect(() => {
@@ -90,7 +89,22 @@ export function DayAssistantView() {
     fetchData()
   }, [userId, showToast])
   
-  // Background polling sync (10-15s interval)
+  const refreshQueue = useCallback(async (includeLater = false) => {
+    if (!userId) return
+
+    try {
+      const url = `/api/day-assistant/queue?userId=${userId}${includeLater ? '&includeLater=true' : ''}`
+      const response = await fetch(url)
+      if (response.ok) {
+        const queue = await response.json()
+        setQueueState(queue)
+      }
+    } catch (error) {
+      console.error('Error refreshing queue:', error)
+    }
+  }, [userId])
+  
+  // Background polling sync (12s interval)
   useEffect(() => {
     if (!userId) return
     
@@ -106,22 +120,7 @@ export function DayAssistantView() {
     }, 12000) // 12 seconds
     
     return () => clearInterval(syncInterval)
-  }, [userId])
-
-  const refreshQueue = async (includeLater = false) => {
-    if (!userId) return
-
-    try {
-      const url = `/api/day-assistant/queue?userId=${userId}${includeLater ? '&includeLater=true' : ''}`
-      const response = await fetch(url)
-      if (response.ok) {
-        const queue = await response.json()
-        setQueueState(queue)
-      }
-    } catch (error) {
-      console.error('Error refreshing queue:', error)
-    }
-  }
+  }, [userId, refreshQueue])
   
   const handleExpandLater = async () => {
     if (!showLaterExpanded) {
@@ -231,11 +230,7 @@ export function DayAssistantView() {
     )
   }
 
-  const handleChatAction = (recommendation: any) => {
-    // Handle chat recommendation actions
-    showToast('Akcja zastosowana', 'success')
-    refreshQueue()
-  }
+
 
   return (
     <div className="h-full flex flex-col">
@@ -267,32 +262,10 @@ export function DayAssistantView() {
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="flex gap-2 mb-4">
-        <Button
-          variant={activeTab === 'tasks' ? 'default' : 'ghost'}
-          onClick={() => setActiveTab('tasks')}
-        >
-          📝 Zadania
-        </Button>
-        <Button
-          variant={activeTab === 'timeline' ? 'default' : 'ghost'}
-          onClick={() => setActiveTab('timeline')}
-        >
-          📅 Harmonogram
-        </Button>
-        <Button
-          variant={activeTab === 'chat' ? 'default' : 'ghost'}
-          onClick={() => setActiveTab('chat')}
-        >
-          💬 Czat
-        </Button>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 overflow-hidden">
-        {activeTab === 'tasks' && (
-          <div className="h-full overflow-y-auto space-y-4">
+      {/* Main Content - Side by Side Layout */}
+      <div className="flex-1 overflow-hidden flex gap-4">
+        {/* Left: Task Queue (NOW/NEXT/LATER) */}
+        <div className="w-1/2 h-full overflow-y-auto space-y-4">
         {/* NOW Section */}
         <Card className="border-2 border-brand-purple">
           <CardHeader>
@@ -409,28 +382,17 @@ export function DayAssistantView() {
             </CardContent>
           )}
         </Card>
-          </div>
-        )}
+        </div>
 
-        {/* Timeline Tab */}
-        {activeTab === 'timeline' && userId && (
-          <div className="h-full">
+        {/* Right: Timeline - The "Live Consequences Map" */}
+        <div className="w-1/2 h-full">
+          {userId && (
             <DayTimeline
               userId={userId}
               onRefresh={refreshQueue}
             />
-          </div>
-        )}
-
-        {/* Chat Tab */}
-        {activeTab === 'chat' && userId && (
-          <div className="h-full">
-            <DayChat
-              userId={userId}
-              onActionApply={handleChatAction}
-            />
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Modals */}
