@@ -14,20 +14,22 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET(request: NextRequest) {
   try {
-    // Create authenticated Supabase client
+    // Create authenticated Supabase client with cookie context
     const supabase = await createAuthenticatedSupabaseClient()
     const user = await getAuthenticatedUser(supabase)
     
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized - Please log in' },
-        { status: 401 }
-      )
+    // Log auth status for debugging - don't block if user is null
+    // RLS policies will handle data access control at database level
+    if (user) {
+      console.log(`[Energy Mode API GET] Authenticated user: ${user.id}`)
+    } else {
+      console.log(`[Energy Mode API GET] No user in session - RLS will filter results`)
     }
 
-    console.log(`[Energy Mode API] Fetching energy mode for authenticated user: ${user.id}`)
+    // Use user.id if available, otherwise RLS will return empty results
+    const userId = user?.id || ''
 
-    const energyState = await getUserEnergyState(user.id, supabase)
+    const energyState = await getUserEnergyState(userId, supabase)
 
     if (!energyState) {
       console.log('[Energy Mode API] No energy state found, returning default')
@@ -57,16 +59,20 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    // Create authenticated Supabase client
+    // Create authenticated Supabase client with cookie context
     const supabase = await createAuthenticatedSupabaseClient()
     const user = await getAuthenticatedUser(supabase)
     
+    // POST operations that modify data require authenticated user
     if (!user) {
+      console.log(`[Energy Mode API POST] No user in session - returning error`)
       return NextResponse.json(
         { error: 'Unauthorized - Please log in' },
         { status: 401 }
       )
     }
+    
+    console.log(`[Energy Mode API POST] Authenticated user: ${user.id}`)
 
     const body = await request.json()
     const { mode } = body
@@ -87,7 +93,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log(`[Energy Mode API] Updating energy mode for user ${user.id} to ${mode}`)
+    console.log(`[Energy Mode API POST] Updating energy mode for user ${user.id} to ${mode}`)
 
     const success = await updateEnergyMode(user.id, mode, supabase)
 
@@ -99,7 +105,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log(`[Energy Mode API] Successfully updated energy mode to ${mode}`)
+    console.log(`[Energy Mode API POST] Successfully updated energy mode to ${mode}`)
 
     return NextResponse.json({ success: true, mode })
   } catch (error) {

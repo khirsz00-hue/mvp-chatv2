@@ -16,21 +16,23 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const includeLater = searchParams.get('includeLater') === 'true'
 
-    // Create authenticated Supabase client
+    // Create authenticated Supabase client with cookie context
     const supabase = await createAuthenticatedSupabaseClient()
     const user = await getAuthenticatedUser(supabase)
     
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized - Please log in' },
-        { status: 401 }
-      )
+    // Log auth status for debugging - don't block if user is null
+    // RLS policies will handle data access control at database level
+    if (user) {
+      console.log(`[Queue API] Authenticated user: ${user.id}`)
+    } else {
+      console.log(`[Queue API] No user in session - RLS will filter results`)
     }
 
-    console.log(`[Queue API] Fetching queue for authenticated user: ${user.id}`)
+    // Use user.id if available, otherwise RLS will return empty results
+    const userId = user?.id || ''
 
     // Fetch queue state with authenticated client (RLS will filter by auth.uid())
-    const queueState = await getQueueState(user.id, includeLater, supabase)
+    const queueState = await getQueueState(userId, includeLater, supabase)
 
     console.log(`[Queue API] Queue state fetched - laterCount: ${queueState.laterCount}`)
 
