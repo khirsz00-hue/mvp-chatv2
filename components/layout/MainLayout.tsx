@@ -86,9 +86,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
     checkAuth()
 
     // Odczytaj zapisaną preferencję widoku, jeśli istnieje
+    // Don't auto-redirect to community - let user stay on main page
     try {
       const stored = localStorage.getItem('active_assistant') as AssistantId | null
-      if (stored && ['tasks', 'day-assistant', 'planning', 'journal', 'decisions', 'community', 'support', 'admin'].includes(stored)) {
+      if (stored && stored !== 'community' && ['tasks', 'day-assistant', 'planning', 'journal', 'decisions', 'support', 'admin'].includes(stored)) {
         setActiveView(stored)
       }
     } catch {}
