@@ -7,7 +7,7 @@ import Card from '@/components/ui/Card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs'
 import { useToast } from '@/components/ui/Toast'
 import { Plus, List, Kanban, CalendarBlank, Calendar, SortAscending, Timer as TimerIcon, CheckSquare, Trash, ArrowRight } from '@phosphor-icons/react'
-import { startOfDay, addDays, parseISO, isSameDay, isBefore, isWithinInterval, format } from 'date-fns'
+import { startOfDay, addDays, parseISO, isSameDay, isBefore, isWithinInterval, format, subDays, startOfMonth, endOfMonth, isAfter } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { CreateTaskModal } from './CreateTaskModal'
 import { TaskDetailsModal } from './TaskDetailsModal'
@@ -41,6 +41,7 @@ type FilterType = 'today' | 'tomorrow' | 'week' | 'month' | 'overdue' | 'all' | 
 type ViewType = 'list' | 'board'
 type SortType = 'date' | 'priority' | 'name'
 type GroupByType = 'none' | 'day' | 'project' | 'priority'
+type CompletedTimeFilter = 'today' | 'yesterday' | 'last7days' | 'last30days' | 'thisMonth' | 'custom'
 
 /**
  * Formats elapsed time in seconds to HH:MM:SS format
@@ -83,6 +84,7 @@ export function TasksAssistant() {
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
   const [bulkActionLoading, setBulkActionLoading] = useState(false)
   const [activeTimerInfo, setActiveTimerInfo] = useState<{ taskId: string; taskTitle: string; isActive: boolean; elapsedSeconds?: number; startTime?: number } | null>(null)
+  const [completedTimeFilter, setCompletedTimeFilter] = useState<CompletedTimeFilter>('last7days')
   
   const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
   
@@ -232,7 +234,31 @@ export function TasksAssistant() {
     const filtered = tasks.filter(task => {
       // Show only completed tasks when filter is 'completed'
       if (filterType === 'completed') {
-        return task.completed === true
+        if (task.completed !== true) return false
+        
+        // Apply time-based filtering for completed tasks
+        const completedAt = task.created_at ? parseISO(task.created_at) : null
+        if (!completedAt) return true // If no created_at, show it
+        
+        const completedDate = startOfDay(completedAt)
+        
+        switch (completedTimeFilter) {
+          case 'today':
+            return isSameDay(completedDate, now)
+          case 'yesterday':
+            return isSameDay(completedDate, subDays(now, 1))
+          case 'last7days':
+            return isAfter(completedDate, subDays(now, 7)) || isSameDay(completedDate, subDays(now, 7))
+          case 'last30days':
+            return isAfter(completedDate, subDays(now, 30)) || isSameDay(completedDate, subDays(now, 30))
+          case 'thisMonth':
+            return isWithinInterval(completedDate, {
+              start: startOfMonth(now),
+              end: endOfMonth(now)
+            })
+          default:
+            return true
+        }
       }
       
       // Skip completed tasks for other filters
@@ -815,57 +841,60 @@ export function TasksAssistant() {
       )}
       
       {/* Header */}
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4 md:gap-6">
         {/* Title Section */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 md:gap-4">
           <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-pink bg-clip-text text-transparent">
+            <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-pink bg-clip-text text-transparent">
               Zarządzanie Zadaniami
             </h1>
-            <p className="text-gray-600 mt-2 text-lg">Organizuj swoje zadania efektywnie</p>
+            <p className="text-gray-600 mt-1 md:mt-2 text-sm md:text-base lg:text-lg">Organizuj swoje zadania efektywnie</p>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
             <Button 
               onClick={() => setShowCreateModal(true)} 
               className="gap-2 bg-gradient-to-r from-brand-purple to-brand-pink hover:shadow-lg transition-all hover:scale-105"
-              size="lg"
+              size="md"
             >
-              <Plus size={20} weight="bold" />
+              <Plus size={18} weight="bold" />
               <span className="hidden sm:inline">Dodaj zadanie</span>
+              <span className="sm:hidden">Dodaj</span>
             </Button>
           </div>
         </div>
         
         {/* Control Bar */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
-          <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+        <div className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-gray-200 p-3 md:p-4">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-3 md:gap-4">
             {/* View switcher */}
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-700 hidden sm:inline">Widok:</span>
-              <div className="inline-flex rounded-xl border-2 border-gray-200 p-1 bg-gray-50 flex-wrap">
+              <span className="text-xs md:text-sm font-medium text-gray-700 hidden sm:inline">Widok:</span>
+              <div className="inline-flex rounded-lg md:rounded-xl border-2 border-gray-200 p-1 bg-gray-50">
                 <button 
                   onClick={() => setView('list')}
-                  className={`px-3 py-2 rounded-lg transition-all flex items-center gap-2 font-medium text-sm ${
+                  className={`px-2 md:px-3 py-1.5 md:py-2 rounded-md md:rounded-lg transition-all flex items-center gap-1.5 md:gap-2 font-medium text-xs md:text-sm ${
                     view === 'list' 
                       ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-md' 
                       : 'text-gray-600 hover:bg-white hover:shadow-sm'
                   }`}
                   title="Widok listy"
                 >
-                  <List size={18} weight="bold" />
+                  <List size={16} weight="bold" className="md:hidden" />
+                  <List size={18} weight="bold" className="hidden md:inline" />
                   <span className="hidden sm:inline">Lista</span>
                 </button>
                 <button 
                   onClick={() => setView('board')}
-                  className={`px-3 py-2 rounded-lg transition-all flex items-center gap-2 font-medium text-sm ${
+                  className={`px-2 md:px-3 py-1.5 md:py-2 rounded-md md:rounded-lg transition-all flex items-center gap-1.5 md:gap-2 font-medium text-xs md:text-sm ${
                     view === 'board' 
                       ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-md' 
                       : 'text-gray-600 hover:bg-white hover:shadow-sm'
                   }`}
                   title="Widok tablicy"
                 >
-                  <Kanban size={18} weight="bold" />
+                  <Kanban size={16} weight="bold" className="md:hidden" />
+                  <Kanban size={18} weight="bold" className="hidden md:inline" />
                   <span className="hidden sm:inline">Tablica</span>
                 </button>
               </div>
@@ -874,13 +903,13 @@ export function TasksAssistant() {
             <div className="h-8 w-px bg-gray-300 hidden lg:block" />
             
             {/* Filters */}
-            <div className="flex items-center gap-3 flex-wrap flex-1">
-              <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-                <SortAscending size={20} className="text-gray-500 hidden sm:inline" />
+            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-3 flex-1">
+              <div className="flex items-center gap-2 flex-1 min-w-0 md:min-w-[160px]">
+                <SortAscending size={18} className="text-gray-500 hidden sm:inline flex-shrink-0" />
                 <select 
                   value={sortBy} 
                   onChange={(e) => setSortBy(e.target.value as SortType)}
-                  className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-sm font-medium hover:border-gray-300 transition-colors"
+                  className="flex-1 px-3 md:px-4 py-1.5 md:py-2 border-2 border-gray-200 rounded-lg md:rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-xs md:text-sm font-medium hover:border-gray-300 transition-colors"
                 >
                   <option value="date">📅 Sortuj: Data</option>
                   <option value="priority">🚩 Sortuj: Priorytet</option>
@@ -889,11 +918,11 @@ export function TasksAssistant() {
               </div>
               
               {view === 'list' && (
-                <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                <div className="flex items-center gap-2 flex-1 min-w-0 md:min-w-[160px]">
                   <select 
                     value={groupBy} 
                     onChange={(e) => setGroupBy(e.target.value as GroupByType)}
-                    className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-sm font-medium hover:border-gray-300 transition-colors"
+                    className="flex-1 px-3 md:px-4 py-1.5 md:py-2 border-2 border-gray-200 rounded-lg md:rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-xs md:text-sm font-medium hover:border-gray-300 transition-colors"
                   >
                     <option value="none">📋 Grupuj: Brak</option>
                     <option value="day">📅 Grupuj: Dzień</option>
@@ -903,11 +932,11 @@ export function TasksAssistant() {
                 </div>
               )}
               
-              <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+              <div className="flex items-center gap-2 flex-1 min-w-0 md:min-w-[160px]">
                 <select 
                   value={selectedProject} 
                   onChange={(e) => setSelectedProject(e.target.value)}
-                  className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-sm font-medium hover:border-gray-300 transition-colors"
+                  className="flex-1 px-3 md:px-4 py-1.5 md:py-2 border-2 border-gray-200 rounded-lg md:rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-xs md:text-sm font-medium hover:border-gray-300 transition-colors"
                 >
                   <option value="all">📁 Wszystkie projekty</option>
                   {projects.map(p => (
@@ -920,7 +949,7 @@ export function TasksAssistant() {
             <div className="h-8 w-px bg-gray-300 hidden lg:block" />
             
             {/* Task count badge */}
-            <Badge variant="secondary" className="text-sm px-4 py-2 font-semibold whitespace-nowrap">
+            <Badge variant="secondary" className="text-xs md:text-sm px-3 md:px-4 py-1.5 md:py-2 font-semibold whitespace-nowrap self-start md:self-auto">
               {sortedTasks.length} {sortedTasks.length === 1 ? 'zadanie' : 'zadań'}
             </Badge>
           </div>
@@ -929,32 +958,74 @@ export function TasksAssistant() {
       
       {/* Filters */}
       {view === 'list' && (
-        <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterType)}>
-          <TabsList className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 w-full gap-1">
-            <TabsTrigger value="today">Dziś</TabsTrigger>
-            <TabsTrigger value="tomorrow">Jutro</TabsTrigger>
-            <TabsTrigger value="week">Tydzień</TabsTrigger>
-            <TabsTrigger value="month">Miesiąc</TabsTrigger>
-            <TabsTrigger value="overdue">Przeterminowane</TabsTrigger>
-            <TabsTrigger value="scheduled">Do zaplanowania</TabsTrigger>
-            <TabsTrigger value="completed">Ukończone</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <>
+          {/* Desktop: Tabs */}
+          <div className="hidden md:block">
+            <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterType)}>
+              <TabsList className="grid grid-cols-7 w-full gap-1">
+                <TabsTrigger value="today" className="text-sm py-2">Dziś</TabsTrigger>
+                <TabsTrigger value="tomorrow" className="text-sm py-2">Jutro</TabsTrigger>
+                <TabsTrigger value="week" className="text-sm py-2">Tydzień</TabsTrigger>
+                <TabsTrigger value="month" className="text-sm py-2">Miesiąc</TabsTrigger>
+                <TabsTrigger value="overdue" className="text-sm py-2">Przeterminowane</TabsTrigger>
+                <TabsTrigger value="scheduled" className="text-sm py-2">Do zaplanowania</TabsTrigger>
+                <TabsTrigger value="completed" className="text-sm py-2">Ukończone</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+          
+          {/* Mobile: Dropdown */}
+          <div className="md:hidden">
+            <select 
+              value={filter} 
+              onChange={(e) => setFilter(e.target.value as FilterType)}
+              className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-sm font-medium hover:border-gray-300 transition-colors"
+            >
+              <option value="today">📅 Dziś</option>
+              <option value="tomorrow">📅 Jutro</option>
+              <option value="week">📅 Tydzień</option>
+              <option value="month">📅 Miesiąc</option>
+              <option value="overdue">⚠️ Przeterminowane</option>
+              <option value="scheduled">📋 Do zaplanowania</option>
+              <option value="completed">✅ Ukończone</option>
+            </select>
+          </div>
+          
+          {/* Completed Tasks Time Filter */}
+          {filter === 'completed' && (
+            <div className="bg-white rounded-lg border border-gray-200 p-3 md:p-4 shadow-sm animate-fade-in">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 md:gap-3">
+                <span className="text-xs md:text-sm font-medium text-gray-600">Pokaż zadania ukończone:</span>
+                <select 
+                  value={completedTimeFilter} 
+                  onChange={(e) => setCompletedTimeFilter(e.target.value as CompletedTimeFilter)}
+                  className="flex-1 sm:max-w-xs px-3 py-1.5 md:py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-xs md:text-sm font-medium hover:border-gray-400 transition-colors"
+                >
+                  <option value="today">Dzisiaj</option>
+                  <option value="yesterday">Wczoraj</option>
+                  <option value="last7days">W ostatnich 7 dniach</option>
+                  <option value="last30days">W ostatnich 30 dniach</option>
+                  <option value="thisMonth">W tym miesiącu</option>
+                </select>
+              </div>
+            </div>
+          )}
+        </>
       )}
       
       {/* Bulk Actions Bar */}
       {view === 'list' && sortedTasks.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="flex items-center gap-3">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 md:p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 md:gap-3">
+            <div className="flex items-center gap-2 md:gap-3">
               <input
                 type="checkbox"
                 checked={selectedTaskIds.size === sortedTasks.length && sortedTasks.length > 0}
                 onChange={toggleAllTasksSelection}
-                className="w-4 h-4 text-brand-purple border-gray-300 rounded focus:ring-brand-purple cursor-pointer"
+                className="w-4 h-4 text-brand-purple border-gray-300 rounded focus:ring-brand-purple cursor-pointer flex-shrink-0"
                 title="Zaznacz"
               />
-              <span className="text-sm font-medium text-gray-700">
+              <span className="text-xs md:text-sm font-medium text-gray-700">
                 {selectedTaskIds.size > 0 ? `Zaznaczono ${selectedTaskIds.size}` : 'Zaznacz'}
               </span>
             </div>
@@ -963,31 +1034,33 @@ export function TasksAssistant() {
               <>
                 <div className="h-6 w-px bg-gray-300 hidden sm:block" />
                 
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleBulkComplete}
-                    disabled={bulkActionLoading}
-                    className="gap-2"
-                  >
-                    <CheckSquare size={16} weight="bold" />
-                    Ukończ
-                  </Button>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-1">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleBulkComplete}
+                      disabled={bulkActionLoading}
+                      className="gap-1.5 flex-1 sm:flex-initial text-xs md:text-sm"
+                    >
+                      <CheckSquare size={14} weight="bold" />
+                      <span>Ukończ</span>
+                    </Button>
+                    
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleBulkDelete}
+                      disabled={bulkActionLoading}
+                      className="gap-1.5 text-red-600 hover:bg-red-50 flex-1 sm:flex-initial text-xs md:text-sm"
+                    >
+                      <Trash size={14} weight="bold" />
+                      <span>Usuń</span>
+                    </Button>
+                  </div>
                   
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleBulkDelete}
-                    disabled={bulkActionLoading}
-                    className="gap-2 text-red-600 hover:bg-red-50"
-                  >
-                    <Trash size={16} weight="bold" />
-                    Usuń
-                  </Button>
-                  
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm text-gray-600">Przenieś na:</span>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <span className="text-xs md:text-sm text-gray-600 hidden sm:inline">Przenieś na:</span>
                     <select
                       onChange={(e) => {
                         if (e.target.value) {
@@ -996,16 +1069,16 @@ export function TasksAssistant() {
                         }
                       }}
                       disabled={bulkActionLoading}
-                      className="text-sm px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-purple"
+                      className="text-xs md:text-sm px-2 md:px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-purple"
                     >
-                      <option value="">Szybki wybór...</option>
+                      <option value="">Przenieś na...</option>
                       <option value={format(new Date(), 'yyyy-MM-dd')}>Dziś</option>
                       <option value={format(addDays(new Date(), 1), 'yyyy-MM-dd')}>Jutro</option>
                       <option value={format(addDays(new Date(), 3), 'yyyy-MM-dd')}>Za 3 dni</option>
                       <option value={format(addDays(new Date(), 7), 'yyyy-MM-dd')}>Za tydzień</option>
                     </select>
                     
-                    <span className="text-sm text-gray-600">lub</span>
+                    <span className="text-xs md:text-sm text-gray-600 text-center hidden sm:inline">lub</span>
                     
                     <input
                       type="date"
@@ -1016,7 +1089,7 @@ export function TasksAssistant() {
                         }
                       }}
                       disabled={bulkActionLoading}
-                      className="text-sm px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-purple"
+                      className="text-xs md:text-sm px-2 md:px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-purple"
                       placeholder="Wybierz datę"
                     />
                   </div>

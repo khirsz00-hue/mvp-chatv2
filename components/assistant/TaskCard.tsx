@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
@@ -61,6 +61,8 @@ export function TaskCard({
   const [showBreakdownModal, setShowBreakdownModal] = useState(false)
   const [showAITooltip, setShowAITooltip] = useState(false)
   const [aiUnderstanding, setAiUnderstanding] = useState<string>('')
+  const [showMobileMenu, setShowMobileMenu] = useState(false)
+  const mobileMenuRef = useRef<HTMLDivElement>(null)
   
   const { startTimer, stopTimer, getActiveTimer } = useTaskTimer()
   const { showToast } = useToast()
@@ -84,6 +86,20 @@ export function TaskCard({
       window.removeEventListener('storage', handleTimerChange)
     }
   }, [task.id, getActiveTimer])
+  
+  // Close mobile menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node)) {
+        setShowMobileMenu(false)
+      }
+    }
+    
+    if (showMobileMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showMobileMenu])
   
   const priorityColors = {
     1: 'border-l-red-500 bg-red-50/50',
@@ -187,7 +203,7 @@ export function TaskCard({
   return (
     <Card 
       className={cn(
-        'p-4 border-l-4 transition-all hover:shadow-lg group cursor-pointer',
+        'p-3 md:p-4 border-l-4 transition-all hover:shadow-lg group cursor-pointer',
         priorityColors[task.priority] || priorityColors[4],
         loading && 'opacity-50 pointer-events-none',
         deleting && 'opacity-0 scale-95',
@@ -232,12 +248,12 @@ export function TaskCard({
         
         {/* Content */}
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-lg truncate group-hover:text-brand-purple transition-colors">
+          <h3 className="font-medium text-base md:text-lg break-words group-hover:text-brand-purple transition-colors">
             {task.content}
           </h3>
           
           {task.description && (
-            <p className="text-sm text-gray-600 line-clamp-2 mt-1">
+            <p className="text-xs md:text-sm text-gray-600 line-clamp-2 mt-1 break-words">
               {task.description}
             </p>
           )}
@@ -259,7 +275,7 @@ export function TaskCard({
           )}
           
           {/* Footer badges */}
-          <div className="flex gap-2 mt-3 flex-wrap items-center">
+          <div className="flex gap-1.5 md:gap-2 mt-2 md:mt-3 flex-wrap items-center">
             {hasActiveTimer && (
               <Badge className="gap-1 text-xs bg-red-500 text-white animate-pulse">
                 <div className="w-2 h-2 rounded-full bg-white" />
@@ -269,7 +285,8 @@ export function TaskCard({
             
             {dueStr && (
               <Badge variant="outline" className="gap-1 text-xs">
-                <CalendarBlank size={14} />
+                <CalendarBlank size={12} className="md:hidden" />
+                <CalendarBlank size={14} className="hidden md:inline" />
                 {format(parseISO(dueStr), 'dd MMM', { locale: pl })}
               </Badge>
             )}
@@ -316,8 +333,9 @@ export function TaskCard({
           </div>
         </div>
         
-        {/* Actions on the Right - horizontal layout for list view */}
-        <div className="flex gap-1 flex-shrink-0 ml-2 items-center">
+        {/* Actions on the Right */}
+        {/* Desktop: Show all icons */}
+        <div className="hidden md:flex gap-1 flex-shrink-0 ml-2 items-center">
           <Button 
             size="sm" 
             variant="ghost"
@@ -371,6 +389,97 @@ export function TaskCard({
           >
             <Trash size={18} weight="bold" className="text-red-600" />
           </Button>
+        </div>
+        
+        {/* Mobile: Show context menu */}
+        <div className="md:hidden relative flex-shrink-0 ml-2" ref={mobileMenuRef}>
+          <Button 
+            size="sm" 
+            variant="ghost"
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowMobileMenu(!showMobileMenu)
+            }}
+            title="Więcej opcji"
+            className="p-2 h-auto"
+          >
+            <DotsThree size={20} weight="bold" className="text-gray-600" />
+          </Button>
+          
+          {showMobileMenu && (
+            <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-50 animate-scale-in">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleChatClick(e)
+                  setShowMobileMenu(false)
+                }}
+                className="w-full px-4 py-2.5 text-left hover:bg-gray-50 flex items-center gap-3 text-sm transition-colors"
+              >
+                <ChatCircle size={18} weight="bold" className="text-blue-600" />
+                <span>Czat</span>
+              </button>
+              
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleBreakdownClick(e)
+                  setShowMobileMenu(false)
+                }}
+                className="w-full px-4 py-2.5 text-left hover:bg-gray-50 flex items-center gap-3 text-sm transition-colors"
+              >
+                <Brain size={18} weight="bold" className="text-purple-600" />
+                <span>Doprecyzuj</span>
+              </button>
+              
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleStartStopTimer(e)
+                  setShowMobileMenu(false)
+                }}
+                className="w-full px-4 py-2.5 text-left hover:bg-gray-50 flex items-center gap-3 text-sm transition-colors"
+              >
+                {hasActiveTimer ? (
+                  <>
+                    <Stop size={18} weight="fill" className="text-red-600" />
+                    <span>Stop Timer</span>
+                  </>
+                ) : (
+                  <>
+                    <TimerIcon size={18} weight="fill" className="text-purple-600" />
+                    <span>Start Timer</span>
+                  </>
+                )}
+              </button>
+              
+              <div className="border-t border-gray-200 my-1"></div>
+              
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleComplete(e)
+                  setShowMobileMenu(false)
+                }}
+                className="w-full px-4 py-2.5 text-left hover:bg-gray-50 flex items-center gap-3 text-sm transition-colors"
+              >
+                <CheckCircle size={18} weight="bold" className="text-green-600" />
+                <span>Ukończ</span>
+              </button>
+              
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleDelete(e)
+                  setShowMobileMenu(false)
+                }}
+                className="w-full px-4 py-2.5 text-left hover:bg-red-50 flex items-center gap-3 text-sm transition-colors text-red-600"
+              >
+                <Trash size={18} weight="bold" />
+                <span>Usuń</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
