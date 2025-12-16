@@ -1,7 +1,6 @@
-import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabaseClient'
+import { NextRequest, NextResponse } from 'next/server'
+import { createAuthenticatedSupabaseClient, getAuthenticatedUser } from '@/lib/supabaseAuth'
 import { format, addMinutes, parseISO } from 'date-fns'
-import { validateUUID } from '@/lib/validation/uuid'
 
 // Mark as dynamic route since we use request.url
 export const dynamic = 'force-dynamic'
@@ -19,20 +18,26 @@ interface TimelineEvent {
 }
 
 // GET: Fetch timeline events for a specific date
-export async function GET(req: Request) {
+// Uses authenticated user context via RLS
+export async function GET(req: NextRequest) {
   try {
+    // Get authenticated user from session
+    const supabase = await createAuthenticatedSupabaseClient()
+    const user = await getAuthenticatedUser(supabase)
+    
+    if (!user?.id) {
+      console.error('[Timeline API GET] No authenticated user - session missing')
+      return NextResponse.json(
+        { error: 'Unauthorized - Please log in' },
+        { status: 401 }
+      )
+    }
+
+    const userId = user.id
     const { searchParams } = new URL(req.url)
-    const userId = searchParams.get('userId')
     const date = searchParams.get('date') || format(new Date(), 'yyyy-MM-dd')
 
-    console.log('🔍 [API Timeline GET] Received userId:', userId, 'date:', date)
-
-    // Validate userId
-    const validationError = validateUUID(userId)
-    if (validationError) {
-      console.error('❌ [API Timeline GET]', validationError)
-      return NextResponse.json({ error: validationError }, { status: 400 })
-    }
+    console.log('🔍 [API Timeline GET] Authenticated user:', userId, 'date:', date)
 
     const events: TimelineEvent[] = []
 
@@ -112,18 +117,25 @@ export async function GET(req: Request) {
 }
 
 // POST: Create a new timeline event (task block or proposal)
-export async function POST(req: Request) {
+// Uses authenticated user context via RLS
+export async function POST(req: NextRequest) {
   try {
-    const { userId, date, type, title, startTime, duration, taskIds, metadata } = await req.json()
-
-    console.log('🔍 [API Timeline POST] Received userId:', userId)
-
-    // Validate userId
-    const validationError = validateUUID(userId)
-    if (validationError) {
-      console.error('❌ [API Timeline POST]', validationError)
-      return NextResponse.json({ error: validationError }, { status: 400 })
+    // Get authenticated user from session
+    const supabase = await createAuthenticatedSupabaseClient()
+    const user = await getAuthenticatedUser(supabase)
+    
+    if (!user?.id) {
+      console.error('[Timeline API POST] No authenticated user - session missing')
+      return NextResponse.json(
+        { error: 'Unauthorized - Please log in' },
+        { status: 401 }
+      )
     }
+
+    const userId = user.id
+    console.log('🔍 [API Timeline POST] Authenticated user:', userId)
+
+    const { date, type, title, startTime, duration, taskIds, metadata } = await req.json()
 
     if (!date || !type || !title || !startTime || !duration) {
       return NextResponse.json(

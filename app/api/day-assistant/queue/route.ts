@@ -20,15 +20,13 @@ export async function GET(request: NextRequest) {
     const supabase = await createAuthenticatedSupabaseClient()
     const user = await getAuthenticatedUser(supabase)
     
-    // Return empty queue if no authenticated user (don't pass empty string to DB)
+    // Return 401 if no authenticated user
     if (!user?.id) {
-      console.error('[Queue API] No authenticated user')
-      return NextResponse.json({
-        now: null,
-        next: [],
-        later: [],
-        laterCount: 0
-      })
+      console.error('[Queue API] No authenticated user - session missing')
+      return NextResponse.json(
+        { error: 'Unauthorized - Please log in' },
+        { status: 401 }
+      )
     }
 
     console.log(`[Queue API] Fetching queue for user: ${user.id}`)

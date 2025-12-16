@@ -89,8 +89,12 @@ export function DayAssistantView() {
         if (queueResponse.ok) {
           const queue = await queueResponse.json()
           setQueueState(queue)
+        } else if (queueResponse.status === 401) {
+          console.error('❌ [DayAssistant] Session missing - user not authenticated')
+          showToast('Zaloguj się, aby korzystać z Asystenta Dnia', 'error')
         } else {
           console.error('❌ [DayAssistant] Queue fetch failed:', await queueResponse.text())
+          showToast('Błąd podczas ładowania kolejki', 'error')
         }
 
         // Fetch energy mode (authentication via cookies)
@@ -98,6 +102,9 @@ export function DayAssistantView() {
         if (energyResponse.ok) {
           const energy = await energyResponse.json()
           setEnergyMode(energy.current_mode || 'normal')
+        } else if (energyResponse.status === 401) {
+          console.error('❌ [DayAssistant] Session missing - user not authenticated')
+          // Don't show duplicate toast, already shown above
         } else {
           console.error('❌ [DayAssistant] Energy mode fetch failed:', await energyResponse.text())
         }

@@ -17,6 +17,16 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  */
 export async function createAuthenticatedSupabaseClient(): Promise<SupabaseClient> {
   const cookieStore = await cookies()
+  const allCookies = cookieStore.getAll()
+  
+  // Defensive logging: confirm cookies present without leaking values
+  // Supabase uses 'sb-<project>-auth-token' pattern for auth cookies
+  const authCookies = allCookies.filter(c => c.name.startsWith('sb-') && c.name.includes('auth-token'))
+  if (authCookies.length > 0) {
+    console.log(`[Auth] Found ${authCookies.length} Supabase auth cookie(s) for session`)
+  } else {
+    console.warn('[Auth] No Supabase auth cookies found - user likely not authenticated')
+  }
   
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,7 +34,7 @@ export async function createAuthenticatedSupabaseClient(): Promise<SupabaseClien
     {
       cookies: {
         getAll() {
-          return cookieStore.getAll()
+          return allCookies
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => {
@@ -46,9 +56,20 @@ export async function createAuthenticatedSupabaseClient(): Promise<SupabaseClien
 export async function getAuthenticatedUser(supabase: SupabaseClient) {
   const { data: { user }, error } = await supabase.auth.getUser()
   
-  if (error || !user) {
-    console.error('[Auth] Authentication error:', error)
+  if (error) {
+    // Log error type but not sensitive details
+    console.error('[Auth] Authentication error:', error.message || 'Unknown error')
     return null
+  }
+  
+  if (!user) {
+    console.warn('[Auth] No user found in session')
+    return null
+  }
+  
+  // Log successful auth in development only
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[Auth] User authenticated: ${user.id.substring(0, 8)}...`)
   }
   
   return user
