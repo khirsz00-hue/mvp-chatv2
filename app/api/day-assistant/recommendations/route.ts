@@ -8,6 +8,9 @@ import {
   DayContext 
 } from '@/lib/dayAssistant/DayContext'
 
+// Mark as dynamic route since we use request.url
+export const dynamic = 'force-dynamic'
+
 /**
  * GET: Generate recommendations for the user
  * 

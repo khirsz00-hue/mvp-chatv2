@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getQueueState } from '@/lib/services/dayAssistantService'
 
+// Mark as dynamic route since we use request.url
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/day-assistant/queue
  * 

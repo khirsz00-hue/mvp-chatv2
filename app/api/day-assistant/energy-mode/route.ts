@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getUserEnergyState, updateEnergyMode } from '@/lib/services/dayAssistantService'
 import { EnergyMode } from '@/lib/types/dayAssistant'
 
+// Mark as dynamic route since we use request.url
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/day-assistant/energy-mode
  * 

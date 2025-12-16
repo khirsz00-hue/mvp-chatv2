@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabaseClient'
 import { format, addMinutes, parseISO } from 'date-fns'
 
+// Mark as dynamic route since we use request.url
+export const dynamic = 'force-dynamic'
+
 interface TimelineEvent {
   id: string
   type: 'meeting' | 'event' | 'task-block' | 'ghost-proposal'
