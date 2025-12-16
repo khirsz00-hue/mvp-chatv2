@@ -86,13 +86,12 @@ export function TasksAssistant() {
   
   const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
   
-  const fetchTasks = useCallback(async (filterType?: FilterType) => {
+  const fetchTasks = useCallback(async (filterType: FilterType) => {
     setLoading(true)
     try {
       console.log('🔍 Fetching tasks with token:', token ?  'EXISTS' : 'MISSING')
       
-      const filterParam = filterType !== undefined ? filterType : filter
-      const res = await fetch(`/api/todoist/tasks?token=${token}&filter=${filterParam}`)
+      const res = await fetch(`/api/todoist/tasks?token=${token}&filter=${filterType}`)
       
       console.log('📡 Response status:', res.status)
       
@@ -466,7 +465,7 @@ export function TasksAssistant() {
       })
       
       // Refresh tasks to get updated list
-      setTimeout(() => fetchTasks(), 500)
+      setTimeout(() => fetchTasks(filter), 500)
       
     } catch (err: any) {
       console.error('❌ Error creating task:', err)
