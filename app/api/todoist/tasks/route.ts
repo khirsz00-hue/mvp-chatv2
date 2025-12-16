@@ -11,6 +11,44 @@ async function fetchAndFilterTasks(token: any, filter: string) {
   }
 
   try {
+    // Fetch completed tasks if filter is 'completed'
+    if (filter === 'completed') {
+      const res = await fetch('https://api.todoist.com/sync/v9/completed/get_all', {
+        method: 'POST',
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({}),
+        cache: 'no-store',
+      })
+
+      if (!res.ok) {
+        console.error(`Todoist Sync API error: ${res.status}`)
+        return []
+      }
+
+      const data = await res.json()
+      const completedTasks = data.items || []
+      
+      // Map completed tasks to match the expected format
+      const simplified = completedTasks.map((t: any) => ({
+        id: t.task_id || t.id,
+        content: t.content,
+        description: t.description || null,
+        project_id: t.project_id,
+        due: t.due ? { date: t.due.date || t.due } : null,
+        priority: t.priority || 4,
+        labels: t.labels || [],
+        duration: t.duration || null,
+        completed: true,
+        completed_at: t.completed_at
+      }))
+      
+      return simplified
+    }
+    
+    // Fetch active tasks for other filters
     const res = await fetch('https://api.todoist.com/rest/v2/tasks', {
       headers: { Authorization: `Bearer ${token}` },
       cache: 'no-store',
