@@ -1,33 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { createAuthenticatedSupabaseClient, getAuthenticatedUser } from '@/lib/supabaseAuth'
 import { createTask, updateTask, deleteTask, getUserTasks } from '@/lib/services/dayAssistantService'
 
 // Mark as dynamic route since we use request.url
 export const dynamic = 'force-dynamic'
-
-/**
- * Helper to create authenticated Supabase client
- */
-async function createAuthenticatedClient() {
-  const cookieStore = await cookies()
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options)
-          })
-        },
-      },
-    }
-  )
-}
 
 /**
  * GET /api/day-assistant/tasks
@@ -39,11 +15,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const includeCompleted = searchParams.get('includeCompleted') === 'true'
 
-    const supabase = await createAuthenticatedClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const supabase = await createAuthenticatedSupabaseClient()
+    const user = await getAuthenticatedUser(supabase)
     
-    if (authError || !user) {
-      console.error('[Tasks API] Authentication error:', authError)
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized - Please log in' },
         { status: 401 }
@@ -71,11 +46,10 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createAuthenticatedClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const supabase = await createAuthenticatedSupabaseClient()
+    const user = await getAuthenticatedUser(supabase)
     
-    if (authError || !user) {
-      console.error('[Tasks API] Authentication error:', authError)
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized - Please log in' },
         { status: 401 }
@@ -121,11 +95,10 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = await createAuthenticatedClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const supabase = await createAuthenticatedSupabaseClient()
+    const user = await getAuthenticatedUser(supabase)
     
-    if (authError || !user) {
-      console.error('[Tasks API] Authentication error:', authError)
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized - Please log in' },
         { status: 401 }
@@ -171,11 +144,10 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createAuthenticatedClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const supabase = await createAuthenticatedSupabaseClient()
+    const user = await getAuthenticatedUser(supabase)
     
-    if (authError || !user) {
-      console.error('[Tasks API] Authentication error:', authError)
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized - Please log in' },
         { status: 401 }
