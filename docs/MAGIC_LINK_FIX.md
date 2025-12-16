@@ -44,10 +44,19 @@ export async function middleware(request: NextRequest) {
     request: { headers: request.headers },
   })
 
+  // Validate environment variables
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error('[Middleware] Missing Supabase environment variables')
+    return response
+  }
+
   // Create authenticated Supabase client with cookie management
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
@@ -69,7 +78,12 @@ export async function middleware(request: NextRequest) {
 
   // This triggers auth code exchange if a code is present in URL
   // and establishes the session server-side
-  await supabase.auth.getUser()
+  try {
+    await supabase.auth.getUser()
+  } catch (error) {
+    // Log the error but don't block the request
+    console.error('[Middleware] Auth error:', error)
+  }
 
   return response
 }

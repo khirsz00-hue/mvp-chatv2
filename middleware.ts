@@ -39,7 +39,13 @@ export async function middleware(request: NextRequest) {
 
   // This will refresh the session if needed and handle the auth code exchange
   // This is crucial for magic links to work properly across different browsers/webviews
-  await supabase.auth.getUser()
+  try {
+    await supabase.auth.getUser()
+  } catch (error) {
+    // Log the error but don't block the request
+    // Authentication errors will be handled by the application pages
+    console.error('[Middleware] Auth error:', error)
+  }
 
   return response
 }
