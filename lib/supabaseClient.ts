@@ -46,8 +46,10 @@ export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey, {
       
       document.cookie = cookieString
       
-      // Log cookie set with warning if on non-localhost production host
-      console.log(`[Client Cookie] Set: ${name} on ${window.location.hostname}`)
+      // Log cookie set with warning if on non-localhost production host (dev only)
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[Client Cookie] Set: ${name} on ${window.location.hostname}`)
+      }
       
       // Verify cookie was set
       const wasSet = document.cookie.includes(`${name}=`)
@@ -70,7 +72,9 @@ export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey, {
       
       document.cookie = cookieString
       
-      console.log(`[Client Cookie] Removed: ${name}`)
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[Client Cookie] Removed: ${name}`)
+      }
     }
   }
 })

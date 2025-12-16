@@ -114,13 +114,18 @@ export function TasksAssistant() {
         }
 
         setUserId(user.id)
-        console.log(`[TasksAssistant] Fetching Todoist token for user: ${user.id.substring(0, 8)}...`)
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[TasksAssistant] Fetching Todoist token for user: ${user.id.substring(0, 8)}...`)
+        }
 
         const todoistToken = await getTodoistToken(user.id)
         
         if (todoistToken) {
           setToken(todoistToken)
-          console.log('[TasksAssistant] ✓ Todoist token found')
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[TasksAssistant] ✓ Todoist token found')
+          }
         } else {
           console.log('[TasksAssistant] ✗ No Todoist token - user needs to connect')
         }

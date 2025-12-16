@@ -29,7 +29,10 @@ export async function isTodoistConnected(userId: string): Promise<boolean> {
     }
 
     const isConnected = !!data?.todoist_token
-    console.log(`[Integrations] Todoist connected for user ${userId.substring(0, 8)}...: ${isConnected ? 'YES' : 'NO'}`)
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[Integrations] Todoist connected for user ${userId.substring(0, 8)}...: ${isConnected ? 'YES' : 'NO'}`)
+    }
 
     return isConnected
   } catch (error) {
@@ -66,7 +69,9 @@ export async function isGoogleCalendarConnected(userId: string): Promise<boolean
     const isExpired = data?.google_token_expiry ? data.google_token_expiry < Date.now() : false
     const isConnected = hasToken && !isExpired
 
-    console.log(`[Integrations] Google Calendar connected for user ${userId.substring(0, 8)}...: ${isConnected ? 'YES' : 'NO'}${isExpired ? ' (expired)' : ''}`)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[Integrations] Google Calendar connected for user ${userId.substring(0, 8)}...: ${isConnected ? 'YES' : 'NO'}${isExpired ? ' (expired)' : ''}`)
+    }
 
     return isConnected
   } catch (error) {
@@ -99,7 +104,10 @@ export async function getTodoistToken(userId: string): Promise<string | null> {
     }
 
     const token = data?.todoist_token || null
-    console.log(`[Integrations] Todoist token for user ${userId.substring(0, 8)}...: ${token ? 'FOUND' : 'MISSING'}`)
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[Integrations] Todoist token for user ${userId.substring(0, 8)}...: ${token ? 'FOUND' : 'MISSING'}`)
+    }
 
     return token
   } catch (error) {
