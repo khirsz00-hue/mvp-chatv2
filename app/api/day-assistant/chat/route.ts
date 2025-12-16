@@ -229,7 +229,7 @@ async function getDayContext(userId: string) {
   try {
     // Get energy mode
     const { data: energyState } = await supabase
-      .from('user_energy_state')
+      .from('day_assistant_energy_state')
       .select('current_mode')
       .eq('user_id', userId)
       .single()

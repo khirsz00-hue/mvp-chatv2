@@ -18,18 +18,18 @@ export async function GET(request: NextRequest) {
     const supabase = await createAuthenticatedSupabaseClient()
     const user = await getAuthenticatedUser(supabase)
     
-    // Log auth status for debugging - don't block if user is null
-    // RLS policies will handle data access control at database level
-    if (user) {
-      console.log(`[Energy Mode API GET] Authenticated user: ${user.id}`)
-    } else {
-      console.log(`[Energy Mode API GET] No user in session - RLS will filter results`)
+    // Return default state if no authenticated user (don't pass empty string to DB)
+    if (!user?.id) {
+      console.log('[Energy Mode API GET] No authenticated user, returning default')
+      return NextResponse.json(
+        { current_mode: 'normal' },
+        { status: 200 }
+      )
     }
 
-    // Use user.id if available, otherwise RLS will return empty results
-    const userId = user?.id || ''
+    console.log(`[Energy Mode API GET] Fetching energy state for user: ${user.id}`)
 
-    const energyState = await getUserEnergyState(userId, supabase)
+    const energyState = await getUserEnergyState(user.id, supabase)
 
     if (!energyState) {
       console.log('[Energy Mode API] No energy state found, returning default')

@@ -27,7 +27,7 @@ import { syncTaskToTodoist } from './dayAssistantSync'
 export async function getUserEnergyState(userId: string, client?: SupabaseClient): Promise<UserEnergyState | null> {
   const db = client || supabaseServer
   const { data, error } = await db
-    .from('user_energy_state')
+    .from('day_assistant_energy_state')
     .select('*')
     .eq('user_id', userId)
     .single()
@@ -50,7 +50,7 @@ export async function getUserEnergyState(userId: string, client?: SupabaseClient
 async function createDefaultEnergyState(userId: string, client?: SupabaseClient): Promise<UserEnergyState | null> {
   const db = client || supabaseServer
   const { data, error } = await db
-    .from('user_energy_state')
+    .from('day_assistant_energy_state')
     .insert({
       user_id: userId,
       current_mode: 'normal'
@@ -72,7 +72,7 @@ async function createDefaultEnergyState(userId: string, client?: SupabaseClient)
 export async function updateEnergyMode(userId: string, mode: EnergyMode, client?: SupabaseClient): Promise<boolean> {
   const db = client || supabaseServer
   const { error } = await db
-    .from('user_energy_state')
+    .from('day_assistant_energy_state')
     .upsert({
       user_id: userId,
       current_mode: mode,
