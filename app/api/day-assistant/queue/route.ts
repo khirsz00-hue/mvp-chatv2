@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getQueueState } from '@/lib/services/dayAssistantService'
+import { supabaseServer } from '@/lib/supabaseServer'
 
 /**
  * GET /api/day-assistant/queue
@@ -19,7 +20,8 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const queueState = await getQueueState(userId, includeLater)
+    // Use server-side Supabase client to bypass RLS
+    const queueState = await getQueueState(userId, includeLater, supabaseServer)
 
     return NextResponse.json(queueState)
   } catch (error) {

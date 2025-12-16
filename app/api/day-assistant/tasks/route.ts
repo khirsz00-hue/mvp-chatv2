@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createTask, updateTask, deleteTask, getUserTasks } from '@/lib/services/dayAssistantService'
+import { supabaseServer } from '@/lib/supabaseServer'
 
 /**
  * GET /api/day-assistant/tasks
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const tasks = await getUserTasks(userId, includeCompleted)
+    const tasks = await getUserTasks(userId, includeCompleted, supabaseServer)
 
     return NextResponse.json({ tasks })
   } catch (error) {
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const createdTask = await createTask(userId, task)
+    const createdTask = await createTask(userId, task, supabaseServer)
 
     if (!createdTask) {
       return NextResponse.json(
@@ -84,7 +85,7 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const updatedTask = await updateTask(taskId, updates)
+    const updatedTask = await updateTask(taskId, updates, supabaseServer)
 
     if (!updatedTask) {
       return NextResponse.json(
@@ -120,7 +121,7 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    const success = await deleteTask(taskId)
+    const success = await deleteTask(taskId, supabaseServer)
 
     if (!success) {
       return NextResponse.json(
