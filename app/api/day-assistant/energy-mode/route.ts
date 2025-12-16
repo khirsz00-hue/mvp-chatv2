@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserEnergyState, updateEnergyMode } from '@/lib/services/dayAssistantService'
+import { supabaseServer } from '@/lib/supabaseServer'
 import { EnergyMode } from '@/lib/types/dayAssistant'
 
 // Mark as dynamic route since we use request.url
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const energyState = await getUserEnergyState(userId)
+    const energyState = await getUserEnergyState(userId, supabaseServer)
 
     if (!energyState) {
       return NextResponse.json(
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const success = await updateEnergyMode(userId, mode)
+    const success = await updateEnergyMode(userId, mode, supabaseServer)
 
     if (!success) {
       return NextResponse.json(

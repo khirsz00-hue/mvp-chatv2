@@ -5,6 +5,8 @@
  */
 
 import { supabase } from '@/lib/supabaseClient'
+import { supabaseServer } from '@/lib/supabaseServer'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   DayTask,
   DaySubtask,
@@ -23,8 +25,9 @@ import { syncTaskToTodoist } from './dayAssistantSync'
 /**
  * Get user's energy state
  */
-export async function getUserEnergyState(userId: string): Promise<UserEnergyState | null> {
-  const { data, error } = await supabase
+export async function getUserEnergyState(userId: string, client?: SupabaseClient): Promise<UserEnergyState | null> {
+  const db = client || supabase
+  const { data, error } = await db
     .from('user_energy_state')
     .select('*')
     .eq('user_id', userId)
@@ -33,7 +36,7 @@ export async function getUserEnergyState(userId: string): Promise<UserEnergyStat
   if (error) {
     if (error.code === 'PGRST116') {
       // No rows found, create default state
-      return await createDefaultEnergyState(userId)
+      return await createDefaultEnergyState(userId, client)
     }
     console.error('Error fetching user energy state:', error)
     return null
@@ -45,8 +48,9 @@ export async function getUserEnergyState(userId: string): Promise<UserEnergyStat
 /**
  * Create default energy state for user
  */
-async function createDefaultEnergyState(userId: string): Promise<UserEnergyState | null> {
-  const { data, error } = await supabase
+async function createDefaultEnergyState(userId: string, client?: SupabaseClient): Promise<UserEnergyState | null> {
+  const db = client || supabase
+  const { data, error } = await db
     .from('user_energy_state')
     .insert({
       user_id: userId,
@@ -66,8 +70,9 @@ async function createDefaultEnergyState(userId: string): Promise<UserEnergyState
 /**
  * Update user's energy mode
  */
-export async function updateEnergyMode(userId: string, mode: EnergyMode): Promise<boolean> {
-  const { error } = await supabase
+export async function updateEnergyMode(userId: string, mode: EnergyMode, client?: SupabaseClient): Promise<boolean> {
+  const db = client || supabase
+  const { error } = await db
     .from('user_energy_state')
     .upsert({
       user_id: userId,
@@ -86,8 +91,9 @@ export async function updateEnergyMode(userId: string, mode: EnergyMode): Promis
 /**
  * Get all tasks for a user with their subtasks
  */
-export async function getUserTasks(userId: string, includeCompleted = false): Promise<DayTask[]> {
-  let query = supabase
+export async function getUserTasks(userId: string, includeCompleted = false, client?: SupabaseClient): Promise<DayTask[]> {
+  const db = client || supabase
+  let query = db
     .from('day_assistant_tasks')
     .select(`
       *,
@@ -128,9 +134,9 @@ export async function getUserTasks(userId: string, includeCompleted = false): Pr
 /**
  * Get queue state (NOW/NEXT/LATER) based on current energy mode
  */
-export async function getQueueState(userId: string, includeLater = false): Promise<QueueState> {
-  const energyState = await getUserEnergyState(userId)
-  const tasks = await getUserTasks(userId)
+export async function getQueueState(userId: string, includeLater = false, client?: SupabaseClient): Promise<QueueState> {
+  const energyState = await getUserEnergyState(userId, client)
+  const tasks = await getUserTasks(userId, false, client)
   
   // Debug logging (remove in production or use proper logging framework)
   if (process.env.NODE_ENV === 'development') {
@@ -175,9 +181,11 @@ export async function getQueueState(userId: string, includeLater = false): Promi
  */
 export async function createTask(
   userId: string,
-  task: Partial<DayTask>
+  task: Partial<DayTask>,
+  client?: SupabaseClient
 ): Promise<DayTask | null> {
-  const { data, error } = await supabase
+  const db = client || supabase
+  const { data, error } = await db
     .from('day_assistant_tasks')
     .insert({
       user_id: userId,
@@ -208,9 +216,11 @@ export async function createTask(
  */
 export async function updateTask(
   taskId: string,
-  updates: Partial<DayTask>
+  updates: Partial<DayTask>,
+  client?: SupabaseClient
 ): Promise<DayTask | null> {
-  const { data, error } = await supabase
+  const db = client || supabase
+  const { data, error } = await db
     .from('day_assistant_tasks')
     .update(updates)
     .eq('id', taskId)
@@ -235,8 +245,9 @@ export async function updateTask(
 /**
  * Delete a task
  */
-export async function deleteTask(taskId: string): Promise<boolean> {
-  const { error } = await supabase
+export async function deleteTask(taskId: string, client?: SupabaseClient): Promise<boolean> {
+  const db = client || supabase
+  const { error } = await db
     .from('day_assistant_tasks')
     .delete()
     .eq('id', taskId)
