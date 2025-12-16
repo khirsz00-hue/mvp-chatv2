@@ -37,7 +37,7 @@ interface Project {
   color?:  string
 }
 
-type FilterType = 'today' | 'tomorrow' | 'week' | 'month' | 'overdue' | 'all' | 'completed'
+type FilterType = 'today' | 'tomorrow' | 'week' | 'month' | 'overdue' | 'all' | 'completed' | 'scheduled'
 type ViewType = 'list' | 'board'
 type SortType = 'date' | 'priority' | 'name'
 type GroupByType = 'none' | 'day' | 'project' | 'priority'
@@ -244,6 +244,11 @@ export function TasksAssistant() {
       const dueStr = typeof task.due === 'string' ? task.due : task.due?.date
       
       if (filterType === 'all') return true
+      
+      // Show tasks without due dates for 'scheduled' filter
+      if (filterType === 'scheduled') {
+        return !dueStr
+      }
       
       if (! dueStr) {
         console.log('⏭️ Skipping task without due date:', task.content)
@@ -942,6 +947,7 @@ export function TasksAssistant() {
             <TabsTrigger value="week" className="flex-1 min-w-[100px]">Tydzień</TabsTrigger>
             <TabsTrigger value="month" className="flex-1 min-w-[100px]">Miesiąc</TabsTrigger>
             <TabsTrigger value="overdue" className="flex-1 min-w-[140px]">Przeterminowane</TabsTrigger>
+            <TabsTrigger value="scheduled" className="flex-1 min-w-[120px]">Zaplanowane</TabsTrigger>
             <TabsTrigger value="completed" className="flex-1 min-w-[120px]">Ukończone</TabsTrigger>
           </TabsList>
         </Tabs>
@@ -1052,6 +1058,7 @@ export function TasksAssistant() {
                 {filter === 'week' && 'Nie masz zadań w tym tygodniu'}
                 {filter === 'month' && 'Nie masz zadań w tym miesiącu'}
                 {filter === 'overdue' && 'Nie masz przeterminowanych zadań'}
+                {filter === 'scheduled' && 'Nie masz zaplanowanych zadań bez daty'}
                 {filter === 'completed' && 'Nie masz ukończonych zadań'}
               </p>
               <Button onClick={() => setShowCreateModal(true)} className="gap-2">
