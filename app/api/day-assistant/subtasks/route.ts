@@ -1,13 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createAuthenticatedSupabaseClient, getAuthenticatedUser } from '@/lib/supabaseAuth'
 import { createSubtasks, updateSubtaskCompletion } from '@/lib/services/dayAssistantService'
+
+export const dynamic = 'force-dynamic'
 
 /**
  * POST /api/day-assistant/subtasks
  * 
  * Create subtasks for a task
+ * Uses authenticated user context via RLS
  */
 export async function POST(request: NextRequest) {
   try {
+    // Get authenticated user
+    const supabase = await createAuthenticatedSupabaseClient()
+    const user = await getAuthenticatedUser(supabase)
+    
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Please log in' },
+        { status: 401 }
+      )
+    }
+
     const body = await request.json()
     const { task_id, subtasks } = body
 
@@ -34,9 +49,21 @@ export async function POST(request: NextRequest) {
  * PATCH /api/day-assistant/subtasks
  * 
  * Update subtask completion status
+ * Uses authenticated user context via RLS
  */
 export async function PATCH(request: NextRequest) {
   try {
+    // Get authenticated user
+    const supabase = await createAuthenticatedSupabaseClient()
+    const user = await getAuthenticatedUser(supabase)
+    
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Please log in' },
+        { status: 401 }
+      )
+    }
+
     const body = await request.json()
     const { subtask_id, completed } = body
 

@@ -1,27 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createAuthenticatedSupabaseClient, getAuthenticatedUser } from '@/lib/supabaseAuth'
 import { undoLastAction } from '@/lib/services/dayAssistantService'
-import { validateUUID } from '@/lib/validation/uuid'
+
+export const dynamic = 'force-dynamic'
 
 /**
  * POST /api/day-assistant/undo
  * 
  * Undo the last action
+ * Uses authenticated user context via RLS
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { userId } = body
-
-    console.log('🔍 [API Undo] Received userId:', userId)
-
-    // Validate userId
-    const validationError = validateUUID(userId)
-    if (validationError) {
-      console.error('❌ [API Undo]', validationError)
-      return NextResponse.json({ error: validationError }, { status: 400 })
+    // Get authenticated user
+    const supabase = await createAuthenticatedSupabaseClient()
+    const user = await getAuthenticatedUser(supabase)
+    
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Please log in' },
+        { status: 401 }
+      )
     }
 
-    const success = await undoLastAction(userId)
+    console.log('🔍 [API Undo] User:', user.id)
+
+    const success = await undoLastAction(user.id)
 
     if (!success) {
       console.log('⚠️ [API Undo] No action to undo')
