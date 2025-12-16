@@ -29,16 +29,33 @@ export function useToast() {
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
+  const [activeMessages, setActiveMessages] = useState<Set<string>>(new Set())
 
   const showToast = (message: string, type: ToastType = 'info', duration: number = 3000) => {
+    // Dedupe: prevent duplicate toasts for the same message within 10 seconds
+    const messageKey = `${type}:${message}`
+    if (activeMessages.has(messageKey)) {
+      console.log('[Toast] Skipping duplicate toast:', message)
+      return
+    }
+    
     const id = `toast-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
     const newToast: Toast = { id, message, type, duration }
     
     setToasts(prev => [...prev, newToast])
+    setActiveMessages(prev => new Set([...prev, messageKey]))
 
     if (duration > 0) {
       setTimeout(() => {
         removeToast(id)
+        // Remove from active messages after 10 seconds to allow future toasts
+        setTimeout(() => {
+          setActiveMessages(prev => {
+            const next = new Set(prev)
+            next.delete(messageKey)
+            return next
+          })
+        }, 10000)
       }, duration)
     }
   }

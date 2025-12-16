@@ -15,6 +15,7 @@ import {
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import { Card } from '@/components/ui/Card'
+import { apiGet, apiPost } from '@/lib/api'
 
 interface ChatMessage {
   id: string
@@ -59,7 +60,7 @@ export function DayChat({ userId, onActionApply }: DayChatProps) {
   useEffect(() => {
     const loadChatHistory = async () => {
       try {
-        const response = await fetch('/api/day-assistant/chat')
+        const response = await apiGet('/api/day-assistant/chat')
         if (response.ok) {
           const data = await response.json()
           setMessages(data.messages || [])
@@ -93,13 +94,9 @@ export function DayChat({ userId, onActionApply }: DayChatProps) {
     setIsLoading(true)
 
     try {
-      const response = await fetch('/api/day-assistant/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: currentInput,
-          conversationHistory: messages
-        })
+      const response = await apiPost('/api/day-assistant/chat', {
+        message: currentInput,
+        conversationHistory: messages
       })
 
       if (response.ok) {

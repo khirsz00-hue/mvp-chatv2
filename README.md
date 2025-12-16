@@ -320,3 +320,176 @@ Asystent używa modelu `gpt-4-turbo-preview`. Upewnij się, że:
 - Masz aktywny klucz API OpenAI
 - Masz dostęp do modelu GPT-4
 - Ustawiono `OPENAI_API_KEY` w zmiennych środowiskowych
+
+---
+
+## 🔐 Supabase & Vercel Auth Cookie Setup
+
+### Overview
+The application uses Supabase SSR authentication with Next.js 14 App Router. For authentication to work correctly in production (Vercel), cookies must be properly configured to be sent with every API request.
+
+### Required Configuration
+
+#### 1. Supabase Dashboard Settings
+
+Go to **Supabase Dashboard** → **Authentication** → **URL Configuration**:
+
+- **Site URL**: Set to your production domain
+  - Production: `https://mvp-chatv2.vercel.app`
+  - Development: `http://localhost:3000`
+  
+- **Redirect URLs**: Add these URLs
+  - `https://mvp-chatv2.vercel.app/**`
+  - `http://localhost:3000/**`
+  - Any other OAuth callback URLs
+
+#### 2. Vercel Environment Variables
+
+In your Vercel project settings, configure these environment variables:
+
+**Required for Client & Server:**
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+```
+
+**Optional (Server-side only):**
+```bash
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+```
+
+**Important**: 
+- `NEXT_PUBLIC_*` variables are exposed to the browser
+- Non-prefixed variables are server-side only
+- Deploy after adding/changing environment variables
+
+#### 3. Cookie Configuration
+
+Supabase automatically handles cookie configuration when using `@supabase/ssr`. The cookies are:
+- **SameSite=Lax** (default for same-site requests)
+- **Secure=true** (automatically set for HTTPS domains)
+- **HttpOnly=true** (for security)
+
+**Cookie Names:**
+- Pattern: `sb-<project-ref>-auth-token`
+- Pattern: `sb-<project-ref>-auth-token.0`, `.1`, etc. (for chunked cookies)
+
+### Implementation Details
+
+#### Client-Side: API Helper with Credentials
+
+All API requests use the centralized helper in `lib/api.ts`:
+
+```typescript
+import { apiGet, apiPost } from '@/lib/api'
+
+// GET request with credentials
+const response = await apiGet('/api/day-assistant/queue')
+
+// POST request with credentials
+const response = await apiPost('/api/day-assistant/chat', {
+  message: 'Hello'
+})
+```
+
+This ensures `credentials: 'include'` is set on every request, sending cookies to the server.
+
+#### Server-Side: Reading Session from Cookies
+
+API routes use `lib/supabaseAuth.ts` helpers:
+
+```typescript
+import { createAuthenticatedSupabaseClient, getAuthenticatedUser } from '@/lib/supabaseAuth'
+
+export async function GET(request: NextRequest) {
+  // Create Supabase client that reads cookies
+  const supabase = await createAuthenticatedSupabaseClient()
+  
+  // Get authenticated user from session
+  const user = await getAuthenticatedUser(supabase)
+  
+  if (!user) {
+    return NextResponse.json(
+      { error: 'Unauthorized - Please log in' },
+      { status: 401 }
+    )
+  }
+  
+  // User is authenticated, proceed with logic
+  // ...
+}
+```
+
+### Debugging Cookie Issues
+
+#### 1. Check if cookies are being sent from client
+
+Use the debug endpoint:
+```bash
+# In browser console or via curl
+fetch('/api/debug/headers', { credentials: 'include' })
+  .then(r => r.json())
+  .then(console.log)
+```
+
+Check the response:
+- `cookiePresent: true` → Cookies are being sent ✓
+- `cookiePresent: false` → Cookies are NOT being sent ✗
+
+#### 2. Check server logs
+
+Look for these log messages in Vercel/local console:
+- `[Auth] ✓ Found N Supabase auth cookie(s)` → Auth working
+- `[Auth] ✗ No Supabase auth cookies found` → Auth failing
+- `[Auth] ✓ User authenticated: <user-id>` → User session valid
+
+#### 3. Verify with curl (advanced)
+
+```bash
+# 1. Get cookies from browser DevTools → Application → Cookies
+# 2. Copy the sb-*-auth-token cookies
+# 3. Test with curl
+
+curl -i \
+  -H "Cookie: sb-xxxxx-auth-token=<your-token>" \
+  https://mvp-chatv2.vercel.app/api/day-assistant/queue
+```
+
+Expected: `200 OK` with queue data
+If `401 Unauthorized`: Session invalid or cookies not configured correctly
+
+#### 4. Check browser DevTools Network tab
+
+1. Open DevTools → Network
+2. Make a request to any `/api/day-assistant/*` endpoint
+3. Check request headers → `Cookie` should include `sb-*-auth-token`
+4. If Cookie header is missing, check:
+   - Are you using the `apiGet`/`apiPost` helpers?
+   - Is the domain the same? (Cross-origin requests need CORS config)
+
+### Common Issues & Solutions
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| 401 errors on all API requests | Cookies not being sent | Use `apiGet`/`apiPost` helpers from `lib/api.ts` |
+| "No Supabase auth cookies found" | Session expired or logged out | Re-login via `/login` |
+| Cookies work locally, not on Vercel | Environment variables missing | Add all `NEXT_PUBLIC_SUPABASE_*` vars in Vercel |
+| Cookies present but still 401 | Site URL mismatch | Update Site URL in Supabase Dashboard |
+| Cross-origin cookie issues | SameSite=Strict or wrong domain | Verify Site URL matches deployment domain |
+
+### Testing Checklist
+
+- [ ] Environment variables set in Vercel
+- [ ] Site URL matches production domain in Supabase Dashboard
+- [ ] Redirect URLs include production domain
+- [ ] User can log in successfully
+- [ ] `/api/debug/headers` shows `cookiePresent: true`
+- [ ] Day Assistant API requests return 200 (not 401)
+- [ ] Server logs show "✓ User authenticated"
+
+### Additional Resources
+
+- [Supabase SSR Documentation](https://supabase.com/docs/guides/auth/server-side/nextjs)
+- [Next.js Cookies Documentation](https://nextjs.org/docs/app/api-reference/functions/cookies)
+- [MDN: HTTP Cookies](https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies)
+

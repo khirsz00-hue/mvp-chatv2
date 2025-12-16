@@ -22,10 +22,16 @@ export async function createAuthenticatedSupabaseClient(): Promise<SupabaseClien
   // Defensive logging: confirm cookies present without leaking values
   // Supabase uses 'sb-<project>-auth-token' pattern for auth cookies
   const authCookies = allCookies.filter(c => c.name.startsWith('sb-') && c.name.includes('auth-token'))
+  
+  console.log(`[Auth] Total cookies received: ${allCookies.length}`)
+  console.log(`[Auth] Cookie names: ${allCookies.map(c => c.name).join(', ')}`)
+  
   if (authCookies.length > 0) {
-    console.log(`[Auth] Found ${authCookies.length} Supabase auth cookie(s) for session`)
+    console.log(`[Auth] ✓ Found ${authCookies.length} Supabase auth cookie(s) for session`)
+    console.log(`[Auth] Auth cookie names: ${authCookies.map(c => c.name).join(', ')}`)
   } else {
-    console.warn('[Auth] No Supabase auth cookies found - user likely not authenticated')
+    console.warn('[Auth] ✗ No Supabase auth cookies found - user likely not authenticated')
+    console.warn('[Auth] All cookie names present:', allCookies.map(c => c.name).join(', ') || 'NONE')
   }
   
   return createServerClient(
@@ -58,19 +64,19 @@ export async function getAuthenticatedUser(supabase: SupabaseClient) {
   
   if (error) {
     // Log error type but not sensitive details
-    console.error('[Auth] Authentication error:', error.message || 'Unknown error')
+    console.error('[Auth] ✗ Authentication error:', error.message || 'Unknown error')
+    console.error('[Auth] Error name:', error.name)
     return null
   }
   
   if (!user) {
-    console.warn('[Auth] No user found in session')
+    console.warn('[Auth] ✗ No user found in session')
     return null
   }
   
-  // Log successful auth in development only
-  if (process.env.NODE_ENV === 'development') {
-    console.log(`[Auth] User authenticated: ${user.id.substring(0, 8)}...`)
-  }
+  // Log successful auth with user ID prefix
+  console.log(`[Auth] ✓ User authenticated: ${user.id.substring(0, 8)}...`)
+  console.log(`[Auth] User email: ${user.email}`)
   
   return user
 }

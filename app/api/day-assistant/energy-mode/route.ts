@@ -14,20 +14,22 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET(request: NextRequest) {
   try {
+    console.log('[DayAssistant EnergyMode GET] === Request received ===')
+    
     // Create authenticated Supabase client with cookie context
     const supabase = await createAuthenticatedSupabaseClient()
     const user = await getAuthenticatedUser(supabase)
     
     // Return 401 if no authenticated user
     if (!user?.id) {
-      console.error('[Energy Mode API GET] No authenticated user - session missing')
+      console.error('[DayAssistant EnergyMode GET] ✗ No authenticated user - returning 401')
       return NextResponse.json(
         { error: 'Unauthorized - Please log in' },
         { status: 401 }
       )
     }
 
-    console.log(`[Energy Mode API GET] Fetching energy state for user: ${user.id}`)
+    console.log(`[DayAssistant EnergyMode GET] ✓ Authenticated user: ${user.id}`)
 
     const energyState = await getUserEnergyState(user.id, supabase)
 
@@ -59,20 +61,22 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    console.log('[DayAssistant EnergyMode POST] === Request received ===')
+    
     // Create authenticated Supabase client with cookie context
     const supabase = await createAuthenticatedSupabaseClient()
     const user = await getAuthenticatedUser(supabase)
     
     // POST operations that modify data require authenticated user
     if (!user) {
-      console.log(`[Energy Mode API POST] No user in session - returning error`)
+      console.error('[DayAssistant EnergyMode POST] ✗ No authenticated user - returning 401')
       return NextResponse.json(
         { error: 'Unauthorized - Please log in' },
         { status: 401 }
       )
     }
     
-    console.log(`[Energy Mode API POST] Authenticated user: ${user.id}`)
+    console.log(`[DayAssistant EnergyMode POST] ✓ Authenticated user: ${user.id}`)
 
     const body = await request.json()
     const { mode } = body

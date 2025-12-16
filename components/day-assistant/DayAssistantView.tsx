@@ -19,6 +19,7 @@ import {
 } from '@/lib/types/dayAssistant'
 import { supabase } from '@/lib/supabaseClient'
 import { syncWithTodoist, shouldSync } from '@/lib/services/dayAssistantSync'
+import { apiGet, apiPost } from '@/lib/api'
 
 /**
  * Main Day Assistant View
@@ -85,7 +86,7 @@ export function DayAssistantView() {
         }
         
         // Fetch queue state (authentication via cookies)
-        const queueResponse = await fetch(`/api/day-assistant/queue`)
+        const queueResponse = await apiGet(`/api/day-assistant/queue`)
         if (queueResponse.ok) {
           const queue = await queueResponse.json()
           setQueueState(queue)
@@ -98,7 +99,7 @@ export function DayAssistantView() {
         }
 
         // Fetch energy mode (authentication via cookies)
-        const energyResponse = await fetch(`/api/day-assistant/energy-mode`)
+        const energyResponse = await apiGet(`/api/day-assistant/energy-mode`)
         if (energyResponse.ok) {
           const energy = await energyResponse.json()
           setEnergyMode(energy.current_mode || 'normal')
@@ -124,7 +125,7 @@ export function DayAssistantView() {
 
     try {
       const url = `/api/day-assistant/queue${includeLater ? '?includeLater=true' : ''}`
-      const response = await fetch(url)
+      const response = await apiGet(url)
       if (response.ok) {
         const queue = await response.json()
         setQueueState(queue)
@@ -166,11 +167,7 @@ export function DayAssistantView() {
     if (!userId) return
 
     try {
-      const response = await fetch('/api/day-assistant/energy-mode', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: newMode })
-      })
+      const response = await apiPost('/api/day-assistant/energy-mode', { mode: newMode })
 
       if (response.ok) {
         setEnergyMode(newMode)
@@ -190,11 +187,7 @@ export function DayAssistantView() {
     if (!userId) return
 
     try {
-      const response = await fetch('/api/day-assistant/actions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId, action })
-      })
+      const response = await apiPost('/api/day-assistant/actions', { taskId, action })
 
       if (response.ok) {
         const actionEmojis = { pin: '📌', postpone: '🧊', escalate: '🔥' }
@@ -216,11 +209,7 @@ export function DayAssistantView() {
     if (!userId) return
 
     try {
-      const response = await fetch('/api/day-assistant/tasks', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId, completed: true })
-      })
+      const response = await apiPost('/api/day-assistant/tasks', { taskId, completed: true })
 
       if (response.ok) {
         showToast('Zadanie ukończone! 🎉', 'success')
@@ -236,11 +225,7 @@ export function DayAssistantView() {
     if (!userId) return
 
     try {
-      const response = await fetch('/api/day-assistant/undo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({})
-      })
+      const response = await apiPost('/api/day-assistant/undo', {})
 
       if (response.ok) {
         showToast('Cofnięto ostatnią zmianę', 'success')

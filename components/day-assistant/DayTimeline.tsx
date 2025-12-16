@@ -14,6 +14,7 @@ import Button from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { format, parseISO, addMinutes } from 'date-fns'
 import { pl } from 'date-fns/locale'
+import { apiGet, apiPost } from '@/lib/api'
 
 interface TimelineEvent {
   id: string
@@ -73,9 +74,7 @@ export function DayTimeline({
     const loadTimeline = async () => {
       setLoading(true)
       try {
-        const response = await fetch(
-          `/api/day-assistant/timeline?date=${today}`
-        )
+        const response = await apiGet(`/api/day-assistant/timeline?date=${today}`)
         if (response.ok) {
           const data = await response.json()
           setEvents(data.events || [])
@@ -102,11 +101,7 @@ export function DayTimeline({
     }
     
     try {
-      const response = await fetch('/api/day-assistant/timeline/approve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventId: event.id })
-      })
+      const response = await apiPost('/api/day-assistant/timeline/approve', { eventId: event.id })
       
       if (response.ok && onRefresh) {
         onRefresh()
@@ -122,11 +117,7 @@ export function DayTimeline({
     }
 
     try {
-      const response = await fetch('/api/day-assistant/timeline/reject', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventId: event.id })
-      })
+      const response = await apiPost('/api/day-assistant/timeline/reject', { eventId: event.id })
 
       if (response.ok && onRefresh) {
         onRefresh()
