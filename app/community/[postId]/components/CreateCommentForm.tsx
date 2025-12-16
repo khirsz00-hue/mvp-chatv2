@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { createComment } from '../../actions'
-import { Textarea } from '@/components/ui/Textarea'
-import { Button } from '@/components/ui/Button'
+import Textarea from '@/components/ui/Textarea'
+import Button from '@/components/ui/Button'
 
 interface CreateCommentFormProps {
   postId: string

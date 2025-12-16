@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { createPost } from '../actions'
-import { Textarea } from '@/components/ui/Textarea'
-import { Button } from '@/components/ui/Button'
+import Textarea from '@/components/ui/Textarea'
+import Button from '@/components/ui/Button'
 
 export function CreatePostForm() {
   const [content, setContent] = useState('')
