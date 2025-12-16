@@ -79,18 +79,22 @@ export function DayAssistantView() {
           console.warn('⚠️ [DayAssistant] No Todoist token - skipping sync')
         }
         
-        // Fetch queue state
-        const queueResponse = await fetch(`/api/day-assistant/queue?userId=${userId}`)
+        // Fetch queue state (authentication via cookies)
+        const queueResponse = await fetch(`/api/day-assistant/queue`)
         if (queueResponse.ok) {
           const queue = await queueResponse.json()
           setQueueState(queue)
+        } else {
+          console.error('❌ [DayAssistant] Queue fetch failed:', await queueResponse.text())
         }
 
-        // Fetch energy mode
-        const energyResponse = await fetch(`/api/day-assistant/energy-mode?userId=${userId}`)
+        // Fetch energy mode (authentication via cookies)
+        const energyResponse = await fetch(`/api/day-assistant/energy-mode`)
         if (energyResponse.ok) {
           const energy = await energyResponse.json()
           setEnergyMode(energy.current_mode || 'normal')
+        } else {
+          console.error('❌ [DayAssistant] Energy mode fetch failed:', await energyResponse.text())
         }
       } catch (error) {
         console.error('❌ [DayAssistant] Error fetching data:', error)
@@ -107,14 +111,16 @@ export function DayAssistantView() {
     if (!userId) return
 
     try {
-      const url = `/api/day-assistant/queue?userId=${userId}${includeLater ? '&includeLater=true' : ''}`
+      const url = `/api/day-assistant/queue${includeLater ? '?includeLater=true' : ''}`
       const response = await fetch(url)
       if (response.ok) {
         const queue = await response.json()
         setQueueState(queue)
+      } else {
+        console.error('❌ [DayAssistant] Queue refresh failed:', await response.text())
       }
     } catch (error) {
-      console.error('Error refreshing queue:', error)
+      console.error('❌ [DayAssistant] Error refreshing queue:', error)
     }
   }, [userId])
   
@@ -151,13 +157,16 @@ export function DayAssistantView() {
       const response = await fetch('/api/day-assistant/energy-mode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, mode: newMode })
+        body: JSON.stringify({ mode: newMode })
       })
 
       if (response.ok) {
         setEnergyMode(newMode)
         showToast(`Tryb zmieniony na ${ENERGY_MODE_EMOJI[newMode]}`, 'success')
         await refreshQueue()  // Refresh to apply new constraints
+      } else {
+        console.error('❌ [DayAssistant] Energy mode update failed:', await response.text())
+        showToast('Błąd podczas zmiany trybu', 'error')
       }
     } catch (error) {
       console.error('Error changing energy mode:', error)
