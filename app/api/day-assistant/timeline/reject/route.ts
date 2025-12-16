@@ -1,26 +1,31 @@
-import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabaseClient'
-import { validateUUID } from '@/lib/validation/uuid'
+import { NextRequest, NextResponse } from 'next/server'
+import { createAuthenticatedSupabaseClient, getAuthenticatedUser } from '@/lib/supabaseAuth'
+
+export const dynamic = 'force-dynamic'
 
 // POST: Reject a ghost proposal and remove it
-export async function POST(req: Request) {
+// Uses authenticated user context via RLS
+export async function POST(req: NextRequest) {
   try {
-    const { userId, eventId } = await req.json()
-
-    console.log('🔍 [API Timeline Reject] Received userId:', userId, 'eventId:', eventId)
-
-    // Validate userId
-    const userIdError = validateUUID(userId)
-    if (userIdError) {
-      console.error('❌ [API Timeline Reject]', userIdError)
-      return NextResponse.json({ error: userIdError }, { status: 400 })
+    // Get authenticated user from session
+    const supabase = await createAuthenticatedSupabaseClient()
+    const user = await getAuthenticatedUser(supabase)
+    
+    if (!user?.id) {
+      console.error('[Timeline Reject API] No authenticated user - session missing')
+      return NextResponse.json(
+        { error: 'Unauthorized - Please log in' },
+        { status: 401 }
+      )
     }
 
-    // Validate eventId
-    const eventIdError = validateUUID(eventId, 'eventId')
-    if (eventIdError) {
-      console.error('❌ [API Timeline Reject]', eventIdError)
-      return NextResponse.json({ error: eventIdError }, { status: 400 })
+    const userId = user.id
+    const { eventId } = await req.json()
+
+    console.log('🔍 [API Timeline Reject] Authenticated user:', userId, 'eventId:', eventId)
+
+    if (!eventId) {
+      return NextResponse.json({ error: 'eventId is required' }, { status: 400 })
     }
 
     // Delete the ghost proposal

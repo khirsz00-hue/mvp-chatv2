@@ -74,11 +74,15 @@ export function DayTimeline({
       setLoading(true)
       try {
         const response = await fetch(
-          `/api/day-assistant/timeline?userId=${userId}&date=${today}`
+          `/api/day-assistant/timeline?date=${today}`
         )
         if (response.ok) {
           const data = await response.json()
           setEvents(data.events || [])
+        } else if (response.status === 401) {
+          console.error('Error loading timeline: Session missing')
+        } else {
+          console.error('Error loading timeline:', response.statusText)
         }
       } catch (error) {
         console.error('Error loading timeline:', error)
@@ -101,7 +105,7 @@ export function DayTimeline({
       const response = await fetch('/api/day-assistant/timeline/approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, eventId: event.id })
+        body: JSON.stringify({ eventId: event.id })
       })
       
       if (response.ok && onRefresh) {
@@ -121,7 +125,7 @@ export function DayTimeline({
       const response = await fetch('/api/day-assistant/timeline/reject', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, eventId: event.id })
+        body: JSON.stringify({ eventId: event.id })
       })
 
       if (response.ok && onRefresh) {

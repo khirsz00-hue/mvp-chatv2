@@ -1,26 +1,31 @@
-import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabaseClient'
-import { validateUUID } from '@/lib/validation/uuid'
+import { NextRequest, NextResponse } from 'next/server'
+import { createAuthenticatedSupabaseClient, getAuthenticatedUser } from '@/lib/supabaseAuth'
+
+export const dynamic = 'force-dynamic'
 
 // POST: Approve a ghost proposal and convert it to a task-block
-export async function POST(req: Request) {
+// Uses authenticated user context via RLS
+export async function POST(req: NextRequest) {
   try {
-    const { userId, eventId } = await req.json()
-
-    console.log('🔍 [API Timeline Approve] Received userId:', userId, 'eventId:', eventId)
-
-    // Validate userId
-    const userIdError = validateUUID(userId)
-    if (userIdError) {
-      console.error('❌ [API Timeline Approve]', userIdError)
-      return NextResponse.json({ error: userIdError }, { status: 400 })
+    // Get authenticated user from session
+    const supabase = await createAuthenticatedSupabaseClient()
+    const user = await getAuthenticatedUser(supabase)
+    
+    if (!user?.id) {
+      console.error('[Timeline Approve API] No authenticated user - session missing')
+      return NextResponse.json(
+        { error: 'Unauthorized - Please log in' },
+        { status: 401 }
+      )
     }
 
-    // Validate eventId
-    const eventIdError = validateUUID(eventId, 'eventId')
-    if (eventIdError) {
-      console.error('❌ [API Timeline Approve]', eventIdError)
-      return NextResponse.json({ error: eventIdError }, { status: 400 })
+    const userId = user.id
+    const { eventId } = await req.json()
+
+    console.log('🔍 [API Timeline Approve] Authenticated user:', userId, 'eventId:', eventId)
+
+    if (!eventId) {
+      return NextResponse.json({ error: 'eventId is required' }, { status: 400 })
     }
 
     // Update the event type from ghost-proposal to task-block

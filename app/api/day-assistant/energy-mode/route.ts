@@ -18,12 +18,12 @@ export async function GET(request: NextRequest) {
     const supabase = await createAuthenticatedSupabaseClient()
     const user = await getAuthenticatedUser(supabase)
     
-    // Return default state if no authenticated user (don't pass empty string to DB)
+    // Return 401 if no authenticated user
     if (!user?.id) {
-      console.log('[Energy Mode API GET] No authenticated user, returning default')
+      console.error('[Energy Mode API GET] No authenticated user - session missing')
       return NextResponse.json(
-        { current_mode: 'normal' },
-        { status: 200 }
+        { error: 'Unauthorized - Please log in' },
+        { status: 401 }
       )
     }
 
