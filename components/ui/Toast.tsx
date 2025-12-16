@@ -27,12 +27,15 @@ export function useToast() {
   return context
 }
 
+// Dedupe cleanup delay: time before allowing same toast to appear again (ms)
+const TOAST_DEDUP_CLEANUP_DELAY = 10000 // 10 seconds
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
   const [activeMessages, setActiveMessages] = useState<Set<string>>(new Set())
 
   const showToast = (message: string, type: ToastType = 'info', duration: number = 3000) => {
-    // Dedupe: prevent duplicate toasts for the same message within 10 seconds
+    // Dedupe: prevent duplicate toasts for the same message within cleanup delay
     const messageKey = `${type}:${message}`
     if (activeMessages.has(messageKey)) {
       console.log('[Toast] Skipping duplicate toast:', message)
@@ -48,14 +51,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     if (duration > 0) {
       setTimeout(() => {
         removeToast(id)
-        // Remove from active messages after 10 seconds to allow future toasts
+        // Remove from active messages after cleanup delay to allow future toasts
         setTimeout(() => {
           setActiveMessages(prev => {
             const next = new Set(prev)
             next.delete(messageKey)
             return next
           })
-        }, 10000)
+        }, TOAST_DEDUP_CLEANUP_DELAY)
       }, duration)
     }
   }

@@ -19,7 +19,7 @@ import {
 } from '@/lib/types/dayAssistant'
 import { supabase } from '@/lib/supabaseClient'
 import { syncWithTodoist, shouldSync } from '@/lib/services/dayAssistantSync'
-import { apiGet, apiPost } from '@/lib/api'
+import { apiGet, apiPost, apiPut } from '@/lib/api'
 
 /**
  * Main Day Assistant View
@@ -209,7 +209,7 @@ export function DayAssistantView() {
     if (!userId) return
 
     try {
-      const response = await apiPost('/api/day-assistant/tasks', { taskId, completed: true })
+      const response = await apiPut('/api/day-assistant/tasks', { taskId, completed: true })
 
       if (response.ok) {
         showToast('Zadanie ukończone! 🎉', 'success')

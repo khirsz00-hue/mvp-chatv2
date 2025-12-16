@@ -76,7 +76,11 @@ export async function getAuthenticatedUser(supabase: SupabaseClient) {
   
   // Log successful auth with user ID prefix
   console.log(`[Auth] ✓ User authenticated: ${user.id.substring(0, 8)}...`)
-  console.log(`[Auth] User email: ${user.email}`)
+  
+  // Only log email in development to avoid exposing PII in production logs
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[Auth] User email: ${user.email}`)
+  }
   
   return user
 }
