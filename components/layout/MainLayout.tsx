@@ -88,7 +88,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     // Odczytaj zapisaną preferencję widoku, jeśli istnieje
     try {
       const stored = localStorage.getItem('active_assistant') as AssistantId | null
-      if (stored && ['tasks', 'day-assistant', 'planning', 'journal', 'decisions', 'support', 'admin'].includes(stored)) {
+      if (stored && ['tasks', 'day-assistant', 'planning', 'journal', 'decisions', 'community', 'support', 'admin'].includes(stored)) {
         setActiveView(stored)
       }
     } catch {}
@@ -112,6 +112,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
       
       case 'decisions':
         return <DecisionAssistant />
+      
+      case 'community':
+        router.push('/community')
+        return null
       
       case 'admin':
         if (!isAdmin) {
