@@ -46,7 +46,10 @@ const EVENT_COLORS = {
   'task-block': 'bg-purple-500',
   'ghost-proposal': 'bg-gray-400 opacity-60 border-2 border-dashed',
   'queue-task': 'bg-brand-purple'
-}
+} as const
+
+// Event type constants
+const EVENT_TYPE_TASK_BLOCK = 'task-block' as const
 
 // Priority-specific colors for queue tasks
 const PRIORITY_COLORS = {
@@ -78,24 +81,31 @@ export function DayTimeline({
     return () => clearInterval(interval)
   }, [])
 
-  // Load timeline events
+  // Load timeline events - single fetch, no cascade
   useEffect(() => {
     const loadTimeline = async () => {
       setLoading(true)
       try {
-        // Fetch timeline built from queue data
+        // Fetch timeline built from queue data (single fetch)
         const response = await apiGet(`/api/day-assistant/timeline?date=${today}&includeAll=false`)
         if (response.ok) {
           const data = await response.json()
           console.log('📅 Timeline loaded:', data.queueSummary)
+          // Set events even if empty (prevents reload loop)
           setEvents(data.events || [])
         } else if (response.status === 401) {
           console.error('Error loading timeline: Session missing')
+          // Set empty array to prevent reload attempts
+          setEvents([])
         } else {
           console.error('Error loading timeline:', response.statusText)
+          // Set empty array on error to show empty state
+          setEvents([])
         }
       } catch (error) {
         console.error('Error loading timeline:', error)
+        // Set empty array on error to show empty state
+        setEvents([])
       } finally {
         setLoading(false)
       }
@@ -114,8 +124,15 @@ export function DayTimeline({
     try {
       const response = await apiPost('/api/day-assistant/timeline/approve', { eventId: event.id })
       
-      if (response.ok && onRefresh) {
-        onRefresh()
+      if (response.ok) {
+        // Optimistically update local state instead of full refresh
+        setEvents(prev => prev.map(e => 
+          e.id === event.id ? { ...e, type: EVENT_TYPE_TASK_BLOCK } : e
+        ))
+        // Only refresh queue if callback provided (debounced by parent)
+        if (onRefresh) {
+          onRefresh()
+        }
       }
     } catch (error) {
       console.error('Error approving proposal:', error)
@@ -130,8 +147,13 @@ export function DayTimeline({
     try {
       const response = await apiPost('/api/day-assistant/timeline/reject', { eventId: event.id })
 
-      if (response.ok && onRefresh) {
-        onRefresh()
+      if (response.ok) {
+        // Optimistically remove from local state instead of full refresh
+        setEvents(prev => prev.filter(e => e.id !== event.id))
+        // Only refresh queue if callback provided (debounced by parent)
+        if (onRefresh) {
+          onRefresh()
+        }
       }
     } catch (error) {
       console.error('Error rejecting proposal:', error)
@@ -172,10 +194,13 @@ export function DayTimeline({
 
   const currentTimePosition = getCurrentTimePosition()
 
-  // Generate hour markers
+  // Generate hour markers (including half-hour markers for better granularity)
   const hourMarkers = []
   for (let hour = workingHours.start; hour <= workingHours.end; hour++) {
-    hourMarkers.push(hour)
+    hourMarkers.push({ hour, isFullHour: true })
+    if (hour < workingHours.end) {
+      hourMarkers.push({ hour: hour + 0.5, isFullHour: false })
+    }
   }
 
   if (loading) {
@@ -212,20 +237,25 @@ export function DayTimeline({
 
       <div className="flex-1 overflow-y-auto p-4">
         <div className="relative" style={{ minHeight: '600px' }}>
-          {/* Hour markers */}
+          {/* Hour markers with grid lines */}
           <div className="absolute inset-0">
-            {hourMarkers.map((hour, idx) => {
-              const totalHours = workingHours.end - workingHours.start + 1
-              const position = (idx / totalHours) * 100
+            {hourMarkers.map((marker, idx) => {
+              const totalSlots = hourMarkers.length
+              const position = (idx / totalSlots) * 100
+              const displayHour = Math.floor(marker.hour)
+              const displayMinute = marker.isFullHour ? '00' : '30'
+              
               return (
                 <div
-                  key={hour}
-                  className="absolute left-0 right-0 border-t border-border"
+                  key={`${marker.hour}-${idx}`}
+                  className={`absolute left-0 right-0 ${marker.isFullHour ? 'border-t-2 border-border' : 'border-t border-border/50 border-dashed'}`}
                   style={{ top: `${position}%` }}
                 >
-                  <span className="absolute -left-12 -top-2 text-xs text-muted-foreground">
-                    {`${hour}:00`}
-                  </span>
+                  {marker.isFullHour && (
+                    <span className="absolute -left-12 -top-2 text-xs font-medium text-muted-foreground">
+                      {`${displayHour}:${displayMinute}`}
+                    </span>
+                  )}
                 </div>
               )
             })}
