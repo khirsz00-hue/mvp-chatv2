@@ -281,7 +281,7 @@ export function DayTimeline({
           <div className="absolute inset-0 pl-4">
             {events.map((event) => {
               // Determine color based on type and priority
-              let colorClass = EVENT_COLORS[event.type]
+              let colorClass: string = EVENT_COLORS[event.type]
               if (event.type === 'queue-task' && event.priority) {
                 colorClass = PRIORITY_COLORS[event.priority]
               }

@@ -33,6 +33,29 @@ export default function AuthCallbackPage() {
           return
         }
 
+        // Check for hash-based tokens (magic links and some OAuth flows)
+        const hash = window.location.hash
+        console.log('🔍 [AuthCallback] Hash:', hash ? 'PRESENT' : 'ABSENT')
+        
+        // Explicitly exchange code for session if present
+        // This is a fallback for cases where:
+        // 1. The middleware didn't run (e.g., cached page, service worker)
+        // 2. Mobile webview with restricted cookie access
+        // 3. Incognito/private browsing with strict cookie policies
+        // The Supabase client can handle this idempotently (won't fail if already exchanged)
+        const code = params.get('code')
+        if (code) {
+          console.log('🔍 [AuthCallback] Code param found, exchanging...')
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+          if (exchangeError) {
+            console.error('❌ [AuthCallback] Code exchange error:', exchangeError)
+            setError(exchangeError.message)
+            setTimeout(() => router.replace('/login'), ERROR_REDIRECT_DELAY)
+            return
+          }
+          console.log('✅ [AuthCallback] Code exchange successful')
+        }
+        
         // The Supabase client with PKCE flow will automatically handle the callback
         // and exchange the code for a session via detectSessionInUrl
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
