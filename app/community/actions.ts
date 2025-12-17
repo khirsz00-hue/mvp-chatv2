@@ -473,9 +473,40 @@ export async function getRandomHelpers(limit: number = 5) {
       .gt('score', 0)
       .limit(limit * 3) // Get more than needed to randomize
 
-    if (error) {
+    if (error || !helpers) {
       console.error('Error fetching helpers:', error)
       return { data: [] }
+    }
+
+    const helperIds = helpers.map(helper => helper.user_id)
+
+    const buildCountMap = (items?: { author_id?: string | null }[]) =>
+      (items || []).reduce<Record<string, number>>((acc, item) => {
+        if (item.author_id) {
+          acc[item.author_id] = (acc[item.author_id] ?? 0) + 1
+        }
+        return acc
+      }, {})
+
+    let postCounts: Record<string, number> = {}
+    let commentCounts: Record<string, number> = {}
+
+    if (helperIds.length > 0) {
+      const [{ data: posts }, { data: comments }] = await Promise.all([
+        supabase
+          .from('posts')
+          .select('author_id')
+          .eq('status', 'active')
+          .in('author_id', helperIds),
+        supabase
+          .from('comments')
+          .select('author_id')
+          .eq('status', 'active')
+          .in('author_id', helperIds)
+      ])
+
+      postCounts = buildCountMap(posts)
+      commentCounts = buildCountMap(comments)
     }
 
     // Randomize and limit
@@ -483,7 +514,14 @@ export async function getRandomHelpers(limit: number = 5) {
       .sort(() => Math.random() - 0.5)
       .slice(0, limit)
 
-    return { data: randomHelpers }
+    const helpersWithStats = randomHelpers.map(helper => ({
+      user_id: helper.user_id,
+      score: helper.score ?? 0,
+      post_count: postCounts[helper.user_id] ?? 0,
+      comment_count: commentCounts[helper.user_id] ?? 0
+    }))
+
+    return { data: helpersWithStats }
   } catch (error) {
     console.error('Unexpected error fetching helpers:', error)
     return { data: [] }

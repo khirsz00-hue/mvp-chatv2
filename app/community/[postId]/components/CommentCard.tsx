@@ -5,6 +5,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { Heart } from '@phosphor-icons/react'
 import { likeComment } from '../../actions'
+import { generateNickname, getNicknameInitials } from '@/utils/nickname'
 
 interface Comment {
   id: string
@@ -13,6 +14,7 @@ interface Comment {
   like_count: number
   is_anonymous: boolean
   isLiked: boolean
+  author_id?: string | null
 }
 
 interface CommentCardProps {
@@ -24,6 +26,8 @@ export function CommentCard({ comment, postId }: CommentCardProps) {
   const [isLiked, setIsLiked] = useState(comment.isLiked)
   const [likeCount, setLikeCount] = useState(comment.like_count)
   const [isLiking, setIsLiking] = useState(false)
+  const nickname = generateNickname(comment.author_id)
+  const initials = getNicknameInitials(nickname)
 
   const handleLike = async () => {
     if (isLiking) return
@@ -64,7 +68,7 @@ export function CommentCard({ comment, postId }: CommentCardProps) {
         {/* Anonymous avatar */}
         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-300 to-pink-300 flex items-center justify-center flex-shrink-0">
           <span className="text-white text-sm font-medium">
-            {comment.is_anonymous ? '?' : 'U'}
+            {initials}
           </span>
         </div>
 
@@ -72,7 +76,11 @@ export function CommentCard({ comment, postId }: CommentCardProps) {
           {/* Header */}
           <div className="flex items-center gap-2 mb-2">
             <span className="text-sm font-medium text-gray-700">
-              {comment.is_anonymous ? 'Anonimowy użytkownik' : 'Użytkownik'}
+              {comment.is_anonymous ? 'Anonimowy głos' : 'Członek społeczności'}
+            </span>
+            <span className="text-sm text-gray-500">•</span>
+            <span className="text-sm font-medium text-purple-700 truncate">
+              {nickname}
             </span>
             <span className="text-sm text-gray-500">•</span>
             <span className="text-sm text-gray-500">{timeAgo}</span>

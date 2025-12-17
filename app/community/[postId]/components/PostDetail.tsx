@@ -5,6 +5,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { Heart, ChatCircle } from '@phosphor-icons/react'
 import { likePost } from '../../actions'
+import { generateNickname, getNicknameInitials } from '@/utils/nickname'
 
 interface Post {
   id: string
@@ -14,6 +15,7 @@ interface Post {
   comment_count: number
   is_anonymous: boolean
   isLiked: boolean
+  author_id?: string | null
   tags?: string[] | null
 }
 
@@ -25,6 +27,8 @@ export function PostDetail({ post }: PostDetailProps) {
   const [isLiked, setIsLiked] = useState(post.isLiked)
   const [likeCount, setLikeCount] = useState(post.like_count)
   const [isLiking, setIsLiking] = useState(false)
+  const nickname = generateNickname(post.author_id)
+  const initials = getNicknameInitials(nickname)
   const tags = (post.tags || []).filter(Boolean)
 
   const formatTag = (tag: string) => tag.replace(/-/g, ' ')
@@ -68,7 +72,7 @@ export function PostDetail({ post }: PostDetailProps) {
         {/* Anonymous avatar */}
         <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center flex-shrink-0">
           <span className="text-white font-medium">
-            {post.is_anonymous ? '?' : 'U'}
+            {initials}
           </span>
         </div>
 
@@ -76,7 +80,11 @@ export function PostDetail({ post }: PostDetailProps) {
           {/* Header */}
           <div className="flex items-center gap-2 mb-3">
             <span className="font-medium text-gray-900">
-              {post.is_anonymous ? 'Anonimowy użytkownik' : 'Użytkownik'}
+              {post.is_anonymous ? 'Anonimowy głos' : 'Członek społeczności'}
+            </span>
+            <span className="text-gray-500">•</span>
+            <span className="font-medium text-purple-700 truncate">
+              {nickname}
             </span>
             <span className="text-gray-500">•</span>
             <span className="text-sm text-gray-500">{timeAgo}</span>

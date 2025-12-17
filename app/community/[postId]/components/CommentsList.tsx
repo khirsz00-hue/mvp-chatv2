@@ -9,6 +9,7 @@ interface Comment {
   like_count: number
   is_anonymous: boolean
   isLiked: boolean
+  author_id?: string | null
 }
 
 interface CommentsListProps {
