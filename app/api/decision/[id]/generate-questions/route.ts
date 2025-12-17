@@ -67,18 +67,10 @@ export async function POST(
       )
     }
 
-    // Get options
-    const { data: options } = await supabase
-      .from('decision_options')
-      .select('*')
-      .eq('decision_id', id)
-      .order('order', { ascending: true })
-
     // Generate questions using AI
     const questions = await AIService.generateQuestionsForHat(
       decision.title,
       decision.description,
-      options || [],
       hatColor as HatColor
     )
 
