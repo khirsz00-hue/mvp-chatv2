@@ -1,5 +1,5 @@
 /**
- * API Route: /api/test-day-assistant/dayplan
+ * API Route: /api/day-assistant-v2/dayplan
  * GET: Fetch day plan with timeline and proposals
  * POST: Update day plan (energy/focus sliders)
  */
@@ -7,13 +7,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import {
-  getOrCreateTestDayAssistant,
+  getOrCreateDayAssistantV2,
   getOrCreateDayPlan,
   updateDayPlan,
   getTasks,
   getActiveProposals
-} from '@/lib/services/testDayAssistantService'
-import { generateSliderChangeRecommendation } from '@/lib/services/testDayRecommendationEngine'
+} from '@/lib/services/dayAssistantV2Service'
+import { generateSliderChangeRecommendation } from '@/lib/services/dayAssistantV2RecommendationEngine'
 
 export async function GET(request: NextRequest) {
   try {
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get('date') || new Date().toISOString().split('T')[0]
     
     // Get or create assistant
-    const assistant = await getOrCreateTestDayAssistant(user.id)
+    const assistant = await getOrCreateDayAssistantV2(user.id)
     if (!assistant) {
       return NextResponse.json({ error: 'Failed to get assistant' }, { status: 500 })
     }
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
       assistant
     })
   } catch (error) {
-    console.error('Error in GET /api/test-day-assistant/dayplan:', error)
+    console.error('Error in GET /api/day-assistant-v2/dayplan:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Get assistant
-    const assistant = await getOrCreateTestDayAssistant(user.id)
+    const assistant = await getOrCreateDayAssistantV2(user.id)
     if (!assistant) {
       return NextResponse.json({ error: 'Failed to get assistant' }, { status: 500 })
     }
@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
       message: 'Day plan updated successfully'
     })
   } catch (error) {
-    console.error('Error in POST /api/test-day-assistant/dayplan:', error)
+    console.error('Error in POST /api/day-assistant-v2/dayplan:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

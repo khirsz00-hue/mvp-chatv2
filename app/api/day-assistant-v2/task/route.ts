@@ -1,5 +1,5 @@
 /**
- * API Route: /api/test-day-assistant/task
+ * API Route: /api/day-assistant-v2/task
  * POST: Create a new task
  * PUT: Update task
  */
@@ -7,14 +7,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import {
-  getOrCreateTestDayAssistant,
+  getOrCreateDayAssistantV2,
   createTask,
   updateTask,
   getTasks,
-  getMustTasksCount
-} from '@/lib/services/testDayAssistantService'
-import { generateTaskAddedRecommendation } from '@/lib/services/testDayRecommendationEngine'
-import { getOrCreateDayPlan } from '@/lib/services/testDayAssistantService'
+  getMustTasksCount,
+  getOrCreateDayPlan
+} from '@/lib/services/dayAssistantV2Service'
+import { generateTaskAddedRecommendation } from '@/lib/services/dayAssistantV2RecommendationEngine'
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     
     // Get assistant
-    const assistant = await getOrCreateTestDayAssistant(user.id)
+    const assistant = await getOrCreateDayAssistantV2(user.id)
     if (!assistant) {
       return NextResponse.json({ error: 'Failed to get assistant' }, { status: 500 })
     }
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
       message: 'Task created successfully'
     })
   } catch (error) {
-    console.error('Error in POST /api/test-day-assistant/task:', error)
+    console.error('Error in POST /api/day-assistant-v2/task:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -134,7 +134,7 @@ export async function PUT(request: NextRequest) {
       message: 'Task updated successfully'
     })
   } catch (error) {
-    console.error('Error in PUT /api/test-day-assistant/task:', error)
+    console.error('Error in PUT /api/day-assistant-v2/task:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

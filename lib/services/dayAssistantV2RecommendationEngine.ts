@@ -1,5 +1,5 @@
 /**
- * Test Day Assistant - Recommendation Engine
+ * Day Assistant v2 - Recommendation Engine
  * Implements scoring logic and live replanning with AI-powered recommendations
  */
 
@@ -12,8 +12,8 @@ import {
   ScoreBreakdown,
   AssistantConfig,
   DEFAULT_SETTINGS
-} from '@/lib/types/testDayAssistant'
-import { createProposal, getTasks } from './testDayAssistantService'
+} from '@/lib/types/dayAssistantV2'
+import { createProposal, getTasks } from './dayAssistantV2Service'
 
 // Scoring weights
 const WEIGHTS = {

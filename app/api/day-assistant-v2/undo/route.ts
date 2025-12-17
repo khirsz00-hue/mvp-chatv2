@@ -1,14 +1,14 @@
 /**
- * API Route: /api/test-day-assistant/undo
+ * API Route: /api/day-assistant-v2/undo
  * POST: Undo last action (within undo window)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import {
-  getOrCreateTestDayAssistant,
+  getOrCreateDayAssistantV2,
   undoLastAction
-} from '@/lib/services/testDayAssistantService'
+} from '@/lib/services/dayAssistantV2Service'
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Get assistant
-    const assistant = await getOrCreateTestDayAssistant(user.id)
+    const assistant = await getOrCreateDayAssistantV2(user.id)
     if (!assistant) {
       return NextResponse.json({ error: 'Failed to get assistant' }, { status: 500 })
     }
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json(result)
   } catch (error) {
-    console.error('Error in POST /api/test-day-assistant/undo:', error)
+    console.error('Error in POST /api/day-assistant-v2/undo:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

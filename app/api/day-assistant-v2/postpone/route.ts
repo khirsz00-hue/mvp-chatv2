@@ -1,15 +1,15 @@
 /**
- * API Route: /api/test-day-assistant/postpone
+ * API Route: /api/day-assistant-v2/postpone
  * POST: Postpone task to next day ("Nie dziś" button)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import {
-  getOrCreateTestDayAssistant,
+  getOrCreateDayAssistantV2,
   postponeTask
-} from '@/lib/services/testDayAssistantService'
-import { generatePostponeRecommendation } from '@/lib/services/testDayRecommendationEngine'
+} from '@/lib/services/dayAssistantV2Service'
+import { generatePostponeRecommendation } from '@/lib/services/dayAssistantV2RecommendationEngine'
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Get assistant
-    const assistant = await getOrCreateTestDayAssistant(user.id)
+    const assistant = await getOrCreateDayAssistantV2(user.id)
     if (!assistant) {
       return NextResponse.json({ error: 'Failed to get assistant' }, { status: 500 })
     }
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
       message: '🧊 Zadanie przeniesione na jutro'
     })
   } catch (error) {
-    console.error('Error in POST /api/test-day-assistant/postpone:', error)
+    console.error('Error in POST /api/day-assistant-v2/postpone:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
