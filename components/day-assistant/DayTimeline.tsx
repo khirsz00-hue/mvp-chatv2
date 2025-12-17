@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { 
   Clock,
@@ -72,6 +72,41 @@ export function DayTimeline({
   const [currentTime, setCurrentTime] = useState(new Date())
 
   const today = date || format(new Date(), 'yyyy-MM-dd')
+
+  const derivedWorkingHours = useMemo(() => {
+    if (!events.length) return workingHours
+
+    const parseToMinutes = (time: string) => {
+      const [hour, minute] = time.split(':').map(Number)
+      return hour * 60 + minute
+    }
+
+    const startMinutes = events
+      .map((event) => parseToMinutes(event.startTime))
+      .filter((value) => !Number.isNaN(value))
+    const endMinutes = events
+      .map((event) => {
+        const parsed = parseToMinutes(event.endTime || event.startTime)
+        if (!Number.isNaN(parsed)) return parsed
+        const start = parseToMinutes(event.startTime)
+        return Number.isNaN(start) ? null : start + event.duration
+      })
+      .filter((value): value is number => value !== null && !Number.isNaN(value))
+
+    if (!startMinutes.length || !endMinutes.length) return workingHours
+
+    const earliestStart = Math.min(...startMinutes)
+    const latestEnd = Math.max(...endMinutes)
+
+    const startHour = Math.min(Math.floor(earliestStart / 60), workingHours.start)
+    const endHour = Math.max(Math.ceil(latestEnd / 60), workingHours.end)
+
+    if (endHour <= startHour) {
+      return workingHours
+    }
+
+    return { start: startHour, end: endHour }
+  }, [events, workingHours])
 
   // Update current time every minute
   useEffect(() => {
@@ -164,9 +199,12 @@ export function DayTimeline({
   const getEventStyle = (event: TimelineEvent) => {
     const [startHour, startMin] = event.startTime.split(':').map(Number)
     const startMinutes = startHour * 60 + startMin
-    const workStartMinutes = workingHours.start * 60
-    const workEndMinutes = workingHours.end * 60
+    const workStartMinutes = derivedWorkingHours.start * 60
+    const workEndMinutes = derivedWorkingHours.end * 60
     const totalWorkMinutes = workEndMinutes - workStartMinutes
+    if (totalWorkMinutes <= 0) {
+      return { top: '0%', height: '0%', minHeight: '40px' }
+    }
 
     const top = ((startMinutes - workStartMinutes) / totalWorkMinutes) * 100
     const height = (event.duration / totalWorkMinutes) * 100
@@ -182,9 +220,10 @@ export function DayTimeline({
   const getCurrentTimePosition = () => {
     const now = currentTime
     const currentMinutes = now.getHours() * 60 + now.getMinutes()
-    const workStartMinutes = workingHours.start * 60
-    const workEndMinutes = workingHours.end * 60
+    const workStartMinutes = derivedWorkingHours.start * 60
+    const workEndMinutes = derivedWorkingHours.end * 60
     const totalWorkMinutes = workEndMinutes - workStartMinutes
+    if (totalWorkMinutes <= 0) return null
 
     const position = ((currentMinutes - workStartMinutes) / totalWorkMinutes) * 100
 
@@ -196,9 +235,9 @@ export function DayTimeline({
 
   // Generate hour markers (including half-hour markers for better granularity)
   const hourMarkers = []
-  for (let hour = workingHours.start; hour <= workingHours.end; hour++) {
+  for (let hour = derivedWorkingHours.start; hour <= derivedWorkingHours.end; hour++) {
     hourMarkers.push({ hour, isFullHour: true })
-    if (hour < workingHours.end) {
+    if (hour < derivedWorkingHours.end) {
       hourMarkers.push({ hour: hour + 0.5, isFullHour: false })
     }
   }
