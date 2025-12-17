@@ -93,6 +93,9 @@ async function fetchAndFilterTasks(token: any, filter: string, date?: string) {
     const sevenDaysEnd = endOfDay(addDays(todayStart, 6))
 
     const filtered = allTasks.filter((t: any) => {
+      if (t?.completed === true || t?.is_completed === true) {
+        return false
+      }
       // unify due source: Todoist may return object with .date or a string
       const dueStr = t?.due?.date || t?.due || null
       if (!dueStr) {

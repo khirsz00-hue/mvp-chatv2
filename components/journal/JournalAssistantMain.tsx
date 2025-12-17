@@ -118,9 +118,12 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
 
         if (isMounted) {
           setTodoistToken(data?.todoist_token || null)
+          const expiryRaw = data?.google_token_expiry || null
+          const expiryMs =
+            expiryRaw && expiryRaw < 1e12 ? expiryRaw * 1000 : expiryRaw
           const isGoogleLinked =
             !!data?.google_access_token &&
-            (!data?.google_token_expiry || data.google_token_expiry > Date.now())
+            (!expiryMs || expiryMs > Date.now())
           setGoogleConnected(isGoogleLinked)
         }
       } catch (err) {
