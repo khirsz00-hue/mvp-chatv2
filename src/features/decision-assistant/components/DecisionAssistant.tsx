@@ -112,6 +112,7 @@ export function DecisionAssistant() {
       const data = await response.json()
 
       if (data.decision) {
+        setSelectedDecisionId(data.decision.id)
         await fetchDecisions()
         setTitle('')
         setDescription('')
