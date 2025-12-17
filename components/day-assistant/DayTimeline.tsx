@@ -14,7 +14,7 @@ import Button from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { format, parseISO, addMinutes } from 'date-fns'
 import { pl } from 'date-fns/locale'
-import { apiGet, apiPost } from '@/lib/api'
+import { apiGet, apiPost, invalidateCache } from '@/lib/api'
 
 interface TimelineEvent {
   id: string
@@ -30,8 +30,11 @@ interface TimelineEvent {
   metadata?: Record<string, any>
 }
 
+import { QueueState } from '@/lib/types/dayAssistant'
+
 interface DayTimelineProps {
   userId: string
+  queueState?: QueueState
   date?: string  // ISO date string, defaults to today
   workingHours?: { start: number; end: number }  // e.g., { start: 9, end: 17 }
   onEventClick?: (event: TimelineEvent) => void
@@ -60,6 +63,7 @@ const PRIORITY_COLORS: Record<'now' | 'next' | 'later', string> = {
 
 export function DayTimeline({
   userId,
+  queueState,
   date,
   workingHours = { start: 9, end: 17 },
   onEventClick,
@@ -70,6 +74,7 @@ export function DayTimeline({
   const [events, setEvents] = useState<TimelineEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [currentTime, setCurrentTime] = useState(new Date())
+  const [isRecalculating, setIsRecalculating] = useState(false)
 
   const today = date || format(new Date(), 'yyyy-MM-dd')
 
@@ -151,6 +156,37 @@ export function DayTimeline({
     }
   }, [userId, today])
 
+  // Reactive timeline refresh when queue state changes
+  useEffect(() => {
+    if (!queueState || loading) return
+    
+    // Debounce timeline recalculation to avoid too many updates
+    const timeoutId = setTimeout(async () => {
+      setIsRecalculating(true)
+      try {
+        // Use cache with short TTL for timeline refreshes
+        const response = await apiGet(`/api/day-assistant/timeline?date=${today}&includeAll=false`, {}, { cache: true, ttl: 3000 })
+        if (response.ok) {
+          const data = await response.json()
+          // Smooth update - only if events actually changed
+          const newEvents = data.events || []
+          // Shallow comparison: check if length or any IDs changed
+          const hasChanged = newEvents.length !== events.length || 
+            newEvents.some((e: TimelineEvent, i: number) => e.id !== events[i]?.id)
+          if (hasChanged) {
+            setEvents(newEvents)
+          }
+        }
+      } catch (error) {
+        console.error('Error refreshing timeline:', error)
+      } finally {
+        setIsRecalculating(false)
+      }
+    }, 300) // 300ms debounce
+    
+    return () => clearTimeout(timeoutId)
+  }, [queueState, today, loading])
+
   const handleApprove = async (event: TimelineEvent) => {
     if (onApproveProposal) {
       onApproveProposal(event)
@@ -160,6 +196,8 @@ export function DayTimeline({
       const response = await apiPost('/api/day-assistant/timeline/approve', { eventId: event.id })
       
       if (response.ok) {
+        // Invalidate timeline cache
+        invalidateCache('/api/day-assistant/timeline')
         // Optimistically update local state instead of full refresh
         setEvents(prev => prev.map(e => 
           e.id === event.id ? { ...e, type: EVENT_TYPE_TASK_BLOCK } : e
@@ -183,6 +221,8 @@ export function DayTimeline({
       const response = await apiPost('/api/day-assistant/timeline/reject', { eventId: event.id })
 
       if (response.ok) {
+        // Invalidate timeline cache
+        invalidateCache('/api/day-assistant/timeline')
         // Optimistically remove from local state instead of full refresh
         setEvents(prev => prev.filter(e => e.id !== event.id))
         // Only refresh queue if callback provided (debounced by parent)
@@ -260,6 +300,11 @@ export function DayTimeline({
           <h3 className="text-lg font-semibold flex items-center gap-2">
             <CalendarBlank size={24} className="text-brand-purple" />
             Harmonogram dnia
+            {isRecalculating && (
+              <span className="text-xs bg-brand-purple/10 text-brand-purple px-2 py-1 rounded-full animate-pulse">
+                🔄 Aktualizacja...
+              </span>
+            )}
           </h3>
           <p className="text-sm text-muted-foreground mt-1">
             {format(parseISO(today), 'd MMMM yyyy', { locale: pl })}
@@ -334,6 +379,9 @@ export function DayTimeline({
                 whileHover={{ scale: 1.02 }}
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 10 }}
+                transition={{ duration: 0.2 }}
+                layout
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">

@@ -15,11 +15,12 @@ import {
   DayTask,
   QueueState,
   EnergyMode,
+  DayPriority,
   ENERGY_MODE_EMOJI
 } from '@/lib/types/dayAssistant'
 import { supabase } from '@/lib/supabaseClient'
 import { syncWithTodoist, shouldSync } from '@/lib/services/dayAssistantSync'
-import { apiGet, apiPost, apiPut } from '@/lib/api'
+import { apiGet, apiPost, apiPut, invalidateCache } from '@/lib/api'
 
 /**
  * Main Day Assistant View
@@ -158,7 +159,8 @@ export function DayAssistantView() {
 
     try {
       const url = `/api/day-assistant/queue${includeLater ? '?includeLater=true' : ''}`
-      const response = await apiGet(url)
+      // Use caching with short TTL for queue fetches to reduce redundant requests
+      const response = await apiGet(url, {}, { cache: true, ttl: 3000 })
       if (response.ok) {
         const queue = await response.json()
         setQueueState(queue)
@@ -270,16 +272,103 @@ export function DayAssistantView() {
     // Set action flag to disable autosync
     actionInProgressRef.current = true
 
+    // Find the task being acted upon
+    const task = [queueState.now, ...queueState.next, ...queueState.later].find(t => t?.id === taskId)
+    if (!task) {
+      console.error('Task not found:', taskId)
+      actionInProgressRef.current = false
+      return
+    }
+
+    // Store previous state for rollback
+    const previousQueueState = { ...queueState }
+
+    // Optimistic UI update - instant visual feedback
+    let newQueueState: QueueState = { ...queueState }
+    
+    switch (action) {
+      case 'escalate':
+        // Move task to NOW, push current NOW to NEXT
+        // Type assertion needed because we're updating the priority field optimistically
+        newQueueState = {
+          now: { ...task, priority: 'now' as DayPriority, is_mega_important: true },
+          next: [
+            ...(queueState.now ? [{ ...queueState.now, priority: 'next' as DayPriority }] : []),
+            ...queueState.next.filter(t => t.id !== taskId)
+          ],
+          later: queueState.later.filter(t => t.id !== taskId),
+          laterCount: queueState.later.filter(t => t.id !== taskId).length
+        }
+        break
+      
+      case 'pin':
+        // Move task to NEXT if not already there, mark as pinned
+        // Type assertion needed for priority field update
+        if (task.priority !== 'next') {
+          newQueueState = {
+            now: queueState.now?.id === taskId ? null : queueState.now,
+            next: [
+              { ...task, priority: 'next' as DayPriority, is_pinned: true },
+              ...queueState.next.filter(t => t.id !== taskId)
+            ],
+            later: queueState.later.filter(t => t.id !== taskId),
+            laterCount: queueState.later.filter(t => t.id !== taskId).length
+          }
+        } else {
+          newQueueState = {
+            ...queueState,
+            next: queueState.next.map(t => 
+              t.id === taskId ? { ...t, is_pinned: true } : t
+            )
+          }
+        }
+        break
+      
+      case 'postpone':
+        // Move task to LATER
+        // Type assertion needed for priority field update
+        newQueueState = {
+          now: queueState.now?.id === taskId ? null : queueState.now,
+          next: queueState.next.filter(t => t.id !== taskId),
+          later: [
+            ...queueState.later,
+            { ...task, priority: 'later' as DayPriority, is_pinned: false }
+          ],
+          laterCount: queueState.later.length + 1
+        }
+        break
+    }
+
+    // Apply optimistic update immediately
+    setQueueState(newQueueState)
+
+    // Show immediate feedback
+    const actionMessages = {
+      pin: '📌 Zadanie przypięte do dzisiaj',
+      postpone: '🧊 Zadanie odłożone na później',
+      escalate: '🔥 Zadanie przeniesione do NOW jako mega ważne'
+    }
+    showToast(actionMessages[action], 'success')
+
     try {
+      // Fire API call in background
       const response = await apiPost('/api/day-assistant/actions', { taskId, action })
 
       if (response.ok) {
-        const actionEmojis = { pin: '📌', postpone: '🧊', escalate: '🔥' }
-        showToast(`Akcja ${actionEmojis[action]} wykonana`, 'success')
+        // API succeeded - invalidate cache and refresh to get accurate state from server
+        invalidateCache('/api/day-assistant/queue')
+        invalidateCache('/api/day-assistant/timeline')
         await refreshQueue()
+      } else {
+        // API failed - rollback to previous state
+        console.error('Action API failed, rolling back')
+        setQueueState(previousQueueState)
+        showToast('Błąd podczas wykonywania akcji', 'error')
       }
     } catch (error) {
+      // Network error - rollback to previous state
       console.error('Error performing action:', error)
+      setQueueState(previousQueueState)
       showToast('Błąd podczas wykonywania akcji', 'error')
     } finally {
       // Release action flag after short delay
@@ -300,15 +389,36 @@ export function DayAssistantView() {
     // Set action flag to disable autosync
     actionInProgressRef.current = true
 
+    // Store previous state for rollback
+    const previousQueueState = { ...queueState }
+
+    // Optimistic UI update - remove completed task immediately
+    const newQueueState: QueueState = {
+      now: queueState.now?.id === taskId ? null : queueState.now,
+      next: queueState.next.filter(t => t.id !== taskId),
+      later: queueState.later.filter(t => t.id !== taskId),
+      laterCount: queueState.later.filter(t => t.id !== taskId).length
+    }
+    
+    setQueueState(newQueueState)
+    showToast('Zadanie ukończone! 🎉', 'success')
+
     try {
       const response = await apiPut('/api/day-assistant/tasks', { taskId, completed: true })
 
       if (response.ok) {
-        showToast('Zadanie ukończone! 🎉', 'success')
+        // Invalidate cache and refresh to sync with server state
+        invalidateCache('/api/day-assistant/queue')
+        invalidateCache('/api/day-assistant/timeline')
         await refreshQueue()
+      } else {
+        // Rollback on failure
+        setQueueState(previousQueueState)
+        showToast('Błąd podczas oznaczania jako ukończone', 'error')
       }
     } catch (error) {
       console.error('Error completing task:', error)
+      setQueueState(previousQueueState)
       showToast('Błąd podczas oznaczania jako ukończone', 'error')
     } finally {
       // Release action flag after short delay
@@ -574,6 +684,7 @@ export function DayAssistantView() {
             {rightPanelView === 'timeline' && userId && (
               <DayTimeline
                 userId={userId}
+                queueState={queueState}
                 onRefresh={refreshQueue}
               />
             )}
