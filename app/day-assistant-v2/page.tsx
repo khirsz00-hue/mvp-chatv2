@@ -1,6 +1,6 @@
 /**
- * Test Day Assistant Page
- * Redirects to main page with test-day-assistant view active
+ * Day Assistant v2 Page
+ * Redirects to main page with day-assistant-v2 view active
  */
 
 'use client'
@@ -8,13 +8,13 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
-export default function TestDayAssistantPage() {
+export default function DayAssistantV2Page() {
   const router = useRouter()
   
   useEffect(() => {
-    // Redirect to main page and set active view to test-day-assistant
+    // Redirect to main page and set active view to day-assistant-v2
     try {
-      localStorage.setItem('active_assistant', 'test-day-assistant')
+      localStorage.setItem('active_assistant', 'day-assistant-v2')
     } catch {}
     router.push('/')
   }, [router])

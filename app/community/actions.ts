@@ -2,6 +2,46 @@
 
 import { createAuthenticatedSupabaseClient, getAuthenticatedUser } from '@/lib/supabaseAuth'
 import { revalidatePath } from 'next/cache'
+import { TAG_DEFINITIONS } from './tagDefinitions'
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function normalizeText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+}
+
+const NORMALIZED_TAG_DEFINITIONS = TAG_DEFINITIONS.map(def => ({
+  ...def,
+  keywords: def.keywords.map(normalizeText),
+  patterns: def.keywords.map(keyword => new RegExp(`\\b${escapeRegExp(normalizeText(keyword))}\\b`))
+}))
+
+function slugifyTagValue(value: string) {
+  if (!value || !value.trim()) return ''
+  return normalizeText(value)
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
+function generatePostTags(content: string) {
+  const normalizedContent = normalizeText(content)
+  const detected = new Set<string>()
+
+  for (const { tag, patterns } of NORMALIZED_TAG_DEFINITIONS) {
+    const match = patterns.some(pattern => pattern.test(normalizedContent))
+    if (match) {
+      detected.add(tag)
+    }
+  }
+
+  return Array.from(detected)
+}
 
 /**
  * Create a new post in the community
@@ -23,11 +63,15 @@ export async function createPost(content: string, isAnonymous: boolean = true) {
       return { error: 'Post nie może być dłuższy niż 2000 znaków' }
     }
 
+    const trimmedContent = content.trim()
+    const tags = generatePostTags(trimmedContent)
+
     const { data, error } = await supabase
       .from('posts')
       .insert({
         author_id: user.id,
-        content: content.trim(),
+        content: trimmedContent,
+        tags,
         is_anonymous: isAnonymous,
         status: 'active'
       })
@@ -220,8 +264,9 @@ export async function likeComment(commentId: string, postId: string) {
 /**
  * Fetch posts for the community feed (chronologically)
  */
-export async function getPosts(limit: number = 50) {
+export async function getPosts(options: { limit?: number; search?: string; tag?: string } = {}) {
   try {
+    const { limit = 50, search, tag } = options
     const supabase = await createAuthenticatedSupabaseClient()
     const user = await getAuthenticatedUser(supabase)
 
@@ -229,19 +274,77 @@ export async function getPosts(limit: number = 50) {
       return { error: 'Musisz być zalogowany, aby przeglądać posty' }
     }
 
-    const { data: posts, error } = await supabase
-      .from('posts')
-      .select('*')
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-      .limit(limit)
+    const buildBaseQuery = () =>
+      supabase
+        .from('posts')
+        .select('*')
+        .eq('status', 'active')
 
-    if (error) {
-      console.error('Error fetching posts:', error)
+    const tagFilter = tag ? slugifyTagValue(tag) : ''
+    const hasSearch = !!(search && search.trim())
+
+    let posts = []
+    let queryError = null as any
+
+    if (hasSearch) {
+      const safeSearch = search.trim()
+      const sanitized = safeSearch
+        .replace(/[^\p{L}\p{N}\s-]/gu, '')
+      const normalizedTagTerm = slugifyTagValue(sanitized)
+
+      if (normalizedTagTerm) {
+        const perQueryLimit = Math.max(1, Math.ceil(limit / 2))
+        const [contentResult, tagResult] = await Promise.all([
+          buildBaseQuery()
+            .ilike('content', `%${sanitized}%`)
+            .order('created_at', { ascending: false })
+            .limit(perQueryLimit),
+          buildBaseQuery()
+            .contains('tags', [normalizedTagTerm])
+            .order('created_at', { ascending: false })
+            .limit(perQueryLimit)
+        ])
+
+        queryError = contentResult.error || tagResult.error
+        const merged = [...(contentResult.data || []), ...(tagResult.data || [])]
+        const seen = new Set<string>()
+        posts = merged.filter(post => {
+          if (seen.has(post.id)) return false
+          seen.add(post.id)
+          return true
+        })
+        posts = posts
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+          .slice(0, limit)
+      } else {
+        const { data, error } = await buildBaseQuery()
+          .ilike('content', `%${sanitized}%`)
+          .order('created_at', { ascending: false })
+          .limit(limit)
+        queryError = error
+        posts = data || []
+      }
+    } else if (tagFilter) {
+      const { data, error } = await buildBaseQuery()
+        .contains('tags', [tagFilter])
+        .order('created_at', { ascending: false })
+        .limit(limit)
+      queryError = error
+      posts = data || []
+    } else {
+      const { data, error } = await buildBaseQuery()
+        .order('created_at', { ascending: false })
+        .limit(limit)
+      queryError = error
+      posts = data || []
+    }
+
+    if (queryError) {
+      console.error('Error fetching posts:', queryError)
       return { error: 'Nie udało się pobrać postów' }
     }
 
-    if (posts.length === 0) {
+    if (!posts || posts.length === 0) {
       return { data: [] }
     }
 
@@ -259,6 +362,7 @@ export async function getPosts(limit: number = 50) {
     // Add liked status to posts
     const postsWithLikes = posts.map(post => ({
       ...post,
+      tags: post.tags || [],
       isLiked: likedPostIds.has(post.id)
     }))
 
@@ -336,9 +440,11 @@ export async function getPost(postId: string) {
       isLiked: likedCommentIds.has(comment.id)
     }))
 
+    const postWithTags = { ...post, tags: post.tags || [] }
+
     return {
       data: {
-        post: { ...post, isLiked: !!postLike },
+        post: { ...postWithTags, isLiked: !!postLike },
         comments: commentsWithLikes
       }
     }

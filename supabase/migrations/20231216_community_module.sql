@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS posts (
   author_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   is_anonymous BOOLEAN DEFAULT TRUE,
   content TEXT NOT NULL,
+  tags TEXT[] DEFAULT '{}',
   like_count INTEGER DEFAULT 0,
   comment_count INTEGER DEFAULT 0,
   status TEXT CHECK (status IN ('active', 'hidden', 'reported')) DEFAULT 'active'
@@ -45,6 +46,7 @@ CREATE TABLE IF NOT EXISTS helper_scores (
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_posts_status ON posts(status);
+CREATE INDEX IF NOT EXISTS idx_posts_tags ON posts USING GIN(tags);
 CREATE INDEX IF NOT EXISTS idx_comments_post_id ON comments(post_id);
 CREATE INDEX IF NOT EXISTS idx_comments_created_at ON comments(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_likes_user_id ON likes(user_id);

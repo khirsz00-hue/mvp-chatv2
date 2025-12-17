@@ -1,13 +1,13 @@
 /**
- * API Route: /api/test-day-assistant/init
- * POST: Initialize test day assistant for user
+ * API Route: /api/day-assistant-v2/init
+ * POST: Initialize day assistant v2 for user
  * Returns confirmation message
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { getOrCreateTestDayAssistant } from '@/lib/services/testDayAssistantService'
-import { DEFAULT_SETTINGS } from '@/lib/types/testDayAssistant'
+import { getOrCreateDayAssistantV2 } from '@/lib/services/dayAssistantV2Service'
+import { DEFAULT_SETTINGS } from '@/lib/types/dayAssistantV2'
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Create or get the assistant
-    const assistant = await getOrCreateTestDayAssistant(user.id)
+    const assistant = await getOrCreateDayAssistantV2(user.id)
     
     if (!assistant) {
       return NextResponse.json(
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       message: confirmationMessage
     })
   } catch (error) {
-    console.error('Error in POST /api/test-day-assistant/init:', error)
+    console.error('Error in POST /api/day-assistant-v2/init:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
       .from('assistant_config')
       .select('*')
       .eq('user_id', user.id)
-      .eq('name', 'asystent dnia test')
+      .eq('name', 'asystent dnia v2')
       .maybeSingle()
     
     if (error) {
@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
       message: generateConfirmationMessage(assistant)
     })
   } catch (error) {
-    console.error('Error in GET /api/test-day-assistant/init:', error)
+    console.error('Error in GET /api/day-assistant-v2/init:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -115,7 +115,7 @@ function generateConfirmationMessage(assistant: any): string {
   const morningBlock = settings.morning_must_block_default || DEFAULT_SETTINGS.morning_must_block_default
   
   // Required confirmation message
-  const confirmation = 'Utworzyłem asystenta: asystent dnia test — gotowy do działania'
+  const confirmation = 'Utworzyłem asystenta: asystent dnia v2 — gotowy do działania'
   
   // Keep detailed settings context for clients that display more info
   return `${confirmation}. Domyślne ustawienia: undo ${undoWindow}s, max_postpones_before_escalation ${maxPostpones}, morning_must_block ${morningBlock} min. Chcesz zmienić progi lub presety?`
