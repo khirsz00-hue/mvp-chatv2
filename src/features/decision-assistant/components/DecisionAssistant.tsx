@@ -356,8 +356,8 @@ export function DecisionAssistant() {
 }
 
 // Helper functions
-function getHatEmoji(hat:  string): string {
-  const emojis:  Record<string, string> = {
+function getHatEmoji(hat: string): string {
+  const emojis: Record<string, string> = {
     blue: '🔵',
     white: '⚪',
     red: '🔴',
