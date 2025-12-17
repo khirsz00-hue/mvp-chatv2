@@ -10,10 +10,13 @@ import {
   PushPin, 
   CheckCircle, 
   Clock,
-  Brain
+  Brain,
+  Timer,
+  ChatCircle
 } from '@phosphor-icons/react'
 import { DayTask, DayPriority, TASK_ACTION_EMOJI } from '@/lib/types/dayAssistant'
 import { cn } from '@/lib/utils'
+import { useTaskTimer } from '@/components/assistant/TaskTimer'
 
 interface DayTaskCardProps {
   task: DayTask
@@ -23,6 +26,8 @@ interface DayTaskCardProps {
   onEscalate: () => void
   onComplete: () => void
   onGenerateSubtasks: () => void
+  onStartTimer?: () => void
+  onOpenChat?: () => void
 }
 
 /**
@@ -37,14 +42,25 @@ export function DayTaskCard({
   onPostpone,
   onEscalate,
   onComplete,
-  onGenerateSubtasks
+  onGenerateSubtasks,
+  onStartTimer,
+  onOpenChat
 }: DayTaskCardProps) {
   const [showActions, setShowActions] = useState(false)
   const [showSubtasks, setShowSubtasks] = useState(section === 'now')
+  const { startTimer } = useTaskTimer()
 
   const hasSubtasks = task.subtasks && task.subtasks.length > 0
   const completedSubtasks = task.subtasks?.filter(s => s.completed).length || 0
   const totalSubtasks = task.subtasks?.length || 0
+  
+  const handleStartTimer = () => {
+    if (onStartTimer) {
+      onStartTimer()
+    } else {
+      startTimer(task.id, task.title)
+    }
+  }
 
   return (
     <Card 
@@ -134,6 +150,30 @@ export function DayTaskCard({
             'flex flex-col gap-2 transition-opacity',
             showActions || section === 'now' ? 'opacity-100' : 'opacity-0'
           )}>
+            {/* 💬 Chat */}
+            {onOpenChat && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onOpenChat}
+                title="Otwórz czat o zadaniu"
+                className="text-blue-600 hover:bg-blue-50"
+              >
+                <ChatCircle size={20} />
+              </Button>
+            )}
+
+            {/* ⏱️ Timer */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleStartTimer}
+              title="Włącz timer"
+              className="text-purple-600 hover:bg-purple-50"
+            >
+              <Timer size={20} />
+            </Button>
+
             {/* 🧠 Generate Subtasks */}
             <Button
               variant="ghost"
@@ -184,7 +224,7 @@ export function DayTaskCard({
             )}
 
             {/* ✅ Complete */}
-            {section === 'now' && (
+            {(section === 'now' || section === 'later') && (
               <Button
                 variant="ghost"
                 size="sm"

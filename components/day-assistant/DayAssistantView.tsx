@@ -11,6 +11,7 @@ import { CreateTaskModal } from './CreateTaskModal'
 import { SubtaskModal } from './SubtaskModal'
 import { DayChat } from './DayChat'
 import { DayTimeline } from './DayTimeline'
+import { TaskChatModal } from '@/components/assistant/TaskChatModal'
 import {
   DayTask,
   QueueState,
@@ -48,6 +49,8 @@ export function DayAssistantView() {
   const [selectedTask, setSelectedTask] = useState<DayTask | null>(null)
   const [showLaterExpanded, setShowLaterExpanded] = useState(false)
   const [rightPanelView, setRightPanelView] = useState<'timeline' | 'chat'>('chat')
+  const [showTaskChatModal, setShowTaskChatModal] = useState(false)
+  const [taskForChat, setTaskForChat] = useState<DayTask | null>(null)
   const showToastRef = useRef(showToast)
   
   // Debounce/lock mechanism for refreshQueue
@@ -383,6 +386,11 @@ export function DayAssistantView() {
     setShowSubtaskModal(true)
   }
 
+  const handleOpenTaskChat = (task: DayTask) => {
+    setTaskForChat(task)
+    setShowTaskChatModal(true)
+  }
+
   const handleCompleteTask = async (taskId: string) => {
     if (!userId) return
     
@@ -391,6 +399,7 @@ export function DayAssistantView() {
 
     // Store previous state for rollback
     const previousQueueState = { ...queueState }
+    const wasNowTask = queueState.now?.id === taskId
 
     // Optimistic UI update - remove completed task immediately
     const newQueueState: QueueState = {
@@ -411,6 +420,24 @@ export function DayAssistantView() {
         invalidateCache('/api/day-assistant/queue')
         invalidateCache('/api/day-assistant/timeline')
         await refreshQueue()
+        
+        // AUTO-PROMOTE: If NOW is empty and NEXT has tasks, promote first NEXT task
+        if (wasNowTask && queueState.next.length > 0) {
+          const nextTask = queueState.next[0]
+          showToast(`📌 Następne zadanie: ${nextTask.title}`, 'info')
+          
+          // Automatically move first NEXT task to NOW
+          const promoteResponse = await apiPost('/api/day-assistant/actions', {
+            taskId: nextTask.id,
+            action: 'promote_to_now'
+          })
+          
+          if (promoteResponse.ok) {
+            // Refresh queue to show promoted task
+            invalidateCache('/api/day-assistant/queue')
+            await refreshQueue()
+          }
+        }
       } else {
         // Rollback on failure
         setQueueState(previousQueueState)
@@ -530,6 +557,7 @@ export function DayAssistantView() {
                 onEscalate={() => handleTaskAction(queueState.now!.id, 'escalate')}
                 onComplete={() => handleCompleteTask(queueState.now!.id)}
                 onGenerateSubtasks={() => handleGenerateSubtasks(queueState.now!)}
+                onOpenChat={() => handleOpenTaskChat(queueState.now!)}
               />
             ) : (
               <div className="text-center py-8 text-muted-foreground">
@@ -561,6 +589,7 @@ export function DayAssistantView() {
                     onEscalate={() => handleTaskAction(task.id, 'escalate')}
                     onComplete={() => handleCompleteTask(task.id)}
                     onGenerateSubtasks={() => handleGenerateSubtasks(task)}
+                    onOpenChat={() => handleOpenTaskChat(task)}
                   />
                 ))}
               </div>
@@ -611,6 +640,7 @@ export function DayAssistantView() {
                     onEscalate={() => handleTaskAction(task.id, 'escalate')}
                     onComplete={() => handleCompleteTask(task.id)}
                     onGenerateSubtasks={() => handleGenerateSubtasks(task)}
+                    onOpenChat={() => handleOpenTaskChat(task)}
                   />
                 ))}
               </div>
@@ -711,6 +741,22 @@ export function DayAssistantView() {
             setSelectedTask(null)
           }}
           onGenerated={refreshQueue}
+        />
+      )}
+
+      {showTaskChatModal && taskForChat && (
+        <TaskChatModal
+          open={showTaskChatModal}
+          onClose={() => {
+            setShowTaskChatModal(false)
+            setTaskForChat(null)
+          }}
+          task={{
+            id: taskForChat.id,
+            content: taskForChat.title,
+            description: taskForChat.description || undefined,
+            priority: 1
+          }}
         />
       )}
     </div>
