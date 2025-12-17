@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
@@ -41,7 +41,7 @@ export function DecisionAssistant() {
   }, [])
 
   // Fetch decisions
-  const fetchDecisions = async () => {
+  const fetchDecisions = useCallback(async () => {
     if (!userId) return
 
     setLoading(true)
@@ -72,13 +72,13 @@ export function DecisionAssistant() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [userId, showToast])
 
   useEffect(() => {
     if (userId) {
       fetchDecisions()
     }
-  }, [userId])
+  }, [userId, fetchDecisions])
 
   // Create decision
   const handleCreateDecision = async () => {

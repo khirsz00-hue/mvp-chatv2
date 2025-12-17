@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { ArrowLeft, Trash } from '@phosphor-icons/react'
 import { Card, CardHeader, CardTitle, Button, Textarea } from '@/components/ui'
 import { Decision, DecisionOption, DecisionEvent } from '../types'
@@ -21,11 +21,7 @@ export function DecisionDetail({ decisionId, onBack }: DecisionDetailProps) {
   const [userInput, setUserInput] = useState('')
   const [aiResponse, setAiResponse] = useState('')
 
-  useEffect(() => {
-    loadDecision()
-  }, [decisionId])
-
-  const loadDecision = async () => {
+  const loadDecision = useCallback(async () => {
     try {
       const result = await DecisionService.getDecision(decisionId)
       setDecision(result.decision)
@@ -36,7 +32,11 @@ export function DecisionDetail({ decisionId, onBack }: DecisionDetailProps) {
     } catch (error) {
       console.error('Error loading decision:', error)
     }
-  }
+  }, [decisionId])
+
+  useEffect(() => {
+    loadDecision()
+  }, [loadDecision])
 
   const handleStartAnalysis = async () => {
     if (!decision) return
