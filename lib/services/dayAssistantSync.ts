@@ -7,6 +7,69 @@
 import { supabase } from '@/lib/supabaseClient'
 import { DayPriority } from '@/lib/types/dayAssistant'
 
+// Client-side token cache to avoid flapping between FOUND/MISSING
+let cachedTodoistToken: string | null = null
+let tokenCacheTimestamp: number = 0
+const TOKEN_CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+
+// Debounce log messages to reduce spam
+let lastMissingTokenLogTime = 0
+const MIN_LOG_INTERVAL = 30000 // 30 seconds
+
+/**
+ * Get cached Todoist token or fetch from database
+ * Caches token for 5 minutes to avoid repeated DB queries
+ */
+async function getCachedTodoistToken(userId: string): Promise<string | null> {
+  const now = Date.now()
+  
+  // Return cached token if still valid
+  if (cachedTodoistToken && (now - tokenCacheTimestamp) < TOKEN_CACHE_DURATION) {
+    return cachedTodoistToken
+  }
+  
+  // Try to get from localStorage first (fastest)
+  if (typeof window !== 'undefined') {
+    const localToken = localStorage.getItem('todoist_token')
+    if (localToken) {
+      cachedTodoistToken = localToken
+      tokenCacheTimestamp = now
+      return localToken
+    }
+  }
+  
+  // Fallback: fetch from database
+  try {
+    const { getTodoistToken } = await import('@/lib/integrations')
+    const token = await getTodoistToken(userId)
+    
+    if (token) {
+      // Cache the token both in memory and localStorage
+      cachedTodoistToken = token
+      tokenCacheTimestamp = now
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('todoist_token', token)
+      }
+    }
+    
+    return token
+  } catch (error) {
+    console.error('[getCachedTodoistToken] Error fetching token:', error)
+    return null
+  }
+}
+
+/**
+ * Clear cached token (call this when user disconnects Todoist)
+ */
+export function clearTodoistTokenCache() {
+  cachedTodoistToken = null
+  tokenCacheTimestamp = 0
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('todoist_token')
+  }
+}
+
 /**
  * Main sync function: Todoist → Day Assistant
  * 
@@ -14,17 +77,18 @@ import { DayPriority } from '@/lib/types/dayAssistant'
  */
 export async function syncWithTodoist(userId: string): Promise<{ success: boolean; taskCount: number }> {
   try {
-    // 1. Get token from localStorage (same as TasksAssistant)
-    const token = typeof window !== 'undefined' 
-      ? localStorage.getItem('todoist_token') 
-      : null
+    // 1. Get cached token (avoids DB flapping)
+    const token = await getCachedTodoistToken(userId)
     
     if (!token) {
-      console.warn('❌ [syncWithTodoist] No Todoist token in localStorage for user:', userId)
+      // Debounced logging to reduce spam
+      const now = Date.now()
+      if (now - lastMissingTokenLogTime > MIN_LOG_INTERVAL) {
+        console.warn('⚠️ [syncWithTodoist] Todoist token: MISSING – skipping sync')
+        lastMissingTokenLogTime = now
+      }
       return { success: false, taskCount: 0 }
     }
-    
-    console.log('✅ [syncWithTodoist] Todoist token found, syncing...')
     
     // 2. Fetch tasks from Todoist
     const response = await fetch('/api/todoist/tasks', {
@@ -243,13 +307,11 @@ export async function syncTaskToTodoist(
       return false
     }
     
-    // 2. Get Todoist token from localStorage
-    const token = typeof window !== 'undefined' 
-      ? localStorage.getItem('todoist_token') 
-      : null
+    // 2. Get cached Todoist token
+    const token = await getCachedTodoistToken(task.user_id)
     
     if (!token) {
-      console.warn('❌ [syncTaskToTodoist] No Todoist token in localStorage')
+      console.warn('⚠️ [syncTaskToTodoist] No Todoist token available')
       return false
     }
     
