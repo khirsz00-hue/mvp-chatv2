@@ -32,9 +32,9 @@ export async function generateSubtasks(
 
   // Determine number of subtasks based on detail level
   const subtaskCounts = {
-    minimum: 1,
-    standard: 2,
-    detailed: 3
+    minimum: 2,
+    standard: 4,  // Default to 4 steps for ADHD-friendly workflow
+    detailed: 6
   }
   const targetCount = subtaskCounts[detail_level]
 
@@ -118,9 +118,9 @@ ZASADY:
 - Unikaj ogólników jak "Przemyśl...", "Zastanów się..."
 - Każdy krok powinien przynosić widoczny postęp
 
-${detailLevel === 'minimum' ? 'Stwórz JEDEN najprostszy krok, który maksymalnie przybliży do celu.' : ''}
-${detailLevel === 'standard' ? 'Stwórz 1-2 kroki, które są praktyczne i wykonalne.' : ''}
-${detailLevel === 'detailed' ? 'Stwórz max 3 kroki, które dzielą zadanie na drobne elementy.' : ''}
+${detailLevel === 'minimum' ? 'Stwórz 2 najprostsze kroki, które maksymalnie przybliżą do celu.' : ''}
+${detailLevel === 'standard' ? 'Stwórz 4 kroki, które są praktyczne i wykonalne. To jest domyślny, najlepszy wybór.' : ''}
+${detailLevel === 'detailed' ? 'Stwórz 6 kroków, które dzielą zadanie na drobne elementy.' : ''}
 
 Zwróć JSON w formacie:
 {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedSupabaseClient, getAuthenticatedUser } from '@/lib/supabaseAuth'
-import { pinTaskToday, postponeTask, escalateTask } from '@/lib/services/dayAssistantService'
+import { pinTaskToday, postponeTask, escalateTask, promoteToNow } from '@/lib/services/dayAssistantService'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,6 +46,9 @@ export async function POST(request: NextRequest) {
         break
       case 'escalate':
         updatedTask = await escalateTask(user.id, taskId)
+        break
+      case 'promote_to_now':
+        updatedTask = await promoteToNow(user.id, taskId)
         break
       default:
         return NextResponse.json(

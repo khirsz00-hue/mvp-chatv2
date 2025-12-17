@@ -352,6 +352,29 @@ export async function escalateTask(userId: string, taskId: string): Promise<DayT
 }
 
 /**
+ * Promote task to NOW (auto-promotion from NEXT)
+ */
+export async function promoteToNow(userId: string, taskId: string): Promise<DayTask | null> {
+  const { data: currentTask } = await supabaseServer
+    .from('day_assistant_tasks')
+    .select('*')
+    .eq('id', taskId)
+    .single()
+
+  if (!currentTask) return null
+
+  const updatedTask = await updateTask(taskId, {
+    priority: 'now'
+  })
+
+  if (updatedTask) {
+    await recordTaskAction(userId, taskId, 'move_to_now', currentTask, updatedTask)
+  }
+
+  return updatedTask
+}
+
+/**
  * Record task action in history for undo functionality
  */
 async function recordTaskAction(

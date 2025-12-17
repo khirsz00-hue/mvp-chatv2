@@ -234,9 +234,9 @@ export const ENERGY_MODE_CONSTRAINTS: Record<EnergyMode, EnergyModeConstraints> 
 
 // Detail Level Descriptions
 export const DETAIL_LEVEL_DESCRIPTIONS: Record<DetailLevel, string> = {
-  minimum: 'Minimum (1 krok)',
-  standard: 'Standard (1-2 kroki)',
-  detailed: 'Dokładniej (max 3 kroki)'
+  minimum: 'Minimum (2 kroki)',
+  standard: 'Standard (4 kroki) ⭐',
+  detailed: 'Dokładniej (6 kroków)'
 }
 
 // Energy Mode Emoji Map

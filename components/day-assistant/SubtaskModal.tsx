@@ -6,6 +6,8 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { useToast } from '@/components/ui/Toast'
 import { ArrowDown, ArrowUp, XCircle, CheckCircle, ArrowsClockwise } from '@phosphor-icons/react'
+import { cn } from '@/lib/utils'
+import { useTaskTimer } from '@/components/assistant/TaskTimer'
 import {
   DayTask,
   EnergyMode,
@@ -38,6 +40,7 @@ export function SubtaskModal({
   onGenerated
 }: SubtaskModalProps) {
   const { showToast } = useToast()
+  const { startTimer } = useTaskTimer()
   const [detailLevel, setDetailLevel] = useState<DetailLevel>('standard')
   const [generatedSubtasks, setGeneratedSubtasks] = useState<GeneratedSubtask[]>([])
   const [loading, setLoading] = useState(false)
@@ -91,7 +94,7 @@ ${clarification.doneCriteria ? `- Kryteria ukończenia: ${clarification.doneCrit
     }
   }
 
-  const handleFeedback = async (feedback: 'ok' | 'simplify' | 'split_more' | 'regenerate' | 'clarify') => {
+  const handleFeedback = async (feedback: 'ok' | 'simplify' | 'split_more' | 'regenerate' | 'clarify', shouldStartTimer = false) => {
     try {
       // Record feedback (except for clarify which is a navigation action)
       if (feedback !== 'clarify') {
@@ -114,6 +117,13 @@ ${clarification.doneCriteria ? `- Kryteria ukończenia: ${clarification.doneCrit
 
         if (response.ok) {
           showToast('Kroki zapisane!', 'success')
+          
+          // Start timer if requested using the hook
+          if (shouldStartTimer) {
+            startTimer(task.id, task.title)
+            showToast('⏱️ Timer started!', 'success')
+          }
+          
           onGenerated()
           onClose()
         }
@@ -188,15 +198,36 @@ ${clarification.doneCriteria ? `- Kryteria ukończenia: ${clarification.doneCrit
               {generatedSubtasks.map((subtask, index) => (
                 <div
                   key={index}
-                  className="p-4 bg-gray-50 rounded-lg flex items-start gap-3"
+                  className={cn(
+                    'p-4 rounded-lg flex items-start gap-3 transition-all',
+                    index === 0 
+                      ? 'bg-brand-purple/10 border-2 border-brand-purple shadow-md' 
+                      : 'bg-gray-50 opacity-70'
+                  )}
                 >
-                  <Badge variant="default" className="shrink-0">
+                  <Badge 
+                    variant={index === 0 ? 'default' : 'outline'} 
+                    className={cn(
+                      'shrink-0',
+                      index === 0 && 'bg-brand-purple text-white'
+                    )}
+                  >
                     {index + 1}
                   </Badge>
                   <div className="flex-1">
-                    <p className="font-medium">{subtask.content}</p>
+                    {index === 0 && (
+                      <div className="text-xs font-semibold text-brand-purple mb-1 uppercase tracking-wide">
+                        ⭐ Teraz - Zaczynaj od tego
+                      </div>
+                    )}
+                    <p className={cn(
+                      'font-medium',
+                      index === 0 && 'text-lg'
+                    )}>
+                      {subtask.content}
+                    </p>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Szacowany czas: {subtask.estimated_duration} min
+                      ⏱️ {subtask.estimated_duration} min
                     </p>
                   </div>
                 </div>
@@ -280,12 +311,12 @@ ${clarification.doneCriteria ? `- Kryteria ukończenia: ${clarification.doneCrit
               <p className="text-sm font-medium">Co myślisz o tych krokach?</p>
               <div className="grid grid-cols-2 gap-3">
                 <Button
-                  onClick={() => handleFeedback('ok')}
+                  onClick={() => handleFeedback('ok', true)}
                   variant="default"
-                  className="w-full"
+                  className="w-full bg-brand-purple hover:bg-brand-purple/90"
                 >
                   <CheckCircle size={20} className="mr-2" />
-                  ✅ OK, START
+                  ✅ OK, START + ⏱️
                 </Button>
                 <Button
                   onClick={() => handleFeedback('regenerate')}

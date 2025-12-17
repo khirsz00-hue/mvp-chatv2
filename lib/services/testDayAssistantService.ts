@@ -156,12 +156,18 @@ export async function getTasks(
   }
   
   // Transform the data to match TestDayTask interface
-  const tasks = (data || []).map(task => ({
-    ...task,
-    subtasks: options?.includeSubtasks ? task.test_day_subtasks || [] : undefined
-  }))
+  if (!data) return []
   
-  return tasks as TestDayTask[]
+  // Map database records to TestDayTask with proper typing
+  const tasks = data.map((task) => {
+    const taskData = task as Record<string, any>
+    return {
+      ...taskData,
+      subtasks: options?.includeSubtasks ? taskData.test_day_subtasks || [] : undefined
+    }
+  }) as TestDayTask[]
+  
+  return tasks
 }
 
 /**
