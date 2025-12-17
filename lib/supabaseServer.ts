@@ -48,7 +48,10 @@ function createSupabaseServer(): SupabaseClient {
  */
 export const supabaseServer = new Proxy({} as SupabaseClient, {
   get: (target, prop, receiver) => {
-    const client = createSupabaseServer()
-    return Reflect.get(client, prop, client)
+    // Initialize client on first access and store reference in target
+    if (!cachedClient) {
+      createSupabaseServer()
+    }
+    return Reflect.get(cachedClient!, prop, cachedClient)
   }
 })
