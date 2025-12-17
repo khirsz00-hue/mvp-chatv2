@@ -76,10 +76,33 @@ export async function DELETE(
     }
 
     // Backup related rows for a best-effort rollback if something fails mid-way
-    const [{ data: eventsBackup }, { data: optionsBackup }] = await Promise.all([
+    const [
+      { data: eventsBackup, error: eventsBackupError },
+      { data: optionsBackup, error: optionsBackupError }
+    ] = await Promise.all([
       supabase.from('decision_events').select('*').eq('decision_id', params.id),
       supabase.from('decision_options').select('*').eq('decision_id', params.id)
     ])
+
+    if (eventsBackupError || optionsBackupError) {
+      throw new Error('Failed to backup related records before deletion')
+    }
+
+    const restoreEvents = async () => {
+      if (!eventsBackup?.length) return
+      const { error } = await supabase.from('decision_events').insert(eventsBackup)
+      if (error) {
+        console.error('Rollback failed for decision_events:', error)
+      }
+    }
+
+    const restoreOptions = async () => {
+      if (!optionsBackup?.length) return
+      const { error } = await supabase.from('decision_options').insert(optionsBackup)
+      if (error) {
+        console.error('Rollback failed for decision_options:', error)
+      }
+    }
 
     let eventsDeleted = false
     let optionsDeleted = false
@@ -101,8 +124,8 @@ export async function DELETE(
       .eq('decision_id', params.id)
 
     if (optionsError) {
-      if (eventsDeleted && eventsBackup?.length) {
-        await supabase.from('decision_events').insert(eventsBackup)
+      if (eventsDeleted) {
+        await restoreEvents()
       }
       throw new Error(`Failed to delete decision options: ${optionsError.message}`)
     }
@@ -117,11 +140,11 @@ export async function DELETE(
       .select()
 
     if (error) {
-      if (eventsDeleted && eventsBackup?.length) {
-        await supabase.from('decision_events').insert(eventsBackup)
+      if (eventsDeleted) {
+        await restoreEvents()
       }
-      if (optionsDeleted && optionsBackup?.length) {
-        await supabase.from('decision_options').insert(optionsBackup)
+      if (optionsDeleted) {
+        await restoreOptions()
       }
       throw new Error(`Failed to delete decision: ${error.message}`)
     }

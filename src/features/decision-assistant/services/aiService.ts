@@ -286,7 +286,7 @@ Tworzysz pomocne, konkretne podsumowania w języku polskim. Odpowiadasz zawsze w
           }
         ],
         temperature: 0.7,
-        max_tokens: 900,
+        max_tokens: 1200,
         response_format: { type: 'json_object' }
       })
 
