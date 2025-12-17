@@ -20,7 +20,7 @@ import {
 } from '@/lib/types/dayAssistant'
 import { supabase } from '@/lib/supabaseClient'
 import { syncWithTodoist, shouldSync } from '@/lib/services/dayAssistantSync'
-import { apiGet, apiPost, apiPut } from '@/lib/api'
+import { apiGet, apiPost, apiPut, invalidateCache } from '@/lib/api'
 
 /**
  * Main Day Assistant View
@@ -159,7 +159,8 @@ export function DayAssistantView() {
 
     try {
       const url = `/api/day-assistant/queue${includeLater ? '?includeLater=true' : ''}`
-      const response = await apiGet(url)
+      // Use caching with short TTL for queue fetches to reduce redundant requests
+      const response = await apiGet(url, {}, { cache: true, ttl: 3000 })
       if (response.ok) {
         const queue = await response.json()
         setQueueState(queue)
@@ -351,7 +352,9 @@ export function DayAssistantView() {
       const response = await apiPost('/api/day-assistant/actions', { taskId, action })
 
       if (response.ok) {
-        // API succeeded - refresh to get accurate state from server
+        // API succeeded - invalidate cache and refresh to get accurate state from server
+        invalidateCache('/api/day-assistant/queue')
+        invalidateCache('/api/day-assistant/timeline')
         await refreshQueue()
       } else {
         // API failed - rollback to previous state
@@ -401,7 +404,9 @@ export function DayAssistantView() {
       const response = await apiPut('/api/day-assistant/tasks', { taskId, completed: true })
 
       if (response.ok) {
-        // Refresh to sync with server state
+        // Invalidate cache and refresh to sync with server state
+        invalidateCache('/api/day-assistant/queue')
+        invalidateCache('/api/day-assistant/timeline')
         await refreshQueue()
       } else {
         // Rollback on failure

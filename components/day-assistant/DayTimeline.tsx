@@ -14,7 +14,7 @@ import Button from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { format, parseISO, addMinutes } from 'date-fns'
 import { pl } from 'date-fns/locale'
-import { apiGet, apiPost } from '@/lib/api'
+import { apiGet, apiPost, invalidateCache } from '@/lib/api'
 
 interface TimelineEvent {
   id: string
@@ -164,7 +164,8 @@ export function DayTimeline({
     const timeoutId = setTimeout(async () => {
       setIsRecalculating(true)
       try {
-        const response = await apiGet(`/api/day-assistant/timeline?date=${today}&includeAll=false`)
+        // Use cache with short TTL for timeline refreshes
+        const response = await apiGet(`/api/day-assistant/timeline?date=${today}&includeAll=false`, {}, { cache: true, ttl: 3000 })
         if (response.ok) {
           const data = await response.json()
           // Smooth update - only if events actually changed
@@ -192,6 +193,8 @@ export function DayTimeline({
       const response = await apiPost('/api/day-assistant/timeline/approve', { eventId: event.id })
       
       if (response.ok) {
+        // Invalidate timeline cache
+        invalidateCache('/api/day-assistant/timeline')
         // Optimistically update local state instead of full refresh
         setEvents(prev => prev.map(e => 
           e.id === event.id ? { ...e, type: EVENT_TYPE_TASK_BLOCK } : e
@@ -215,6 +218,8 @@ export function DayTimeline({
       const response = await apiPost('/api/day-assistant/timeline/reject', { eventId: event.id })
 
       if (response.ok) {
+        // Invalidate timeline cache
+        invalidateCache('/api/day-assistant/timeline')
         // Optimistically remove from local state instead of full refresh
         setEvents(prev => prev.filter(e => e.id !== event.id))
         // Only refresh queue if callback provided (debounced by parent)
