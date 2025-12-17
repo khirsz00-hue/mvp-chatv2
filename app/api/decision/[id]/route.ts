@@ -94,7 +94,7 @@ export async function DELETE(
       throw new Error(`Failed to delete decision options: ${optionsError.message}`)
     }
 
-    // Delete decision using authenticated client
+    // Finally delete decision using authenticated client
     const { data, error } = await supabase
       .from('decisions')
       .delete()
