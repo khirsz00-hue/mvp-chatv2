@@ -46,19 +46,22 @@ async function getCachedTodoistToken(userId: string): Promise<string | null> {
 ### 2. Refresh Debouncing (`components/day-assistant/DayAssistantView.tsx`)
 
 **Changes:**
-- Added separate `refreshing` state for light refreshes (no global spinner)
 - Implemented `refreshLockRef` to prevent concurrent calls
-- Added 500ms debounce after refresh completes
+- Configurable debounce timing via `REFRESH_DEBOUNCE_MS` constant (500ms)
 - Cleanup effect for refresh timeout on unmount
+- Fixed race condition by clearing existing timeout before setting new one
 
 **Benefits:**
 - ✅ No more concurrent refresh race conditions
-- ✅ Actions trigger light refresh (no full-screen spinner)
+- ✅ Actions don't show full-screen spinner (only initial load does)
 - ✅ Prevents rapid-fire refresh calls
 - ✅ UI remains interactive during refresh
 
 **Code:**
 ```typescript
+// Debounce timing constant
+const REFRESH_DEBOUNCE_MS = 500
+
 const refreshLockRef = useRef(false)
 const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -70,16 +73,18 @@ const refreshQueue = useCallback(async (includeLater = false) => {
   }
   
   refreshLockRef.current = true
-  setRefreshing(true) // Light refresh indicator, not global loading
   
   try {
     // Fetch queue...
   } finally {
-    setRefreshing(false)
-    // Release lock after 500ms debounce
+    // Clear any pending timeout before setting new one (prevent race conditions)
+    if (refreshTimeoutRef.current) {
+      clearTimeout(refreshTimeoutRef.current)
+    }
+    // Release lock after debounce period
     refreshTimeoutRef.current = setTimeout(() => {
       refreshLockRef.current = false
-    }, 500)
+    }, REFRESH_DEBOUNCE_MS)
   }
 }, [userId])
 ```
@@ -144,7 +149,7 @@ const refreshQueue = useCallback(async (includeLater = false) => {
 
 ### State Management
 - **Initial Load**: `loading` state (shows full spinner)
-- **Light Refresh**: `refreshing` state (no spinner, optional indicator)
+- **Light Refresh**: No loading state (no spinner shown during refresh)
 - **Refresh Lock**: `refreshLockRef` (prevents concurrent calls)
 - **Token Cache**: In-memory + localStorage (dual-layer cache)
 
