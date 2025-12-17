@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import Button from '@/components/ui/Button'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card'
@@ -57,9 +57,64 @@ export default function ProfilePage() {
   const { showToast } = useToast()
   const router = useRouter()
 
+  const loadData = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/login')
+        return
+      }
+
+      // Load profile with integration tokens
+      const { data: profileData } = await supabase
+        .from('user_profiles')
+        .select('*, todoist_token, google_access_token, google_token_expiry')
+        .eq('id', user.id)
+        .single()
+
+      if (profileData) {
+        setProfile(profileData)
+      }
+
+      // Get user's authentication providers
+      const providers = (user.identities?.map(identity => identity.provider) || []) as AuthProvider[]
+      setAuthProviders(providers)
+
+      // Load journal entries
+      const { data: journalData } = await supabase
+        .from('journal_entries')
+        .select('id, content, created_at')
+        .eq('user_id', user.id)
+        .eq('archived', false)
+        .order('created_at', { ascending: false })
+        .limit(10)
+
+      if (journalData) {
+        setJournalEntries(journalData)
+      }
+
+      // Load AI insights
+      const { data: insightsData } = await supabase
+        .from('ai_insights')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10)
+
+      if (insightsData) {
+        setInsights(insightsData)
+      }
+    } catch (error) {
+      console.error('Error loading data:', error)
+      showToast('Błąd podczas ładowania danych', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }, [router, showToast])
+
   useEffect(() => {
     loadData()
-  }, [])
+  }, [loadData])
 
   const handleConnectTodoist = async () => {
     setConnectingTodoist(true)
@@ -165,61 +220,6 @@ export default function ProfilePage() {
       showToast(error.message || 'Błąd podczas aktualizacji hasła', 'error')
     } finally {
       setUpdatingPassword(false)
-    }
-  }
-
-  const loadData = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
-
-      // Load profile with integration tokens
-      const { data: profileData } = await supabase
-        .from('user_profiles')
-        .select('*, todoist_token, google_access_token, google_token_expiry')
-        .eq('id', user.id)
-        .single()
-
-      if (profileData) {
-        setProfile(profileData)
-      }
-
-      // Get user's authentication providers
-      const providers = (user.identities?.map(identity => identity.provider) || []) as AuthProvider[]
-      setAuthProviders(providers)
-
-      // Load journal entries
-      const { data: journalData } = await supabase
-        .from('journal_entries')
-        .select('id, content, created_at')
-        .eq('user_id', user.id)
-        .eq('archived', false)
-        .order('created_at', { ascending: false })
-        .limit(10)
-
-      if (journalData) {
-        setJournalEntries(journalData)
-      }
-
-      // Load AI insights
-      const { data: insightsData } = await supabase
-        .from('ai_insights')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(10)
-
-      if (insightsData) {
-        setInsights(insightsData)
-      }
-    } catch (error) {
-      console.error('Error loading data:', error)
-      showToast('Błąd podczas ładowania danych', 'error')
-    } finally {
-      setLoading(false)
     }
   }
 
