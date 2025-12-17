@@ -63,7 +63,7 @@ async function fetchAndFilterTasks(token: any, filter: string, date?: string) {
         labels: t.labels || [],
         duration: t.duration || null,
         completed: true,
-        completed_at: t.completed_at,
+        completed_at: t.completed_at || null,
       }))
       
       return simplified
@@ -99,8 +99,8 @@ async function fetchAndFilterTasks(token: any, filter: string, date?: string) {
     const sevenDaysEnd = endOfDay(addDays(todayStart, 6))
 
     const filtered = allTasks.filter((t: any) => {
-      // Todoist REST v2 tasks are open; some SDKs may still return completed/is_completed flags
-      if (t?.completed === true || t?.is_completed === true) {
+      // Todoist REST v2 tasks are open; some SDKs may still return completed/is_completed/completed_at flags
+      if (t?.completed === true || t?.is_completed === true || t?.completed_at) {
         return false
       }
       // unify due source: Todoist may return object with .date or a string

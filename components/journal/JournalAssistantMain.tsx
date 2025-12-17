@@ -20,7 +20,8 @@ import {
 import { format } from 'date-fns'
 
 // OAuth expiry can be stored in ms or seconds depending on provider; anything below
-// this threshold is treated as seconds and converted to ms for consistent comparisons.
+// this threshold (~Sep 2001 in ms) is treated as seconds and converted to ms so
+// we compare timestamps consistently.
 const SECONDS_MS_THRESHOLD = 1e12
 const ALL_DAY_LABEL = 'Cały dzień'
 
@@ -299,7 +300,7 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
   const formatEventTimeRange = (start?: string, end?: string) => {
     const startLabel = formatEventTime(start)
     const endLabel = formatEventTime(end)
-    if (startLabel && endLabel) return `${startLabel}${endLabel ? `-${endLabel}` : ''}`
+    if (startLabel && endLabel) return `${startLabel}-${endLabel}`
     return startLabel || endLabel || ''
   }
 
