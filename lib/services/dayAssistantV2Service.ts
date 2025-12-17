@@ -1,5 +1,5 @@
 /**
- * Test Day Assistant Service
+ * Day Assistant v2 Service
  * Core business logic for the enhanced day planner
  */
 
@@ -17,12 +17,12 @@ import {
   AssistantSettings,
   DecisionContext,
   ProposalAction
-} from '@/lib/types/testDayAssistant'
+} from '@/lib/types/dayAssistantV2'
 
 /**
- * Create or get the test day assistant for a user
+ * Create or get the day assistant v2 for a user
  */
-export async function getOrCreateTestDayAssistant(
+export async function getOrCreateDayAssistantV2(
   userId: string,
   client?: SupabaseClient
 ): Promise<AssistantConfig | null> {
@@ -33,7 +33,7 @@ export async function getOrCreateTestDayAssistant(
     .from('assistant_config')
     .select('*')
     .eq('user_id', userId)
-    .eq('name', 'asystent dnia test')
+    .eq('name', 'asystent dnia v2')
     .single()
   
   if (existing && !fetchError) {
@@ -45,7 +45,7 @@ export async function getOrCreateTestDayAssistant(
     .from('assistant_config')
     .insert({
       user_id: userId,
-      name: 'asystent dnia test',
+      name: 'asystent dnia v2',
       type: 'day_planner',
       settings: DEFAULT_SETTINGS,
       is_active: true

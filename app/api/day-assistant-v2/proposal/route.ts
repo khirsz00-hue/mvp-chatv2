@@ -1,17 +1,17 @@
 /**
- * API Route: /api/test-day-assistant/proposal
+ * API Route: /api/day-assistant-v2/proposal
  * POST: Respond to a proposal (accept/reject)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import {
-  getOrCreateTestDayAssistant,
+  getOrCreateDayAssistantV2,
   respondToProposal,
   updateTask
-} from '@/lib/services/testDayAssistantService'
+} from '@/lib/services/dayAssistantV2Service'
 import { supabaseServer } from '@/lib/supabaseServer'
-import type { Proposal, ProposalAction } from '@/lib/types/testDayAssistant'
+import type { Proposal, ProposalAction } from '@/lib/types/dayAssistantV2'
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Get assistant
-    const assistant = await getOrCreateTestDayAssistant(user.id)
+    const assistant = await getOrCreateDayAssistantV2(user.id)
     if (!assistant) {
       return NextResponse.json({ error: 'Failed to get assistant' }, { status: 500 })
     }
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
         : 'Propozycja zaakceptowana i zastosowana'
     })
   } catch (error) {
-    console.error('Error in POST /api/test-day-assistant/proposal:', error)
+    console.error('Error in POST /api/day-assistant-v2/proposal:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

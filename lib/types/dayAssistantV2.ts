@@ -1,5 +1,5 @@
 /**
- * Test Day Assistant - Type Definitions
+ * Day Assistant v2 - Type Definitions
  * Enhanced day planner with dual sliders, ADHD-friendly features, and live replanning
  */
 
@@ -25,7 +25,7 @@ export interface AssistantSettings {
   auto_decompose_threshold?: number  // minutes, default 60
 }
 
-// Test Day Assistant Task
+// Day Assistant v2 Task
 export interface TestDayTask {
   id: string
   user_id: string
