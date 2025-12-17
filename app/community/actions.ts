@@ -241,6 +241,10 @@ export async function getPosts(limit: number = 50) {
       return { error: 'Nie udało się pobrać postów' }
     }
 
+    if (posts.length === 0) {
+      return { data: [] }
+    }
+
     // Get user's likes for these posts
     const postIds = posts.map(p => p.id)
     const { data: userLikes } = await supabase
@@ -313,14 +317,18 @@ export async function getPost(postId: string) {
       .single()
 
     const commentIds = comments.map(c => c.id)
-    const { data: commentLikes } = await supabase
-      .from('likes')
-      .select('target_id')
-      .eq('user_id', user.id)
-      .eq('target_type', 'comment')
-      .in('target_id', commentIds)
+    let likedCommentIds = new Set<string>()
 
-    const likedCommentIds = new Set(commentLikes?.map(l => l.target_id) || [])
+    if (commentIds.length > 0) {
+      const { data: commentLikes } = await supabase
+        .from('likes')
+        .select('target_id')
+        .eq('user_id', user.id)
+        .eq('target_type', 'comment')
+        .in('target_id', commentIds)
+
+      likedCommentIds = new Set(commentLikes?.map(l => l.target_id) || [])
+    }
 
     // Add liked status
     const commentsWithLikes = comments.map(comment => ({
