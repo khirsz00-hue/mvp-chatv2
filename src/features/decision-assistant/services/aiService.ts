@@ -252,7 +252,7 @@ Na podstawie powyższej analizy Six Thinking Hats, wygeneruj kompletne podsumowa
     "Drugi krok (<=10 słów)",
     "Trzeci krok (<=10 słów)"
   ],
-  "recommendation": "3-5 bardzo krótkich punktów (oddzielone \\n) w prostym języku, bez dygresji"
+  "recommendation": "3-5 bardzo krótkich punktów (każdy w nowej linii) w prostym języku, bez dygresji"
 }
 
 WAŻNE:

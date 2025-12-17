@@ -75,6 +75,15 @@ export async function DELETE(
       )
     }
 
+    // Backup related rows for a best-effort rollback if something fails mid-way
+    const [{ data: eventsBackup }, { data: optionsBackup }] = await Promise.all([
+      supabase.from('decision_events').select('*').eq('decision_id', params.id),
+      supabase.from('decision_options').select('*').eq('decision_id', params.id)
+    ])
+
+    let eventsDeleted = false
+    let optionsDeleted = false
+
     // Clean up related data first to avoid constraint errors
     const { error: eventsError } = await supabase
       .from('decision_events')
@@ -84,6 +93,7 @@ export async function DELETE(
     if (eventsError) {
       throw new Error(`Failed to delete decision events: ${eventsError.message}`)
     }
+    eventsDeleted = true
 
     const { error: optionsError } = await supabase
       .from('decision_options')
@@ -91,8 +101,12 @@ export async function DELETE(
       .eq('decision_id', params.id)
 
     if (optionsError) {
+      if (eventsDeleted && eventsBackup?.length) {
+        await supabase.from('decision_events').insert(eventsBackup)
+      }
       throw new Error(`Failed to delete decision options: ${optionsError.message}`)
     }
+    optionsDeleted = true
 
     // Finally delete decision using authenticated client
     const { data, error } = await supabase
@@ -103,6 +117,12 @@ export async function DELETE(
       .select()
 
     if (error) {
+      if (eventsDeleted && eventsBackup?.length) {
+        await supabase.from('decision_events').insert(eventsBackup)
+      }
+      if (optionsDeleted && optionsBackup?.length) {
+        await supabase.from('decision_options').insert(optionsBackup)
+      }
       throw new Error(`Failed to delete decision: ${error.message}`)
     }
 
