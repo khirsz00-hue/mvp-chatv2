@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/Toast'
 import { useRouter } from 'next/navigation'
 import { User, Notebook, Sparkle, CreditCard, Link as LinkIcon, CheckCircle, XCircle, LockKey } from '@phosphor-icons/react'
 import Input from '@/components/ui/Input'
+import { MIN_PASSWORD_LENGTH, AUTH_PROVIDER_NAMES, type AuthProvider } from '@/lib/authConstants'
 import { format } from 'date-fns'
 import { pl } from 'date-fns/locale'
 
@@ -52,7 +53,7 @@ export default function ProfilePage() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [updatingPassword, setUpdatingPassword] = useState(false)
-  const [authProviders, setAuthProviders] = useState<string[]>([])
+  const [authProviders, setAuthProviders] = useState<AuthProvider[]>([])
   const { showToast } = useToast()
   const router = useRouter()
 
@@ -129,8 +130,8 @@ export default function ProfilePage() {
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!newPassword || newPassword.length < 6) {
-      showToast('Hasło musi mieć co najmniej 6 znaków', 'error')
+    if (!newPassword || newPassword.length < MIN_PASSWORD_LENGTH) {
+      showToast(`Hasło musi mieć co najmniej ${MIN_PASSWORD_LENGTH} znaków`, 'error')
       return
     }
     
@@ -187,7 +188,7 @@ export default function ProfilePage() {
       }
 
       // Get user's authentication providers
-      const providers = user.identities?.map(identity => identity.provider) || []
+      const providers = (user.identities?.map(identity => identity.provider) || []) as AuthProvider[]
       setAuthProviders(providers)
 
       // Load journal entries
@@ -560,11 +561,11 @@ export default function ProfilePage() {
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
                           placeholder="Wprowadź nowe hasło"
-                          minLength={6}
+                          minLength={MIN_PASSWORD_LENGTH}
                           disabled={updatingPassword}
                         />
                         <p className="text-xs text-muted-foreground mt-1">
-                          Minimum 6 znaków
+                          Minimum {MIN_PASSWORD_LENGTH} znaków
                         </p>
                       </div>
                       
@@ -578,7 +579,7 @@ export default function ProfilePage() {
                           value={confirmPassword}
                           onChange={(e) => setConfirmPassword(e.target.value)}
                           placeholder="Potwierdź nowe hasło"
-                          minLength={6}
+                          minLength={MIN_PASSWORD_LENGTH}
                           disabled={updatingPassword}
                         />
                       </div>
@@ -605,11 +606,7 @@ export default function ProfilePage() {
                         <span className="text-muted-foreground">Metody logowania:</span>
                         <span className="font-medium">
                           {authProviders.length > 0 ? (
-                            authProviders.map(provider => {
-                              if (provider === 'google') return 'Google OAuth'
-                              if (provider === 'email') return 'Email i hasło'
-                              return provider
-                            }).join(', ')
+                            authProviders.map(provider => AUTH_PROVIDER_NAMES[provider] || provider).join(', ')
                           ) : (
                             'Email i hasło'
                           )}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedSupabaseClient, getAuthenticatedUser } from '@/lib/supabaseAuth'
+import { MIN_PASSWORD_LENGTH } from '@/lib/authConstants'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,6 +9,8 @@ export const dynamic = 'force-dynamic'
  * Allows authenticated users to change their password
  */
 export async function POST(request: NextRequest) {
+  const timestamp = new Date().toISOString()
+  
   try {
     const supabase = await createAuthenticatedSupabaseClient()
     const user = await getAuthenticatedUser(supabase)
@@ -29,14 +32,26 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (password.length < 6) {
+    if (password.length < MIN_PASSWORD_LENGTH) {
       return NextResponse.json(
-        { error: 'Password must be at least 6 characters' },
+        { error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` },
         { status: 400 }
       )
     }
 
-    console.log(`[UpdatePassword] Updating password for user: ${user.id.substring(0, 8)}...`)
+    // Security audit log
+    const userAgent = request.headers.get('user-agent') || 'unknown'
+    const forwarded = request.headers.get('x-forwarded-for')
+    const realIp = request.headers.get('x-real-ip')
+    const ipAddress = forwarded || realIp || 'unknown'
+    
+    console.log(`[UpdatePassword] Password update attempt:`, {
+      timestamp,
+      userId: user.id.substring(0, 8) + '...',
+      email: user.email,
+      ipAddress,
+      userAgent: userAgent.substring(0, 100) + '...'
+    })
 
     // Update the user's password
     const { error } = await supabase.auth.updateUser({
@@ -44,14 +59,24 @@ export async function POST(request: NextRequest) {
     })
 
     if (error) {
-      console.error('[UpdatePassword] ✗ Error:', error.message)
+      console.error('[UpdatePassword] ✗ Password update failed:', {
+        timestamp,
+        userId: user.id.substring(0, 8) + '...',
+        error: error.message,
+        ipAddress
+      })
       return NextResponse.json(
         { error: error.message },
         { status: 400 }
       )
     }
 
-    console.log(`[UpdatePassword] ✓ Password updated successfully for user: ${user.id.substring(0, 8)}...`)
+    console.log(`[UpdatePassword] ✓ Password updated successfully:`, {
+      timestamp,
+      userId: user.id.substring(0, 8) + '...',
+      email: user.email,
+      ipAddress
+    })
 
     return NextResponse.json({
       success: true,
