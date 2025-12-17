@@ -287,6 +287,22 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
     }
   }
 
+  const formatCompletionTime = (dateTime?: string) => {
+    if (!dateTime) return ''
+    try {
+      return format(new Date(dateTime), 'HH:mm')
+    } catch {
+      return ''
+    }
+  }
+
+  const formatEventTimeRange = (start?: string, end?: string) => {
+    const startLabel = formatEventTime(start)
+    const endLabel = formatEventTime(end)
+    if (startLabel && endLabel) return `${startLabel}${endLabel ? `-${endLabel}` : ''}`
+    return startLabel || endLabel || ''
+  }
+
   // Add note
   const handleAddNote = () => {
     if (!newNote.trim()) return
@@ -570,7 +586,7 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
                         <div>{task.content}</div>
                         {task.completed_at && (
                           <p className="text-[11px] text-gray-500">
-                            Zakończono o {formatEventTime(task.completed_at)}
+                            Zakończono o {formatCompletionTime(task.completed_at)}
                           </p>
                         )}
                       </div>
@@ -617,10 +633,7 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
                 {googleEvents.map((event, index) => {
                   const start = event?.start?.dateTime || event?.start?.date
                   const end = event?.end?.dateTime || event?.end?.date
-                  const range =
-                    start || end
-                      ? `${formatEventTime(start)}${end ? `-${formatEventTime(end)}` : ''}`
-                      : ''
+                  const range = formatEventTimeRange(start, end)
 
                   return (
                     <li
