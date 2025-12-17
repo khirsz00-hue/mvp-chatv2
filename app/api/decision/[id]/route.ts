@@ -88,20 +88,24 @@ export async function DELETE(
       throw new Error('Failed to backup related records before deletion')
     }
 
-    const restoreEvents = async () => {
-      if (!eventsBackup?.length) return
+    const restoreEvents = async (): Promise<boolean> => {
+      if (!eventsBackup?.length) return true
       const { error } = await supabase.from('decision_events').insert(eventsBackup)
       if (error) {
         console.error('Rollback failed for decision_events:', error)
+        return false
       }
+      return true
     }
 
-    const restoreOptions = async () => {
-      if (!optionsBackup?.length) return
+    const restoreOptions = async (): Promise<boolean> => {
+      if (!optionsBackup?.length) return true
       const { error } = await supabase.from('decision_options').insert(optionsBackup)
       if (error) {
         console.error('Rollback failed for decision_options:', error)
+        return false
       }
+      return true
     }
 
     let eventsDeleted = false
@@ -124,10 +128,11 @@ export async function DELETE(
       .eq('decision_id', params.id)
 
     if (optionsError) {
-      if (eventsDeleted) {
-        await restoreEvents()
-      }
-      throw new Error(`Failed to delete decision options: ${optionsError.message}`)
+      const rollbackSucceeded = eventsDeleted
+        ? (await Promise.all([restoreEvents()])).every(Boolean)
+        : true
+      const rollbackNote = rollbackSucceeded ? '' : ' (rollback may be incomplete)'
+      throw new Error(`Failed to delete decision options: ${optionsError.message}${rollbackNote}`)
     }
     optionsDeleted = true
 
@@ -140,13 +145,13 @@ export async function DELETE(
       .select()
 
     if (error) {
-      if (eventsDeleted) {
-        await restoreEvents()
-      }
-      if (optionsDeleted) {
-        await restoreOptions()
-      }
-      throw new Error(`Failed to delete decision: ${error.message}`)
+      const rollbackResults = await Promise.all([
+        eventsDeleted ? restoreEvents() : Promise.resolve(true),
+        optionsDeleted ? restoreOptions() : Promise.resolve(true)
+      ])
+      const rollbackSucceeded = rollbackResults.every(Boolean)
+      const rollbackNote = rollbackSucceeded ? '' : ' (rollback may be incomplete)'
+      throw new Error(`Failed to delete decision: ${error.message}${rollbackNote}`)
     }
 
     // Verify that a decision was actually deleted
