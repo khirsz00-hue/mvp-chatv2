@@ -373,15 +373,15 @@ async function fetchWeekState(userId: string, weekStartDate: Date, supabase: Awa
 
 async function buildSnapshot(userId: string, weekStartDate: Date, supabase: Awaited<ReturnType<typeof createAuthenticatedSupabaseClient>>): Promise<WeekSnapshot> {
   const { tasks, events, insight, recommendations, weekStartIso } = await fetchWeekState(userId, weekStartDate, supabase)
-  const days = buildDaySummaries(tasks, events, weekStartDate)
-  const analysisText = insight?.analysis_text || buildAnalysisText(days, tasks, events)
+  const days = buildDaySummaries(tasks || [], events || [], weekStartDate)
+  const analysisText = insight?.analysis_text || buildAnalysisText(days, tasks || [], events || [])
   return {
     authenticated: true,
     weekStart: weekStartIso,
     capacityMinutes: DAY_CAPACITY_MINUTES,
     days,
     analysisText,
-    recommendations: recommendations.map(r => ({
+    recommendations: (recommendations || []).map(r => ({
       id: r.id,
       title: r.title,
       explanation: r.explanation,
@@ -418,9 +418,9 @@ export async function runWeekAnalysis(): Promise<{ error?: string; data?: WeekSn
 
   const weekStartDate = resolveWeekStart()
   const { tasks, events, weekStartIso } = await fetchWeekState(user.id, weekStartDate, supabase)
-  const days = buildDaySummaries(tasks, events, weekStartDate)
-  const analysisText = buildAnalysisText(days, tasks, events)
-  const proposals = generateRecommendations(user.id, weekStartIso, days, tasks, events)
+  const days = buildDaySummaries(tasks || [], events || [], weekStartDate)
+  const analysisText = buildAnalysisText(days, tasks || [], events || [])
+  const proposals = generateRecommendations(user.id, weekStartIso, days, tasks || [], events || [])
 
   // Replace pending recommendations with fresh set
   await supabase
