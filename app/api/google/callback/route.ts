@@ -1,10 +1,6 @@
 import { NextResponse } from 'next/server'
 import { google } from 'googleapis'
-import { createClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+import { createAuthenticatedSupabaseClient, getAuthenticatedUser } from '@/lib/supabaseAuth'
 
 /**
  * Handle Google OAuth callback
@@ -46,28 +42,11 @@ export async function GET(req: Request) {
 
     console.log('Tokens obtained successfully (not showing full tokens for security)')
 
-    // Get user session from cookie
-    const cookieStore = await cookies()
-    const allCookies = cookieStore.getAll()
-    
-    // Find Supabase auth token cookies
-    const authCookies = allCookies.filter(cookie => 
-      cookie.name.includes('sb-') && cookie.name.includes('auth-token')
-    )
+    // Create Supabase client with authenticated session from cookies
+    const supabase = await createAuthenticatedSupabaseClient()
+    const user = await getAuthenticatedUser(supabase)
 
-    if (authCookies.length === 0) {
-      console.error('No auth cookies found - user not logged in')
-      return NextResponse.redirect(`${baseUrl}/login?google_error=not_logged_in`)
-    }
-
-    // Create Supabase client with the auth token
-    const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
-    // Try to get the user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      console.error('Auth error:', authError)
+    if (!user) {
       return NextResponse.redirect(`${baseUrl}/login?google_error=auth_failed`)
     }
 
