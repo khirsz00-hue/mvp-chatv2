@@ -52,7 +52,7 @@ const EVENT_COLORS = {
 const EVENT_TYPE_TASK_BLOCK = 'task-block' as const
 
 // Priority-specific colors for queue tasks
-const PRIORITY_COLORS = {
+const PRIORITY_COLORS: Record<'now' | 'next' | 'later', string> = {
   now: 'bg-brand-purple border-2 border-brand-purple',
   next: 'bg-green-500/80',
   later: 'bg-gray-400/60'
