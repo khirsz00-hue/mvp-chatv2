@@ -52,6 +52,7 @@ export default function ProfilePage() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [updatingPassword, setUpdatingPassword] = useState(false)
+  const [authProviders, setAuthProviders] = useState<string[]>([])
   const { showToast } = useToast()
   const router = useRouter()
 
@@ -184,6 +185,10 @@ export default function ProfilePage() {
       if (profileData) {
         setProfile(profileData)
       }
+
+      // Get user's authentication providers
+      const providers = user.identities?.map(identity => identity.provider) || []
+      setAuthProviders(providers)
 
       // Load journal entries
       const { data: journalData } = await supabase
@@ -597,14 +602,22 @@ export default function ProfilePage() {
                         <span className="font-medium">{profile.email}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Metoda logowania:</span>
+                        <span className="text-muted-foreground">Metody logowania:</span>
                         <span className="font-medium">
-                          Email i hasło
+                          {authProviders.length > 0 ? (
+                            authProviders.map(provider => {
+                              if (provider === 'google') return 'Google OAuth'
+                              if (provider === 'email') return 'Email i hasło'
+                              return provider
+                            }).join(', ')
+                          ) : (
+                            'Email i hasło'
+                          )}
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground mt-3">
-                        💡 Możesz logować się używając swojego adresu email i hasła, 
-                        przez Google OAuth, lub za pomocą magic link.
+                        💡 Możesz ustawić hasło, aby móc logować się zarówno przez Google, 
+                        jak i za pomocą email/hasło lub magic link. To daje Ci więcej opcji dostępu do konta.
                       </p>
                     </div>
                   </div>

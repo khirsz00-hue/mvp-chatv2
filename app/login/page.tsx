@@ -98,23 +98,37 @@ export default function LoginPage() {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
       if (!baseUrl) {
-        throw new Error('NEXT_PUBLIC_SITE_URL is not configured')
+        console.error('[Login] NEXT_PUBLIC_SITE_URL is not configured')
+        throw new Error('Konfiguracja aplikacji jest nieprawidłowa. Skontaktuj się z administratorem.')
       }
+
+      console.log('[Login] Initiating Google OAuth flow...')
+      console.log('[Login] Redirect URL:', `${baseUrl}/auth/callback`)
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${baseUrl}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         },
       })
 
-      if (error) throw error
+      if (error) {
+        console.error('[Login] ✗ Google OAuth error:', error)
+        throw error
+      }
 
-      console.log('[Login] ✓ Google OAuth initiated')
-      // Browser will redirect to Google
+      console.log('[Login] ✓ Google OAuth initiated successfully')
+      // Browser will redirect to Google - no need to update loading state
     } catch (error: any) {
       console.error('[Login] ✗ Google sign in failed:', error)
-      showToast(error.message || 'Błąd podczas logowania przez Google', 'error')
+      showToast(
+        error.message || 'Błąd podczas logowania przez Google. Sprawdź czy masz włączone pliki cookie.',
+        'error'
+      )
       setLoading(false)
     }
   }
