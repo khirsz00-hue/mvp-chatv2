@@ -22,7 +22,7 @@ import { format } from 'date-fns'
 // OAuth expiry can be stored in ms or seconds depending on provider; anything below
 // this threshold (~Sep 2001 in ms) is treated as seconds and converted to ms so
 // we compare timestamps consistently.
-const SECONDS_MS_THRESHOLD = 1e12
+const SECONDS_MS_THRESHOLD = new Date('2001-09-09').getTime()
 const ALL_DAY_LABEL = 'Cały dzień'
 
 interface JournalAssistantMainProps {
@@ -162,8 +162,11 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
         if (isMounted) {
           setTodoistToken(data?.todoist_token || null)
           const expiryRaw = data?.google_token_expiry || null
-          const expiryMs =
-            expiryRaw && expiryRaw < SECONDS_MS_THRESHOLD ? expiryRaw * 1000 : expiryRaw
+          const expiryMs = expiryRaw
+            ? expiryRaw < SECONDS_MS_THRESHOLD
+              ? expiryRaw * 1000
+              : expiryRaw
+            : null
           const isGoogleLinked =
             !!data?.google_access_token &&
             (!expiryMs || expiryMs > Date.now())

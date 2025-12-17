@@ -45,12 +45,9 @@ async function fetchAndFilterTasks(token: any, filter: string, date?: string) {
       const completedTasks = data.items || []
       const targetDate = date ? parseISO(date) : null
       
-      const filteredCompleted = targetDate
-        ? completedTasks.filter((t: any) => {
-            if (!t.completed_at) return false
-            return isCompletedOnDate(t.completed_at, targetDate)
-          })
-        : completedTasks
+      const filteredCompleted = completedTasks.filter(
+        (t: any) => t.completed_at && (!targetDate || isCompletedOnDate(t.completed_at, targetDate))
+      )
       
       // Map completed tasks to match the expected format
       const simplified = filteredCompleted.map((t: any) => ({
@@ -99,7 +96,7 @@ async function fetchAndFilterTasks(token: any, filter: string, date?: string) {
     const sevenDaysEnd = endOfDay(addDays(todayStart, 6))
 
     const filtered = allTasks.filter((t: any) => {
-      // Todoist REST v2 tasks are open; some SDKs may still return completed/is_completed/completed_at flags
+      // Todoist REST v2 tasks list active (open) tasks; filter out any entries marked as completed to keep planned lists clean
       if (t?.completed === true || t?.is_completed === true || t?.completed_at) {
         return false
       }
