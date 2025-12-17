@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { DecisionService } from '@/src/features/decision-assistant/services/decisionService'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -15,7 +15,7 @@ interface DecisionEvent {
   event_type: string
   content: string
   ai_response: string | null
-  metadata: any
+  metadata: unknown
   created_at: string
 }
 
@@ -30,7 +30,7 @@ interface DecisionOption {
 
 // Rollback function to restore deleted data
 async function attemptRollback(
-  supabase: any,
+  supabase: SupabaseClient,
   events: DecisionEvent[],
   options: DecisionOption[]
 ): Promise<boolean> {
@@ -135,27 +135,23 @@ export async function DELETE(
     }
 
     // Capture events and options data before deletion for potential rollback
-    const { data: eventsData, error: eventsFetchError } = await supabase
-      .from('decision_events')
-      .select('*')
-      .eq('decision_id', params.id)
+    // Execute both queries in parallel for better performance
+    const [eventsResult, optionsResult] = await Promise.all([
+      supabase.from('decision_events').select('*').eq('decision_id', params.id),
+      supabase.from('decision_options').select('*').eq('decision_id', params.id)
+    ])
 
-    if (eventsFetchError) {
-      throw new Error(`Failed to fetch decision events: ${eventsFetchError.message}`)
+    if (eventsResult.error) {
+      throw new Error(`Failed to fetch decision events: ${eventsResult.error.message}`)
     }
 
-    const { data: optionsData, error: optionsFetchError } = await supabase
-      .from('decision_options')
-      .select('*')
-      .eq('decision_id', params.id)
-
-    if (optionsFetchError) {
-      throw new Error(`Failed to fetch decision options: ${optionsFetchError.message}`)
+    if (optionsResult.error) {
+      throw new Error(`Failed to fetch decision options: ${optionsResult.error.message}`)
     }
 
     // Store captured data for rollback
-    const eventsDeleted: DecisionEvent[] = eventsData || []
-    const optionsDeleted: DecisionOption[] = optionsData || []
+    const eventsDeleted: DecisionEvent[] = eventsResult.data || []
+    const optionsDeleted: DecisionOption[] = optionsResult.data || []
 
     // Clean up related data first to avoid constraint errors
     const { error: eventsError } = await supabase
