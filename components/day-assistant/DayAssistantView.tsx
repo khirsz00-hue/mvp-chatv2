@@ -676,6 +676,7 @@ export function DayAssistantView() {
             {rightPanelView === 'timeline' && userId && (
               <DayTimeline
                 userId={userId}
+                queueState={queueState}
                 onRefresh={refreshQueue}
               />
             )}
