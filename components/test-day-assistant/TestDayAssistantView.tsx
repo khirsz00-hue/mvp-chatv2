@@ -5,11 +5,28 @@ import { supabase } from '@/lib/supabaseClient'
 import Button from '@/components/ui/Button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 
+interface AssistantSettings {
+  undo_window?: number
+  max_postpones_before_escalation?: number
+  morning_must_block_default?: number
+  auto_decompose_threshold?: number
+  light_task_limit_minutes?: number
+  max_daily_recommendations?: number
+}
+
+interface Assistant {
+  name: string
+  type: string
+  is_active: boolean
+  created_at: string
+  settings?: AssistantSettings
+}
+
 export function TestDayAssistantView() {
   const [loading, setLoading] = useState(false)
   const [initialized, setInitialized] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
-  const [assistant, setAssistant] = useState<any>(null)
+  const [assistant, setAssistant] = useState<Assistant | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
