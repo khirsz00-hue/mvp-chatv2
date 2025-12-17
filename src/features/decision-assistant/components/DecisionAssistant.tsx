@@ -7,7 +7,7 @@ import Card from '@/components/ui/Card'
 import Input from '@/components/ui/Input'
 import Textarea from '@/components/ui/Textarea'
 import { useToast } from '@/components/ui/Toast'
-import { Plus, Play, Trash, Eye, ArrowLeft } from '@phosphor-icons/react'
+import { Plus, Trash, Eye } from '@phosphor-icons/react'
 import { Decision } from '../types'
 import { DecisionProcess } from './DecisionProcess'
 
@@ -23,10 +23,6 @@ export function DecisionAssistant() {
   // Form state
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [options, setOptions] = useState<Array<{ title: string; description:  string }>>([
-    { title: '', description: '' }
-  ])
-
   // Get user ID
   useEffect(() => {
     const getUser = async () => {
@@ -89,8 +85,6 @@ export function DecisionAssistant() {
 
     setLoading(true)
     try {
-      const validOptions = options.filter(opt => opt.title.trim())
-      
       // Get session token
       const { data: { session } } = await supabase.auth.getSession()
       
@@ -106,8 +100,7 @@ export function DecisionAssistant() {
         },
         body: JSON.stringify({
           title: title.trim(),
-          description: description.trim(),
-          options: validOptions.length > 0 ? validOptions : undefined
+          description: description.trim()
         })
       })
 
@@ -122,7 +115,6 @@ export function DecisionAssistant() {
         await fetchDecisions()
         setTitle('')
         setDescription('')
-        setOptions([{ title: '', description: '' }])
         setShowCreateForm(false)
         showToast('Decyzja utworzona!', 'success')
       }
@@ -163,23 +155,6 @@ export function DecisionAssistant() {
       console.error('Error deleting decision:', err)
       showToast('Nie udało się usunąć decyzji', 'error')
     }
-  }
-
-  // Add option field
-  const addOptionField = () => {
-    setOptions([...options, { title: '', description: '' }])
-  }
-
-  // Remove option field
-  const removeOptionField = (index: number) => {
-    setOptions(options.filter((_, i) => i !== index))
-  }
-
-  // Update option
-  const updateOption = (index: number, field: 'title' | 'description', value: string) => {
-    const newOptions = [...options]
-    newOptions[index][field] = value
-    setOptions(newOptions)
   }
 
   // Check auth loading state
@@ -277,46 +252,6 @@ export function DecisionAssistant() {
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Opcje do rozważenia (opcjonalne)
-              </label>
-              {options.map((option, index) => (
-                <div key={index} className="flex gap-2 mb-2">
-                  <Input
-                    value={option.title}
-                    onChange={(e) => updateOption(index, 'title', e. target.value)}
-                    placeholder={`Opcja ${index + 1}`}
-                    className="flex-1"
-                  />
-                  <Input
-                    value={option.description}
-                    onChange={(e) => updateOption(index, 'description', e.target.value)}
-                    placeholder="Opis (opcjonalny)"
-                    className="flex-1"
-                  />
-                  {options.length > 1 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeOptionField(index)}
-                    >
-                      <Trash size={16} />
-                    </Button>
-                  )}
-                </div>
-              ))}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={addOptionField}
-                className="gap-2 mt-2"
-              >
-                <Plus size={16} />
-                Dodaj opcję
-              </Button>
-            </div>
-
             <div className="flex justify-end gap-2 pt-4">
               <Button
                 variant="outline"
@@ -324,7 +259,6 @@ export function DecisionAssistant() {
                   setShowCreateForm(false)
                   setTitle('')
                   setDescription('')
-                  setOptions([{ title:  '', description: '' }])
                 }}
                 disabled={loading}
               >

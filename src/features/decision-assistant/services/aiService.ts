@@ -50,65 +50,56 @@ ${prompt}
   static async generateQuestionsForHat(
     decisionTitle: string,
     decisionDescription: string,
-    options: Array<{ title: string; description?: string | null }>,
     hatColor: HatColor
   ): Promise<string[]> {
     try {
       const hatPrompts: Record<HatColor, string> = {
-        blue: `Perspektywa: ORGANIZACJA I PROCES
-Wygeneruj dokładnie 3 pytania pomagające:
-- Zdefiniować problem i cel decyzji
-- Zorganizować proces myślenia
-- Określić kryteria i priorytety
-Pytania muszą być konkretne i dotyczące struktury problemu.`,
-        white: `Perspektywa: FAKTY I DANE
-Wygeneruj dokładnie 3 pytania o:
-- Obiektywne fakty i dostępne informacje
-- Konkretne liczby, koszty, terminy
-- Brakujące dane potrzebne do decyzji
-Pytania muszą być faktograficzne, bez emocji i ocen.`,
-        red: `Perspektywa: EMOCJE I INTUICJA
-Wygeneruj dokładnie 3 pytania o:
-- Odczucia i emocje związane z decyzją
-- Intuicyjne przeczucia (dobre i złe)
-- Reakcje ciała i "głos wewnętrzny"
-Pytania muszą dotyczyć emocji, nie logiki.`,
-        black: `Perspektywa: RYZYKA I ZAGROŻENIA
-Wygeneruj dokładnie 3 pytania o:
-- Potencjalne ryzyka i zagrożenia
-- Najgorsze możliwe scenariusze
-- Przeszkody i trudności
-Pytania muszą być krytyczne i ostrożne, koncentrować się na problemach.`,
-        yellow: `Perspektywa: KORZYŚCI I SZANSE
-Wygeneruj dokładnie 3 pytania o:
-- Korzyści i pozytywne aspekty
-- Możliwości i potencjał wzrostu
-- Długoterminowe korzyści
-Pytania muszą być optymistyczne, koncentrować się na wartości.`,
-        green: `Perspektywa: KREATYWNOŚĆ I ALTERNATYWY
-Wygeneruj dokładnie 3 pytania stymulujące:
-- Nietypowe rozwiązania i alternatywy
-- Kreatywne podejścia do problemu
-- Innowacyjne możliwości
-Pytania muszą prowokować do nieszablonowego myślenia.`
+        blue: `3 pytania (max 12 słów każde) które:
+- Ustalają konkretny cel i rezultat sukcesu
+- Zbierają największe ograniczenia (czas/pieniądze/zasoby)
+- Definiują 1–2 kryteria oceny teraz
+Pytania muszą być ostre, jednoznaczne, bez ogólników.`,
+        white: `3 krótkie pytania o twarde fakty:
+- Liczby/koszty/termine kluczowe dla decyzji
+- Jakie dane są pewne, a czego brakuje
+- Źródło lub sposób szybkiej weryfikacji
+Pytania tylko o dane, bez opinii.`,
+        red: `3 krótkie pytania o emocje i intuicję:
+- Co budzi entuzjazm lub opór
+- Gdzie czujesz największy niepokój
+- Co mówi „pierwszy odruch”
+Pytania mają wyciągać konkretny sygnał emocjonalny.`,
+        black: `3 pytania ostrzegawcze (max 12 słów):
+- Najgorszy realistyczny scenariusz i jego skutki
+- Największa przeszkoda, która zablokuje decyzję
+- Wczesne sygnały, że ryzyko rośnie
+Pytania mają odsłaniać realne zagrożenia.`,
+        yellow: `3 pytania o wartość (max 12 słów):
+- Największa korzyść, którą można uchwycić szybko
+- Długoterminowa przewaga / szansa
+- Jaki efekt pozytywny byłby decydujący
+Pytania mają kierować na jasne zyski.`,
+        green: `3 pytania pobudzające rozwiązania:
+- Jak zrobić to taniej/szybciej bez utraty jakości
+- Alternatywa spoza schematu, którą warto sprawdzić
+- Jeden mały eksperyment do natychmiastowego testu
+Pytania muszą wymuszać konkretny pomysł.`
       }
-
-      const optionsText = options.length > 0 
-        ? options.map((opt, idx) => `${idx + 1}. ${opt.title}${opt.description ? ': ' + opt.description : ''}`).join('\n')
-        : 'Brak zdefiniowanych opcji'
 
       const userMessage = `
 Decyzja: ${decisionTitle}
 Opis: ${decisionDescription}
 
-Opcje do rozważenia:
-${optionsText}
-
 ${hatPrompts[hatColor]}
 
+Założenia:
+- To Ty wygenerujesz opcje i wskażesz najlepszą, nie pytaj o listę opcji.
+- Użytkownik ma włożyć minimalny wysiłek – pytania mają być krótkie, proste, bez dygresji.
+- Każde pytanie ma wyciągać możliwie największą wartość do podjęcia decyzji.
+
 Zwróć odpowiedź w formacie JSON: { "questions": ["pytanie 1", "pytanie 2", "pytanie 3"] }
-Pytania powinny być w języku polskim, konkretne i dostosowane do tej konkretnej decyzji.
-`
+Pytania powinny być w języku polskim, konkretne i dopasowane do tej decyzji.
+      `
 
       const response = await getOpenAIClient().chat.completions.create({
         model: 'gpt-4-turbo-preview',
@@ -120,11 +111,13 @@ Pytania powinny być w języku polskim, konkretne i dostosowane do tej konkretne
 ZASADY:
 1. Wygeneruj DOKŁADNIE 3 pytania (nie więcej, nie mniej)
 2. Każde pytanie musi być UNIKALNE i specyficzne dla danej perspektywy
-3. NIE używaj ogólnych pytań typu "Co myślisz o..."
-4. Pytania muszą być KONKRETNE i odnoszące się do decyzji użytkownika
+3. Maks. 12 słów na pytanie, zero waty, zero wstępów
+4. Pytania muszą być KONKRETNE i odnosić się do decyzji użytkownika
 5. Każde pytanie z innej "podkategorii" danej perspektywy
-6. Język: polski
-7. Format JSON: { "questions": ["pytanie 1", "pytanie 2", "pytanie 3"] }`
+6. Użytkownik nie podaje opcji – to Ty później je zaproponujesz, więc nie pytaj o ich listę
+7. Pytania mają minimalizować wysiłek użytkownika i prowadzić do natychmiast użytecznych odpowiedzi
+8. Język: polski
+9. Format JSON: { "questions": ["pytanie 1", "pytanie 2", "pytanie 3"] }`
           },
           {
             role: 'user',
