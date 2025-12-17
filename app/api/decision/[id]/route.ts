@@ -90,7 +90,9 @@ export async function DELETE(
 
     const restoreEvents = async (): Promise<boolean> => {
       if (!eventsBackup?.length) return true
-      const { error } = await supabase.from('decision_events').insert(eventsBackup)
+      const { error } = await supabase
+        .from('decision_events')
+        .upsert(eventsBackup, { onConflict: 'id' })
       if (error) {
         console.error('Rollback failed for decision_events:', error)
         return false
@@ -100,7 +102,9 @@ export async function DELETE(
 
     const restoreOptions = async (): Promise<boolean> => {
       if (!optionsBackup?.length) return true
-      const { error } = await supabase.from('decision_options').insert(optionsBackup)
+      const { error } = await supabase
+        .from('decision_options')
+        .upsert(optionsBackup, { onConflict: 'id' })
       if (error) {
         console.error('Rollback failed for decision_options:', error)
         return false
@@ -134,7 +138,9 @@ export async function DELETE(
       .eq('decision_id', params.id)
 
     if (eventsError) {
-      throw new Error(`Failed to delete decision events: ${eventsError.message}`)
+      const rollbackSucceeded = await attemptRollback(true, false)
+      const rollbackNote = rollbackSucceeded ? '' : ' (rollback may be incomplete)'
+      throw new Error(`Failed to delete decision events: ${eventsError.message}${rollbackNote}`)
     }
     eventsDeleted = true
 
@@ -144,7 +150,7 @@ export async function DELETE(
       .eq('decision_id', params.id)
 
     if (optionsError) {
-      const rollbackSucceeded = await attemptRollback(eventsDeleted, optionsDeleted)
+      const rollbackSucceeded = await attemptRollback(eventsDeleted, false)
       const rollbackNote = rollbackSucceeded ? '' : ' (rollback may be incomplete)'
       throw new Error(`Failed to delete decision options: ${optionsError.message}${rollbackNote}`)
     }
