@@ -10,6 +10,19 @@ async function fetchAndFilterTasks(token: any, filter: string, date?: string) {
     return []
   }
 
+  const isCompletedOnDate = (completedAt: string, targetDate: Date | null) => {
+    if (!targetDate) return false
+    try {
+      const completedDate = parseISO(completedAt)
+      return isWithinInterval(completedDate, {
+        start: startOfDay(targetDate),
+        end: endOfDay(targetDate),
+      })
+    } catch {
+      return false
+    }
+  }
+
   try {
     // Fetch completed tasks if filter is 'completed'
     if (filter === 'completed') {
@@ -31,18 +44,11 @@ async function fetchAndFilterTasks(token: any, filter: string, date?: string) {
       const data = await res.json()
       const completedTasks = data.items || []
       const targetDate = date ? parseISO(date) : null
-      const start = targetDate ? startOfDay(targetDate) : null
-      const end = targetDate ? endOfDay(targetDate) : null
       
       const filteredCompleted = targetDate
         ? completedTasks.filter((t: any) => {
-            if (!t.completed_at || !start || !end) return false
-            try {
-              const completedAt = parseISO(t.completed_at)
-              return isWithinInterval(completedAt, { start, end })
-            } catch {
-              return false
-            }
+            if (!t.completed_at) return false
+            return isCompletedOnDate(t.completed_at, targetDate)
           })
         : completedTasks
       

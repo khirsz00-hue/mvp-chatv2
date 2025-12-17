@@ -19,7 +19,10 @@ import {
 } from '@phosphor-icons/react'
 import { format } from 'date-fns'
 
-const SECONDS_MS_THRESHOLD = 1e12 // values below are assumed to be seconds since epoch
+// OAuth expiry can be stored in ms or seconds depending on provider; anything below
+// this threshold is treated as seconds and converted to ms for consistent comparisons.
+const SECONDS_MS_THRESHOLD = 1e12
+const ALL_DAY_LABEL = 'Cały dzień'
 
 interface JournalAssistantMainProps {
   onShowArchive: () => void
@@ -276,7 +279,7 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
   const formatEventTime = (dateTime?: string) => {
     if (!dateTime) return ''
     // All-day events come as YYYY-MM-DD without time
-    if (!dateTime.includes('T')) return 'Cały dzień'
+    if (!dateTime.includes('T')) return ALL_DAY_LABEL
     try {
       return format(new Date(dateTime), 'HH:mm')
     } catch {
