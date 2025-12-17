@@ -8,7 +8,8 @@ import Badge from '@/components/ui/Badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs'
 import { useToast } from '@/components/ui/Toast'
 import { useRouter } from 'next/navigation'
-import { User, Notebook, Sparkle, CreditCard, Link as LinkIcon, CheckCircle, XCircle } from '@phosphor-icons/react'
+import { User, Notebook, Sparkle, CreditCard, Link as LinkIcon, CheckCircle, XCircle, LockKey } from '@phosphor-icons/react'
+import Input from '@/components/ui/Input'
 import { format } from 'date-fns'
 import { pl } from 'date-fns/locale'
 
@@ -48,6 +49,9 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState('journal')
   const [connectingTodoist, setConnectingTodoist] = useState(false)
   const [connectingGoogle, setConnectingGoogle] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [updatingPassword, setUpdatingPassword] = useState(false)
   const { showToast } = useToast()
   const router = useRouter()
 
@@ -118,6 +122,47 @@ export default function ProfilePage() {
     } catch (error) {
       console.error('Error disconnecting Google Calendar:', error)
       showToast('Błąd podczas odłączania Google Calendar', 'error')
+    }
+  }
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!newPassword || newPassword.length < 6) {
+      showToast('Hasło musi mieć co najmniej 6 znaków', 'error')
+      return
+    }
+    
+    if (newPassword !== confirmPassword) {
+      showToast('Hasła nie są zgodne', 'error')
+      return
+    }
+    
+    setUpdatingPassword(true)
+    
+    try {
+      const response = await fetch('/api/auth/update-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ password: newPassword }),
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Nie udało się zaktualizować hasła')
+      }
+      
+      showToast('Hasło zostało zaktualizowane pomyślnie', 'success')
+      setNewPassword('')
+      setConfirmPassword('')
+    } catch (error: any) {
+      console.error('Error updating password:', error)
+      showToast(error.message || 'Błąd podczas aktualizacji hasła', 'error')
+    } finally {
+      setUpdatingPassword(false)
     }
   }
 
@@ -249,7 +294,7 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
-        {/* Tabs for Journal, Insights, and Integrations */}
+        {/* Tabs for Journal, Insights, Integrations, and Security */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
             <TabsTrigger value="journal">
@@ -263,6 +308,10 @@ export default function ProfilePage() {
             <TabsTrigger value="integrations">
               <LinkIcon size={20} className="mr-2" />
               Integracje
+            </TabsTrigger>
+            <TabsTrigger value="security">
+              <LockKey size={20} className="mr-2" />
+              Bezpieczeństwo
             </TabsTrigger>
           </TabsList>
 
@@ -464,6 +513,99 @@ export default function ProfilePage() {
                           </Button>
                         )}
                       </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="security">
+            <Card>
+              <CardHeader>
+                <CardTitle>Bezpieczeństwo konta</CardTitle>
+                <CardDescription>
+                  Zarządzaj hasłem i ustawieniami bezpieczeństwa
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  {/* Password Management */}
+                  <div className="p-4 border border-gray-200 rounded-lg">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+                        <LockKey size={24} className="text-purple-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-lg">Hasło</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Ustaw lub zmień hasło do swojego konta
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <form onSubmit={handleUpdatePassword} className="space-y-4">
+                      <div>
+                        <label htmlFor="new-password" className="block text-sm font-medium mb-2">
+                          Nowe hasło
+                        </label>
+                        <Input
+                          id="new-password"
+                          type="password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Wprowadź nowe hasło"
+                          minLength={6}
+                          disabled={updatingPassword}
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Minimum 6 znaków
+                        </p>
+                      </div>
+                      
+                      <div>
+                        <label htmlFor="confirm-password" className="block text-sm font-medium mb-2">
+                          Potwierdź hasło
+                        </label>
+                        <Input
+                          id="confirm-password"
+                          type="password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="Potwierdź nowe hasło"
+                          minLength={6}
+                          disabled={updatingPassword}
+                        />
+                      </div>
+                      
+                      <Button
+                        type="submit"
+                        disabled={updatingPassword || !newPassword || !confirmPassword}
+                        className="w-full sm:w-auto"
+                      >
+                        {updatingPassword ? 'Aktualizacja...' : 'Zmień hasło'}
+                      </Button>
+                    </form>
+                  </div>
+                  
+                  {/* Account Info */}
+                  <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                    <h4 className="font-medium mb-2">Informacje o koncie</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Email:</span>
+                        <span className="font-medium">{profile.email}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Metoda logowania:</span>
+                        <span className="font-medium">
+                          Email i hasło
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-3">
+                        💡 Możesz logować się używając swojego adresu email i hasła, 
+                        przez Google OAuth, lub za pomocą magic link.
+                      </p>
                     </div>
                   </div>
                 </div>
