@@ -265,7 +265,7 @@ export function DecisionAssistant() {
                 Anuluj
               </Button>
               <Button onClick={handleCreateDecision} disabled={loading}>
-                {loading ? 'Tworzenie.. .' : 'Utwórz decyzję'}
+                {loading ? 'Tworzenie...' : 'Utwórz decyzję'}
               </Button>
             </div>
           </div>
