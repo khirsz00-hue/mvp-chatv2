@@ -59,6 +59,43 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
     saveEntry,
   } = useJournalEntries(userId)
 
+  const fetchTodoistData = useCallback(async () => {
+    if (!todoistToken || !selectedDate) {
+      return { planned: [], completed: [] }
+    }
+
+    try {
+      const [plannedResponse, completedResponse] = await Promise.all([
+        fetch('/api/todoist/tasks', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token: todoistToken, filter: 'today', date: selectedDate }),
+        }),
+        fetch('/api/todoist/tasks', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token: todoistToken, filter: 'completed', date: selectedDate }),
+        }),
+      ])
+
+      if (!plannedResponse.ok || !completedResponse.ok) {
+        console.error('Failed to fetch Todoist tasks:', plannedResponse.status, completedResponse.status)
+        return { planned: [], completed: [] }
+      }
+
+      const plannedData = await plannedResponse.json()
+      const completedData = await completedResponse.json()
+      return { planned: plannedData.tasks || [], completed: completedData.tasks || [] }
+    } catch (error: any) {
+      console.error('Error fetching Todoist tasks:', error)
+      return { planned: [], completed: [] }
+    }
+  }, [selectedDate, todoistToken])
+
   // Get user ID
   useEffect(() => {
     const getUser = async () => {
@@ -147,7 +184,7 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
   useEffect(() => {
     let isMounted = true
 
-    const fetchTodoistTasks = async () => {
+    const load = async () => {
       if (!todoistToken || !selectedDate) {
         if (isMounted) {
           setTodayTasks([])
@@ -157,60 +194,20 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
       }
 
       setLoadingTasks(true)
-      try {
-        const [plannedResponse, completedResponse] = await Promise.all([
-          fetch('/api/todoist/tasks', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ token: todoistToken, filter: 'today', date: selectedDate }),
-          }),
-          fetch('/api/todoist/tasks', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ token: todoistToken, filter: 'completed', date: selectedDate }),
-          }),
-        ])
-
-        if (!plannedResponse.ok || !completedResponse.ok) {
-          console.error('Failed to fetch Todoist tasks:', plannedResponse.status, completedResponse.status)
-          if (isMounted) {
-            setTodayTasks([])
-            setCompletedTodayTasks([])
-          }
-          return
-        }
-
-        const plannedData = await plannedResponse.json()
-        const completedData = await completedResponse.json()
-        if (isMounted) {
-          setTodayTasks(plannedData.tasks || [])
-          setCompletedTodayTasks(completedData.tasks || [])
-        }
-      } catch (error: any) {
-        console.error('Error fetching Todoist tasks:', error)
-        if (isMounted) {
-          setTodayTasks([])
-          setCompletedTodayTasks([])
-        }
-      } finally {
-        if (isMounted) {
-          setLoadingTasks(false)
-        }
+      const { planned, completed } = await fetchTodoistData()
+      if (isMounted) {
+        setTodayTasks(planned)
+        setCompletedTodayTasks(completed)
+        setLoadingTasks(false)
       }
     }
 
-    if (todoistToken) {
-      fetchTodoistTasks()
-    }
+    load()
 
     return () => {
       isMounted = false
     }
-  }, [todoistToken, selectedDate])
+  }, [fetchTodoistData, selectedDate, todoistToken])
 
   const loadGoogleEvents = useCallback(async () => {
     if (!userId || !googleConnected || !selectedDate) {
@@ -264,34 +261,9 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
 
     setLoadingTasks(true)
     try {
-      const [plannedResponse, completedResponse] = await Promise.all([
-        fetch('/api/todoist/tasks', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ token: todoistToken, filter: 'today', date: selectedDate }),
-        }),
-        fetch('/api/todoist/tasks', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ token: todoistToken, filter: 'completed', date: selectedDate }),
-        }),
-      ])
-
-      if (!plannedResponse.ok || !completedResponse.ok) {
-        console.error('Failed to fetch Todoist tasks:', plannedResponse.status, completedResponse.status)
-        setTodayTasks([])
-        setCompletedTodayTasks([])
-        return
-      }
-
-      const plannedData = await plannedResponse.json()
-      const completedData = await completedResponse.json()
-      setTodayTasks(plannedData.tasks || [])
-      setCompletedTodayTasks(completedData.tasks || [])
+      const { planned, completed } = await fetchTodoistData()
+      setTodayTasks(planned)
+      setCompletedTodayTasks(completed)
     } catch (error: any) {
       console.error('Error fetching Todoist tasks:', error)
       setTodayTasks([])
@@ -303,6 +275,8 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
 
   const formatEventTime = (dateTime?: string) => {
     if (!dateTime) return ''
+    // All-day events come as YYYY-MM-DD without time
+    if (!dateTime.includes('T')) return 'Cały dzień'
     try {
       return format(new Date(dateTime), 'HH:mm')
     } catch {
