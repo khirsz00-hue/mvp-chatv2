@@ -1,15 +1,25 @@
-import MainLayout from '@/components/layout/MainLayout'
-import { getWeekSnapshot } from './actions'
-import { WeekAssistantClient } from './components/WeekAssistantClient'
+'use client'
 
-export default async function AssistantWeekPage() {
-  const snapshot = await getWeekSnapshot()
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+
+export default function AssistantWeekPage() {
+  const router = useRouter()
+  
+  useEffect(() => {
+    // Redirect to main page and set active view to planning
+    try {
+      localStorage.setItem('active_assistant', 'planning')
+    } catch {}
+    router.push('/')
+  }, [router])
 
   return (
-    <MainLayout>
-      <div className="max-w-6xl mx-auto">
-        <WeekAssistantClient initialData={snapshot} />
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+        <p className="text-muted-foreground">Przekierowanie...</p>
       </div>
-    </MainLayout>
+    </div>
   )
 }
