@@ -1,24 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedSupabaseClient, getAuthenticatedUser } from '@/lib/supabaseAuth'
 import { format, addMinutes, parseISO } from 'date-fns'
+import { getQueueState } from '@/lib/services/dayAssistantService'
 
 // Mark as dynamic route since we use request.url
 export const dynamic = 'force-dynamic'
 
 interface TimelineEvent {
   id: string
-  type: 'meeting' | 'event' | 'task-block' | 'ghost-proposal'
+  type: 'meeting' | 'event' | 'task-block' | 'ghost-proposal' | 'queue-task'
   title: string
   startTime: string
   endTime: string
   duration: number
   taskIds?: string[]
+  priority?: 'now' | 'next' | 'later'
   mutable?: boolean
   metadata?: Record<string, any>
 }
 
 // GET: Fetch timeline events for a specific date
 // Uses authenticated user context via RLS
+// Builds timeline from queue data (NOW/NEXT/LATER tasks)
 export async function GET(req: NextRequest) {
   try {
     // Get authenticated user from session
@@ -36,25 +39,96 @@ export async function GET(req: NextRequest) {
     const userId = user.id
     const { searchParams } = new URL(req.url)
     const date = searchParams.get('date') || format(new Date(), 'yyyy-MM-dd')
+    const includeAll = searchParams.get('includeAll') === 'true'
 
     console.log('🔍 [API Timeline GET] Authenticated user:', userId, 'date:', date)
 
     const events: TimelineEvent[] = []
 
-    // 1. Fetch calendar events (meetings) from Google Calendar
-    // Note: In server-side context, we need to use Supabase to fetch calendar events
-    // or call Google Calendar API directly. Relative URLs don't work in Next.js API routes.
-    // For now, we'll skip calendar integration and rely on manual timeline events.
-    // TODO: Implement direct Google Calendar API integration
-    try {
-      // Placeholder for future Google Calendar integration
-      // This would call googleapis directly with user's refresh token from Supabase
-      console.log('Calendar integration pending - add Google Calendar API calls here')
-    } catch (error) {
-      console.error('Error fetching calendar events:', error)
+    // 1. Build timeline from queue data (NOW/NEXT/LATER)
+    // This preserves priority ordering and energy-mode constraints
+    const queueState = await getQueueState(userId, includeAll, supabase)
+    
+    let currentTime = new Date()
+    // Start scheduling from current time or 9 AM, whichever is later
+    const workStartHour = 9
+    const now = new Date()
+    if (now.getHours() < workStartHour) {
+      currentTime = new Date(now.setHours(workStartHour, 0, 0, 0))
     }
 
-    // 2. Fetch task blocks from database
+    // Schedule NOW task first
+    if (queueState.now) {
+      const task = queueState.now
+      const startTime = format(currentTime, 'HH:mm')
+      const endDate = addMinutes(currentTime, task.estimated_duration)
+      const endTime = format(endDate, 'HH:mm')
+      
+      events.push({
+        id: task.id,
+        type: 'queue-task',
+        title: `🎯 NOW: ${task.title}`,
+        startTime,
+        endTime,
+        duration: task.estimated_duration,
+        taskIds: [task.id],
+        priority: 'now',
+        mutable: true,
+        metadata: { taskId: task.id, priority: 'now', isPinned: task.is_pinned }
+      })
+      
+      currentTime = endDate
+    }
+
+    // Schedule NEXT tasks in order
+    if (queueState.next && queueState.next.length > 0) {
+      for (const task of queueState.next) {
+        const startTime = format(currentTime, 'HH:mm')
+        const endDate = addMinutes(currentTime, task.estimated_duration)
+        const endTime = format(endDate, 'HH:mm')
+        
+        events.push({
+          id: task.id,
+          type: 'queue-task',
+          title: `⏭️ NEXT: ${task.title}`,
+          startTime,
+          endTime,
+          duration: task.estimated_duration,
+          taskIds: [task.id],
+          priority: 'next',
+          mutable: true,
+          metadata: { taskId: task.id, priority: 'next', isPinned: task.is_pinned }
+        })
+        
+        currentTime = endDate
+      }
+    }
+
+    // Optionally include LATER tasks if requested
+    if (includeAll && queueState.later && queueState.later.length > 0) {
+      for (const task of queueState.later.slice(0, 5)) { // Limit to first 5
+        const startTime = format(currentTime, 'HH:mm')
+        const endDate = addMinutes(currentTime, task.estimated_duration)
+        const endTime = format(endDate, 'HH:mm')
+        
+        events.push({
+          id: task.id,
+          type: 'queue-task',
+          title: `📋 LATER: ${task.title}`,
+          startTime,
+          endTime,
+          duration: task.estimated_duration,
+          taskIds: [task.id],
+          priority: 'later',
+          mutable: true,
+          metadata: { taskId: task.id, priority: 'later' }
+        })
+        
+        currentTime = endDate
+      }
+    }
+
+    // 2. Fetch manual task blocks from database (overlay on queue)
     const { data: taskBlocks } = await supabase
       .from('day_timeline_events')
       .select('*')
@@ -109,7 +183,13 @@ export async function GET(req: NextRequest) {
       return timeA[0] * 60 + timeA[1] - (timeB[0] * 60 + timeB[1])
     })
 
-    return NextResponse.json({ events })
+    console.log(`✅ [API Timeline] Built timeline with ${events.length} events (NOW: ${queueState.now ? 1 : 0}, NEXT: ${queueState.next.length})`)
+
+    return NextResponse.json({ events, queueSummary: {
+      nowCount: queueState.now ? 1 : 0,
+      nextCount: queueState.next.length,
+      laterCount: queueState.laterCount
+    }})
   } catch (err: any) {
     console.error('Error in GET /api/day-assistant/timeline:', err)
     return NextResponse.json({ error: err.message }, { status: 500 })

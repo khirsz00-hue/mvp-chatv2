@@ -2,6 +2,8 @@
 
 This document provides a visual overview of all implemented features for the enhanced Day Assistant.
 
+> 📘 **See also:** [Timeline & Recommendations Guide](./TIMELINE_AND_RECOMMENDATIONS.md) for detailed documentation on timeline scheduling and accepting AI recommendations.
+
 ## Architecture Overview
 
 ```
