@@ -26,8 +26,10 @@ import { apiGet, apiPost, apiPut } from '@/lib/api'
  * 
  * Displays NOW/NEXT/LATER sections with task queue management
  */
-// Debounce timing constant
+// Debounce timing constants
 const REFRESH_DEBOUNCE_MS = 500
+const ACTION_COMPLETE_DELAY_MS = 500 // Delay before releasing action flag
+const MIN_ENERGY_MODE_FETCH_INTERVAL_MS = 1000 // Minimum interval between energy mode fetches
 
 export function DayAssistantView() {
   const { showToast } = useToast()
@@ -56,7 +58,6 @@ export function DayAssistantView() {
   // Energy mode fetch lock to prevent parallel requests
   const energyModeFetchLockRef = useRef(false)
   const lastEnergyModeFetchRef = useRef<number>(0)
-  const MIN_ENERGY_MODE_FETCH_INTERVAL = 1000 // 1 second minimum interval
 
   // Get current user
   useEffect(() => {
@@ -224,7 +225,7 @@ export function DayAssistantView() {
     
     // Check minimum interval
     const now = Date.now()
-    if (now - lastEnergyModeFetchRef.current < MIN_ENERGY_MODE_FETCH_INTERVAL) {
+    if (now - lastEnergyModeFetchRef.current < MIN_ENERGY_MODE_FETCH_INTERVAL_MS) {
       console.log('⏳ [DayAssistant] Energy mode change too soon, debouncing...')
       return
     }
@@ -253,7 +254,7 @@ export function DayAssistantView() {
       // Release action flag after short delay
       setTimeout(() => {
         actionInProgressRef.current = false
-      }, 500)
+      }, ACTION_COMPLETE_DELAY_MS)
     }
   }
 
@@ -278,7 +279,7 @@ export function DayAssistantView() {
       // Release action flag after short delay
       setTimeout(() => {
         actionInProgressRef.current = false
-      }, 500)
+      }, ACTION_COMPLETE_DELAY_MS)
     }
   }
 
@@ -307,7 +308,7 @@ export function DayAssistantView() {
       // Release action flag after short delay
       setTimeout(() => {
         actionInProgressRef.current = false
-      }, 500)
+      }, ACTION_COMPLETE_DELAY_MS)
     }
   }
 
@@ -333,7 +334,7 @@ export function DayAssistantView() {
       // Release action flag after short delay
       setTimeout(() => {
         actionInProgressRef.current = false
-      }, 500)
+      }, ACTION_COMPLETE_DELAY_MS)
     }
   }
 
@@ -559,7 +560,7 @@ export function DayAssistantView() {
                     // Release action flag after short delay
                     setTimeout(() => {
                       actionInProgressRef.current = false
-                    }, 500)
+                    }, ACTION_COMPLETE_DELAY_MS)
                   }
                 }}
               />

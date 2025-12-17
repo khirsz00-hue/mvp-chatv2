@@ -46,7 +46,10 @@ const EVENT_COLORS = {
   'task-block': 'bg-purple-500',
   'ghost-proposal': 'bg-gray-400 opacity-60 border-2 border-dashed',
   'queue-task': 'bg-brand-purple'
-}
+} as const
+
+// Event type constants
+const EVENT_TYPE_TASK_BLOCK = 'task-block' as const
 
 // Priority-specific colors for queue tasks
 const PRIORITY_COLORS = {
@@ -124,7 +127,7 @@ export function DayTimeline({
       if (response.ok) {
         // Optimistically update local state instead of full refresh
         setEvents(prev => prev.map(e => 
-          e.id === event.id ? { ...e, type: 'task-block' as const } : e
+          e.id === event.id ? { ...e, type: EVENT_TYPE_TASK_BLOCK } : e
         ))
         // Only refresh queue if callback provided (debounced by parent)
         if (onRefresh) {
