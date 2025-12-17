@@ -5,9 +5,11 @@
  * Supabase authentication in API routes
  */
 
-// Simple in-memory cache for GET requests
+// Simple in-memory cache for GET requests - stores response body as JSON
 interface CacheEntry {
-  data: Response
+  data: any
+  status: number
+  headers: Record<string, string>
   timestamp: number
 }
 
@@ -34,7 +36,11 @@ export async function apiGet(
     const cached = getCache.get(cacheKey)
     if (cached && Date.now() - cached.timestamp < ttl) {
       console.log(`[API Cache] Hit for ${path}`)
-      return cached.data.clone()
+      // Create a new Response from cached data
+      return new Response(JSON.stringify(cached.data), {
+        status: cached.status,
+        headers: cached.headers
+      })
     }
   }
   
@@ -42,21 +48,31 @@ export async function apiGet(
   const pending = pendingRequests.get(cacheKey)
   if (pending) {
     console.log(`[API Dedup] Reusing in-flight request for ${path}`)
-    return pending.then(res => res.clone())
+    return pending
   }
   
   // Make the request
   const requestPromise = fetch(path, {
     credentials: 'include',
     ...init,
-  }).then(res => {
+  }).then(async res => {
     // Remove from pending
     pendingRequests.delete(cacheKey)
     
     // Cache if enabled and successful
     if (cache && res.ok) {
+      // Clone and consume the response to cache it
+      const cloned = res.clone()
+      const data = await cloned.json()
+      const headers: Record<string, string> = {}
+      cloned.headers.forEach((value, key) => {
+        headers[key] = value
+      })
+      
       getCache.set(cacheKey, {
-        data: res.clone(),
+        data,
+        status: res.status,
+        headers,
         timestamp: Date.now()
       })
       

@@ -170,7 +170,10 @@ export function DayTimeline({
           const data = await response.json()
           // Smooth update - only if events actually changed
           const newEvents = data.events || []
-          if (JSON.stringify(newEvents) !== JSON.stringify(events)) {
+          // Shallow comparison: check if length or any IDs changed
+          const hasChanged = newEvents.length !== events.length || 
+            newEvents.some((e: TimelineEvent, i: number) => e.id !== events[i]?.id)
+          if (hasChanged) {
             setEvents(newEvents)
           }
         }

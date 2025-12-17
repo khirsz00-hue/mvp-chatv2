@@ -95,9 +95,11 @@ ${clarification.doneCriteria ? `- Kryteria ukończenia: ${clarification.doneCrit
     try {
       // Record feedback (except for clarify which is a navigation action)
       if (feedback !== 'clarify') {
+        // Map 'regenerate' to 'nonsense' for API compatibility - both mean "try again with different approach"
+        const apiCompatibleFeedback = feedback === 'regenerate' ? 'nonsense' : feedback
         await apiPost('/api/day-assistant/subtasks/feedback', {
           task_id: task.id,
-          feedback_type: feedback === 'regenerate' ? 'nonsense' : feedback,
+          feedback_type: apiCompatibleFeedback,
           feedback_stage: 'pre_completion',
           detail_level: detailLevel
         })

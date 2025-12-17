@@ -289,6 +289,7 @@ export function DayAssistantView() {
     switch (action) {
       case 'escalate':
         // Move task to NOW, push current NOW to NEXT
+        // Type assertion needed because we're updating the priority field optimistically
         newQueueState = {
           now: { ...task, priority: 'now' as DayPriority, is_mega_important: true },
           next: [
@@ -302,6 +303,7 @@ export function DayAssistantView() {
       
       case 'pin':
         // Move task to NEXT if not already there, mark as pinned
+        // Type assertion needed for priority field update
         if (task.priority !== 'next') {
           newQueueState = {
             now: queueState.now?.id === taskId ? null : queueState.now,
@@ -324,6 +326,7 @@ export function DayAssistantView() {
       
       case 'postpone':
         // Move task to LATER
+        // Type assertion needed for priority field update
         newQueueState = {
           now: queueState.now?.id === taskId ? null : queueState.now,
           next: queueState.next.filter(t => t.id !== taskId),
