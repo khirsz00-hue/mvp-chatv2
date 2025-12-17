@@ -374,6 +374,14 @@ export async function getRandomHelpers(limit: number = 5) {
 
     const helperIds = helpers.map(helper => helper.user_id)
 
+    const buildCountMap = (items?: { author_id?: string | null }[]) =>
+      (items || []).reduce<Record<string, number>>((acc, item) => {
+        if (item.author_id) {
+          acc[item.author_id] = (acc[item.author_id] ?? 0) + 1
+        }
+        return acc
+      }, {})
+
     let postCounts: Record<string, number> = {}
     let commentCounts: Record<string, number> = {}
 
@@ -391,19 +399,8 @@ export async function getRandomHelpers(limit: number = 5) {
           .in('author_id', helperIds)
       ])
 
-      postCounts = (posts || []).reduce<Record<string, number>>((acc, post) => {
-        if (post.author_id) {
-          acc[post.author_id] = (acc[post.author_id] || 0) + 1
-        }
-        return acc
-      }, {})
-
-      commentCounts = (comments || []).reduce<Record<string, number>>((acc, comment) => {
-        if (comment.author_id) {
-          acc[comment.author_id] = (acc[comment.author_id] || 0) + 1
-        }
-        return acc
-      }, {})
+      postCounts = buildCountMap(posts)
+      commentCounts = buildCountMap(comments)
     }
 
     // Randomize and limit
@@ -414,8 +411,8 @@ export async function getRandomHelpers(limit: number = 5) {
     const helpersWithStats = randomHelpers.map(helper => ({
       user_id: helper.user_id,
       score: helper.score ?? 0,
-      post_count: postCounts[helper.user_id] || 0,
-      comment_count: commentCounts[helper.user_id] || 0
+      post_count: postCounts[helper.user_id] ?? 0,
+      comment_count: commentCounts[helper.user_id] ?? 0
     }))
 
     return { data: helpersWithStats }

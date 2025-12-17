@@ -51,5 +51,5 @@ export function getNicknameInitials(nickname: string): string {
     .slice(0, 2)
     .toUpperCase()
 
-  return initials || '?'
+  return initials.trim() ? initials : '?'
 }

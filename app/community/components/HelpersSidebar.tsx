@@ -77,19 +77,19 @@ export function HelpersSidebar({ helpers }: HelpersSidebarProps) {
                   </span>
                 </div>
               </div>
-            <div className="flex flex-col items-center text-pink-500">
-              <HandHeart size={18} weight="fill" />
-              <span className="text-xs font-semibold text-gray-700">
-                {helper.score}
-              </span>
-              <span className="text-[10px] text-gray-500 leading-none mt-1">
-                Pomocne
-              </span>
+              <div className="flex flex-col items-center text-pink-500">
+                <HandHeart size={18} weight="fill" />
+                <span className="text-xs font-semibold text-gray-700">
+                  {helper.score}
+                </span>
+                <span className="text-[10px] text-gray-500 leading-none mt-1">
+                  Pomocne
+                </span>
+              </div>
             </div>
-          </div>
-        )
-      })}
-    </div>
+          )
+        })}
+      </div>
 
       <p className="text-xs text-gray-500 mt-4 text-center">
         Brak rankingów, brak presji — wspieramy się wzajemnie
