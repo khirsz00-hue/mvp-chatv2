@@ -108,6 +108,22 @@ export async function DELETE(
       return true
     }
 
+    const attemptRollback = async (
+      shouldRestoreEvents: boolean,
+      shouldRestoreOptions: boolean
+    ): Promise<boolean> => {
+      const tasks: Array<Promise<boolean>> = []
+      if (shouldRestoreEvents) {
+        tasks.push(restoreEvents())
+      }
+      if (shouldRestoreOptions) {
+        tasks.push(restoreOptions())
+      }
+      if (tasks.length === 0) return true
+      const results = await Promise.all(tasks)
+      return results.every(Boolean)
+    }
+
     let eventsDeleted = false
     let optionsDeleted = false
 
@@ -128,9 +144,7 @@ export async function DELETE(
       .eq('decision_id', params.id)
 
     if (optionsError) {
-      const rollbackSucceeded = eventsDeleted
-        ? (await Promise.all([restoreEvents()])).every(Boolean)
-        : true
+      const rollbackSucceeded = await attemptRollback(eventsDeleted, true)
       const rollbackNote = rollbackSucceeded ? '' : ' (rollback may be incomplete)'
       throw new Error(`Failed to delete decision options: ${optionsError.message}${rollbackNote}`)
     }
@@ -145,11 +159,7 @@ export async function DELETE(
       .select()
 
     if (error) {
-      const rollbackResults = await Promise.all([
-        eventsDeleted ? restoreEvents() : Promise.resolve(true),
-        optionsDeleted ? restoreOptions() : Promise.resolve(true)
-      ])
-      const rollbackSucceeded = rollbackResults.every(Boolean)
+      const rollbackSucceeded = await attemptRollback(eventsDeleted, optionsDeleted)
       const rollbackNote = rollbackSucceeded ? '' : ' (rollback may be incomplete)'
       throw new Error(`Failed to delete decision: ${error.message}${rollbackNote}`)
     }
