@@ -505,8 +505,8 @@ export async function getRandomHelpers(limit: number = 5) {
           .in('author_id', helperIds)
       ])
 
-      postCounts = buildCountMap(posts)
-      commentCounts = buildCountMap(comments)
+      postCounts = buildCountMap(posts ?? undefined)
+      commentCounts = buildCountMap(comments ?? undefined)
     }
 
     // Randomize and limit
