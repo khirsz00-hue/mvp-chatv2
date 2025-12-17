@@ -6,7 +6,7 @@ export class AIService {
     hatColor: HatColor,
     decisionTitle: string,
     decisionDescription: string,
-    options: Array<{ title: string; description?: string | null }>,
+    options: Array<{ title: string; description?: string | null }> = [],
     prompt: string
   ): Promise<string> {
     try {
@@ -14,12 +14,15 @@ export class AIService {
         `${idx + 1}. ${opt.title}${opt.description ? ': ' + opt.description : ''}`
       ).join('\n')
 
+      const optionsSection = optionsText
+        ? `Opcje:\n${optionsText}`
+        : 'Opcje: Brak zdefiniowanych opcji - zaproponuj 2-3 najsensowniejsze alternatywy i wskaż najlepszą.'
+
       const userMessage = `
 Decyzja: ${decisionTitle}
 Opis: ${decisionDescription}
 
-Opcje:
-${optionsText}
+${optionsSection}
 
 ${prompt}
 `
@@ -145,7 +148,7 @@ ZASADY:
   static async generateSummary(
     decisionTitle: string,
     decisionDescription: string,
-    options: Array<{ title: string; description?: string | null }>,
+    options: Array<{ title: string; description?: string | null }> = [],
     events: DecisionEvent[]
   ): Promise<{
     perspectives: Array<{ hat: string; name: string; synthesis: string }>
@@ -201,7 +204,7 @@ ZASADY:
 
       const optionsText = options.length > 0 
         ? options.map((opt, idx) => `${idx + 1}. ${opt.title}${opt.description ? ': ' + opt.description : ''}`).join('\n')
-        : 'Brak zdefiniowanych opcji'
+        : 'Brak zdefiniowanych opcji — zaproponuj 2-3 najmocniejsze warianty na podstawie analizy'
 
       let hatSummaries = ''
       Object.entries(userInputsByHat).forEach(([hatColor, inputs]) => {
