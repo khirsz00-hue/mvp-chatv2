@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useToast } from '@/components/ui/Toast'
 import { HatColor, Decision, DecisionOption } from '../types'
@@ -41,17 +41,7 @@ export function DecisionProcess({ decisionId, onBack }: DecisionProcessProps) {
   const [summary, setSummary] = useState<any>(null)
   const [showSummary, setShowSummary] = useState(false)
 
-  useEffect(() => {
-    loadDecision()
-  }, [decisionId])
-
-  useEffect(() => {
-    if (decision) {
-      generateQuestions()
-    }
-  }, [currentHatIndex, decision])
-
-  const loadDecision = async () => {
+  const loadDecision = useCallback(async () => {
     try {
       const result = await DecisionService.getDecision(decisionId)
       setDecision(result.decision)
@@ -76,9 +66,9 @@ export function DecisionProcess({ decisionId, onBack }: DecisionProcessProps) {
       console.error('Error loading decision:', error)
       showToast('Nie udało się załadować decyzji', 'error')
     }
-  }
+  }, [decisionId, showToast])
 
-  const generateQuestions = async () => {
+  const generateQuestions = useCallback(async () => {
     if (!decision) return
 
     setIsGeneratingQuestions(true)
@@ -116,7 +106,17 @@ export function DecisionProcess({ decisionId, onBack }: DecisionProcessProps) {
     } finally {
       setIsGeneratingQuestions(false)
     }
-  }
+  }, [decision, currentHatIndex, decisionId, showToast])
+
+  useEffect(() => {
+    loadDecision()
+  }, [loadDecision])
+
+  useEffect(() => {
+    if (decision) {
+      generateQuestions()
+    }
+  }, [decision, generateQuestions])
 
   const handleNext = async (responses: any) => {
     try {

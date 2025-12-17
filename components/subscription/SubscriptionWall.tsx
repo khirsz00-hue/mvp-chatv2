@@ -131,7 +131,7 @@ export default function SubscriptionWall({ children }: SubscriptionWallProps) {
       isMounted = false
       clearTimeoutIfExists()
     }
-  }, [])
+  }, [router])
 
   const createMissingProfile = async (userId: string, email: string): Promise<boolean> => {
     try {

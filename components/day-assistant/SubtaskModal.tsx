@@ -328,7 +328,7 @@ ${clarification.doneCriteria ? `- Kryteria ukończenia: ${clarification.doneCrit
               <Button variant="ghost" onClick={onClose}>
                 Anuluj
               </Button>
-              <Button onClick={handleGenerate} disabled={loading}>
+              <Button onClick={() => handleGenerate(false)} disabled={loading}>
                 {loading ? 'Generuję...' : '🧠 Generuj kroki'}
               </Button>
             </DialogFooter>
