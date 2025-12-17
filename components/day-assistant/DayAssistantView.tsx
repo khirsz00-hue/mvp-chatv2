@@ -26,10 +26,15 @@ import { apiGet, apiPost, apiPut } from '@/lib/api'
  * 
  * Displays NOW/NEXT/LATER sections with task queue management
  */
+// Debounce timing constant
+const REFRESH_DEBOUNCE_MS = 500
+
 export function DayAssistantView() {
   const { showToast } = useToast()
   const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false) // Separate state for light refresh
+  // NOTE: refreshing state is for future light refresh indicator (e.g., subtle spinner in header)
+  // Currently not rendered in UI but tracks refresh state for potential future use
+  const [refreshing, setRefreshing] = useState(false)
   const [queueState, setQueueState] = useState<QueueState>({
     now: null,
     next: [],
@@ -157,7 +162,7 @@ export function DayAssistantView() {
       // Release lock after a short delay to prevent rapid-fire refreshes
       refreshTimeoutRef.current = setTimeout(() => {
         refreshLockRef.current = false
-      }, 500) // 500ms debounce
+      }, REFRESH_DEBOUNCE_MS)
     }
   }, [userId])
   
