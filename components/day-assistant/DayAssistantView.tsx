@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useToast } from '@/components/ui/Toast'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
@@ -26,6 +26,9 @@ import { apiGet, apiPost, apiPut } from '@/lib/api'
  * 
  * Displays NOW/NEXT/LATER sections with task queue management
  */
+// Debounce timing constant
+const REFRESH_DEBOUNCE_MS = 500
+
 export function DayAssistantView() {
   const { showToast } = useToast()
   const [loading, setLoading] = useState(true)
@@ -42,6 +45,10 @@ export function DayAssistantView() {
   const [selectedTask, setSelectedTask] = useState<DayTask | null>(null)
   const [showLaterExpanded, setShowLaterExpanded] = useState(false)
   const [rightPanelView, setRightPanelView] = useState<'timeline' | 'chat'>('chat')
+  
+  // Debounce/lock mechanism for refreshQueue
+  const refreshLockRef = useRef(false)
+  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Get current user
   useEffect(() => {
@@ -65,25 +72,18 @@ export function DayAssistantView() {
 
     const fetchData = async () => {
       setLoading(true)
+      let hasShown401Toast = false // Track if we've shown auth error toast
+      
       try {
         console.log('🔍 [DayAssistant] Initializing sync for user:', userId)
         
-        // Check if Todoist token exists in DB (single source of truth)
-        const { getTodoistToken } = await import('@/lib/integrations')
-        const token = await getTodoistToken(userId)
-        console.log('🔍 [DayAssistant] Todoist token:', token ? 'FOUND' : 'MISSING')
-        
-        // Auto-sync with Todoist on mount (if needed)
-        if (token && shouldSync()) {
+        // Auto-sync with Todoist on mount (if needed) - uses cached token
+        if (shouldSync()) {
           console.log('🔍 [DayAssistant] Starting Todoist sync...')
           const result = await syncWithTodoist(userId)
           if (result.success) {
             console.log('✅ [DayAssistant] Sync completed successfully')
-          } else {
-            console.warn('⚠️ [DayAssistant] Sync failed or returned no tasks')
           }
-        } else if (!token) {
-          console.warn('⚠️ [DayAssistant] No Todoist token - skipping sync')
         }
         
         // Fetch queue state (authentication via cookies)
@@ -93,7 +93,10 @@ export function DayAssistantView() {
           setQueueState(queue)
         } else if (queueResponse.status === 401) {
           console.error('❌ [DayAssistant] Session missing - user not authenticated')
-          showToast('Zaloguj się, aby korzystać z Asystenta Dnia', 'error')
+          if (!hasShown401Toast) {
+            showToast('Zaloguj się, aby korzystać z Asystenta Dnia', 'error')
+            hasShown401Toast = true
+          }
         } else {
           console.error('❌ [DayAssistant] Queue fetch failed:', await queueResponse.text())
           showToast('Błąd podczas ładowania kolejki', 'error')
@@ -106,7 +109,7 @@ export function DayAssistantView() {
           setEnergyMode(energy.current_mode || 'normal')
         } else if (energyResponse.status === 401) {
           console.error('❌ [DayAssistant] Session missing - user not authenticated')
-          // Don't show duplicate toast, already shown above
+          // Don't show duplicate toast
         } else {
           console.error('❌ [DayAssistant] Energy mode fetch failed:', await energyResponse.text())
         }
@@ -123,6 +126,15 @@ export function DayAssistantView() {
   
   const refreshQueue = useCallback(async (includeLater = false) => {
     if (!userId) return
+    
+    // Debounce/lock: prevent concurrent refreshes
+    if (refreshLockRef.current) {
+      console.log('⏳ [DayAssistant] Refresh already in progress, skipping...')
+      return
+    }
+    
+    // Set lock to prevent concurrent refreshes (no global spinner)
+    refreshLockRef.current = true
 
     try {
       const url = `/api/day-assistant/queue${includeLater ? '?includeLater=true' : ''}`
@@ -135,19 +147,27 @@ export function DayAssistantView() {
       }
     } catch (error) {
       console.error('❌ [DayAssistant] Error refreshing queue:', error)
+    } finally {
+      // Clear any pending timeout before setting new one (prevent race conditions)
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current)
+      }
+      // Release lock after a short delay to prevent rapid-fire refreshes
+      refreshTimeoutRef.current = setTimeout(() => {
+        refreshLockRef.current = false
+      }, REFRESH_DEBOUNCE_MS)
     }
   }, [userId])
   
-  // Background polling sync (12s interval)
+  // Background polling sync (12s interval) - only when token available
   useEffect(() => {
     if (!userId) return
     
     const syncInterval = setInterval(async () => {
       if (shouldSync()) {
-        console.log('[DayAssistant] Background sync with Todoist...')
         const result = await syncWithTodoist(userId)
         if (result.success && result.taskCount > 0) {
-          // Refresh queue after successful sync
+          // Refresh queue after successful sync (debounced)
           await refreshQueue()
         }
       }
@@ -155,6 +175,15 @@ export function DayAssistantView() {
     
     return () => clearInterval(syncInterval)
   }, [userId, refreshQueue])
+  
+  // Cleanup refresh timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current)
+      }
+    }
+  }, [])
   
   const handleExpandLater = async () => {
     if (!showLaterExpanded) {
