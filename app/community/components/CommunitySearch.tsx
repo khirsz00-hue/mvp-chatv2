@@ -11,12 +11,12 @@ const QUICK_TAGS = TAG_DEFINITIONS.map(({ tag, label }) => ({ value: tag, label 
 export function CommunitySearch() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [query, setQuery] = useState(searchParams.get('q') || '')
-  const [activeTag, setActiveTag] = useState(searchParams.get('tag') || '')
+  const [query, setQuery] = useState(searchParams?.get('q') || '')
+  const [activeTag, setActiveTag] = useState(searchParams?.get('tag') || '')
 
   useEffect(() => {
-    setQuery(searchParams.get('q') || '')
-    setActiveTag(searchParams.get('tag') || '')
+    setQuery(searchParams?.get('q') || '')
+    setActiveTag(searchParams?.get('tag') || '')
   }, [searchParams])
 
   const buildAndPushUrl = (nextQuery: string, nextTag: string) => {
