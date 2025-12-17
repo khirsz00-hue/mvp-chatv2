@@ -1,11 +1,13 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { createPost } from '../actions'
 import Textarea from '@/components/ui/Textarea'
 import Button from '@/components/ui/Button'
 
 export function CreatePostForm() {
+  const router = useRouter()
   const [content, setContent] = useState('')
   const [isAnonymous, setIsAnonymous] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -29,6 +31,7 @@ export function CreatePostForm() {
       } else {
         setContent('')
         setError('')
+        router.refresh()
       }
     } catch (err) {
       setError('Wystąpił nieoczekiwany błąd')
