@@ -203,7 +203,7 @@ export function TaskCard({
   return (
     <Card 
       className={cn(
-        'p-3 md:p-4 border-l-4 transition-all hover:shadow-lg group cursor-pointer',
+        'p-2.5 md:p-4 border-l-4 transition-all hover:shadow-lg group cursor-pointer',
         priorityColors[task.priority] || priorityColors[4],
         loading && 'opacity-50 pointer-events-none',
         deleting && 'opacity-0 scale-95',
@@ -211,7 +211,7 @@ export function TaskCard({
       )}
       onClick={() => onDetails(task)}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-2.5">
         {/* Selection checkbox - shown when bulk selection is active */}
         {selectable && onToggleSelection && (
           <input
@@ -248,7 +248,7 @@ export function TaskCard({
         
         {/* Content */}
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-base md:text-lg break-words group-hover:text-brand-purple transition-colors">
+          <h3 className="font-medium text-sm sm:text-base md:text-lg break-words group-hover:text-brand-purple transition-colors">
             {task.content}
           </h3>
           
