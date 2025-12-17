@@ -426,16 +426,24 @@ export function DayAssistantView() {
           const nextTask = queueState.next[0]
           showToast(`📌 Następne zadanie: ${nextTask.title}`, 'info')
           
-          // Automatically move first NEXT task to NOW
-          const promoteResponse = await apiPost('/api/day-assistant/actions', {
-            taskId: nextTask.id,
-            action: 'promote_to_now'
-          })
-          
-          if (promoteResponse.ok) {
-            // Refresh queue to show promoted task
-            invalidateCache('/api/day-assistant/queue')
-            await refreshQueue()
+          try {
+            // Automatically move first NEXT task to NOW
+            const promoteResponse = await apiPost('/api/day-assistant/actions', {
+              taskId: nextTask.id,
+              action: 'promote_to_now'
+            })
+            
+            if (promoteResponse.ok) {
+              // Refresh queue to show promoted task
+              invalidateCache('/api/day-assistant/queue')
+              await refreshQueue()
+            } else {
+              // If promotion fails, just log it - queue is still valid
+              console.error('❌ [DayAssistant] Auto-promotion failed, but task completion succeeded')
+            }
+          } catch (promoteError) {
+            // Don't fail the whole operation if auto-promote fails
+            console.error('❌ [DayAssistant] Error during auto-promotion:', promoteError)
           }
         }
       } else {

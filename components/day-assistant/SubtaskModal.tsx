@@ -7,6 +7,7 @@ import Badge from '@/components/ui/Badge'
 import { useToast } from '@/components/ui/Toast'
 import { ArrowDown, ArrowUp, XCircle, CheckCircle, ArrowsClockwise } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
+import { useTaskTimer } from '@/components/assistant/TaskTimer'
 import {
   DayTask,
   EnergyMode,
@@ -39,6 +40,7 @@ export function SubtaskModal({
   onGenerated
 }: SubtaskModalProps) {
   const { showToast } = useToast()
+  const { startTimer } = useTaskTimer()
   const [detailLevel, setDetailLevel] = useState<DetailLevel>('standard')
   const [generatedSubtasks, setGeneratedSubtasks] = useState<GeneratedSubtask[]>([])
   const [loading, setLoading] = useState(false)
@@ -92,7 +94,7 @@ ${clarification.doneCriteria ? `- Kryteria ukończenia: ${clarification.doneCrit
     }
   }
 
-  const handleFeedback = async (feedback: 'ok' | 'simplify' | 'split_more' | 'regenerate' | 'clarify', startTimer = false) => {
+  const handleFeedback = async (feedback: 'ok' | 'simplify' | 'split_more' | 'regenerate' | 'clarify', shouldStartTimer = false) => {
     try {
       // Record feedback (except for clarify which is a navigation action)
       if (feedback !== 'clarify') {
@@ -116,18 +118,9 @@ ${clarification.doneCriteria ? `- Kryteria ukończenia: ${clarification.doneCrit
         if (response.ok) {
           showToast('Kroki zapisane!', 'success')
           
-          // Start timer if requested
-          if (startTimer && typeof window !== 'undefined') {
-            const timerState = {
-              taskId: task.id,
-              taskTitle: task.title,
-              startTime: Date.now(),
-              elapsedSeconds: 0,
-              isRunning: true,
-              isPaused: false
-            }
-            localStorage.setItem('taskTimer', JSON.stringify(timerState))
-            window.dispatchEvent(new CustomEvent('timerStateChanged', { detail: timerState }))
+          // Start timer if requested using the hook
+          if (shouldStartTimer) {
+            startTimer(task.id, task.title)
             showToast('⏱️ Timer started!', 'success')
           }
           
