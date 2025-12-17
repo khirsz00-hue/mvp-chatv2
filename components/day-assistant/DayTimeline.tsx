@@ -168,14 +168,13 @@ export function DayTimeline({
         const response = await apiGet(`/api/day-assistant/timeline?date=${today}&includeAll=false`, {}, { cache: true, ttl: 3000 })
         if (response.ok) {
           const data = await response.json()
-          // Smooth update - only if events actually changed
           const newEvents = data.events || []
-          // Shallow comparison: check if length or any IDs changed
-          const hasChanged = newEvents.length !== events.length || 
-            newEvents.some((e: TimelineEvent, i: number) => e.id !== events[i]?.id)
-          if (hasChanged) {
-            setEvents(newEvents)
-          }
+          // Smooth update - only if events actually changed
+          setEvents((prev) => {
+            const hasChanged = newEvents.length !== prev.length || 
+              newEvents.some((e: TimelineEvent, i: number) => e.id !== prev[i]?.id)
+            return hasChanged ? newEvents : prev
+          })
         }
       } catch (error) {
         console.error('Error refreshing timeline:', error)
@@ -185,7 +184,7 @@ export function DayTimeline({
     }, 300) // 300ms debounce
     
     return () => clearTimeout(timeoutId)
-  }, [events, loading, queueState, today])
+  }, [loading, queueState, today])
 
   const handleApprove = async (event: TimelineEvent) => {
     if (onApproveProposal) {
