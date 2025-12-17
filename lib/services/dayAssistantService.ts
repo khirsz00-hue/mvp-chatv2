@@ -157,13 +157,25 @@ export async function getQueueState(userId: string, includeLater = false, client
   // Take only the first task from NOW
   const now = nowTasks[0] || null
 
-  // Limit NEXT based on energy mode
-  const next = nextTasks.slice(0, constraints.maxNextTasks)
+  // Include overflow NOW tasks at the front of NEXT (so they stay visible)
+  const overflowNowTasks = nowTasks.slice(1)
+  const overflowNowCapacity = nextTasks.length > 0
+    ? Math.max(constraints.maxNextTasks - 1, 0)  // keep at least one slot for true NEXT tasks when available
+    : constraints.maxNextTasks
+
+  const overflowNowTasksForNext = overflowNowTasks.slice(0, overflowNowCapacity)
+  const remainingNextCapacity = Math.max(constraints.maxNextTasks - overflowNowTasksForNext.length, 0)
+
+  // Limit NEXT based on energy mode (after accounting for overflow NOW tasks)
+  const next = [
+    ...overflowNowTasksForNext,
+    ...nextTasks.slice(0, remainingNextCapacity)
+  ]
 
   // Rest goes to LATER
   const later = [
-    ...nowTasks.slice(1),  // Additional NOW tasks
-    ...nextTasks.slice(constraints.maxNextTasks),  // Overflow from NEXT
+    ...overflowNowTasks.slice(overflowNowTasksForNext.length),  // Additional NOW tasks beyond NEXT capacity
+    ...nextTasks.slice(remainingNextCapacity),  // Overflow from NEXT (after accommodating overflow NOW)
     ...laterTasks
   ]
 
