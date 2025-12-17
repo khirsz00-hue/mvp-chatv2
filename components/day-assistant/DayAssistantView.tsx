@@ -49,6 +49,14 @@ export function DayAssistantView() {
   // Debounce/lock mechanism for refreshQueue
   const refreshLockRef = useRef(false)
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  
+  // Action flag to disable autosync during user actions
+  const actionInProgressRef = useRef(false)
+  
+  // Energy mode fetch lock to prevent parallel requests
+  const energyModeFetchLockRef = useRef(false)
+  const lastEnergyModeFetchRef = useRef<number>(0)
+  const MIN_ENERGY_MODE_FETCH_INTERVAL = 1000 // 1 second minimum interval
 
   // Get current user
   useEffect(() => {
@@ -86,8 +94,13 @@ export function DayAssistantView() {
           }
         }
         
-        // Fetch queue state (authentication via cookies)
-        const queueResponse = await apiGet(`/api/day-assistant/queue`)
+        // Fetch both queue and energy mode in parallel (single batch, not cascade)
+        const [queueResponse, energyResponse] = await Promise.all([
+          apiGet(`/api/day-assistant/queue`),
+          apiGet(`/api/day-assistant/energy-mode`)
+        ])
+        
+        // Handle queue response
         if (queueResponse.ok) {
           const queue = await queueResponse.json()
           setQueueState(queue)
@@ -102,11 +115,11 @@ export function DayAssistantView() {
           showToast('Błąd podczas ładowania kolejki', 'error')
         }
 
-        // Fetch energy mode (authentication via cookies)
-        const energyResponse = await apiGet(`/api/day-assistant/energy-mode`)
+        // Handle energy mode response
         if (energyResponse.ok) {
           const energy = await energyResponse.json()
           setEnergyMode(energy.current_mode || 'normal')
+          lastEnergyModeFetchRef.current = Date.now()
         } else if (energyResponse.status === 401) {
           console.error('❌ [DayAssistant] Session missing - user not authenticated')
           // Don't show duplicate toast
@@ -160,10 +173,17 @@ export function DayAssistantView() {
   }, [userId])
   
   // Background polling sync (12s interval) - only when token available
+  // Disabled during user actions to prevent conflicts
   useEffect(() => {
     if (!userId) return
     
     const syncInterval = setInterval(async () => {
+      // Skip sync if action is in progress
+      if (actionInProgressRef.current) {
+        console.log('⏸️ [DayAssistant] Skipping autosync - action in progress')
+        return
+      }
+      
       if (shouldSync()) {
         const result = await syncWithTodoist(userId)
         if (result.success && result.taskCount > 0) {
@@ -195,12 +215,30 @@ export function DayAssistantView() {
 
   const handleEnergyModeChange = async (newMode: EnergyMode) => {
     if (!userId) return
+    
+    // Prevent parallel energy mode changes
+    if (energyModeFetchLockRef.current) {
+      console.log('⏳ [DayAssistant] Energy mode change already in progress, skipping...')
+      return
+    }
+    
+    // Check minimum interval
+    const now = Date.now()
+    if (now - lastEnergyModeFetchRef.current < MIN_ENERGY_MODE_FETCH_INTERVAL) {
+      console.log('⏳ [DayAssistant] Energy mode change too soon, debouncing...')
+      return
+    }
+    
+    // Set action flag to disable autosync
+    actionInProgressRef.current = true
+    energyModeFetchLockRef.current = true
 
     try {
       const response = await apiPost('/api/day-assistant/energy-mode', { mode: newMode })
 
       if (response.ok) {
         setEnergyMode(newMode)
+        lastEnergyModeFetchRef.current = Date.now()
         showToast(`Tryb zmieniony na ${ENERGY_MODE_EMOJI[newMode]}`, 'success')
         await refreshQueue()  // Refresh to apply new constraints
       } else {
@@ -210,11 +248,20 @@ export function DayAssistantView() {
     } catch (error) {
       console.error('Error changing energy mode:', error)
       showToast('Błąd podczas zmiany trybu', 'error')
+    } finally {
+      energyModeFetchLockRef.current = false
+      // Release action flag after short delay
+      setTimeout(() => {
+        actionInProgressRef.current = false
+      }, 500)
     }
   }
 
   const handleTaskAction = async (taskId: string, action: 'pin' | 'postpone' | 'escalate') => {
     if (!userId) return
+    
+    // Set action flag to disable autosync
+    actionInProgressRef.current = true
 
     try {
       const response = await apiPost('/api/day-assistant/actions', { taskId, action })
@@ -227,6 +274,11 @@ export function DayAssistantView() {
     } catch (error) {
       console.error('Error performing action:', error)
       showToast('Błąd podczas wykonywania akcji', 'error')
+    } finally {
+      // Release action flag after short delay
+      setTimeout(() => {
+        actionInProgressRef.current = false
+      }, 500)
     }
   }
 
@@ -237,6 +289,9 @@ export function DayAssistantView() {
 
   const handleCompleteTask = async (taskId: string) => {
     if (!userId) return
+    
+    // Set action flag to disable autosync
+    actionInProgressRef.current = true
 
     try {
       const response = await apiPut('/api/day-assistant/tasks', { taskId, completed: true })
@@ -248,11 +303,19 @@ export function DayAssistantView() {
     } catch (error) {
       console.error('Error completing task:', error)
       showToast('Błąd podczas oznaczania jako ukończone', 'error')
+    } finally {
+      // Release action flag after short delay
+      setTimeout(() => {
+        actionInProgressRef.current = false
+      }, 500)
     }
   }
 
   const handleUndoLastAction = async () => {
     if (!userId) return
+    
+    // Set action flag to disable autosync
+    actionInProgressRef.current = true
 
     try {
       const response = await apiPost('/api/day-assistant/undo', {})
@@ -266,6 +329,11 @@ export function DayAssistantView() {
     } catch (error) {
       console.error('Error undoing action:', error)
       showToast('Błąd podczas cofania', 'error')
+    } finally {
+      // Release action flag after short delay
+      setTimeout(() => {
+        actionInProgressRef.current = false
+      }, 500)
     }
   }
 
@@ -462,6 +530,10 @@ export function DayAssistantView() {
                 onActionApply={async (recommendation) => {
                   // Handle applying recommendations from chat
                   console.log('Applying recommendation:', recommendation)
+                  
+                  // Set action flag to disable autosync
+                  actionInProgressRef.current = true
+                  
                   try {
                     const response = await apiPost('/api/day-assistant/recommendations/apply', {
                       recommendation
@@ -471,7 +543,7 @@ export function DayAssistantView() {
                       const result = await response.json()
                       if (result.success) {
                         showToast(result.message || 'Rekomendacja zastosowana! ✅', 'success')
-                        // Refresh both queue and timeline
+                        // Single refresh of queue (no cascade)
                         await refreshQueue()
                       } else {
                         showToast('Nie udało się zastosować wszystkich akcji', 'warning')
@@ -483,6 +555,11 @@ export function DayAssistantView() {
                   } catch (error) {
                     console.error('Error applying recommendation:', error)
                     showToast('Błąd podczas stosowania rekomendacji', 'error')
+                  } finally {
+                    // Release action flag after short delay
+                    setTimeout(() => {
+                      actionInProgressRef.current = false
+                    }, 500)
                   }
                 }}
               />
