@@ -47,6 +47,7 @@ export function DayAssistantView() {
   const [selectedTask, setSelectedTask] = useState<DayTask | null>(null)
   const [showLaterExpanded, setShowLaterExpanded] = useState(false)
   const [rightPanelView, setRightPanelView] = useState<'timeline' | 'chat'>('chat')
+  const showToastRef = useRef(showToast)
   
   // Debounce/lock mechanism for refreshQueue
   const refreshLockRef = useRef(false)
@@ -59,6 +60,11 @@ export function DayAssistantView() {
   const energyModeFetchLockRef = useRef(false)
   const lastEnergyModeFetchRef = useRef<number>(0)
 
+  // Keep toast reference stable inside effects to avoid unnecessary reload loops
+  useEffect(() => {
+    showToastRef.current = showToast
+  }, [showToast])
+
   // Get current user
   useEffect(() => {
     const getCurrentUser = async () => {
@@ -69,11 +75,11 @@ export function DayAssistantView() {
         setUserId(user.id)
       } else {
         console.error('❌ [DayAssistant] No user ID found')
-        showToast('Please log in to use Day Assistant', 'error')
+        showToastRef.current('Please log in to use Day Assistant', 'error')
       }
     }
     getCurrentUser()
-  }, [showToast])
+  }, [])
 
   // Fetch queue state and energy mode + auto-sync with Todoist
   useEffect(() => {
@@ -108,12 +114,12 @@ export function DayAssistantView() {
         } else if (queueResponse.status === 401) {
           console.error('❌ [DayAssistant] Session missing - user not authenticated')
           if (!hasShown401Toast) {
-            showToast('Zaloguj się, aby korzystać z Asystenta Dnia', 'error')
+            showToastRef.current('Zaloguj się, aby korzystać z Asystenta Dnia', 'error')
             hasShown401Toast = true
           }
         } else {
           console.error('❌ [DayAssistant] Queue fetch failed:', await queueResponse.text())
-          showToast('Błąd podczas ładowania kolejki', 'error')
+          showToastRef.current('Błąd podczas ładowania kolejki', 'error')
         }
 
         // Handle energy mode response
@@ -129,14 +135,14 @@ export function DayAssistantView() {
         }
       } catch (error) {
         console.error('❌ [DayAssistant] Error fetching data:', error)
-        showToast('Błąd podczas ładowania danych', 'error')
+        showToastRef.current('Błąd podczas ładowania danych', 'error')
       } finally {
         setLoading(false)
       }
     }
 
     fetchData()
-  }, [userId, showToast])
+  }, [userId])
   
   const refreshQueue = useCallback(async (includeLater = false) => {
     if (!userId) return
