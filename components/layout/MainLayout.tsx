@@ -10,6 +10,8 @@ import { TasksAssistant } from '@/components/assistant/TasksAssistant'
 import { DayAssistantView } from '@/components/day-assistant/DayAssistantView'
 import { JournalAssistantWrapper } from '@/components/journal/JournalAssistantWrapper'
 import { DecisionAssistant } from '@/src/features/decision-assistant/components/DecisionAssistant'
+import { TestDayAssistantView } from '@/components/test-day-assistant/TestDayAssistantView'
+import { WeekAssistantView } from '@/components/week-assistant/WeekAssistantView'
 import SubscriptionWall from '@/components/subscription/SubscriptionWall'
 
 /**
@@ -89,7 +91,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     // Don't auto-redirect to community - let user stay on main page
     try {
       const stored = localStorage.getItem('active_assistant') as AssistantId | null
-      if (stored && stored !== 'community' && ['tasks', 'day-assistant', 'planning', 'journal', 'decisions', 'support', 'admin'].includes(stored)) {
+      if (stored && stored !== 'community' && ['tasks', 'day-assistant', 'test-day-assistant', 'planning', 'journal', 'decisions', 'support', 'admin'].includes(stored)) {
         setActiveView(stored)
       }
     } catch {}
@@ -107,6 +109,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
       
       case 'day-assistant':
         return <DayAssistantView />
+      
+      case 'test-day-assistant':
+        return <TestDayAssistantView />
       
       case 'journal':
         return <JournalAssistantWrapper />
@@ -148,8 +153,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         )
       
       case 'planning':
-        router.push('/assistant-week')
-        return null
+        return <WeekAssistantView />
       case 'support':
         return (
           <div className="glass p-8 rounded-2xl text-center">
