@@ -74,19 +74,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
-    // Get existing assistant
-    const assistant = await getOrCreateTestDayAssistant(user.id)
+    // Get existing assistant (without creating a new one)
+    const { data: assistant, error } = await supabase
+      .from('assistant_config')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('name', 'asystent dnia test')
+      .maybeSingle()
+    
+    if (error) {
+      console.error('Error fetching existing assistant:', error)
+      return NextResponse.json({ error: 'Failed to fetch assistant' }, { status: 500 })
+    }
     
     if (!assistant) {
-      return NextResponse.json(
-        { error: 'Assistant not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Assistant not found' }, { status: 404 })
     }
     
     return NextResponse.json({
       assistant,
-      message: 'Assistant retrieved successfully'
+      message: generateConfirmationMessage(assistant)
     })
   } catch (error) {
     console.error('Error in GET /api/test-day-assistant/init:', error)
@@ -107,5 +114,9 @@ function generateConfirmationMessage(assistant: any): string {
   const maxPostpones = settings.max_postpones_before_escalation || DEFAULT_SETTINGS.max_postpones_before_escalation
   const morningBlock = settings.morning_must_block_default || DEFAULT_SETTINGS.morning_must_block_default
   
-  return `Utworzyłem asystenta: asystent dnia test — gotowy do działania. Domyślne ustawienia: undo ${undoWindow}s, max_postpones_before_escalation ${maxPostpones}, morning_must_block ${morningBlock} min. Chcesz zmienić progi lub presety?`
+  // Required confirmation message
+  const confirmation = 'Utworzyłem asystenta: asystent dnia test — gotowy do działania'
+  
+  // Keep detailed settings context for clients that display more info
+  return `${confirmation}. Domyślne ustawienia: undo ${undoWindow}s, max_postpones_before_escalation ${maxPostpones}, morning_must_block ${morningBlock} min. Chcesz zmienić progi lub presety?`
 }
