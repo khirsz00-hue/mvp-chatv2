@@ -14,6 +14,7 @@ interface Post {
   comment_count: number
   is_anonymous: boolean
   isLiked: boolean
+  tags?: string[] | null
 }
 
 interface PostDetailProps {
@@ -24,6 +25,9 @@ export function PostDetail({ post }: PostDetailProps) {
   const [isLiked, setIsLiked] = useState(post.isLiked)
   const [likeCount, setLikeCount] = useState(post.like_count)
   const [isLiking, setIsLiking] = useState(false)
+  const tags = (post.tags || []).filter(Boolean)
+
+  const formatTag = (tag: string) => tag.replace(/-/g, ' ')
 
   const handleLike = async () => {
     if (isLiking) return
@@ -82,6 +86,19 @@ export function PostDetail({ post }: PostDetailProps) {
           <p className="text-gray-900 text-lg whitespace-pre-wrap break-words mb-6">
             {post.content}
           </p>
+
+          {tags.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-6">
+              {tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center rounded-full bg-purple-50 text-purple-700 text-xs font-medium px-3 py-1"
+                >
+                  #{formatTag(tag)}
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex items-center gap-6 pt-4 border-t border-gray-200">

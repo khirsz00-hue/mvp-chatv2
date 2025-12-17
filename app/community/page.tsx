@@ -1,10 +1,21 @@
 import { CommunityFeed } from './components/CommunityFeed'
+import { CommunitySearch } from './components/CommunitySearch'
 import { CreatePostForm } from './components/CreatePostForm'
 import { HelpersSidebar } from './components/HelpersSidebar'
 import { getPosts, getRandomHelpers } from './actions'
 
-export default async function CommunityPage() {
-  const { data: posts, error: postsError } = await getPosts()
+export default async function CommunityPage({
+  searchParams
+}: {
+  searchParams?: { q?: string; tag?: string }
+}) {
+  const searchTerm = typeof searchParams?.q === 'string' ? searchParams.q : undefined
+  const selectedTag = typeof searchParams?.tag === 'string' ? searchParams.tag : undefined
+
+  const { data: posts, error: postsError } = await getPosts({
+    search: searchTerm,
+    tag: selectedTag
+  })
   const { data: helpers } = await getRandomHelpers(5)
 
   return (
@@ -21,6 +32,7 @@ export default async function CommunityPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main content */}
         <div className="lg:col-span-2 space-y-6">
+          <CommunitySearch />
           <CreatePostForm />
           
           {postsError ? (
@@ -28,7 +40,11 @@ export default async function CommunityPage() {
               <p className="text-red-600">{postsError}</p>
             </div>
           ) : (
-            <CommunityFeed initialPosts={posts || []} />
+            <CommunityFeed
+              initialPosts={posts || []}
+              searchTerm={searchTerm}
+              selectedTag={selectedTag}
+            />
           )}
         </div>
 

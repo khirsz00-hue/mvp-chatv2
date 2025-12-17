@@ -82,13 +82,14 @@ create policy "Wiadomości tylko własne"
 create table if not exists posts (
   id uuid primary key default gen_random_uuid(),
   created_at timestamp with time zone default now(),
-  author_id uuid references auth.users(id) on delete set null,
-  is_anonymous boolean default true,
-  content text not null,
-  like_count integer default 0,
-  comment_count integer default 0,
-  status text check (status in ('active', 'hidden', 'reported')) default 'active'
-);
+   author_id uuid references auth.users(id) on delete set null,
+   is_anonymous boolean default true,
+   content text not null,
+   tags text[] default '{}',
+   like_count integer default 0,
+   comment_count integer default 0,
+   status text check (status in ('active', 'hidden', 'reported')) default 'active'
+  );
 
 -- 🔹 Comments table
 create table if not exists comments (
@@ -122,6 +123,7 @@ create table if not exists helper_scores (
 -- Indexes for performance
 create index if not exists idx_posts_created_at on posts(created_at desc);
 create index if not exists idx_posts_status on posts(status);
+create index if not exists idx_posts_tags on posts using gin(tags);
 create index if not exists idx_comments_post_id on comments(post_id);
 create index if not exists idx_comments_created_at on comments(created_at desc);
 create index if not exists idx_likes_user_id on likes(user_id);

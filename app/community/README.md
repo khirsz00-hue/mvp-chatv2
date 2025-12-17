@@ -50,7 +50,7 @@ createPost(content, isAnonymous)      // Create new post
 createComment(postId, content, isAnonymous)  // Add comment
 likePost(postId)                      // Toggle post like
 likeComment(commentId, postId)        // Toggle comment like
-getPosts(limit)                       // Fetch posts
+getPosts({ limit, search, tag })      // Fetch posts with optional filters
 getPost(postId)                       // Fetch post + comments
 getRandomHelpers(limit)               // Fetch helpers
 ```
@@ -95,6 +95,7 @@ All tables have RLS enabled for security.
 - Comment on posts
 - Like posts and comments
 - See supportive community members
+- Find threads faster with automatic tags and search
 
 ### For System
 - Automatic comment counting
@@ -132,7 +133,7 @@ All tables have RLS enabled for security.
 - [ ] Report inappropriate content
 - [ ] Edit/delete own posts
 - [ ] Admin moderation dashboard
-- [ ] Optional topic tags
+- [x] Automatic topic tags + search
 - [ ] Bookmark posts
 
 ## 📞 Need Help?
