@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 
 export default function KnowledgeEditor() {
   const [assistant, setAssistant] = useState<string>('todoist')
@@ -9,11 +9,7 @@ export default function KnowledgeEditor() {
   const [content, setContent] = useState<string>('')
   const [prompt, setPrompt] = useState<string>('')
 
-  useEffect(() => {
-    loadFiles()
-  }, [assistant])
-
-  async function loadFiles() {
+  const loadFiles = useCallback(async () => {
     try {
       const res = await fetch(`/api/admin/knowledge?assistant=${encodeURIComponent(assistant)}`)
       const data = await res.json()
@@ -22,7 +18,11 @@ export default function KnowledgeEditor() {
       console.error('loadFiles error', err)
       setFiles([])
     }
-  }
+  }, [assistant])
+
+  useEffect(() => {
+    loadFiles()
+  }, [loadFiles])
 
   async function openFile(file: string) {
     try {

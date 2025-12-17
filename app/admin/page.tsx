@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card'
@@ -24,11 +24,22 @@ export default function AdminPage() {
   const { showToast } = useToast()
   const router = useRouter()
 
-  useEffect(() => {
-    checkAdminAndLoad()
-  }, [])
+  const loadUsers = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .order('created_at', { ascending: false })
 
-  const checkAdminAndLoad = async () => {
+    if (error) {
+      console.error('Error loading users:', error)
+      showToast('Błąd podczas ładowania użytkowników', 'error')
+      return
+    }
+
+    setUsers(data || [])
+  }, [showToast])
+
+  const checkAdminAndLoad = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       
@@ -58,22 +69,11 @@ export default function AdminPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [loadUsers, router, showToast])
 
-  const loadUsers = async () => {
-    const { data, error } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('Error loading users:', error)
-      showToast('Błąd podczas ładowania użytkowników', 'error')
-      return
-    }
-
-    setUsers(data || [])
-  }
+  useEffect(() => {
+    checkAdminAndLoad()
+  }, [checkAdminAndLoad])
 
   const toggleSubscription = async (userId: string, currentStatus: string) => {
     const newStatus = currentStatus === 'active' ? 'inactive' : 'active'

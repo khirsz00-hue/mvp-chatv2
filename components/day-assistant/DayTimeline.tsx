@@ -185,7 +185,7 @@ export function DayTimeline({
     }, 300) // 300ms debounce
     
     return () => clearTimeout(timeoutId)
-  }, [queueState, today, loading])
+  }, [events, loading, queueState, today])
 
   const handleApprove = async (event: TimelineEvent) => {
     if (onApproveProposal) {

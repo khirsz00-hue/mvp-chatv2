@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
@@ -37,14 +37,7 @@ export function AIInsightsPanel({ tasks, completedTasks = [], className }: AIIns
   const [hasGenerated, setHasGenerated] = useState(false)
   
   // Auto-generate insights on mount if not collapsed
-  useEffect(() => {
-    if (!hasGenerated && !isCollapsed && tasks.length > 0) {
-      generateInsights()
-      setHasGenerated(true)
-    }
-  }, [tasks, hasGenerated, isCollapsed])
-  
-  const generateInsights = async () => {
+  const generateInsights = useCallback(async () => {
     setLoading(true)
     setError(null)
     
@@ -82,7 +75,14 @@ export function AIInsightsPanel({ tasks, completedTasks = [], className }: AIIns
     } finally {
       setLoading(false)
     }
-  }
+  }, [completedTasks, tasks])
+  
+  useEffect(() => {
+    if (!hasGenerated && !isCollapsed && tasks.length > 0) {
+      generateInsights()
+      setHasGenerated(true)
+    }
+  }, [generateInsights, hasGenerated, isCollapsed, tasks])
   
   const getInsightIcon = (type: AIInsight['type']) => {
     switch (type) {

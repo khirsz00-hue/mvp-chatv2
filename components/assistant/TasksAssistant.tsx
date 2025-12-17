@@ -185,7 +185,7 @@ export function TasksAssistant() {
       console.error('Error fetching projects:', err)
       showToast('Błąd przy pobieraniu projektów', 'error')
     }
-  }, [token])
+  }, [showToast, token])
   
   // Fetch tasks on mount and when filter or token changes
   useEffect(() => {

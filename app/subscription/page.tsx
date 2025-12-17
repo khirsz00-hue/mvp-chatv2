@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { useCallback, useEffect, useState, Suspense } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import Button from '@/components/ui/Button'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/Card'
@@ -25,20 +25,7 @@ function SubscriptionContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  useEffect(() => {
-    // Check for success/cancel params
-    if (searchParams?.get('success')) {
-      showToast('Subskrypcja aktywowana pomyślnie!', 'success')
-      router.replace('/subscription')
-    } else if (searchParams?.get('canceled')) {
-      showToast('Płatność anulowana', 'error')
-      router.replace('/subscription')
-    }
-
-    loadProfile()
-  }, [searchParams])
-
-  const loadProfile = async () => {
+  const loadProfile = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
@@ -58,7 +45,20 @@ function SubscriptionContent() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [router])
+
+  useEffect(() => {
+    // Check for success/cancel params
+    if (searchParams?.get('success')) {
+      showToast('Subskrypcja aktywowana pomyślnie!', 'success')
+      router.replace('/subscription')
+    } else if (searchParams?.get('canceled')) {
+      showToast('Płatność anulowana', 'error')
+      router.replace('/subscription')
+    }
+
+    loadProfile()
+  }, [loadProfile, router, searchParams, showToast])
 
   const handleSubscribe = async (planType: string) => {
     setProcessingCheckout(true)
