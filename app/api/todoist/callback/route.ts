@@ -1,4 +1,7 @@
 import { NextResponse } from 'next/server'
+import { createAuthenticatedSupabaseClient, getAuthenticatedUser } from '@/lib/supabaseAuth'
+
+export const dynamic = 'force-dynamic'
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
@@ -21,6 +24,18 @@ export async function GET(req: Request) {
   }
 
   try {
+    // Get authenticated user
+    const supabase = await createAuthenticatedSupabaseClient()
+    const user = await getAuthenticatedUser(supabase)
+
+    if (!user) {
+      console.error('[Todoist Callback] ✗ No authenticated user')
+      return NextResponse.redirect(`${baseUrl}/login?error=not_authenticated`)
+    }
+
+    console.log(`[Todoist Callback] ✓ Authenticated user: ${user.id}`)
+
+    // Exchange code for token
     const tokenRes = await fetch('https://todoist.com/oauth/access_token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -32,15 +47,29 @@ export async function GET(req: Request) {
     })
 
     const data = await tokenRes.json()
-    console.log('🔑 Otrzymano token Todoist:', data)
+    console.log('[Todoist Callback] 🔑 Token received')
 
     if (!data.access_token) {
       throw new Error(JSON.stringify(data))
     }
 
-    return NextResponse.redirect(`${baseUrl}/?todoist_token=${data.access_token}`)
+    // Save token to database
+    const { error: updateError } = await supabase
+      .from('user_profiles')
+      .update({ todoist_token: data.access_token })
+      .eq('id', user.id)
+
+    if (updateError) {
+      console.error('[Todoist Callback] ✗ Failed to save token to DB:', updateError.message)
+      throw updateError
+    }
+
+    console.log('[Todoist Callback] ✓ Token saved to database for user:', user.id)
+
+    // Redirect with success indicator
+    return NextResponse.redirect(`${baseUrl}/?todoist_connected=true`)
   } catch (err) {
-    console.error('⚠️ Błąd podczas wymiany kodu OAuth:', err)
-    return NextResponse.json({ error: 'Nie udało się uzyskać tokena.' }, { status: 500 })
+    console.error('[Todoist Callback] ⚠️ Error during OAuth exchange:', err)
+    return NextResponse.redirect(`${baseUrl}/?error=todoist_connection_failed`)
   }
 }

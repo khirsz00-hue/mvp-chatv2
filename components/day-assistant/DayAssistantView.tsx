@@ -68,8 +68,9 @@ export function DayAssistantView() {
       try {
         console.log('🔍 [DayAssistant] Initializing sync for user:', userId)
         
-        // Check if Todoist token exists
-        const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
+        // Check if Todoist token exists in DB (single source of truth)
+        const { getTodoistToken } = await import('@/lib/integrations')
+        const token = await getTodoistToken(userId)
         console.log('🔍 [DayAssistant] Todoist token:', token ? 'FOUND' : 'MISSING')
         
         // Auto-sync with Todoist on mount (if needed)

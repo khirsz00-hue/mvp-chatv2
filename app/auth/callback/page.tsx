@@ -15,6 +15,7 @@ export default function AuthCallbackPage() {
     const handleCallback = async () => {
       console.log('🔍 [AuthCallback] Starting callback handling')
       console.log('🔍 [AuthCallback] URL:', window.location.href)
+      console.log('🔍 [AuthCallback] Host:', window.location.hostname)
       
       try {
         // Check for error in URL
@@ -47,9 +48,28 @@ export default function AuthCallbackPage() {
         }
 
         if (session) {
-          console.log('✅ [AuthCallback] Session found, redirecting to /')
-          // Dodaj małe opóźnienie aby sesja została zapisana
+          console.log('✅ [AuthCallback] Session found, refreshing and redirecting')
+          
+          // Refresh session to ensure cookies are properly set
+          const { error: refreshError } = await supabase.auth.refreshSession()
+          if (refreshError) {
+            console.warn('⚠️ [AuthCallback] Refresh session warning:', refreshError.message)
+          } else {
+            console.log('✅ [AuthCallback] Session refreshed successfully')
+          }
+          
+          // Check if cookies were set
+          const cookies = document.cookie.split('; ')
+          const authCookies = cookies.filter(c => c.startsWith('sb-') && c.includes('auth-token'))
+          console.log(`✅ [AuthCallback] Auth cookies found: ${authCookies.length}`)
+          
+          if (authCookies.length === 0) {
+            console.warn('⚠️ [AuthCallback] No auth cookies found after session refresh')
+          }
+          
+          // Wait for cookies to be written
           await new Promise(resolve => setTimeout(resolve, 500))
+          
           router.replace('/')
         } else {
           console.log('⚠️ [AuthCallback] No session, redirecting to login')

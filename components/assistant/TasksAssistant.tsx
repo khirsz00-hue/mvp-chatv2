@@ -16,6 +16,8 @@ import { SevenDaysBoardView } from './SevenDaysBoardView'
 import { MonthView } from './MonthView'
 import { TaskTimer } from './TaskTimer'
 import { PomodoroTimer } from './PomodoroTimer'
+import { supabase } from '@/lib/supabaseClient'
+import { getTodoistToken } from '@/lib/integrations'
 
 interface Task {
   id: string
@@ -97,8 +99,43 @@ export function TasksAssistant() {
   const [bulkActionLoading, setBulkActionLoading] = useState(false)
   const [activeTimerInfo, setActiveTimerInfo] = useState<{ taskId: string; taskTitle: string; isActive: boolean; elapsedSeconds?: number; startTime?: number } | null>(null)
   const [completedTimeFilter, setCompletedTimeFilter] = useState<CompletedTimeFilter>('last7days')
-  
-  const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
+  const [token, setToken] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
+
+  // Fetch Todoist token from database (single source of truth)
+  useEffect(() => {
+    const fetchTokenFromDB = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (!user) {
+          console.warn('[TasksAssistant] No authenticated user')
+          return
+        }
+
+        setUserId(user.id)
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[TasksAssistant] Fetching Todoist token for user: ${user.id.substring(0, 8)}...`)
+        }
+
+        const todoistToken = await getTodoistToken(user.id)
+        
+        if (todoistToken) {
+          setToken(todoistToken)
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[TasksAssistant] ✓ Todoist token found')
+          }
+        } else {
+          console.log('[TasksAssistant] ✗ No Todoist token - user needs to connect')
+        }
+      } catch (error) {
+        console.error('[TasksAssistant] Error fetching token:', error)
+      }
+    }
+
+    fetchTokenFromDB()
+  }, [])
   
   const fetchTasks = useCallback(async (filterType: FilterType) => {
     setLoading(true)
@@ -454,7 +491,7 @@ export function TasksAssistant() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user_id: token || 'anonymous',
+          user_id: userId || 'anonymous',
           ...analyticsData
         })
       })
