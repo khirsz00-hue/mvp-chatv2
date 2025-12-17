@@ -30,11 +30,7 @@ async function getCachedTodoistToken(userId: string): Promise<string | null> {
   const now = Date.now()
   
   // Invalidate cache if userId changed (edge case: user logout/login in same session)
-  if (cachedTokenUserId && cachedTokenUserId !== userId) {
-    cachedTodoistToken = null
-    cachedTokenUserId = null
-    tokenCacheTimestamp = 0
-  }
+  invalidateCacheIfNeeded(userId)
   
   // Return cached token if still valid and for correct user
   if (cachedTodoistToken && cachedTokenUserId === userId && (now - tokenCacheTimestamp) < TOKEN_CACHE_DURATION) {
@@ -76,7 +72,7 @@ async function getCachedTodoistToken(userId: string): Promise<string | null> {
 }
 
 /**
- * Clear cached token (call this when user disconnects Todoist)
+ * Clear cached token (call this when user disconnects Todoist or when invalidating cache)
  */
 export function clearTodoistTokenCache() {
   cachedTodoistToken = null
@@ -84,6 +80,15 @@ export function clearTodoistTokenCache() {
   tokenCacheTimestamp = 0
   if (typeof window !== 'undefined') {
     localStorage.removeItem('todoist_token')
+  }
+}
+
+/**
+ * Invalidate cache if it belongs to a different user
+ */
+function invalidateCacheIfNeeded(userId: string) {
+  if (cachedTokenUserId && cachedTokenUserId !== userId) {
+    clearTodoistTokenCache()
   }
 }
 

@@ -32,9 +32,6 @@ const REFRESH_DEBOUNCE_MS = 500
 export function DayAssistantView() {
   const { showToast } = useToast()
   const [loading, setLoading] = useState(true)
-  // NOTE: refreshing state is for future light refresh indicator (e.g., subtle spinner in header)
-  // Currently not rendered in UI but tracks refresh state for potential future use
-  const [refreshing, setRefreshing] = useState(false)
   const [queueState, setQueueState] = useState<QueueState>({
     now: null,
     next: [],
@@ -136,15 +133,8 @@ export function DayAssistantView() {
       return
     }
     
-    // Clear any pending refresh timeout
-    if (refreshTimeoutRef.current) {
-      clearTimeout(refreshTimeoutRef.current)
-      refreshTimeoutRef.current = null
-    }
-    
-    // Set lock and optional light refresh indicator (no global spinner)
+    // Set lock to prevent concurrent refreshes (no global spinner)
     refreshLockRef.current = true
-    setRefreshing(true)
 
     try {
       const url = `/api/day-assistant/queue${includeLater ? '?includeLater=true' : ''}`
@@ -158,7 +148,10 @@ export function DayAssistantView() {
     } catch (error) {
       console.error('❌ [DayAssistant] Error refreshing queue:', error)
     } finally {
-      setRefreshing(false)
+      // Clear any pending timeout before setting new one (prevent race conditions)
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current)
+      }
       // Release lock after a short delay to prevent rapid-fire refreshes
       refreshTimeoutRef.current = setTimeout(() => {
         refreshLockRef.current = false
