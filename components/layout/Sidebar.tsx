@@ -17,7 +17,7 @@ interface Assistant {
 const assistants: Assistant[] = [
   { id: 'tasks', icon: ListChecks, label: 'Zadania', color: 'text-blue-500' },
   { id: 'day-assistant', icon: Sun, label: 'Asystent Dnia', color: 'text-yellow-500' },
-  { id: 'planning', icon: CalendarBlank, label: 'Planowanie', color: 'text-green-500' },
+  { id: 'planning', icon: CalendarBlank, label: 'Asystent Tygodnia', color: 'text-green-500' },
   { id: 'journal', icon: Notebook, label: 'Dziennik', color: 'text-purple-500' },
   { id: 'decisions', icon: Brain, label: 'Decyzje', color: 'text-orange-500' },
   { id: 'community', icon: Users, label: 'Społeczność', color: 'text-teal-500' },
