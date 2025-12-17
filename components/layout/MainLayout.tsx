@@ -148,13 +148,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
         )
       
       case 'planning':
+        router.push('/assistant-week')
+        return null
       case 'support':
         return (
           <div className="glass p-8 rounded-2xl text-center">
-            <h2 className="text-2xl font-bold mb-4">
-              {activeView === 'planning' && 'Asystent Planowania'}
-              {activeView === 'support' && 'Wsparcie'}
-            </h2>
+            <h2 className="text-2xl font-bold mb-4">Wsparcie</h2>
             <p className="text-muted-foreground">
               Ten asystent będzie dodany w kolejnych etapach
             </p>
