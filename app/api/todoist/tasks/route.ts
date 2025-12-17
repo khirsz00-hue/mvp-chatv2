@@ -4,10 +4,23 @@ import { startOfDay, endOfDay, addDays, isWithinInterval, parseISO, isBefore } f
 export const dynamic = 'force-dynamic'
 
 // Shared function to process tasks with filtering
-async function fetchAndFilterTasks(token: any, filter: string) {
+async function fetchAndFilterTasks(token: any, filter: string, date?: string) {
   // Better token validation - return empty array for invalid tokens
   if (!token || typeof token !== 'string' || token.trim() === '') {
     return []
+  }
+
+  const isCompletedOnDate = (completedAt: string, targetDate: Date | null) => {
+    if (!targetDate) return false
+    try {
+      const completedDate = parseISO(completedAt)
+      return isWithinInterval(completedDate, {
+        start: startOfDay(targetDate),
+        end: endOfDay(targetDate),
+      })
+    } catch {
+      return false
+    }
   }
 
   try {
@@ -30,9 +43,14 @@ async function fetchAndFilterTasks(token: any, filter: string) {
 
       const data = await res.json()
       const completedTasks = data.items || []
+      const targetDate = date ? parseISO(date) : null
+      
+      const filteredCompleted = completedTasks.filter(
+        (t: any) => t.completed_at && (!targetDate || isCompletedOnDate(t.completed_at, targetDate))
+      )
       
       // Map completed tasks to match the expected format
-      const simplified = completedTasks.map((t: any) => ({
+      const simplified = filteredCompleted.map((t: any) => ({
         id: t.task_id || t.id,
         content: t.content,
         description: t.description || null,
@@ -42,7 +60,7 @@ async function fetchAndFilterTasks(token: any, filter: string) {
         labels: t.labels || [],
         duration: t.duration || null,
         completed: true,
-        completed_at: t.completed_at
+        completed_at: t.completed_at || null,
       }))
       
       return simplified
@@ -63,7 +81,14 @@ async function fetchAndFilterTasks(token: any, filter: string) {
     const allTasks = await res.json()
 
     // Lokalne zakresy dat (użytkownika)
-    const now = new Date()
+    let now = new Date()
+    if (date) {
+      try {
+        now = parseISO(date)
+      } catch (e) {
+        console.warn('⚠️ Invalid date provided to /api/todoist/tasks, falling back to today', date, e)
+      }
+    }
     const todayStart = startOfDay(now)
     const todayEnd = endOfDay(now)
     const tomorrowStart = startOfDay(addDays(now, 1))
@@ -71,6 +96,10 @@ async function fetchAndFilterTasks(token: any, filter: string) {
     const sevenDaysEnd = endOfDay(addDays(todayStart, 6))
 
     const filtered = allTasks.filter((t: any) => {
+      // Todoist REST v2 tasks list active (open) tasks; filter out any entries marked as completed to keep planned lists clean
+      if (t?.completed === true || t?.is_completed === true || t?.completed_at) {
+        return false
+      }
       // unify due source: Todoist may return object with .date or a string
       const dueStr = t?.due?.date || t?.due || null
       if (!dueStr) {
@@ -113,6 +142,7 @@ async function fetchAndFilterTasks(token: any, filter: string) {
       priority: t.priority,
       labels: t.labels || [],
       duration: t.duration || null,
+      completed: false,
     }))
 
     return simplified
@@ -127,9 +157,9 @@ async function fetchAndFilterTasks(token: any, filter: string) {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { token, filter = 'all' } = body
+    const { token, filter = 'all', date } = body
 
-    const tasks = await fetchAndFilterTasks(token, filter.toLowerCase())
+    const tasks = await fetchAndFilterTasks(token, filter.toLowerCase(), date)
     return NextResponse.json({ tasks })
   } catch (error: any) {
     console.error('❌ Błąd w /api/todoist/tasks POST:', error)
@@ -142,7 +172,8 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const token = searchParams.get('token') || ''
   const filter = (searchParams.get('filter') || 'all').toLowerCase()
+  const date = searchParams.get('date') || undefined
 
-  const tasks = await fetchAndFilterTasks(token, filter)
+  const tasks = await fetchAndFilterTasks(token, filter, date)
   return NextResponse.json({ tasks })
 }
