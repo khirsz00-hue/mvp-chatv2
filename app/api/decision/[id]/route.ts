@@ -75,7 +75,7 @@ export async function DELETE(
       )
     }
 
-    // Backup related rows for a best-effort rollback if something fails mid-way
+    // Backup related rows for a best-effort rollback if something fails midway
     const [
       { data: eventsBackup, error: eventsBackupError },
       { data: optionsBackup, error: optionsBackupError }
@@ -144,7 +144,7 @@ export async function DELETE(
       .eq('decision_id', params.id)
 
     if (optionsError) {
-      const rollbackSucceeded = await attemptRollback(eventsDeleted, true)
+      const rollbackSucceeded = await attemptRollback(eventsDeleted, optionsDeleted)
       const rollbackNote = rollbackSucceeded ? '' : ' (rollback may be incomplete)'
       throw new Error(`Failed to delete decision options: ${optionsError.message}${rollbackNote}`)
     }
