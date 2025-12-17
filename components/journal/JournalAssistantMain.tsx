@@ -19,6 +19,8 @@ import {
 } from '@phosphor-icons/react'
 import { format } from 'date-fns'
 
+const SECONDS_MS_THRESHOLD = 1e12 // values below are assumed to be seconds since epoch
+
 interface JournalAssistantMainProps {
   onShowArchive: () => void
 }
@@ -120,7 +122,7 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
           setTodoistToken(data?.todoist_token || null)
           const expiryRaw = data?.google_token_expiry || null
           const expiryMs =
-            expiryRaw && expiryRaw < 1e12 ? expiryRaw * 1000 : expiryRaw
+            expiryRaw && expiryRaw < SECONDS_MS_THRESHOLD ? expiryRaw * 1000 : expiryRaw
           const isGoogleLinked =
             !!data?.google_access_token &&
             (!expiryMs || expiryMs > Date.now())
@@ -645,7 +647,7 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
 
                   return (
                     <li
-                      key={event.id || `${event.summary}-${index}`}
+                      key={event.id || `event-${index}`}
                       className="text-sm flex items-start gap-3"
                     >
                       <div className="text-xs text-gray-500 w-20">{range}</div>

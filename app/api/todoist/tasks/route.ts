@@ -34,9 +34,9 @@ async function fetchAndFilterTasks(token: any, filter: string, date?: string) {
       const start = targetDate ? startOfDay(targetDate) : null
       const end = targetDate ? endOfDay(targetDate) : null
       
-      const filteredCompleted = targetDate && start && end
+      const filteredCompleted = targetDate
         ? completedTasks.filter((t: any) => {
-            if (!t.completed_at) return false
+            if (!t.completed_at || !start || !end) return false
             try {
               const completedAt = parseISO(t.completed_at)
               return isWithinInterval(completedAt, { start, end })
@@ -93,6 +93,7 @@ async function fetchAndFilterTasks(token: any, filter: string, date?: string) {
     const sevenDaysEnd = endOfDay(addDays(todayStart, 6))
 
     const filtered = allTasks.filter((t: any) => {
+      // Todoist REST v2 tasks are open; some SDKs may still return completed/is_completed flags
       if (t?.completed === true || t?.is_completed === true) {
         return false
       }
