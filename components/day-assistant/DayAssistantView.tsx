@@ -433,7 +433,28 @@ export function DayAssistantView() {
                 onActionApply={async (recommendation) => {
                   // Handle applying recommendations from chat
                   console.log('Applying recommendation:', recommendation)
-                  await refreshQueue()
+                  try {
+                    const response = await apiPost('/api/day-assistant/recommendations/apply', {
+                      recommendation
+                    })
+
+                    if (response.ok) {
+                      const result = await response.json()
+                      if (result.success) {
+                        showToast(result.message || 'Rekomendacja zastosowana! ✅', 'success')
+                        // Refresh both queue and timeline
+                        await refreshQueue()
+                      } else {
+                        showToast('Nie udało się zastosować wszystkich akcji', 'warning')
+                      }
+                    } else {
+                      const error = await response.json()
+                      showToast(error.error || 'Błąd podczas stosowania rekomendacji', 'error')
+                    }
+                  } catch (error) {
+                    console.error('Error applying recommendation:', error)
+                    showToast('Błąd podczas stosowania rekomendacji', 'error')
+                  }
                 }}
               />
             )}

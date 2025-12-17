@@ -18,11 +18,12 @@ import { apiGet, apiPost } from '@/lib/api'
 
 interface TimelineEvent {
   id: string
-  type: 'meeting' | 'event' | 'task-block' | 'ghost-proposal'
+  type: 'meeting' | 'event' | 'task-block' | 'ghost-proposal' | 'queue-task'
   title: string
   startTime: string  // HH:mm
   endTime: string    // HH:mm
   duration: number   // minutes
+  priority?: 'now' | 'next' | 'later'
   color?: string
   taskIds?: string[]
   mutable?: boolean  // can be moved
@@ -43,7 +44,15 @@ const EVENT_COLORS = {
   meeting: 'bg-blue-500',
   event: 'bg-green-500',
   'task-block': 'bg-purple-500',
-  'ghost-proposal': 'bg-gray-400 opacity-60 border-2 border-dashed'
+  'ghost-proposal': 'bg-gray-400 opacity-60 border-2 border-dashed',
+  'queue-task': 'bg-brand-purple'
+}
+
+// Priority-specific colors for queue tasks
+const PRIORITY_COLORS = {
+  now: 'bg-brand-purple border-2 border-brand-purple',
+  next: 'bg-green-500/80',
+  later: 'bg-gray-400/60'
 }
 
 export function DayTimeline({
@@ -74,9 +83,11 @@ export function DayTimeline({
     const loadTimeline = async () => {
       setLoading(true)
       try {
-        const response = await apiGet(`/api/day-assistant/timeline?date=${today}`)
+        // Fetch timeline built from queue data
+        const response = await apiGet(`/api/day-assistant/timeline?date=${today}&includeAll=false`)
         if (response.ok) {
           const data = await response.json()
+          console.log('📅 Timeline loaded:', data.queueSummary)
           setEvents(data.events || [])
         } else if (response.status === 401) {
           console.error('Error loading timeline: Session missing')
@@ -238,12 +249,17 @@ export function DayTimeline({
 
           {/* Events */}
           <div className="absolute inset-0 pl-4">
-            {events.map((event) => (
+            {events.map((event) => {
+              // Determine color based on type and priority
+              let colorClass = EVENT_COLORS[event.type]
+              if (event.type === 'queue-task' && event.priority) {
+                colorClass = PRIORITY_COLORS[event.priority]
+              }
+              
+              return (
               <motion.div
                 key={event.id}
-                className={`absolute left-4 right-4 rounded-lg p-3 cursor-pointer ${
-                  EVENT_COLORS[event.type]
-                } text-white overflow-hidden`}
+                className={`absolute left-4 right-4 rounded-lg p-3 cursor-pointer ${colorClass} text-white overflow-hidden`}
                 style={getEventStyle(event)}
                 onClick={() => onEventClick && onEventClick(event)}
                 whileHover={{ scale: 1.02 }}
@@ -298,7 +314,8 @@ export function DayTimeline({
                   )}
                 </div>
               </motion.div>
-            ))}
+            )
+            })}
           </div>
 
           {/* Empty state */}
