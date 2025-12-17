@@ -227,32 +227,32 @@ ${hatSummaries}
 Na podstawie powyższej analizy Six Thinking Hats, wygeneruj kompletne podsumowanie w formacie JSON:
 {
   "perspectives": [
-    { "hat": "emoji", "name": "nazwa", "synthesis": "2-3 zdania syntezy z tej perspektywy" }
+    { "hat": "emoji", "name": "nazwa", "synthesis": "1-2 krótkie zdania (maks 25 słów) z tej perspektywy" }
   ],
   "insights": [
-    "Kluczowy wniosek 1 (konkretny)",
-    "Kluczowy wniosek 2 (konkretny)",
-    "Kluczowy wniosek 3 (konkretny)"
+    "Kluczowy wniosek 1 (maks 15 słów, prosty język)",
+    "Kluczowy wniosek 2 (maks 15 słów, prosty język)",
+    "Kluczowy wniosek 3 (maks 15 słów, prosty język)"
   ],
   "options_analysis": [
     {
       "option": "Nazwa opcji/ścieżki",
-      "pros": ["konkretna zaleta", "konkretna zaleta"],
-      "cons": ["konkretna wada", "konkretna wada"],
+      "pros": ["konkretna zaleta (<=10 słów)", "konkretna zaleta (<=10 słów)"],
+      "cons": ["konkretna wada (<=10 słów)", "konkretna wada (<=10 słów)"],
       "score": "X/10",
-      "summary": "Jedno zdanie podsumowania"
+      "summary": "1 krótkie zdanie podsumowania (<=18 słów)"
     }
   ],
   "recommended_option": {
     "option": "KONKRETNA nazwa najlepszej opcji",
-    "reasoning": "Wyjaśnienie w 2-3 zdaniach DLACZEGO ta opcja jest najlepsza dla użytkownika, bazując na CAŁEJ analizie z 6 kapeluszy"
+    "reasoning": "2-3 bardzo krótkie zdania (łącznie <=45 słów) DLACZEGO ta opcja jest najlepsza"
   },
   "next_steps": [
-    "Konkretny pierwszy krok do wykonania",
-    "Konkretny drugi krok",
-    "Konkretny trzeci krok"
+    "Pierwszy krok (<=10 słów)",
+    "Drugi krok (<=10 słów)",
+    "Trzeci krok (<=10 słów)"
   ],
-  "recommendation": "Finalna rekomendacja (2-3 akapity z konkretnymi wskazówkami)"
+  "recommendation": "3-5 bardzo krótkich punktów (oddzielone \\n) w prostym języku, bez dygresji"
 }
 
 WAŻNE:
@@ -261,6 +261,7 @@ WAŻNE:
 - Uzasadnienie musi odnosić się do faktów z analizy
 - Jeśli użytkownik nie podał gotowych opcji, zaproponuj 2-3 opcje bazując na analizie
 - Zwróć uwagę na wszystkie dostępne perspektywy i stwórz spójne, pomocne podsumowanie w języku polskim.
+- Styl ADHD-friendly: proste słowa, krótkie zdania, zero wstępów, same konkrety.
 `
 
       const response = await getOpenAIClient().chat.completions.create({
@@ -275,6 +276,8 @@ KRYTYCZNA ZASADA:
 - NIE wymyślaj, NIE zakładaj, NIE dodawaj informacji których użytkownik nie podał
 - Jeśli dane są niepełne, napisz o tym w analizie
 
+Styl: krótko, prosto, zero dygresji; każde pole ma być maksymalnie zwięzłe (kilka słów).
+
 Tworzysz pomocne, konkretne podsumowania w języku polskim. Odpowiadasz zawsze w formacie JSON.`
           },
           {
@@ -283,7 +286,7 @@ Tworzysz pomocne, konkretne podsumowania w języku polskim. Odpowiadasz zawsze w
           }
         ],
         temperature: 0.7,
-        max_tokens: 1500,
+        max_tokens: 900,
         response_format: { type: 'json_object' }
       })
 

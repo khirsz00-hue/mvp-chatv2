@@ -56,8 +56,45 @@ export async function DELETE(
       )
     }
 
+    // Make sure decision exists and belongs to user
+    const { data: existingDecision, error: fetchError } = await supabase
+      .from('decisions')
+      .select('id')
+      .eq('id', params.id)
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (fetchError) {
+      throw new Error(`Failed to fetch decision: ${fetchError.message}`)
+    }
+
+    if (!existingDecision) {
+      return NextResponse.json(
+        { error: 'Decision not found or access denied' },
+        { status: 404 }
+      )
+    }
+
+    // Clean up related data first to avoid constraint errors
+    const { error: eventsError } = await supabase
+      .from('decision_events')
+      .delete()
+      .eq('decision_id', params.id)
+
+    if (eventsError) {
+      throw new Error(`Failed to delete decision events: ${eventsError.message}`)
+    }
+
+    const { error: optionsError } = await supabase
+      .from('decision_options')
+      .delete()
+      .eq('decision_id', params.id)
+
+    if (optionsError) {
+      throw new Error(`Failed to delete decision options: ${optionsError.message}`)
+    }
+
     // Delete decision using authenticated client
-    // Explicitly check user ownership for better security
     const { data, error } = await supabase
       .from('decisions')
       .delete()
