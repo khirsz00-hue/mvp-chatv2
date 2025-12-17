@@ -101,6 +101,7 @@ export function TasksAssistant() {
   const [completedTimeFilter, setCompletedTimeFilter] = useState<CompletedTimeFilter>('last7days')
   const [token, setToken] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
 
   // Fetch Todoist token from database (single source of truth)
   useEffect(() => {
@@ -953,7 +954,7 @@ export function TasksAssistant() {
             <div className="h-8 w-px bg-gray-300 hidden lg:block" />
             
             {/* Filters */}
-            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-3 flex-1">
+            <div className="hidden md:flex items-stretch md:items-center gap-2 md:gap-3 flex-1">
               <div className="flex items-center gap-2 flex-1 min-w-0 md:min-w-[160px]">
                 <SortAscending size={18} className="text-gray-500 hidden sm:inline flex-shrink-0" />
                 <select 
@@ -996,6 +997,18 @@ export function TasksAssistant() {
               </div>
             </div>
             
+            <div className="flex md:hidden flex-1">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full justify-center gap-2"
+                onClick={() => setShowMobileFilters((prev) => !prev)}
+              >
+                <SortAscending size={16} className="text-gray-600" />
+                <span className="text-sm font-medium">{showMobileFilters ? 'Ukryj filtry' : 'Pokaż filtry'}</span>
+              </Button>
+            </div>
+            
             <div className="h-8 w-px bg-gray-300 hidden lg:block" />
             
             {/* Task count badge */}
@@ -1003,6 +1016,44 @@ export function TasksAssistant() {
               {sortedTasks.length} {sortedTasks.length === 1 ? 'zadanie' : 'zadań'}
             </Badge>
           </div>
+
+          {showMobileFilters && (
+            <div className="md:hidden mt-3 grid grid-cols-1 gap-2">
+              <select 
+                value={sortBy} 
+                onChange={(e) => setSortBy(e.target.value as SortType)}
+                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-sm font-medium hover:border-gray-300 transition-colors"
+              >
+                <option value="date">📅 Sortuj: Data</option>
+                <option value="priority">🚩 Sortuj: Priorytet</option>
+                <option value="name">🔤 Sortuj: Nazwa</option>
+              </select>
+
+              {view === 'list' && (
+                <select 
+                  value={groupBy} 
+                  onChange={(e) => setGroupBy(e.target.value as GroupByType)}
+                  className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-sm font-medium hover:border-gray-300 transition-colors"
+                >
+                  <option value="none">📋 Grupuj: Brak</option>
+                  <option value="day">📅 Grupuj: Dzień</option>
+                  <option value="project">📁 Grupuj: Projekt</option>
+                  <option value="priority">🚩 Grupuj: Priorytet</option>
+                </select>
+              )}
+
+              <select 
+                value={selectedProject} 
+                onChange={(e) => setSelectedProject(e.target.value)}
+                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-sm font-medium hover:border-gray-300 transition-colors"
+              >
+                <option value="all">📁 Wszystkie projekty</option>
+                {projects.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
       
