@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useJournalEntries } from '@/hooks/useJournalEntries'
 import { JournalEntry, TodoistTask } from '@/types/journal'
@@ -39,9 +39,13 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
   // UI state
   const [newNote, setNewNote] = useState<string>('')
   const [isRecording, setIsRecording] = useState(false)
-  const [completedTasks, setCompletedTasks] = useState<TodoistTask[]>([])
+  const [todayTasks, setTodayTasks] = useState<TodoistTask[]>([])
+  const [completedTodayTasks, setCompletedTodayTasks] = useState<TodoistTask[]>([])
   const [loadingTasks, setLoadingTasks] = useState(false)
   const [todoistToken, setTodoistToken] = useState<string | null>(null)
+  const [googleConnected, setGoogleConnected] = useState(false)
+  const [googleEvents, setGoogleEvents] = useState<any[]>([])
+  const [loadingEvents, setLoadingEvents] = useState(false)
 
   // Voice recognition - using any for Web Speech API which doesn't have standard types
   const recognitionRef = useRef<any>(null)
@@ -103,7 +107,7 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
       try {
         const { data, error } = await supabase
           .from('user_profiles')
-          .select('todoist_token')
+          .select('todoist_token, google_access_token, google_token_expiry')
           .eq('id', userId)
           .single()
 
@@ -114,6 +118,10 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
 
         if (isMounted) {
           setTodoistToken(data?.todoist_token || null)
+          const isGoogleLinked =
+            !!data?.google_access_token &&
+            (!data?.google_token_expiry || data.google_token_expiry > Date.now())
+          setGoogleConnected(isGoogleLinked)
         }
       } catch (err) {
         console.error('Error fetching user profile:', err)
@@ -135,34 +143,53 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
     let isMounted = true
 
     const fetchTodoistTasks = async () => {
-      if (!todoistToken) return
+      if (!todoistToken || !selectedDate) {
+        if (isMounted) {
+          setTodayTasks([])
+          setCompletedTodayTasks([])
+        }
+        return
+      }
 
       setLoadingTasks(true)
       try {
-        const response = await fetch('/api/todoist/tasks', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ token: todoistToken, filter: 'today' }),
-        })
+        const [plannedResponse, completedResponse] = await Promise.all([
+          fetch('/api/todoist/tasks', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ token: todoistToken, filter: 'today', date: selectedDate }),
+          }),
+          fetch('/api/todoist/tasks', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ token: todoistToken, filter: 'completed', date: selectedDate }),
+          }),
+        ])
 
-        if (!response.ok) {
-          console.error('Failed to fetch Todoist tasks:', response.status)
+        if (!plannedResponse.ok || !completedResponse.ok) {
+          console.error('Failed to fetch Todoist tasks:', plannedResponse.status, completedResponse.status)
           if (isMounted) {
-            setCompletedTasks([])
+            setTodayTasks([])
+            setCompletedTodayTasks([])
           }
           return
         }
 
-        const data = await response.json()
+        const plannedData = await plannedResponse.json()
+        const completedData = await completedResponse.json()
         if (isMounted) {
-          setCompletedTasks(data.tasks || [])
+          setTodayTasks(plannedData.tasks || [])
+          setCompletedTodayTasks(completedData.tasks || [])
         }
       } catch (error: any) {
         console.error('Error fetching Todoist tasks:', error)
         if (isMounted) {
-          setCompletedTasks([])
+          setTodayTasks([])
+          setCompletedTodayTasks([])
         }
       } finally {
         if (isMounted) {
@@ -180,33 +207,101 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
     }
   }, [todoistToken, selectedDate])
 
-  // Refresh Todoist tasks
-  const handleRefreshTodoistTasks = async () => {
-    if (!todoistToken) return
+  const loadGoogleEvents = useCallback(async () => {
+    if (!userId || !googleConnected || !selectedDate) {
+      setGoogleEvents([])
+      return
+    }
 
-    setLoadingTasks(true)
+    setLoadingEvents(true)
     try {
-      const response = await fetch('/api/todoist/tasks', {
-        method: 'POST',
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (!session) {
+        setGoogleEvents([])
+        return
+      }
+
+      const response = await fetch(`/api/google/events?date=${selectedDate}`, {
         headers: {
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ token: todoistToken, filter: 'today' }),
       })
 
       if (!response.ok) {
-        console.error('Failed to fetch Todoist tasks:', response.status)
-        setCompletedTasks([])
+        setGoogleEvents([])
         return
       }
 
       const data = await response.json()
-      setCompletedTasks(data.tasks || [])
+      setGoogleEvents(data.events || [])
+    } catch (error: any) {
+      console.error('Error fetching Google events:', error)
+      setGoogleEvents([])
+    } finally {
+      setLoadingEvents(false)
+    }
+  }, [userId, googleConnected, selectedDate])
+
+  useEffect(() => {
+    loadGoogleEvents()
+  }, [loadGoogleEvents])
+
+  // Refresh Todoist tasks
+  const handleRefreshTodoistTasks = async () => {
+    if (!todoistToken || !selectedDate) {
+      setTodayTasks([])
+      setCompletedTodayTasks([])
+      return
+    }
+
+    setLoadingTasks(true)
+    try {
+      const [plannedResponse, completedResponse] = await Promise.all([
+        fetch('/api/todoist/tasks', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token: todoistToken, filter: 'today', date: selectedDate }),
+        }),
+        fetch('/api/todoist/tasks', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token: todoistToken, filter: 'completed', date: selectedDate }),
+        }),
+      ])
+
+      if (!plannedResponse.ok || !completedResponse.ok) {
+        console.error('Failed to fetch Todoist tasks:', plannedResponse.status, completedResponse.status)
+        setTodayTasks([])
+        setCompletedTodayTasks([])
+        return
+      }
+
+      const plannedData = await plannedResponse.json()
+      const completedData = await completedResponse.json()
+      setTodayTasks(plannedData.tasks || [])
+      setCompletedTodayTasks(completedData.tasks || [])
     } catch (error: any) {
       console.error('Error fetching Todoist tasks:', error)
-      setCompletedTasks([])
+      setTodayTasks([])
+      setCompletedTodayTasks([])
     } finally {
       setLoadingTasks(false)
+    }
+  }
+
+  const formatEventTime = (dateTime?: string) => {
+    if (!dateTime) return ''
+    try {
+      return format(new Date(dateTime), 'HH:mm')
+    } catch {
+      return ''
     }
   }
 
@@ -278,7 +373,7 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
         motivation,
         sleep_quality: sleepQuality,
         hours_slept: hoursSlept,
-        completed_tasks_snapshot: completedTasks.map((t) => t.content),
+        completed_tasks_snapshot: completedTodayTasks.map((t) => t.content),
         notes,
       }
 
@@ -434,7 +529,7 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
         </div>
       </Card>
 
-      {/* Completed Tasks from Todoist */}
+      {/* Tasks from Todoist */}
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4">📋 Zadania Todoist</h3>
 
@@ -446,9 +541,14 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
         ) : (
           <>
             <div className="flex items-center justify-between mb-4">
-              <h4 className="font-medium text-sm text-gray-700">
-                Zaplanowane na dziś
-              </h4>
+              <div>
+                <h4 className="font-medium text-sm text-gray-700">
+                  Zaplanowane na {selectedDate}
+                </h4>
+                <p className="text-xs text-gray-500">
+                  Filtruje zadania przypisane na wybrany dzień
+                </p>
+              </div>
               <Button
                 onClick={handleRefreshTodoistTasks}
                 variant="outline"
@@ -458,16 +558,105 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
                 {loadingTasks ? 'Ładowanie...' : 'Odśwież'}
               </Button>
             </div>
-            {completedTasks.length === 0 ? (
-              <p className="text-sm text-gray-500">Brak zadań na dziś</p>
+            {todayTasks.length === 0 ? (
+              <p className="text-sm text-gray-500">Brak zadań na wybraną datę</p>
             ) : (
               <ul className="space-y-2">
-                {completedTasks.map((task) => (
+                {todayTasks.map((task) => (
                   <li key={task.id} className="text-sm flex items-center gap-2">
                     <span className="text-gray-400">□</span>
                     {task.content}
                   </li>
                 ))}
+              </ul>
+            )}
+
+            <div className="mt-5 pt-4 border-t border-gray-100">
+              <h4 className="font-medium text-sm text-gray-700 mb-2">
+                Ukończone w tym dniu
+              </h4>
+              {completedTodayTasks.length === 0 ? (
+                <p className="text-sm text-gray-500">
+                  Brak ukończonych zadań dla wybranej daty
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {completedTodayTasks.map((task) => (
+                    <li key={task.id} className="text-sm flex items-center gap-2">
+                      <span className="text-green-500">☑</span>
+                      <div>
+                        <div>{task.content}</div>
+                        {task.completed_at && (
+                          <p className="text-[11px] text-gray-500">
+                            Zakończono o {formatEventTime(task.completed_at)}
+                          </p>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </>
+        )}
+      </Card>
+
+      {/* Google Calendar events */}
+      <Card className="p-6">
+        <h3 className="text-lg font-semibold mb-4">📅 Spotkania (Google Calendar)</h3>
+
+        {!googleConnected ? (
+          <div className="text-sm text-gray-500 p-4 border border-dashed border-gray-300 rounded-lg bg-gray-50">
+            🔗 Połącz Google Calendar w profilu, aby widzieć spotkania w dzienniku.
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h4 className="font-medium text-sm text-gray-700">
+                  Spotkania w dniu {selectedDate}
+                </h4>
+                <p className="text-xs text-gray-500">Pobierane z Twojego połączonego kalendarza</p>
+              </div>
+              <Button
+                onClick={loadGoogleEvents}
+                variant="outline"
+                size="sm"
+                disabled={loadingEvents}
+              >
+                {loadingEvents ? 'Ładowanie...' : 'Odśwież'}
+              </Button>
+            </div>
+
+            {googleEvents.length === 0 ? (
+              <p className="text-sm text-gray-500">Brak spotkań w wybranym dniu</p>
+            ) : (
+              <ul className="space-y-2">
+                {googleEvents.map((event, index) => {
+                  const start = event?.start?.dateTime || event?.start?.date
+                  const end = event?.end?.dateTime || event?.end?.date
+                  const range =
+                    start || end
+                      ? `${formatEventTime(start)}${end ? `-${formatEventTime(end)}` : ''}`
+                      : ''
+
+                  return (
+                    <li
+                      key={event.id || `${event.summary}-${index}`}
+                      className="text-sm flex items-start gap-3"
+                    >
+                      <div className="text-xs text-gray-500 w-20">{range}</div>
+                      <div>
+                        <div className="font-medium text-gray-800">
+                          {event.summary || 'Bez tytułu'}
+                        </div>
+                        {event.location && (
+                          <div className="text-xs text-gray-500">{event.location}</div>
+                        )}
+                      </div>
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </>

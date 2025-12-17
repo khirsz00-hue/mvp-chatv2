@@ -120,11 +120,14 @@ export class GoogleCalendarService {
   /**
    * List events from user's primary calendar
    */
-  async listEvents(maxResults: number = 10): Promise<any[]> {
+  async listEvents(options: { maxResults?: number; timeMin?: string; timeMax?: string } = {}): Promise<any[]> {
+    const { maxResults = 10, timeMin = new Date().toISOString(), timeMax } = options
+
     return this.executeWithRetry(async () => {
       const response = await this.calendar.events.list({
         calendarId: 'primary',
-        timeMin: new Date().toISOString(),
+        timeMin,
+        timeMax,
         maxResults,
         singleEvents: true,
         orderBy: 'startTime',

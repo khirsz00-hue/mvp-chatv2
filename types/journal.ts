@@ -27,6 +27,7 @@ export interface TodoistTask {
   content: string
   description?: string
   completed: boolean
+  completed_at?: string
   due?: {
     date: string
     datetime?: string

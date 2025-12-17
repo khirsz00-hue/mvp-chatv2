@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { startOfDay, endOfDay, parseISO } from 'date-fns'
 import { GoogleCalendarService } from '@/lib/googleCalendar'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -67,6 +68,20 @@ export async function GET(req: NextRequest) {
     // Get max results from query params (default 10)
     const { searchParams } = new URL(req.url)
     const maxResults = parseInt(searchParams.get('maxResults') || '10', 10)
+    const dateParam = searchParams.get('date')
+
+    let timeMin: string | undefined
+    let timeMax: string | undefined
+
+    if (dateParam) {
+      try {
+        const targetDate = parseISO(dateParam)
+        timeMin = startOfDay(targetDate).toISOString()
+        timeMax = endOfDay(targetDate).toISOString()
+      } catch (error) {
+        console.warn('⚠️ Invalid date param for Google events:', dateParam, error)
+      }
+    }
 
     // Create calendar service for user
     const service = await GoogleCalendarService.forUser(user.id)
@@ -79,7 +94,7 @@ export async function GET(req: NextRequest) {
     }
 
     // List events
-    const events = await service.listEvents(maxResults)
+    const events = await service.listEvents({ maxResults, timeMin, timeMax })
 
     return NextResponse.json({ events })
   } catch (error: any) {
