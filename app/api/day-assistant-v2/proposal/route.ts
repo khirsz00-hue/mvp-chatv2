@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     
     // Get proposal details first
     const { data: proposal, error: proposalError } = await supabaseServer
-      .from('test_day_proposals')
+      .from('day_assistant_v2_proposals')
       .select('*')
       .eq('id', proposal_id)
       .single()
