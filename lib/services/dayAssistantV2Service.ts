@@ -147,7 +147,7 @@ export async function getTasks(
   let query = db
     .from('test_day_assistant_tasks')
     .select(options?.includeSubtasks 
-      ? `*, test_day_subtasks(*)` 
+      ? `*,test_day_subtasks(*)` 
       : '*'
     )
     .eq('user_id', userId)
@@ -187,10 +187,15 @@ export async function getTasks(
   
   // Transform the data to match TestDayTask interface
   if (!data) return []
+  if (!Array.isArray(data)) {
+    console.error('[getTasks] Unexpected data format:', data)
+    return []
+  }
+  const typedData = data as unknown as TestDayTask[]
   
   // Log sample tasks (first 3)
-  if (data.length > 0) {
-    const sampleTasks = data.slice(0, 3).map(task => ({
+  if (typedData.length > 0) {
+    const sampleTasks = typedData.slice(0, 3).map(task => ({
       id: task.id,
       title: task.title,
       due_date: task.due_date,
@@ -223,7 +228,7 @@ export async function getTasks(
   }
   
   // Map database records to TestDayTask with proper typing
-  const tasks = data.map((task) => {
+  const tasks = typedData.map((task) => {
     const taskData = task as Record<string, any>
     return {
       ...taskData,
