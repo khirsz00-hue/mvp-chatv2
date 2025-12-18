@@ -1,3 +1,9 @@
+/**
+ * @deprecated This is Day Assistant v1 API endpoint - no longer actively used.
+ * The active API is at /api/day-assistant-v2/
+ * This endpoint is kept for backward compatibility but should not be used in new code.
+ */
+
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedSupabaseClient, getAuthenticatedUser } from '@/lib/supabaseAuth'
 import { getQueueState } from '@/lib/services/dayAssistantService'
@@ -10,6 +16,8 @@ export const dynamic = 'force-dynamic'
  * 
  * Get user's task queue (NOW/NEXT/LATER)
  * Uses authenticated user context via RLS
+ * 
+ * @deprecated Use /api/day-assistant-v2/dayplan instead
  */
 export async function GET(request: NextRequest) {
   try {

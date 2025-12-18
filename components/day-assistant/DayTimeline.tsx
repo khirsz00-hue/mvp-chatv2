@@ -1,3 +1,8 @@
+/**
+ * @deprecated This is Day Assistant v1 component - no longer actively used.
+ * Active version is in components/day-assistant-v2/
+ */
+
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'

@@ -1,3 +1,10 @@
+/**
+ * @deprecated This is Day Assistant v1 - no longer actively used.
+ * The active version is DayAssistantV2View in components/day-assistant-v2/
+ * This file is kept for reference but should not be used in new code.
+ * Migration: Use DayAssistantV2View which uses test_day_assistant_* tables
+ */
+
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
