@@ -7,7 +7,6 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import { User } from '@supabase/supabase-js'
 import { TasksAssistant } from '@/components/assistant/TasksAssistant'
-import { DayAssistantView } from '@/components/day-assistant/DayAssistantView'
 import { JournalAssistantWrapper } from '@/components/journal/JournalAssistantWrapper'
 import { DecisionAssistant } from '@/src/features/decision-assistant/components/DecisionAssistant'
 import { DayAssistantV2View } from '@/components/day-assistant-v2/DayAssistantV2View'
@@ -91,7 +90,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
     // Don't auto-redirect to community - let user stay on main page
     try {
       const stored = localStorage.getItem('active_assistant') as AssistantId | null
-      if (stored && stored !== 'community' && ['tasks', 'day-assistant', 'day-assistant-v2', 'planning', 'journal', 'decisions', 'support', 'admin'].includes(stored)) {
+      // Redirect old 'day-assistant' v1 to v2
+      if (stored === 'day-assistant') {
+        setActiveView('day-assistant-v2')
+        localStorage.setItem('active_assistant', 'day-assistant-v2')
+      } else if (stored && stored !== 'community' && ['tasks', 'day-assistant-v2', 'planning', 'journal', 'decisions', 'support', 'admin'].includes(stored)) {
         setActiveView(stored)
       }
     } catch {}
@@ -106,9 +109,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
     switch (activeView) {
       case 'tasks':
         return <TasksAssistant />
-      
-      case 'day-assistant':
-        return <DayAssistantView />
       
       case 'day-assistant-v2':
         return <DayAssistantV2View />

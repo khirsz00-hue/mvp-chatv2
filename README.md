@@ -87,54 +87,68 @@ Szczegóły w `theme.json` i `tailwind.config.ts`.
 
 ---
 
-## ☀️ Asystent Dnia (Day Assistant) - MVP
+## ☀️ Asystent Dnia v2 (Day Assistant v2)
 
-Asystent Dnia to system zarządzania zadaniami oparty na współpracy z AI w trybie "współpilot". System używa frameworku NOW/NEXT/LATER z trybami energii.
+**Status:** ✅ Active Version (v2)
 
-### Główne Funkcje
-- ✅ **NOW/NEXT/LATER** - 3-sekcyjny interfejs kolejki zadań
-- ✅ **Tryby energii** (🔴 Zjazd / 🟡 Normalnie / 🟢 Flow) - ręczny przełącznik
-- ✅ **Akcje użytkownika** - 📌 Musi dziś / 🧊 Nie dziś / 🔥 Mega ważne
-- ✅ **Generator kroków AI** - Automatyczne rozbicie zadań na subtaski z feedbackiem
-- ✅ **Historia decyzji** - Możliwość cofnięcia ostatniej zmiany
-- ✅ **Persystencja w Supabase** - Wszystkie dane bezpiecznie zapisane
+Day Assistant v2 is an ADHD-friendly day planner with dual sliders, intelligent recommendations, and seamless Todoist integration.
 
-### Zasady Działania
+### Key Features
+- ✅ **Dual Sliders** - Energy (1-5) and Focus (1-5) level tracking
+- ✅ **MUST Tasks** - Limit critical tasks to 1-3 per day
+- ✅ **Context Filtering** - Filter by work type (code, admin, komunikacja, prywatne)
+- ✅ **Todoist Sync** - Real-time bidirectional sync (10s interval)
+- ✅ **Smart Recommendations** - AI-powered suggestions based on energy/focus
+- ✅ **Undo Functionality** - Configurable undo window (5-15s)
+- ✅ **Postpone Tracking** - Monitor and warn on excessive postpones
+- ✅ **Decision Log** - Complete audit trail for learning
+- ✅ **Manual Tasks** - Add tasks directly without Todoist
 
-**Shared Control:**
-- **Agent** rekomenduje, porządkuje, proponuje następny ruch
-- **Użytkownik** widzi plan, wybiera, nadpisuje, przełącza tryby
-- Agent **nigdy nie zabiera kierownicy**
+### Architecture
 
-**NOW (Teraz):**
-- 1 aktywne zadanie + aktualny krok
-- Użytkownik wie dokładnie, co robi teraz
+**Components:**
+- Main View: `components/day-assistant-v2/DayAssistantV2View.tsx`
+- API Routes: `app/api/day-assistant-v2/`
+- Services: `lib/services/dayAssistantV2Service.ts`
+- Sync: `lib/todoistSync.ts`
 
-**NEXT (Następne):**
-- 2-5 zadań w kolejce (zależnie od trybu energii)
-- Krótka lista tego, co jest zaplanowane
+**Database Tables:**
+- `assistant_config` - Assistant settings per user
+- `test_day_assistant_tasks` - Main task table
+- `test_day_plan` - Daily plan with energy/focus
+- `test_day_proposals` - AI recommendations
+- `test_day_decision_log` - Decision audit trail
+- `sync_metadata` - Sync status tracking
 
-**LATER (Później):**
-- Reszta zadań (zwinięta, tylko licznik)
-- Użytkownik nie jest zalany listą
-
-### Tryby Energii
-
-- 🔴 **Zjazd (kryzys)**: Kroki ≤5 min, NEXT max 2 pozycje
-- 🟡 **Normalnie**: Kroki 5-20 min, NEXT 2-5 pozycji
-- 🟢 **Flow**: Kroki do 25 min, możliwe bloki podobnych zadań
-
-### Dokumentacja
-Pełna dokumentacja: [docs/DAY_ASSISTANT.md](./docs/DAY_ASSISTANT.md)
+### Documentation
+📘 **Full Architecture Guide:** [docs/DAY_ASSISTANT_V2_ARCHITECTURE.md](./docs/DAY_ASSISTANT_V2_ARCHITECTURE.md)
 
 ### Setup
 ```bash
-# Uruchom migrację bazy danych
-# W Supabase SQL Editor: supabase/migrations/20231217_day_assistant.sql
+# Apply migrations in order
+# 1. Day Assistant v2 tables
+# supabase/migrations/20251217_test_day_assistant.sql
 
-# Lub używając Supabase CLI
+# 2. Todoist sync tables
+# supabase/migrations/20251218_todoist_sync.sql
+
+# 3. Cleanup v1/v2 conflicts
+# supabase/migrations/20251218_cleanup_assistant_conflict.sql
+
+# Or use Supabase CLI
 supabase db push
 ```
+
+### Migration from v1 to v2
+
+Old Day Assistant v1 components are deprecated and marked with `@deprecated`.
+The migration script (`20251218_cleanup_assistant_conflict.sql`) will:
+- Create 'asystent dnia v2' assistant for all users
+- Fix `assistant_id` for all tasks
+- Mark old v1 assistants as inactive
+- Add foreign key constraints for data integrity
+
+**Note:** v1 is no longer accessible from the sidebar. All users are automatically redirected to v2.
 
 ---
 
