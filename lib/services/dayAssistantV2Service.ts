@@ -206,7 +206,7 @@ export async function getTasks(
   }
   
   // Diagnostic: If query with date returns 0 tasks, show all tasks
-  if (data.length === 0 && options?.date && !options?.includeAllDates) {
+  if (typedData.length === 0 && options?.date && !options?.includeAllDates) {
     console.log('[getTasks] No tasks found for date', options.date, '- fetching all tasks for diagnostic')
     const { data: allTasks, error: allError } = await db
       .from('test_day_assistant_tasks')
