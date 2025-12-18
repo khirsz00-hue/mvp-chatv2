@@ -84,6 +84,20 @@ export function DayAssistantV2View() {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Background sync every 10 seconds
+  useEffect(() => {
+    if (!sessionToken) return
+    
+    const interval = setInterval(() => {
+      fetch('/api/todoist/sync', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${sessionToken}` }
+      }).catch(err => console.error('[DayAssistantV2] Background sync failed:', err))
+    }, 10000)
+    
+    return () => clearInterval(interval)
+  }, [sessionToken])
+
   const authFetch = async (url: string, options: RequestInit = {}) => {
     if (!sessionToken) throw new Error('Brak sesji')
     const headers = {
@@ -114,6 +128,13 @@ export function DayAssistantV2View() {
         return
       }
       
+      // ✨ STEP 1: Call sync (cache-aware)
+      await fetch('/api/todoist/sync', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${authHeader}` }
+      }).catch(err => console.warn('[DayAssistantV2] Sync warning:', err))
+      
+      // ✨ STEP 2: Fetch day plan (getTasks reads from test_day_assistant_tasks)
       const url = `/api/day-assistant-v2/dayplan?date=${selectedDate}`
       console.log('[DayAssistantV2] Fetching day plan from:', url)
       console.log('[DayAssistantV2] Selected date:', selectedDate)
