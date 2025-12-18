@@ -19,6 +19,44 @@ import {
   ProposalAction
 } from '@/lib/types/dayAssistantV2'
 
+const isNullableString = (value: unknown) =>
+  value === null || typeof value === 'string' || value === undefined
+
+const isNonArrayObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+
+function isValidTestDayTask(task: unknown): task is TestDayTask {
+  if (!isNonArrayObject(task)) return false
+  const candidate = task
+  return (
+    typeof candidate.id === 'string' &&
+    typeof candidate.user_id === 'string' &&
+    typeof candidate.assistant_id === 'string' &&
+    typeof candidate.title === 'string' &&
+    typeof candidate.priority === 'number' &&
+    typeof candidate.is_must === 'boolean' &&
+    typeof candidate.is_important === 'boolean' &&
+    typeof candidate.estimate_min === 'number' &&
+    typeof candidate.cognitive_load === 'number' &&
+    Array.isArray(candidate.tags) &&
+    typeof candidate.position === 'number' &&
+    typeof candidate.postpone_count === 'number' &&
+    typeof candidate.auto_moved === 'boolean' &&
+    isNonArrayObject(candidate.metadata) &&
+    typeof candidate.created_at === 'string' &&
+    typeof candidate.updated_at === 'string' &&
+    typeof candidate.completed === 'boolean' &&
+    isNullableString(candidate.description) &&
+    isNullableString(candidate.todoist_task_id) &&
+    isNullableString(candidate.completed_at) &&
+    isNullableString(candidate.context_type) &&
+    isNullableString(candidate.moved_from_date) &&
+    isNullableString(candidate.moved_reason) &&
+    isNullableString(candidate.last_moved_at) &&
+    isNullableString(candidate.due_date)
+  )
+}
+
 /**
  * Create or get the day assistant v2 for a user
  */
@@ -147,7 +185,7 @@ export async function getTasks(
   let query = db
     .from('test_day_assistant_tasks')
     .select(options?.includeSubtasks 
-      ? `*,test_day_subtasks(*)` 
+      ? `*, test_day_subtasks(*)` 
       : '*'
     )
     .eq('user_id', userId)
@@ -191,7 +229,13 @@ export async function getTasks(
     console.error('[getTasks] Unexpected data format:', data)
     return []
   }
-  const typedData = data as unknown as TestDayTask[]
+  const typedData = (data as unknown[]).filter((task) => {
+    const valid = isValidTestDayTask(task)
+    if (!valid) {
+      console.warn('[getTasks] Skipping invalid task payload', task)
+    }
+    return valid
+  })
   
   // Log sample tasks (first 3)
   if (typedData.length > 0) {
@@ -229,10 +273,14 @@ export async function getTasks(
   
   // Map database records to TestDayTask with proper typing
   const tasks = typedData.map((task) => {
-    const taskData = task as Record<string, any>
+    const taskWithRelations = task as TestDayTask & { test_day_subtasks?: TestDaySubtask[] }
+    let subtasks: TestDaySubtask[] | undefined
+    if (options?.includeSubtasks) {
+      subtasks = Array.isArray(taskWithRelations.test_day_subtasks) ? taskWithRelations.test_day_subtasks : []
+    }
     return {
-      ...taskData,
-      subtasks: options?.includeSubtasks ? taskData.test_day_subtasks || [] : undefined
+      ...taskWithRelations,
+      subtasks
     }
   }) as TestDayTask[]
   
