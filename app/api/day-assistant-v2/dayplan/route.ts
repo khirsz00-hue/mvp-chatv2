@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
+    // Debug logging - TODO: Consider removing or gating behind env variable in production
     // Log authenticated user
     console.log('[dayplan API] Authenticated user:', user.id)
     

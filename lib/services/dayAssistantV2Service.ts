@@ -131,6 +131,7 @@ export async function getTasks(
 ): Promise<TestDayTask[]> {
   const db = client || supabaseServer
   
+  // Debug logging - TODO: Consider removing or gating behind env variable in production
   // Log function call with parameters
   console.log('[getTasks] Called with:', {
     userId,
