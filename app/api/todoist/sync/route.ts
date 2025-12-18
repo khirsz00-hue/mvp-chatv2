@@ -83,7 +83,7 @@ function mapTodoistToTestDayTask(
     estimate_min: 30, // default
     cognitive_load: cognitiveLoad,
     context_type: contextType,
-    due_date: task.due?.date || new Date().toISOString().split('T')[0],
+    due_date: task.due?.date || null,
     synced_at: new Date().toISOString()
   }
 }

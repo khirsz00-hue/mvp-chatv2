@@ -198,11 +198,20 @@ export async function getTasks(
   }
   
   // Only filter by date if not includeAllDates
+  let targetDate: string | null = null
   if (options?.includeAllDates) {
     console.log('[getTasks] includeAllDates=true, skipping date filter')
   } else if (options?.date) {
     console.log('[getTasks] Filtering by due_date:', options.date)
-    query = query.or(`due_date.eq.${options.date},due_date.is.null`)
+    const safeDate = options.date.trim()
+    const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(safeDate)
+    const parsed = Date.parse(safeDate)
+    const matchesCalendarDate = !Number.isNaN(parsed) && new Date(parsed).toISOString().split('T')[0] === safeDate
+    if (!isValidDate || !matchesCalendarDate) {
+      console.warn('[getTasks] Invalid date format provided, returning empty result')
+      return []
+    }
+    targetDate = safeDate
   }
   
   // Log query details
@@ -237,10 +246,14 @@ export async function getTasks(
     }
     return valid
   })
+  // Include undated tasks alongside the selected day to surface inbox items without due dates
+  const filteredByDate = targetDate
+    ? typedData.filter(task => !task.due_date || task.due_date === targetDate)
+    : typedData
   
   // Log sample tasks (first 3)
-  if (typedData.length > 0) {
-    const sampleTasks = typedData.slice(0, 3).map(task => ({
+  if (filteredByDate.length > 0) {
+    const sampleTasks = filteredByDate.slice(0, 3).map(task => ({
       id: task.id,
       title: task.title,
       due_date: task.due_date,
@@ -251,7 +264,7 @@ export async function getTasks(
   }
   
   // Diagnostic: If query with date returns 0 tasks, show all tasks
-  if (typedData.length === 0 && options?.date && !options?.includeAllDates) {
+  if (filteredByDate.length === 0 && options?.date && !options?.includeAllDates) {
     console.log('[getTasks] No tasks found for date', options.date, '- fetching all tasks for diagnostic')
     const { data: allTasks, error: allError } = await db
       .from('day_assistant_v2_tasks')
@@ -273,7 +286,7 @@ export async function getTasks(
   }
   
   // Map database records to TestDayTask with proper typing
-  const tasks = typedData.map((task) => {
+  const tasks = filteredByDate.map((task) => {
     const taskWithRelations = task as TestDayTask & { day_assistant_v2_subtasks?: TestDaySubtask[] }
     let subtasks: TestDaySubtask[] | undefined
     if (options?.includeSubtasks) {
@@ -307,7 +320,7 @@ export async function createTask(
       title: task.title,
       description: task.description,
       todoist_task_id: task.todoist_task_id,
-      todoist_id: (task as any).todoist_id,
+      todoist_id: task.todoist_id,
       priority: task.priority || 3,
       is_must: task.is_must || false,
       is_important: task.is_important || false,

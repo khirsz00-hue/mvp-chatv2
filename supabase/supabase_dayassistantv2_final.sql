@@ -19,8 +19,8 @@ CREATE TABLE IF NOT EXISTS day_assistant_v2_tasks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) NOT NULL,
   assistant_id UUID REFERENCES assistant_config(id) ON DELETE CASCADE NOT NULL,
-  todoist_id TEXT,
-  todoist_task_id TEXT,
+  todoist_id TEXT,         -- primary Todoist task reference
+  todoist_task_id TEXT,    -- legacy alias kept for backward compatibility
   title TEXT NOT NULL,
   description TEXT,
   priority INTEGER DEFAULT 3,

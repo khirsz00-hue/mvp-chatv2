@@ -71,7 +71,7 @@ async function createTodoistTask(
   }
 }
 
-async function completeTodoistTask(todoistId: string, token: string) {
+async function completeTodoistTask(token: string, todoistId: string): Promise<boolean> {
   try {
     const res = await fetch(`https://api.todoist.com/rest/v2/tasks/${todoistId}/close`, {
       method: 'POST',
@@ -80,9 +80,12 @@ async function completeTodoistTask(todoistId: string, token: string) {
 
     if (!res.ok) {
       console.warn('[day-assistant-v2/task] Failed to close Todoist task', todoistId, res.status)
+      return false
     }
+    return true
   } catch (error) {
     console.error('[day-assistant-v2/task] Error closing Todoist task:', error)
+    return false
   }
 }
 
@@ -138,6 +141,7 @@ export async function POST(request: NextRequest) {
     // Create task
     const newTask = await createTask(user.id, assistant.id, {
       ...body,
+      // Keep both fields to support legacy consumers that still rely on todoist_task_id
       todoist_task_id: todoistTaskId,
       todoist_id: todoistTaskId
     })
@@ -215,8 +219,12 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to update task' }, { status: 500 })
     }
     
-    if (updates.completed && updatedTask.todoist_task_id && todoistToken) {
-      await completeTodoistTask(updatedTask.todoist_task_id, todoistToken)
+    const todoistRef = updatedTask.todoist_id ?? updatedTask.todoist_task_id
+    if (updates.completed && todoistRef && todoistToken) {
+      const synced = await completeTodoistTask(todoistToken, todoistRef)
+      if (!synced) {
+        console.warn('[day-assistant-v2/task] Todoist completion sync failed for task', todoistRef)
+      }
     }
     
     return NextResponse.json({
