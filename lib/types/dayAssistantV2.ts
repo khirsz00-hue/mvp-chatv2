@@ -30,6 +30,7 @@ export interface TestDayTask {
   id: string
   user_id: string
   assistant_id: string
+  todoist_id?: string | null
   todoist_task_id?: string | null
   title: string
   description?: string | null

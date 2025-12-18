@@ -97,7 +97,7 @@ Both now:
 
 ### 5. Documentation
 **Files**:
-- `TODOIST_SYNC_SETUP.md` - Setup guide
+- `supabase/supabase_dayassistantv2_final.sql` - Consolidated Supabase schema
 - `SYNC_IMPLEMENTATION_SUMMARY.md` - This file
 
 ## Performance & Security
@@ -112,7 +112,7 @@ Both now:
 
 ## Next Steps
 
-1. **Run SQL migration** in Supabase (see `TODOIST_SYNC_SETUP.md`)
+1. **Run SQL migration** in Supabase (see `supabase/supabase_dayassistantv2_final.sql`)
 2. **Deploy** application code
 3. **Test** both components
 4. **Monitor** console logs and database

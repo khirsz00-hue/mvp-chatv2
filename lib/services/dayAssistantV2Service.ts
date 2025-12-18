@@ -46,6 +46,7 @@ function isValidTestDayTask(task: unknown): task is TestDayTask {
     typeof candidate.created_at === 'string' &&
     typeof candidate.updated_at === 'string' &&
     typeof candidate.completed === 'boolean' &&
+    isNullableString(candidate.todoist_id) &&
     isNullableString(candidate.description) &&
     isNullableString(candidate.todoist_task_id) &&
     isNullableString(candidate.completed_at) &&
@@ -201,7 +202,7 @@ export async function getTasks(
     console.log('[getTasks] includeAllDates=true, skipping date filter')
   } else if (options?.date) {
     console.log('[getTasks] Filtering by due_date:', options.date)
-    query = query.eq('due_date', options.date)
+    query = query.or(`due_date.eq.${options.date},due_date.is.null`)
   }
   
   // Log query details
@@ -305,6 +306,8 @@ export async function createTask(
       assistant_id: assistantId,
       title: task.title,
       description: task.description,
+      todoist_task_id: task.todoist_task_id,
+      todoist_id: (task as any).todoist_id,
       priority: task.priority || 3,
       is_must: task.is_must || false,
       is_important: task.is_important || false,

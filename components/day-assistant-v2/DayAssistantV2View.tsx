@@ -191,7 +191,7 @@ export function DayAssistantV2View() {
   }
 
   const filteredTasks = useMemo(() => {
-    return tasks.filter(t => t.due_date === selectedDate && (contextFilter === 'all' || t.context_type === contextFilter))
+    return tasks.filter(t => (!t.due_date || t.due_date === selectedDate) && (contextFilter === 'all' || t.context_type === contextFilter))
   }, [tasks, selectedDate, contextFilter])
 
   const mustTasks = filteredTasks.filter(t => t.is_must).slice(0, 3)
