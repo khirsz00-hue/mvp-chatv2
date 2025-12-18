@@ -127,25 +127,12 @@ Day Assistant v2 is an ADHD-friendly day planner with dual sliders, intelligent 
 
 ### Setup
 ```bash
-# Apply migrations in order
-# 1. Day Assistant v2 tables
-# supabase/migrations/20251217_test_day_assistant.sql
-
-# 2. Todoist sync tables
-# supabase/migrations/20251218_todoist_sync.sql
-
-# 3. Cleanup v1/v2 conflicts
-# supabase/migrations/20251218_cleanup_assistant_conflict.sql
-
-# 4. Rename tables to production names
-# supabase/migrations/20251218_rename_to_v2.sql
-
-# Or use Supabase CLI
-supabase db push
+# Apply consolidated schema
+psql $DATABASE_URL -f supabase/supabase_dayassistantv2_final.sql
 ```
 
 **Migration to Production Tables:**  
-If you're upgrading from the `test_day_*` tables, see [MIGRATION_INSTRUCTIONS.md](./MIGRATION_INSTRUCTIONS.md) for step-by-step migration guide.
+The consolidated SQL above contains the full, final schema (assistant_config, day_assistant_v2_*, sync_metadata) so you no longer need to run multiple day-assistant migrations.
 
 ### Migration from v1 to v2
 
@@ -163,7 +150,7 @@ The migration script (`20251218_cleanup_assistant_conflict.sql`) will:
 - Mark old v1 assistants as inactive
 - Add foreign key constraints for data integrity
 
-**Note:** All users now use v2 exclusively. See [MIGRATION_INSTRUCTIONS.md](./MIGRATION_INSTRUCTIONS.md) for database migration details.
+**Note:** All users now use v2 exclusively. Use `supabase/supabase_dayassistantv2_final.sql` for the complete database schema.
 
 ---
 
@@ -521,4 +508,3 @@ If `401 Unauthorized`: Session invalid or cookies not configured correctly
 - [Supabase SSR Documentation](https://supabase.com/docs/guides/auth/server-side/nextjs)
 - [Next.js Cookies Documentation](https://nextjs.org/docs/app/api-reference/functions/cookies)
 - [MDN: HTTP Cookies](https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies)
-

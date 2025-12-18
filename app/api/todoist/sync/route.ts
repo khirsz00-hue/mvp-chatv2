@@ -8,7 +8,6 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { getTodoistToken } from '@/lib/integrations'
 
 export const dynamic = 'force-dynamic'
 
@@ -134,7 +133,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Get Todoist token
-    const todoistToken = await getTodoistToken(user.id)
+    const { data: profile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('todoist_token')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError) {
+      console.error('[Sync] Error fetching Todoist token:', profileError)
+    }
+
+    const todoistToken = profile?.todoist_token
     if (!todoistToken) {
       return NextResponse.json(
         { error: 'Todoist token not found - please connect your account' },
