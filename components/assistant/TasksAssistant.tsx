@@ -18,6 +18,7 @@ import { TaskTimer } from './TaskTimer'
 import { PomodoroTimer } from './PomodoroTimer'
 import { supabase } from '@/lib/supabaseClient'
 import { getTodoistToken } from '@/lib/integrations'
+import { syncTodoist, startBackgroundSync } from '@/lib/todoistSync'
 
 interface Task {
   id: string
@@ -143,15 +144,11 @@ export function TasksAssistant() {
     try {
       console.log('🔍 Fetching tasks with token:', token ?  'EXISTS' : 'MISSING')
       
-      // ✨ STEP 1: Call sync (cache-aware)
+      // ✨ STEP 1: Call sync (cache-aware, coordinated)
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.access_token) {
-        await fetch('/api/todoist/sync', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`
-          }
-        }).catch(err => console.warn('[TasksAssistant] Sync warning:', err))
+        await syncTodoist(session.access_token)
+          .catch(err => console.warn('[TasksAssistant] Sync warning:', err))
       }
       
       // ✨ STEP 2: Fetch from Todoist API (already synchronized)
@@ -218,24 +215,22 @@ export function TasksAssistant() {
     fetchProjects()
   }, [token, fetchProjects])
   
-  // Background sync every 10 seconds
+  // Background sync every 10 seconds (coordinated globally)
   useEffect(() => {
-    const doBackgroundSync = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session?.access_token) {
-        fetch('/api/todoist/sync', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${session.access_token}` }
-        }).catch(err => console.error('[TasksAssistant] Background sync failed:', err))
-      }
-    }
-    
     if (!token) return
     
-    // Background sync every 10 seconds
-    const interval = setInterval(doBackgroundSync, 10000)
+    let cleanup: (() => void) | null = null
     
-    return () => clearInterval(interval)
+    // Get session token and start background sync
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.access_token) {
+        cleanup = startBackgroundSync(session.access_token, 10000)
+      }
+    })
+    
+    return () => {
+      if (cleanup) cleanup()
+    }
   }, [token])
   
   // Monitor active timer/pomodoro

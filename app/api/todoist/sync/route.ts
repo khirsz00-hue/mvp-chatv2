@@ -74,8 +74,8 @@ function mapTodoistToTestDayTask(
   return {
     user_id: userId,
     assistant_id: assistantId,
-    todoist_id: task.id,
-    todoist_task_id: task.id,
+    todoist_id: task.id, // Primary reference to Todoist task
+    todoist_task_id: task.id, // Legacy field for compatibility with existing code
     title: task.content,
     description: task.description || null,
     priority: task.priority,
@@ -208,30 +208,31 @@ export async function POST(request: NextRequest) {
     // Delete old synced tasks that are no longer in Todoist
     const todoistIds = todoistTasks.map(t => t.id)
     
-    // Only attempt deletion if there are Todoist IDs to compare against
-    if (todoistIds.length > 0) {
-      const { error: deleteError } = await supabase
-        .from('test_day_assistant_tasks')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('assistant_id', assistantId)
-        .not('todoist_id', 'is', null)
-        .not('todoist_id', 'in', `(${todoistIds.join(',')})`)
+    // Get all existing synced tasks
+    const { data: existingTasks } = await supabase
+      .from('test_day_assistant_tasks')
+      .select('id, todoist_id')
+      .eq('user_id', user.id)
+      .eq('assistant_id', assistantId)
+      .not('todoist_id', 'is', null)
+    
+    // Find tasks to delete (tasks that exist in DB but not in Todoist)
+    if (existingTasks && existingTasks.length > 0) {
+      const tasksToDelete = existingTasks
+        .filter(task => task.todoist_id && !todoistIds.includes(task.todoist_id))
+        .map(task => task.id)
+      
+      if (tasksToDelete.length > 0) {
+        const { error: deleteError } = await supabase
+          .from('test_day_assistant_tasks')
+          .delete()
+          .in('id', tasksToDelete)
 
-      if (deleteError) {
-        console.error('[Sync] Error deleting old tasks:', deleteError)
-      }
-    } else {
-      // If no tasks from Todoist, delete all synced tasks
-      const { error: deleteError } = await supabase
-        .from('test_day_assistant_tasks')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('assistant_id', assistantId)
-        .not('todoist_id', 'is', null)
-
-      if (deleteError) {
-        console.error('[Sync] Error deleting old tasks:', deleteError)
+        if (deleteError) {
+          console.error('[Sync] Error deleting old tasks:', deleteError)
+        } else {
+          console.log(`[Sync] Deleted ${tasksToDelete.length} stale tasks`)
+        }
       }
     }
 
