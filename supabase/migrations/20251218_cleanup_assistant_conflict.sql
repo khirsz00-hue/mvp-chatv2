@@ -30,21 +30,23 @@ ON CONFLICT (user_id, name) DO NOTHING;
 
 -- Step 2: Fix assistant_id for all tasks in test_day_assistant_tasks
 -- Update tasks that have NULL or incorrect assistant_id
+-- Optimized with UPDATE...FROM join for better performance on large datasets
 UPDATE test_day_assistant_tasks t
-SET assistant_id = (
-  SELECT id FROM assistant_config 
-  WHERE user_id = t.user_id 
-  AND name = 'asystent dnia v2' 
-  LIMIT 1
-)
-WHERE assistant_id IS NULL 
-   OR assistant_id NOT IN (
-     SELECT id FROM assistant_config 
-     WHERE name = 'asystent dnia v2'
-   );
+SET assistant_id = ac.id
+FROM assistant_config ac
+WHERE ac.user_id = t.user_id 
+  AND ac.name = 'asystent dnia v2'
+  AND (
+    t.assistant_id IS NULL 
+    OR t.assistant_id NOT IN (
+      SELECT id FROM assistant_config 
+      WHERE name = 'asystent dnia v2'
+    )
+  );
 
 -- Step 3: Add foreign key constraint if it doesn't exist
 -- This ensures all future tasks will have valid assistant_id
+-- Using ON DELETE RESTRICT to prevent accidental data loss
 DO $$ 
 BEGIN
   IF NOT EXISTS (
@@ -55,7 +57,7 @@ BEGIN
       ADD CONSTRAINT fk_test_day_tasks_assistant_id 
       FOREIGN KEY (assistant_id) 
       REFERENCES assistant_config(id) 
-      ON DELETE CASCADE;
+      ON DELETE RESTRICT;
   END IF;
 END $$;
 

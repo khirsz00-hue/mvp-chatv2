@@ -74,5 +74,11 @@ export default function Sidebar({ activeView, onNavigate, isAdmin, isMobileMenuO
   )
 }
 
+// Helper to validate assistant IDs
+export function isValidAssistantId(id: string): id is AssistantId {
+  const validIds: AssistantId[] = ['tasks', 'day-assistant-v2', 'planning', 'journal', 'decisions', 'community', 'support', 'admin']
+  return validIds.includes(id as AssistantId)
+}
+
 export { assistants }
 export type { Assistant }

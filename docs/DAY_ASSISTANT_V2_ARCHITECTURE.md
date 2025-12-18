@@ -70,7 +70,7 @@ Stores assistant configurations for each user.
 ```sql
 id              UUID PRIMARY KEY
 user_id         UUID REFERENCES auth.users
-name            TEXT (e.g., 'asystent dnia v2')
+name            TEXT (must be exactly 'asystent dnia v2' for v2)
 type            TEXT (day_planner, week_planner, journal, decision)
 settings        JSONB (undo_window, max_postpones, etc.)
 is_active       BOOLEAN
@@ -79,7 +79,7 @@ updated_at      TIMESTAMP
 UNIQUE(user_id, name)
 ```
 
-**Important:** The assistant name **must** be exactly `'asystent dnia v2'` for v2 functionality.
+**Important:** The assistant name **must** be exactly `'asystent dnia v2'` (with lowercase 'a' and 'v2' suffix) for v2 functionality to work correctly. This exact string is used in queries throughout the codebase.
 
 #### `test_day_assistant_tasks`
 Main task table with ADHD-friendly metadata.

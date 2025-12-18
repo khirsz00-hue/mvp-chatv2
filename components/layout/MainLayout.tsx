@@ -1,7 +1,7 @@
 'use client'
 
 import Header from './Header'
-import Sidebar, { AssistantId } from './Sidebar'
+import Sidebar, { AssistantId, isValidAssistantId } from './Sidebar'
 import { ReactNode, useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
@@ -94,8 +94,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
       if (stored === 'day-assistant') {
         setActiveView('day-assistant-v2')
         localStorage.setItem('active_assistant', 'day-assistant-v2')
-      } else if (stored && stored !== 'community' && ['tasks', 'day-assistant-v2', 'planning', 'journal', 'decisions', 'support', 'admin'].includes(stored)) {
-        setActiveView(stored as AssistantId)
+      } else if (stored && stored !== 'community' && isValidAssistantId(stored)) {
+        setActiveView(stored)
       }
     } catch {}
 
