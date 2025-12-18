@@ -55,14 +55,27 @@ export function DayAssistantV2View() {
 
   useEffect(() => {
     const init = async () => {
+      console.log('[DayAssistantV2] Component mounted - starting initialization')
+      
       const { data: { session } } = await supabase.auth.getSession()
+      console.log('[DayAssistantV2] Session check completed:', session ? 'SESSION EXISTS' : 'NO SESSION')
+      
       if (!session) {
+        console.warn('[DayAssistantV2] No session found - user not authenticated')
         showToast('Musisz być zalogowany, aby korzystać z Asystenta Dnia v2', 'error')
         setLoading(false)
         return
       }
-      setSessionToken(session.access_token)
-      await loadDayPlan(session.access_token)
+      
+      const token = session.access_token
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[DayAssistantV2] Token exists:', token ? 'YES' : 'NO')
+        console.log('[DayAssistantV2] Token length:', token?.length || 0)
+      }
+      
+      setSessionToken(token)
+      console.log('[DayAssistantV2] Calling loadDayPlan() with token from session')
+      await loadDayPlan(token)
     }
     init()
 
@@ -82,26 +95,82 @@ export function DayAssistantV2View() {
   }
 
   const loadDayPlan = async (token?: string) => {
+    console.log('[DayAssistantV2] loadDayPlan() called')
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[DayAssistantV2] - token parameter:', token ? 'PROVIDED' : 'NOT PROVIDED')
+      console.log('[DayAssistantV2] - sessionToken state:', sessionToken ? 'EXISTS' : 'NULL')
+    }
+    
     try {
       setLoading(true)
       const authHeader = token || sessionToken
-      if (!authHeader) return
-      const response = await fetch(`/api/day-assistant-v2/dayplan?date=${selectedDate}`, {
-        headers: { Authorization: `Bearer ${authHeader}` }
-      })
-      if (!response.ok) {
-        showToast('Nie udało się pobrać planu dnia', 'error')
+      
+      console.log('[DayAssistantV2] authHeader resolved:', authHeader ? 'EXISTS' : 'MISSING')
+      
+      if (!authHeader) {
+        console.error('[DayAssistantV2] ❌ No auth header available - cannot fetch day plan')
+        console.error('[DayAssistantV2] This means both token parameter and sessionToken state are null/undefined')
+        showToast('Brak autoryzacji - spróbuj odświeżyć stronę', 'error')
         return
       }
+      
+      const url = `/api/day-assistant-v2/dayplan?date=${selectedDate}`
+      console.log('[DayAssistantV2] Fetching day plan from:', url)
+      console.log('[DayAssistantV2] Selected date:', selectedDate)
+      
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${authHeader}` }
+      })
+      
+      console.log('[DayAssistantV2] Response received - status:', response.status, response.statusText)
+      
+      if (!response.ok) {
+        console.error('[DayAssistantV2] ❌ API request failed with status:', response.status)
+        let errorMessage = 'Nie udało się pobrać planu dnia'
+        try {
+          const errorData = await response.json()
+          console.error('[DayAssistantV2] Error response data:', errorData)
+          errorMessage = errorData.error || errorMessage
+        } catch (e) {
+          console.error('[DayAssistantV2] Could not parse error response as JSON')
+        }
+        showToast(errorMessage, 'error')
+        return
+      }
+      
       const data = await response.json()
+      console.log('[DayAssistantV2] ✅ Day plan loaded successfully')
+      console.log('[DayAssistantV2] - Assistant:', data.assistant ? 'LOADED' : 'MISSING')
+      console.log('[DayAssistantV2] - Day plan:', data.dayPlan ? 'LOADED' : 'MISSING')
+      console.log('[DayAssistantV2] - Tasks count:', data.tasks?.length || 0)
+      console.log('[DayAssistantV2] - Proposals count:', data.proposals?.length || 0)
+      
+      if (data.tasks && data.tasks.length > 0) {
+        console.log('[DayAssistantV2] Tasks preview:', data.tasks.slice(0, 3).map((t: TestDayTask) => ({
+          id: t.id,
+          title: t.title,
+          is_must: t.is_must,
+          due_date: t.due_date
+        })))
+      }
+      
       setAssistant(data.assistant)
       setDayPlan(data.dayPlan)
       setTasks(data.tasks || [])
       setProposals(data.proposals || [])
+      
+      console.log('[DayAssistantV2] State updated successfully')
     } catch (error) {
-      console.error('DayAssistantV2 load error', error)
+      console.error('[DayAssistantV2] ❌ Exception in loadDayPlan:', error)
+      if (error instanceof Error) {
+        console.error('[DayAssistantV2] Error name:', error.name)
+        console.error('[DayAssistantV2] Error message:', error.message)
+        console.error('[DayAssistantV2] Error stack:', error.stack)
+      }
+      showToast('Wystąpił błąd podczas ładowania planu dnia', 'error')
     } finally {
       setLoading(false)
+      console.log('[DayAssistantV2] loadDayPlan() completed, loading state set to false')
     }
   }
 
