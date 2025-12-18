@@ -54,7 +54,7 @@ Day Assistant v2 is an ADHD-friendly day planner that helps users manage their t
 
 **Sync Strategy:**
 - Cache-aware: only syncs if >10 seconds since last sync
-- Bidirectional: syncs tasks from Todoist to `test_day_assistant_tasks`
+- Bidirectional: syncs tasks from Todoist to `day_assistant_v2_tasks`
 - Handles: create, update, delete operations
 - Auto-creates 'asystent dnia v2' assistant if missing
 
@@ -81,7 +81,7 @@ UNIQUE(user_id, name)
 
 **Important:** The assistant name **must** be exactly `'asystent dnia v2'` (with lowercase 'a' and 'v2' suffix) for v2 functionality to work correctly. This exact string is used in queries throughout the codebase.
 
-#### `test_day_assistant_tasks`
+#### `day_assistant_v2_tasks`
 Main task table with ADHD-friendly metadata.
 
 ```sql
@@ -115,13 +115,13 @@ updated_at        TIMESTAMP
 ```
 
 **Indexes:**
-- `idx_test_day_tasks_user_assistant` on (user_id, assistant_id)
-- `idx_test_day_tasks_due` on (due_date)
-- `idx_test_day_tasks_must` on (is_must) WHERE is_must = TRUE
+- `idx_v2_tasks_user_assistant` on (user_id, assistant_id)
+- `idx_v2_tasks_due` on (due_date)
+- `idx_v2_tasks_must` on (is_must) WHERE is_must = TRUE
 - `idx_tasks_todoist_id` on (todoist_id)
 - `idx_tasks_user_assistant_todoist` UNIQUE on (user_id, assistant_id, todoist_id) WHERE todoist_id IS NOT NULL
 
-#### `test_day_plan`
+#### `day_assistant_v2_plan`
 Daily plan with energy/focus levels and timeline blocks.
 
 ```sql
@@ -138,7 +138,7 @@ updated_at      TIMESTAMP
 UNIQUE(user_id, assistant_id, plan_date)
 ```
 
-#### `test_day_proposals`
+#### `day_assistant_v2_proposals`
 AI-generated recommendations with alternatives.
 
 ```sql
@@ -155,14 +155,14 @@ expires_at        TIMESTAMP
 responded_at      TIMESTAMP
 ```
 
-#### `test_day_decision_log`
+#### `day_assistant_v2_decision_log`
 Audit trail of all user decisions for ML learning.
 
 ```sql
 id              UUID PRIMARY KEY
 user_id         UUID REFERENCES auth.users
 assistant_id    UUID REFERENCES assistant_config
-task_id         UUID REFERENCES test_day_assistant_tasks
+task_id         UUID REFERENCES day_assistant_v2_tasks
 action          TEXT (postpone, unmark_must, accept_proposal, etc.)
 from_date       DATE
 to_date         DATE
@@ -171,14 +171,14 @@ context         JSONB (energy, focus, time_of_day, etc.)
 timestamp       TIMESTAMP
 ```
 
-#### `test_day_undo_history`
+#### `day_assistant_v2_undo_history`
 Short-term undo buffer (5-15 seconds).
 
 ```sql
 id                      UUID PRIMARY KEY
 user_id                 UUID REFERENCES auth.users
 assistant_id            UUID REFERENCES assistant_config
-decision_log_id         UUID REFERENCES test_day_decision_log
+decision_log_id         UUID REFERENCES day_assistant_v2_decision_log
 previous_state          JSONB (state snapshot)
 undo_window_expires     TIMESTAMP
 undone                  BOOLEAN
@@ -248,7 +248,7 @@ Fetch tasks from Todoist
     ↓
 Get/Create 'asystent dnia v2' assistant
     ↓
-Map Todoist tasks → test_day_assistant_tasks
+Map Todoist tasks → day_assistant_v2_tasks
     ↓
 Upsert tasks (by todoist_id)
     ↓
@@ -286,9 +286,9 @@ POST /api/day-assistant-v2/postpone
     ↓
 Validate task belongs to user
     ↓
-Log decision to test_day_decision_log
+Log decision to day_assistant_v2_decision_log
     ↓
-Create undo point in test_day_undo_history
+Create undo point in day_assistant_v2_undo_history
     ↓
 Update task: due_date = tomorrow, postpone_count++
     ↓
@@ -348,7 +348,7 @@ All tables have RLS enabled with policies:
 
 **Actions:**
 1. Create 'asystent dnia v2' assistant for all users (if missing)
-2. Fix assistant_id for all tasks in test_day_assistant_tasks
+2. Fix assistant_id for all tasks in day_assistant_v2_tasks
 3. Add foreign key constraint on assistant_id
 4. Mark old v1 assistants as inactive
 
@@ -392,7 +392,7 @@ WHERE user_id = '<uuid>' AND name = 'asystent dnia v2';
 
 -- Check tasks
 SELECT id, title, assistant_id, due_date, todoist_id 
-FROM test_day_assistant_tasks 
+FROM day_assistant_v2_tasks 
 WHERE user_id = '<uuid>';
 
 -- Check sync status

@@ -1,5 +1,16 @@
 # Todoist Sync Setup Guide
 
+## ⚠️ Note: Table Names Updated
+
+As of December 2024, all `test_day_*` tables have been renamed to `day_assistant_v2_*`:
+- `test_day_assistant_tasks` → `day_assistant_v2_tasks`
+- `test_day_plan` → `day_assistant_v2_plan`
+- `test_day_proposals` → `day_assistant_v2_proposals`
+- etc.
+
+If you see historical references to `test_day_*` tables below, use the new `day_assistant_v2_*` names instead.
+See [MIGRATION_INSTRUCTIONS.md](./MIGRATION_INSTRUCTIONS.md) for migration details.
+
 ## Overview
 This guide explains how to set up the centralized Todoist → Supabase synchronization system that ensures both TasksAssistant and DayAssistantV2 use the same data source.
 
