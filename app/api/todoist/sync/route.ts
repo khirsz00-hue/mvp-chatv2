@@ -207,36 +207,67 @@ export async function POST(request: NextRequest) {
 
     // Delete old synced tasks that are no longer in Todoist
     const todoistIds = todoistTasks.map(t => t.id)
-    const { error: deleteError } = await supabase
-      .from('test_day_assistant_tasks')
-      .delete()
-      .eq('user_id', user.id)
-      .eq('assistant_id', assistantId)
-      .not('todoist_id', 'is', null)
-      .not('todoist_id', 'in', `(${todoistIds.join(',')})`)
+    
+    // Only attempt deletion if there are Todoist IDs to compare against
+    if (todoistIds.length > 0) {
+      const { error: deleteError } = await supabase
+        .from('test_day_assistant_tasks')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('assistant_id', assistantId)
+        .not('todoist_id', 'is', null)
+        .not('todoist_id', 'in', `(${todoistIds.join(',')})`)
 
-    if (deleteError) {
-      console.error('[Sync] Error deleting old tasks:', deleteError)
+      if (deleteError) {
+        console.error('[Sync] Error deleting old tasks:', deleteError)
+      }
+    } else {
+      // If no tasks from Todoist, delete all synced tasks
+      const { error: deleteError } = await supabase
+        .from('test_day_assistant_tasks')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('assistant_id', assistantId)
+        .not('todoist_id', 'is', null)
+
+      if (deleteError) {
+        console.error('[Sync] Error deleting old tasks:', deleteError)
+      }
     }
 
     // Upsert tasks (update existing, insert new)
+    // Strategy: For each task, check if it exists by todoist_id, then update or insert
     if (mappedTasks.length > 0) {
-      const { error: upsertError } = await supabase
-        .from('test_day_assistant_tasks')
-        .upsert(
-          mappedTasks,
-          {
-            onConflict: 'user_id,assistant_id,todoist_id',
-            ignoreDuplicates: false
-          }
-        )
+      for (const task of mappedTasks) {
+        // Check if task with this todoist_id already exists
+        const { data: existing } = await supabase
+          .from('test_day_assistant_tasks')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('assistant_id', assistantId)
+          .eq('todoist_id', task.todoist_id)
+          .single()
 
-      if (upsertError) {
-        console.error('[Sync] Error upserting tasks:', upsertError)
-        return NextResponse.json(
-          { error: 'Failed to sync tasks to database' },
-          { status: 500 }
-        )
+        if (existing) {
+          // Update existing task
+          const { error: updateError } = await supabase
+            .from('test_day_assistant_tasks')
+            .update(task)
+            .eq('id', existing.id)
+
+          if (updateError) {
+            console.error(`[Sync] Error updating task ${task.todoist_id}:`, updateError)
+          }
+        } else {
+          // Insert new task
+          const { error: insertError } = await supabase
+            .from('test_day_assistant_tasks')
+            .insert(task)
+
+          if (insertError) {
+            console.error(`[Sync] Error inserting task ${task.todoist_id}:`, insertError)
+          }
+        }
       }
     }
 

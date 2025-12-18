@@ -22,6 +22,12 @@ ADD COLUMN IF NOT EXISTS synced_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_tasks_todoist_id ON test_day_assistant_tasks(todoist_id);
 
+-- Create unique constraint for upsert operations
+-- Note: This allows NULL todoist_id for manually created tasks
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_user_assistant_todoist 
+  ON test_day_assistant_tasks(user_id, assistant_id, todoist_id)
+  WHERE todoist_id IS NOT NULL;
+
 -- RLS Policies for sync_metadata
 ALTER TABLE sync_metadata ENABLE ROW LEVEL SECURITY;
 
