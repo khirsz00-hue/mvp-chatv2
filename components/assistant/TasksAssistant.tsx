@@ -18,6 +18,7 @@ import { TaskTimer } from './TaskTimer'
 import { PomodoroTimer } from './PomodoroTimer'
 import { supabase } from '@/lib/supabaseClient'
 import { getTodoistToken } from '@/lib/integrations'
+import { syncTodoist, startBackgroundSync } from '@/lib/todoistSync'
 
 interface Task {
   id: string
@@ -143,6 +144,14 @@ export function TasksAssistant() {
     try {
       console.log('🔍 Fetching tasks with token:', token ?  'EXISTS' : 'MISSING')
       
+      // ✨ STEP 1: Call sync (cache-aware, coordinated)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.access_token) {
+        await syncTodoist(session.access_token)
+          .catch(err => console.warn('[TasksAssistant] Sync warning:', err))
+      }
+      
+      // ✨ STEP 2: Fetch from Todoist API (already synchronized)
       const res = await fetch(`/api/todoist/tasks?token=${token}&filter=${filterType}`)
       
       console.log('📡 Response status:', res.status)
@@ -205,6 +214,24 @@ export function TasksAssistant() {
     if (!token) return
     fetchProjects()
   }, [token, fetchProjects])
+  
+  // Background sync every 10 seconds (coordinated globally)
+  useEffect(() => {
+    if (!token) return
+    
+    let cleanup: (() => void) | null = null
+    
+    // Get session token and start background sync
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.access_token) {
+        cleanup = startBackgroundSync(session.access_token, 10000)
+      }
+    })
+    
+    return () => {
+      if (cleanup) cleanup()
+    }
+  }, [token])
   
   // Monitor active timer/pomodoro
   useEffect(() => {
