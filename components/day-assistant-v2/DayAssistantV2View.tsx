@@ -68,8 +68,10 @@ export function DayAssistantV2View() {
       }
       
       const token = session.access_token
-      console.log('[DayAssistantV2] Token exists:', token ? 'YES' : 'NO')
-      console.log('[DayAssistantV2] Token length:', token?.length || 0)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[DayAssistantV2] Token exists:', token ? 'YES' : 'NO')
+        console.log('[DayAssistantV2] Token length:', token?.length || 0)
+      }
       
       setSessionToken(token)
       console.log('[DayAssistantV2] Calling loadDayPlan() with token from session')
@@ -94,8 +96,10 @@ export function DayAssistantV2View() {
 
   const loadDayPlan = async (token?: string) => {
     console.log('[DayAssistantV2] loadDayPlan() called')
-    console.log('[DayAssistantV2] - token parameter:', token ? 'PROVIDED' : 'NOT PROVIDED')
-    console.log('[DayAssistantV2] - sessionToken state:', sessionToken ? 'EXISTS' : 'NULL')
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[DayAssistantV2] - token parameter:', token ? 'PROVIDED' : 'NOT PROVIDED')
+      console.log('[DayAssistantV2] - sessionToken state:', sessionToken ? 'EXISTS' : 'NULL')
+    }
     
     try {
       setLoading(true)
@@ -142,7 +146,7 @@ export function DayAssistantV2View() {
       console.log('[DayAssistantV2] - Proposals count:', data.proposals?.length || 0)
       
       if (data.tasks && data.tasks.length > 0) {
-        console.log('[DayAssistantV2] Tasks preview:', data.tasks.slice(0, 3).map((t: any) => ({
+        console.log('[DayAssistantV2] Tasks preview:', data.tasks.slice(0, 3).map((t: TestDayTask) => ({
           id: t.id,
           title: t.title,
           is_must: t.is_must,
