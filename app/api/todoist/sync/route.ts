@@ -210,7 +210,7 @@ export async function POST(request: NextRequest) {
     
     // Get all existing synced tasks
     const { data: existingTasks } = await supabase
-      .from('test_day_assistant_tasks')
+      .from('day_assistant_v2_tasks')
       .select('id, todoist_id')
       .eq('user_id', user.id)
       .eq('assistant_id', assistantId)
@@ -224,7 +224,7 @@ export async function POST(request: NextRequest) {
       
       if (tasksToDelete.length > 0) {
         const { error: deleteError } = await supabase
-          .from('test_day_assistant_tasks')
+          .from('day_assistant_v2_tasks')
           .delete()
           .in('id', tasksToDelete)
 
@@ -237,38 +237,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Upsert tasks (update existing, insert new)
-    // Strategy: For each task, check if it exists by todoist_id, then update or insert
+    // Use proper upsert to avoid 23505 unique constraint errors
     if (mappedTasks.length > 0) {
-      for (const task of mappedTasks) {
-        // Check if task with this todoist_id already exists
-        const { data: existing } = await supabase
-          .from('test_day_assistant_tasks')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('assistant_id', assistantId)
-          .eq('todoist_id', task.todoist_id)
-          .single()
+      const { error: upsertError } = await supabase
+        .from('day_assistant_v2_tasks')
+        .upsert(mappedTasks, {
+          onConflict: 'user_id,assistant_id,todoist_id',
+          ignoreDuplicates: false
+        })
 
-        if (existing) {
-          // Update existing task
-          const { error: updateError } = await supabase
-            .from('test_day_assistant_tasks')
-            .update(task)
-            .eq('id', existing.id)
-
-          if (updateError) {
-            console.error(`[Sync] Error updating task ${task.todoist_id}:`, updateError)
-          }
-        } else {
-          // Insert new task
-          const { error: insertError } = await supabase
-            .from('test_day_assistant_tasks')
-            .insert(task)
-
-          if (insertError) {
-            console.error(`[Sync] Error inserting task ${task.todoist_id}:`, insertError)
-          }
-        }
+      if (upsertError) {
+        console.error('[Sync] Error upserting tasks:', upsertError)
+        return NextResponse.json(
+          { error: 'Failed to sync tasks', details: upsertError.message },
+          { status: 500 }
+        )
       }
     }
 

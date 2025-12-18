@@ -183,9 +183,9 @@ export async function getTasks(
   })
   
   let query = db
-    .from('test_day_assistant_tasks')
+    .from('day_assistant_v2_tasks')
     .select(options?.includeSubtasks 
-      ? `*, test_day_subtasks(*)` 
+      ? `*, day_assistant_v2_subtasks(*)` 
       : '*'
     )
     .eq('user_id', userId)
@@ -253,7 +253,7 @@ export async function getTasks(
   if (typedData.length === 0 && options?.date && !options?.includeAllDates) {
     console.log('[getTasks] No tasks found for date', options.date, '- fetching all tasks for diagnostic')
     const { data: allTasks, error: allError } = await db
-      .from('test_day_assistant_tasks')
+      .from('day_assistant_v2_tasks')
       .select('id, title, due_date, completed')
       .eq('user_id', userId)
       .eq('assistant_id', assistantId)
@@ -273,10 +273,10 @@ export async function getTasks(
   
   // Map database records to TestDayTask with proper typing
   const tasks = typedData.map((task) => {
-    const taskWithRelations = task as TestDayTask & { test_day_subtasks?: TestDaySubtask[] }
+    const taskWithRelations = task as TestDayTask & { day_assistant_v2_subtasks?: TestDaySubtask[] }
     let subtasks: TestDaySubtask[] | undefined
     if (options?.includeSubtasks) {
-      subtasks = Array.isArray(taskWithRelations.test_day_subtasks) ? taskWithRelations.test_day_subtasks : []
+      subtasks = Array.isArray(taskWithRelations.day_assistant_v2_subtasks) ? taskWithRelations.day_assistant_v2_subtasks : []
     }
     return {
       ...taskWithRelations,
@@ -299,7 +299,7 @@ export async function createTask(
   const db = client || supabaseServer
   
   const { data, error } = await db
-    .from('test_day_assistant_tasks')
+    .from('day_assistant_v2_tasks')
     .insert({
       user_id: userId,
       assistant_id: assistantId,
@@ -338,7 +338,7 @@ export async function updateTask(
   const db = client || supabaseServer
   
   const { data, error } = await db
-    .from('test_day_assistant_tasks')
+    .from('day_assistant_v2_tasks')
     .update(updates)
     .eq('id', taskId)
     .select()
@@ -365,7 +365,7 @@ export async function getOrCreateDayPlan(
   
   // Try to find existing plan
   const { data: existing, error: fetchError } = await db
-    .from('test_day_plan')
+    .from('day_assistant_v2_plan')
     .select('*')
     .eq('user_id', userId)
     .eq('assistant_id', assistantId)
@@ -378,7 +378,7 @@ export async function getOrCreateDayPlan(
   
   // Create new plan with default values
   const { data: newPlan, error: createError } = await db
-    .from('test_day_plan')
+    .from('day_assistant_v2_plan')
     .insert({
       user_id: userId,
       assistant_id: assistantId,
@@ -412,7 +412,7 @@ export async function updateDayPlan(
   const db = client || supabaseServer
   
   const { data, error } = await db
-    .from('test_day_plan')
+    .from('day_assistant_v2_plan')
     .update(updates)
     .eq('user_id', userId)
     .eq('assistant_id', assistantId)
@@ -448,7 +448,7 @@ export async function postponeTask(
   
   // Get current task
   const { data: task, error: taskError } = await db
-    .from('test_day_assistant_tasks')
+    .from('day_assistant_v2_tasks')
     .select('*')
     .eq('id', taskId)
     .single()
@@ -465,7 +465,7 @@ export async function postponeTask(
   
   // Update task with postpone tracking
   const { data: updatedTask, error: updateError } = await db
-    .from('test_day_assistant_tasks')
+    .from('day_assistant_v2_tasks')
     .update({
       due_date: tomorrowStr,
       postpone_count: (task.postpone_count || 0) + 1,
@@ -513,7 +513,7 @@ export async function postponeTask(
   undoExpires.setSeconds(undoExpires.getSeconds() + undoWindow)
   
   await db
-    .from('test_day_undo_history')
+    .from('day_assistant_v2_undo_history')
     .insert({
       user_id: userId,
       assistant_id: assistantId,
@@ -549,7 +549,7 @@ export async function logDecision(
   const db = client || supabaseServer
   
   const { data: entry, error } = await db
-    .from('test_day_decision_log')
+    .from('day_assistant_v2_decision_log')
     .insert({
       user_id: userId,
       assistant_id: assistantId,
@@ -583,7 +583,7 @@ export async function undoLastAction(
   
   // Find most recent undo-able entry
   const { data: undoEntry, error: fetchError } = await db
-    .from('test_day_undo_history')
+    .from('day_assistant_v2_undo_history')
     .select('*')
     .eq('user_id', userId)
     .eq('assistant_id', assistantId)
@@ -601,7 +601,7 @@ export async function undoLastAction(
   
   // Restore previous state
   const { error: restoreError } = await db
-    .from('test_day_assistant_tasks')
+    .from('day_assistant_v2_tasks')
     .update(previousState)
     .eq('id', previousState.id)
   
@@ -612,7 +612,7 @@ export async function undoLastAction(
   
   // Mark as undone
   await db
-    .from('test_day_undo_history')
+    .from('day_assistant_v2_undo_history')
     .update({
       undone: true,
       undone_at: new Date().toISOString()
@@ -653,7 +653,7 @@ export async function createProposal(
   expiresAt.setHours(expiresAt.getHours() + 24)  // Proposals expire after 24 hours
   
   const { data, error } = await db
-    .from('test_day_proposals')
+    .from('day_assistant_v2_proposals')
     .insert({
       user_id: userId,
       assistant_id: assistantId,
@@ -687,7 +687,7 @@ export async function getActiveProposals(
   const db = client || supabaseServer
   
   const { data, error } = await db
-    .from('test_day_proposals')
+    .from('day_assistant_v2_proposals')
     .select('*')
     .eq('user_id', userId)
     .eq('assistant_id', assistantId)
@@ -718,7 +718,7 @@ export async function respondToProposal(
   const status = action === 'reject' ? 'rejected' : 'accepted'
   
   const { error } = await db
-    .from('test_day_proposals')
+    .from('day_assistant_v2_proposals')
     .update({
       status: status,
       responded_at: new Date().toISOString()
@@ -745,7 +745,7 @@ export async function getMustTasksCount(
   const db = client || supabaseServer
   
   const { count, error } = await db
-    .from('test_day_assistant_tasks')
+    .from('day_assistant_v2_tasks')
     .select('*', { count: 'exact', head: true })
     .eq('user_id', userId)
     .eq('assistant_id', assistantId)
@@ -798,7 +798,7 @@ export async function nightlyRollover(
   
   // Find incomplete tasks from yesterday
   const { data: overdueTasks, error: fetchError } = await db
-    .from('test_day_assistant_tasks')
+    .from('day_assistant_v2_tasks')
     .select('*')
     .eq('user_id', userId)
     .eq('assistant_id', assistantId)
@@ -813,7 +813,7 @@ export async function nightlyRollover(
   const movedTasks: TestDayTask[] = []
   for (const task of overdueTasks) {
     const { data: movedTask } = await db
-      .from('test_day_assistant_tasks')
+      .from('day_assistant_v2_tasks')
       .update({
         due_date: today,
         auto_moved: true,

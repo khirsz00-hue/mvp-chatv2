@@ -129,7 +129,7 @@ export function DayAssistantV2View() {
       await syncTodoist(authHeader)
         .catch(err => console.warn('[DayAssistantV2] Sync warning:', err))
       
-      // ✨ STEP 2: Fetch day plan (getTasks reads from test_day_assistant_tasks)
+      // ✨ STEP 2: Fetch day plan (getTasks reads from day_assistant_v2_tasks)
       const url = `/api/day-assistant-v2/dayplan?date=${selectedDate}`
       console.log('[DayAssistantV2] Fetching day plan from:', url)
       console.log('[DayAssistantV2] Selected date:', selectedDate)

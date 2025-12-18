@@ -16,7 +16,7 @@ The repository contained two conflicting versions of Day Assistant:
 - **Features:** NOW/NEXT/LATER workflow, energy modes (crisis/normal/flow)
 
 ### Day Assistant v2 (Active)
-- **Tables:** `test_day_assistant_*`, `sync_metadata`
+- **Tables:** `day_assistant_v2_*`, `sync_metadata`
 - **Components:** `components/day-assistant-v2/`
 - **API:** `/api/day-assistant-v2/`
 - **Features:** Dual sliders (energy/focus), MUST tasks, Todoist sync, smart recommendations
@@ -24,7 +24,7 @@ The repository contained two conflicting versions of Day Assistant:
 ### Issues Found
 
 1. **UI Confusion:** Sidebar showed both "Asystent Dnia" and "Asystent Dnia v2"
-2. **Data Inconsistency:** Tasks synced from Todoist went to `test_day_assistant_tasks` but might have wrong `assistant_id`
+2. **Data Inconsistency:** Tasks synced from Todoist went to `day_assistant_v2_tasks` but might have wrong `assistant_id`
 3. **No Documentation:** v2 architecture was not documented
 4. **Code Ambiguity:** No clear indication which version was active
 5. **Type Safety:** Hardcoded arrays instead of validation helpers
@@ -52,7 +52,7 @@ The repository contained two conflicting versions of Day Assistant:
 **Key Code:**
 ```sql
 -- Optimized UPDATE using join instead of subquery
-UPDATE test_day_assistant_tasks t
+UPDATE day_assistant_v2_tasks t
 SET assistant_id = ac.id
 FROM assistant_config ac
 WHERE ac.user_id = t.user_id 
@@ -60,8 +60,8 @@ WHERE ac.user_id = t.user_id
   AND (t.assistant_id IS NULL OR ...);
 
 -- Foreign key with RESTRICT to prevent accidental deletion
-ALTER TABLE test_day_assistant_tasks
-  ADD CONSTRAINT fk_test_day_tasks_assistant_id 
+ALTER TABLE day_assistant_v2_tasks
+  ADD CONSTRAINT fk_v2_tasks_assistant_id 
   FOREIGN KEY (assistant_id) 
   REFERENCES assistant_config(id) 
   ON DELETE RESTRICT;
@@ -128,7 +128,7 @@ Added `@deprecated` JSDoc comments to v1 components:
  * @deprecated This is Day Assistant v1 - no longer actively used.
  * The active version is DayAssistantV2View in components/day-assistant-v2/
  * This file is kept for reference but should not be used in new code.
- * Migration: Use DayAssistantV2View which uses test_day_assistant_* tables
+ * Migration: Use DayAssistantV2View which uses day_assistant_v2_* tables
  */
 ```
 
@@ -285,8 +285,8 @@ git push origin main
 ### 2. Rollback Database (if needed)
 ```sql
 -- Remove foreign key constraint
-ALTER TABLE test_day_assistant_tasks 
-  DROP CONSTRAINT IF EXISTS fk_test_day_tasks_assistant_id;
+ALTER TABLE day_assistant_v2_tasks 
+  DROP CONSTRAINT IF EXISTS fk_v2_tasks_assistant_id;
 
 -- Restore v1 assistants (if needed)
 UPDATE assistant_config 
@@ -358,7 +358,7 @@ For questions or issues:
 ```sql
 -- Should return 0 after migration
 SELECT COUNT(*) as orphaned_tasks
-FROM test_day_assistant_tasks t
+FROM day_assistant_v2_tasks t
 WHERE NOT EXISTS (
   SELECT 1 FROM assistant_config 
   WHERE id = t.assistant_id 

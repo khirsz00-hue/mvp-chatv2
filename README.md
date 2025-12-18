@@ -114,10 +114,12 @@ Day Assistant v2 is an ADHD-friendly day planner with dual sliders, intelligent 
 
 **Database Tables:**
 - `assistant_config` - Assistant settings per user
-- `test_day_assistant_tasks` - Main task table
-- `test_day_plan` - Daily plan with energy/focus
-- `test_day_proposals` - AI recommendations
-- `test_day_decision_log` - Decision audit trail
+- `day_assistant_v2_tasks` - Main task table (renamed from `test_day_assistant_tasks`)
+- `day_assistant_v2_plan` - Daily plan with energy/focus (renamed from `test_day_plan`)
+- `day_assistant_v2_proposals` - AI recommendations (renamed from `test_day_proposals`)
+- `day_assistant_v2_decision_log` - Decision audit trail (renamed from `test_day_decision_log`)
+- `day_assistant_v2_subtasks` - Subtasks for decomposition (renamed from `test_day_subtasks`)
+- `day_assistant_v2_undo_history` - Undo tracking (renamed from `test_day_undo_history`)
 - `sync_metadata` - Sync status tracking
 
 ### Documentation
@@ -135,20 +137,33 @@ Day Assistant v2 is an ADHD-friendly day planner with dual sliders, intelligent 
 # 3. Cleanup v1/v2 conflicts
 # supabase/migrations/20251218_cleanup_assistant_conflict.sql
 
+# 4. Rename tables to production names
+# supabase/migrations/20251218_rename_to_v2.sql
+
 # Or use Supabase CLI
 supabase db push
 ```
 
+**Migration to Production Tables:**  
+If you're upgrading from the `test_day_*` tables, see [MIGRATION_INSTRUCTIONS.md](./MIGRATION_INSTRUCTIONS.md) for step-by-step migration guide.
+
 ### Migration from v1 to v2
 
-Old Day Assistant v1 components are deprecated and marked with `@deprecated`.
+Old Day Assistant v1 components and API routes have been **removed** as they are no longer needed.
+The migration to v2 includes:
+- ✅ Removed: `components/day-assistant/` (v1 components)
+- ✅ Removed: `app/api/day-assistant/` (v1 API routes)
+- ✅ Removed: `lib/dayAssistant/` (v1 business logic)
+- ✅ Clean table names: `day_assistant_v2_*` (removed `test_` prefix)
+- ✅ Fixed upsert in Todoist sync to prevent 23505 errors
+
 The migration script (`20251218_cleanup_assistant_conflict.sql`) will:
 - Create 'asystent dnia v2' assistant for all users
 - Fix `assistant_id` for all tasks
 - Mark old v1 assistants as inactive
 - Add foreign key constraints for data integrity
 
-**Note:** v1 is no longer accessible from the sidebar. All users are automatically redirected to v2.
+**Note:** All users now use v2 exclusively. See [MIGRATION_INSTRUCTIONS.md](./MIGRATION_INSTRUCTIONS.md) for database migration details.
 
 ---
 
