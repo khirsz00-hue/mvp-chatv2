@@ -89,13 +89,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
     // Odczytaj zapisaną preferencję widoku, jeśli istnieje
     // Don't auto-redirect to community - let user stay on main page
     try {
-      const stored = localStorage.getItem('active_assistant') as AssistantId | null
+      const stored = localStorage.getItem('active_assistant') as string | null
       // Redirect old 'day-assistant' v1 to v2
       if (stored === 'day-assistant') {
         setActiveView('day-assistant-v2')
         localStorage.setItem('active_assistant', 'day-assistant-v2')
       } else if (stored && stored !== 'community' && ['tasks', 'day-assistant-v2', 'planning', 'journal', 'decisions', 'support', 'admin'].includes(stored)) {
-        setActiveView(stored)
+        setActiveView(stored as AssistantId)
       }
     } catch {}
 
