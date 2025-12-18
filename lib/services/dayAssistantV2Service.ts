@@ -125,10 +125,24 @@ export async function getTasks(
     includeCompleted?: boolean
     date?: string
     includeSubtasks?: boolean
+    includeAllDates?: boolean
   },
   client?: SupabaseClient
 ): Promise<TestDayTask[]> {
   const db = client || supabaseServer
+  
+  // Debug logging - TODO: Consider removing or gating behind env variable in production
+  // Log function call with parameters
+  console.log('[getTasks] Called with:', {
+    userId,
+    assistantId,
+    options: {
+      includeCompleted: options?.includeCompleted,
+      date: options?.date,
+      includeSubtasks: options?.includeSubtasks,
+      includeAllDates: options?.includeAllDates
+    }
+  })
   
   let query = db
     .from('test_day_assistant_tasks')
@@ -144,19 +158,69 @@ export async function getTasks(
     query = query.eq('completed', false)
   }
   
-  if (options?.date) {
+  // Only filter by date if not includeAllDates
+  if (options?.includeAllDates) {
+    console.log('[getTasks] includeAllDates=true, skipping date filter')
+  } else if (options?.date) {
+    console.log('[getTasks] Filtering by due_date:', options.date)
     query = query.eq('due_date', options.date)
   }
+  
+  // Log query details
+  console.log('[getTasks] Query filters:', {
+    user_id: userId,
+    assistant_id: assistantId,
+    completed: options?.includeCompleted ? 'any' : false,
+    due_date: options?.includeAllDates ? 'all dates' : options?.date || 'any',
+    include_subtasks: options?.includeSubtasks || false
+  })
   
   const { data, error } = await query
   
   if (error) {
-    console.error('Error fetching tasks:', error)
+    console.error('[getTasks] Error fetching tasks:', error)
     return []
   }
   
+  // Log results
+  console.log('[getTasks] Query returned', data?.length || 0, 'tasks')
+  
   // Transform the data to match TestDayTask interface
   if (!data) return []
+  
+  // Log sample tasks (first 3)
+  if (data.length > 0) {
+    const sampleTasks = data.slice(0, 3).map(task => ({
+      id: task.id,
+      title: task.title,
+      due_date: task.due_date,
+      completed: task.completed,
+      priority: task.priority
+    }))
+    console.log('[getTasks] Sample tasks (first 3):', sampleTasks)
+  }
+  
+  // Diagnostic: If query with date returns 0 tasks, show all tasks
+  if (data.length === 0 && options?.date && !options?.includeAllDates) {
+    console.log('[getTasks] No tasks found for date', options.date, '- fetching all tasks for diagnostic')
+    const { data: allTasks, error: allError } = await db
+      .from('test_day_assistant_tasks')
+      .select('id, title, due_date, completed')
+      .eq('user_id', userId)
+      .eq('assistant_id', assistantId)
+      .limit(10)
+    
+    if (allError) {
+      console.error('[getTasks] Error fetching all tasks:', allError)
+    } else if (allTasks) {
+      console.log('[getTasks] Total tasks in DB (first 10):', allTasks.length)
+      if (allTasks.length > 0) {
+        console.log('[getTasks] All tasks sample:', allTasks)
+      } else {
+        console.log('[getTasks] No tasks found in DB for this user/assistant combination')
+      }
+    }
+  }
   
   // Map database records to TestDayTask with proper typing
   const tasks = data.map((task) => {

@@ -31,33 +31,85 @@ export async function GET(request: NextRequest) {
     
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
+      console.error('[dayplan API] Authentication failed:', authError)
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
+    // Debug logging - TODO: Consider removing or gating behind env variable in production
+    // Log authenticated user
+    console.log('[dayplan API] Authenticated user:', user.id)
+    
     const searchParams = request.nextUrl.searchParams
     const date = searchParams.get('date') || new Date().toISOString().split('T')[0]
+    const includeAllDates = searchParams.get('includeAllDates') === 'true'
+    
+    // Log date parameter
+    console.log('[dayplan API] Request parameters:', { 
+      date, 
+      includeAllDates,
+      requestedDate: searchParams.get('date'),
+      defaultedToToday: !searchParams.get('date')
+    })
     
     // Get or create assistant
     const assistant = await getOrCreateDayAssistantV2(user.id)
     if (!assistant) {
+      console.error('[dayplan API] Failed to get or create assistant for user:', user.id)
       return NextResponse.json({ error: 'Failed to get assistant' }, { status: 500 })
     }
+    
+    // Log assistant ID
+    console.log('[dayplan API] Assistant retrieved:', { 
+      assistantId: assistant.id,
+      assistantName: assistant.name,
+      assistantType: assistant.type
+    })
     
     // Get or create day plan
     const dayPlan = await getOrCreateDayPlan(user.id, assistant.id, date)
     if (!dayPlan) {
+      console.error('[dayplan API] Failed to get or create day plan:', { 
+        userId: user.id, 
+        assistantId: assistant.id, 
+        date 
+      })
       return NextResponse.json({ error: 'Failed to get day plan' }, { status: 500 })
     }
+    
+    console.log('[dayplan API] Day plan retrieved:', {
+      dayPlanId: dayPlan.id,
+      planDate: dayPlan.plan_date,
+      energy: dayPlan.energy,
+      focus: dayPlan.focus
+    })
     
     // Get tasks for the date
     const tasks = await getTasks(user.id, assistant.id, { 
       date, 
       includeCompleted: false,
-      includeSubtasks: true
+      includeSubtasks: true,
+      includeAllDates
     })
+    
+    // Log tasks count
+    console.log('[dayplan API] Tasks retrieved:', tasks.length)
     
     // Get active proposals
     const proposals = await getActiveProposals(user.id, assistant.id, date)
+    
+    // Log proposals count
+    console.log('[dayplan API] Active proposals retrieved:', proposals.length)
+    
+    // Log full response summary
+    console.log('[dayplan API] Returning response:', {
+      tasksCount: tasks.length,
+      proposalsCount: proposals.length,
+      dayPlanExists: !!dayPlan,
+      assistantExists: !!assistant,
+      date,
+      userId: user.id,
+      assistantId: assistant.id
+    })
     
     return NextResponse.json({
       dayPlan,
@@ -66,7 +118,7 @@ export async function GET(request: NextRequest) {
       assistant
     })
   } catch (error) {
-    console.error('Error in GET /api/day-assistant-v2/dayplan:', error)
+    console.error('[dayplan API] Error in GET /api/day-assistant-v2/dayplan:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
