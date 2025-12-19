@@ -242,7 +242,35 @@ export async function getTasks(
   const typedData = (data as unknown[]).filter((task) => {
     const valid = isValidTestDayTask(task)
     if (!valid) {
-      console.warn('[getTasks] Skipping invalid task payload', task)
+      // Log detailed validation failure reason
+      const reasons: string[] = []
+      if (!isNonArrayObject(task)) {
+        reasons.push('not an object')
+      } else {
+        const t = task
+        if (typeof t.id !== 'string') reasons.push(`id: ${typeof t.id}`)
+        if (typeof t.user_id !== 'string') reasons.push(`user_id: ${typeof t.user_id}`)
+        if (typeof t.assistant_id !== 'string') reasons.push(`assistant_id: ${typeof t.assistant_id}`)
+        if (typeof t.title !== 'string') reasons.push(`title: ${typeof t.title}`)
+        if (typeof t.priority !== 'number') reasons.push(`priority: ${typeof t.priority}`)
+        if (typeof t.is_must !== 'boolean') reasons.push(`is_must: ${typeof t.is_must}`)
+        if (typeof t.is_important !== 'boolean') reasons.push(`is_important: ${typeof t.is_important}`)
+        if (typeof t.estimate_min !== 'number') reasons.push(`estimate_min: ${typeof t.estimate_min}`)
+        if (typeof t.cognitive_load !== 'number') reasons.push(`cognitive_load: ${typeof t.cognitive_load}`)
+        if (!Array.isArray(t.tags)) reasons.push(`tags: not array`)
+        if (typeof t.position !== 'number') reasons.push(`position: ${typeof t.position}`)
+        if (typeof t.postpone_count !== 'number') reasons.push(`postpone_count: ${typeof t.postpone_count}`)
+        if (typeof t.auto_moved !== 'boolean') reasons.push(`auto_moved: ${typeof t.auto_moved}`)
+        if (!isNonArrayObject(t.metadata)) reasons.push(`metadata: not object`)
+        if (typeof t.created_at !== 'string') reasons.push(`created_at: ${typeof t.created_at}`)
+        if (typeof t.updated_at !== 'string') reasons.push(`updated_at: ${typeof t.updated_at}`)
+        if (typeof t.completed !== 'boolean') reasons.push(`completed: ${typeof t.completed}`)
+      }
+      console.warn('[getTasks] Skipping invalid task. Reasons:', reasons.join(', '), 'Task preview:', {
+        id: task && typeof task === 'object' ? (task as any).id : undefined,
+        title: task && typeof task === 'object' ? (task as any).title : undefined,
+        due_date: task && typeof task === 'object' ? (task as any).due_date : undefined
+      })
     }
     return valid
   })

@@ -85,15 +85,31 @@ export function DayAssistantV2View() {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Background sync every 10 seconds (coordinated globally)
+  // Background sync every 30 seconds with data refresh
   useEffect(() => {
     if (!sessionToken) return
     
-    // Use coordinated background sync to prevent redundant operations
-    const cleanup = startBackgroundSync(sessionToken, 10000)
+    const doSyncAndRefresh = async () => {
+      try {
+        const response = await syncTodoist(sessionToken)
+        if (response.ok) {
+          const data = await response.json()
+          // Only reload if tasks were actually synced
+          if (data.task_count > 0 || data.synced_at) {
+            console.log('[DayAssistantV2] Background sync completed, reloading data')
+            await loadDayPlan(sessionToken)
+          }
+        }
+      } catch (err) {
+        console.error('[DayAssistantV2] Background sync failed:', err)
+      }
+    }
     
-    return cleanup
-  }, [sessionToken])
+    // Sync every 30 seconds (reduced from 10s to avoid too frequent updates)
+    const interval = setInterval(doSyncAndRefresh, 30000)
+    
+    return () => clearInterval(interval)
+  }, [sessionToken]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const authFetch = async (url: string, options: RequestInit = {}) => {
     if (!sessionToken) throw new Error('Brak sesji')
