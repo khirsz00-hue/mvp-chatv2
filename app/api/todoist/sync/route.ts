@@ -12,6 +12,7 @@ import { createClient } from '@supabase/supabase-js'
 export const dynamic = 'force-dynamic'
 
 const SYNC_INTERVAL_MS = 10000 // 10 seconds cache
+const POSTGRES_UNIQUE_VIOLATION = '23505' // PostgreSQL error code for unique constraint violation
 
 interface TodoistTask {
   id: string
@@ -41,6 +42,12 @@ interface DayAssistantV2Task {
   due_date: string | null
   todoist_task_id: string
   synced_at: string
+  tags: string[]
+  position: number
+  postpone_count: number
+  auto_moved: boolean
+  metadata: Record<string, unknown>
+  completed: boolean
 }
 
 /**
@@ -95,7 +102,14 @@ function mapTodoistToDayAssistantTask(
     cognitive_load: cognitiveLoad,
     context_type: contextType,
     due_date: task.due?.date || null,
-    synced_at: new Date().toISOString()
+    synced_at: new Date().toISOString(),
+    // Add required fields with default values for validation
+    tags: [],
+    position: 0,
+    postpone_count: 0,
+    auto_moved: false,
+    metadata: {},
+    completed: false
   }
 }
 
@@ -163,17 +177,46 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch all tasks from Todoist API
-    const todoistResponse = await fetch('https://api.todoist.com/rest/v2/tasks', {
+    let todoistResponse = await fetch('https://api.todoist.com/rest/v2/tasks', {
       headers: {
         Authorization: `Bearer ${todoistToken}`
       },
       cache: 'no-store'
     })
 
+    // Handle 401 Unauthorized - token might be expired or invalid
+    if (todoistResponse.status === 401) {
+      console.error('[Sync] Todoist API 401 Unauthorized - token might be expired')
+      
+      // Try to refresh the token or clear it
+      // For now, we'll clear the token and ask user to reconnect
+      const { error: clearError } = await supabase
+        .from('user_profiles')
+        .update({ todoist_token: null })
+        .eq('id', user.id)
+      
+      if (clearError) {
+        console.error('[Sync] Error clearing invalid token:', clearError)
+      }
+      
+      return NextResponse.json(
+        { 
+          error: 'Todoist authorization expired - please reconnect your account',
+          error_code: 'TODOIST_AUTH_EXPIRED',
+          needs_reconnect: true
+        },
+        { status: 401 }
+      )
+    }
+
     if (!todoistResponse.ok) {
       console.error(`[Sync] Todoist API error: ${todoistResponse.status}`)
       return NextResponse.json(
-        { error: 'Failed to fetch tasks from Todoist' },
+        { 
+          error: `Failed to fetch tasks from Todoist (${todoistResponse.status})`,
+          error_code: 'TODOIST_API_ERROR',
+          status_code: todoistResponse.status
+        },
         { status: todoistResponse.status }
       )
     }
@@ -271,45 +314,39 @@ export async function POST(request: NextRequest) {
     }
 
     // Upsert tasks (update existing, insert new)
-    // Process each task individually to handle conflicts properly
-    // This is necessary because the unique index has a WHERE clause (WHERE todoist_id IS NOT NULL)
-    // which makes it a partial unique index that Supabase's onConflict doesn't handle well
+    // Process each task individually to handle the partial unique index properly
+    // The unique constraint is on (user_id, assistant_id, todoist_id) WHERE todoist_id IS NOT NULL
     if (mappedTasks.length > 0) {
-      // Fetch all existing tasks with todoist_id once to avoid N+1 queries
-      const { data: allExistingTasks } = await supabase
-        .from('day_assistant_v2_tasks')
-        .select('id, todoist_id')
-        .eq('user_id', user.id)
-        .eq('assistant_id', assistantId)
-        .not('todoist_id', 'is', null)
+      console.log(`[Sync] Upserting ${mappedTasks.length} tasks with conflict resolution`)
       
-      // Create a map for O(1) lookups
-      const existingTasksMap = new Map<string, string>()
-      if (allExistingTasks) {
-        for (const task of allExistingTasks) {
-          if (task.todoist_id) {
-            existingTasksMap.set(task.todoist_id, task.id)
-          }
-        }
-      }
-
       let successCount = 0
       let errorCount = 0
       const errors: string[] = []
 
+      // Process each task individually to handle conflicts properly
       for (const task of mappedTasks) {
         try {
-          const existingTaskId = existingTasksMap.get(task.todoist_id!)
+          // First, try to find existing task by todoist_id
+          const { data: existingTask } = await supabase
+            .from('day_assistant_v2_tasks')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('assistant_id', assistantId)
+            .eq('todoist_id', task.todoist_id!)
+            .maybeSingle()
 
-          if (existingTaskId) {
+          if (existingTask) {
             // Update existing task
             const { error: updateError } = await supabase
               .from('day_assistant_v2_tasks')
-              .update(task)
-              .eq('id', existingTaskId)
+              .update({
+                ...task,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', existingTask.id)
 
             if (updateError) {
-              console.error('[Sync] Error updating task:', updateError)
+              console.error('[Sync] Error updating task:', task.todoist_id, updateError)
               errorCount++
               errors.push(`Update failed for task ${task.todoist_id}: ${updateError.message}`)
             } else {
@@ -322,15 +359,50 @@ export async function POST(request: NextRequest) {
               .insert(task)
 
             if (insertError) {
-              console.error('[Sync] Error inserting task:', insertError)
-              errorCount++
-              errors.push(`Insert failed for task ${task.todoist_id}: ${insertError.message}`)
+              // If it's a duplicate key error, try to update instead
+              if (insertError.code === POSTGRES_UNIQUE_VIOLATION) {
+                console.warn('[Sync] Duplicate key on insert, attempting update for:', task.todoist_id)
+                
+                // Fetch the task again and update
+                const { data: retryExisting } = await supabase
+                  .from('day_assistant_v2_tasks')
+                  .select('id')
+                  .eq('user_id', user.id)
+                  .eq('assistant_id', assistantId)
+                  .eq('todoist_id', task.todoist_id!)
+                  .maybeSingle()
+
+                if (retryExisting) {
+                  const { error: retryError } = await supabase
+                    .from('day_assistant_v2_tasks')
+                    .update({
+                      ...task,
+                      updated_at: new Date().toISOString()
+                    })
+                    .eq('id', retryExisting.id)
+
+                  if (retryError) {
+                    console.error('[Sync] Retry update failed:', task.todoist_id, retryError)
+                    errorCount++
+                    errors.push(`Retry update failed for task ${task.todoist_id}: ${retryError.message}`)
+                  } else {
+                    successCount++
+                  }
+                } else {
+                  errorCount++
+                  errors.push(`Could not find duplicate task ${task.todoist_id} after 23505 error`)
+                }
+              } else {
+                console.error('[Sync] Error inserting task:', task.todoist_id, insertError)
+                errorCount++
+                errors.push(`Insert failed for task ${task.todoist_id}: ${insertError.message}`)
+              }
             } else {
               successCount++
             }
           }
         } catch (err) {
-          console.error('[Sync] Error processing task:', err)
+          console.error('[Sync] Error processing task:', task.todoist_id, err)
           errorCount++
           errors.push(`Processing failed for task ${task.todoist_id}`)
         }
@@ -350,8 +422,19 @@ export async function POST(request: NextRequest) {
           { status: 500 }
         )
       } else if (errorCount > 0) {
-        // Partial success
-        console.warn('[Sync] Partial sync - some tasks failed:', errors)
+        // Partial success - log with error aggregation
+        const errorTypes = errors.reduce((acc, err) => {
+          const type = err.split(':')[0] // Get error type (e.g., "Update failed", "Insert failed")
+          acc[type] = (acc[type] || 0) + 1
+          return acc
+        }, {} as Record<string, number>)
+        
+        console.warn('[Sync] Partial sync - some tasks failed')
+        console.warn('[Sync] Error summary:', errorTypes)
+        console.warn('[Sync] Sample errors (first 3):', errors.slice(0, 3))
+        if (errors.length > 3) {
+          console.warn(`[Sync] ... and ${errors.length - 3} more errors`)
+        }
       }
     }
 

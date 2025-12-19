@@ -51,7 +51,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
         
         if (!user) {
           console.log('⚠️ [MainLayout] No user found, redirecting to login')
-          setLoading(false)  // ✅ DODANO: setLoading(false) przed return
+          setLoading(false)
+          clearTimeout(timeoutId)  // Clear timeout on early return
           router.push('/login')
           return
         }
@@ -77,10 +78,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
         }
       } catch (error) {
         console.error('❌ [MainLayout] Error in checkAuth:', error)
-        setLoading(false)  // ✅ DODANO: setLoading(false) w catch
+        setLoading(false)
+        clearTimeout(timeoutId)  // Clear timeout on error
       } finally {
         console.log('✅ [MainLayout] Setting loading to false')
         setLoading(false)
+        clearTimeout(timeoutId)  // Clear timeout on successful completion
       }
     }
 
