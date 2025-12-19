@@ -50,7 +50,18 @@ function mapTodoistToDayAssistantTask(
   task: TodoistTask,
   userId: string,
   assistantId: string
-): Partial<DayAssistantV2Task> {
+): Partial<DayAssistantV2Task> | null {
+  // Validate required fields
+  if (!task.id) {
+    console.warn('[Sync] Skipping task without ID:', task)
+    return null
+  }
+  
+  if (!task.content) {
+    console.warn('[Sync] Skipping task without content:', task.id)
+    return null
+  }
+
   // Determine context_type from labels
   let contextType = 'code' // default
   if (task.labels) {
@@ -210,9 +221,23 @@ export async function POST(request: NextRequest) {
     const assistantId = assistant.id
 
     // Map Todoist tasks to DayAssistantV2Task format
-    const mappedTasks = todoistTasks.map(task =>
-      mapTodoistToDayAssistantTask(task, user.id, assistantId)
-    )
+    // Filter out invalid tasks that couldn't be mapped
+    const mappedTasks = todoistTasks
+      .map(task => {
+        try {
+          return mapTodoistToDayAssistantTask(task, user.id, assistantId)
+        } catch (error) {
+          console.error('[Sync] Error mapping task:', task.id, error)
+          return null
+        }
+      })
+      .filter((task): task is Partial<DayAssistantV2Task> => task !== null)
+    
+    const skippedCount = todoistTasks.length - mappedTasks.length
+    if (skippedCount > 0) {
+      console.warn(`[Sync] Skipped ${skippedCount} invalid tasks out of ${todoistTasks.length}`)
+    }
+    console.log(`[Sync] Mapped ${mappedTasks.length} valid tasks from ${todoistTasks.length} Todoist tasks`)
 
     // Delete old synced tasks that are no longer in Todoist
     const todoistIds = todoistTasks.map(t => t.id)
@@ -246,21 +271,87 @@ export async function POST(request: NextRequest) {
     }
 
     // Upsert tasks (update existing, insert new)
-    // Use proper upsert to avoid 23505 unique constraint errors
+    // Process each task individually to handle conflicts properly
+    // This is necessary because the unique index has a WHERE clause (WHERE todoist_id IS NOT NULL)
+    // which makes it a partial unique index that Supabase's onConflict doesn't handle well
     if (mappedTasks.length > 0) {
-      const { error: upsertError } = await supabase
+      // Fetch all existing tasks with todoist_id once to avoid N+1 queries
+      const { data: allExistingTasks } = await supabase
         .from('day_assistant_v2_tasks')
-        .upsert(mappedTasks, {
-          onConflict: 'user_id,assistant_id,todoist_id',
-          ignoreDuplicates: false
-        })
+        .select('id, todoist_id')
+        .eq('user_id', user.id)
+        .eq('assistant_id', assistantId)
+        .not('todoist_id', 'is', null)
+      
+      // Create a map for O(1) lookups
+      const existingTasksMap = new Map<string, string>()
+      if (allExistingTasks) {
+        for (const task of allExistingTasks) {
+          if (task.todoist_id) {
+            existingTasksMap.set(task.todoist_id, task.id)
+          }
+        }
+      }
 
-      if (upsertError) {
-        console.error('[Sync] Error upserting tasks:', upsertError)
+      let successCount = 0
+      let errorCount = 0
+      const errors: string[] = []
+
+      for (const task of mappedTasks) {
+        try {
+          const existingTaskId = existingTasksMap.get(task.todoist_id!)
+
+          if (existingTaskId) {
+            // Update existing task
+            const { error: updateError } = await supabase
+              .from('day_assistant_v2_tasks')
+              .update(task)
+              .eq('id', existingTaskId)
+
+            if (updateError) {
+              console.error('[Sync] Error updating task:', updateError)
+              errorCount++
+              errors.push(`Update failed for task ${task.todoist_id}: ${updateError.message}`)
+            } else {
+              successCount++
+            }
+          } else {
+            // Insert new task
+            const { error: insertError } = await supabase
+              .from('day_assistant_v2_tasks')
+              .insert(task)
+
+            if (insertError) {
+              console.error('[Sync] Error inserting task:', insertError)
+              errorCount++
+              errors.push(`Insert failed for task ${task.todoist_id}: ${insertError.message}`)
+            } else {
+              successCount++
+            }
+          }
+        } catch (err) {
+          console.error('[Sync] Error processing task:', err)
+          errorCount++
+          errors.push(`Processing failed for task ${task.todoist_id}`)
+        }
+      }
+
+      console.log(`[Sync] Processed ${successCount} tasks successfully, ${errorCount} errors`)
+
+      if (errorCount > 0 && successCount === 0) {
+        // All tasks failed
         return NextResponse.json(
-          { error: 'Failed to sync tasks', details: upsertError.message },
+          { 
+            error: 'Failed to sync all tasks', 
+            details: errors.join('; '),
+            success_count: successCount,
+            error_count: errorCount
+          },
           { status: 500 }
         )
+      } else if (errorCount > 0) {
+        // Partial success
+        console.warn('[Sync] Partial sync - some tasks failed:', errors)
       }
     }
 
