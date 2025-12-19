@@ -7,20 +7,26 @@
 export interface AssistantSettings {
   undo_window?: number  // in seconds, default 10
   max_postpones?: number  // default 3
+  max_postpones_before_escalation?: number  // default 3
   morning_must_block?: boolean  // default true
+  morning_must_block_default?: number  // in minutes, default 60
   auto_decompose_threshold?: number  // in minutes, default 60
   energy_reminder_interval?: number  // in minutes
   focus_reminder_interval?: number  // in minutes
+  light_task_limit_minutes?: number  // in minutes, default 90
 }
 
 // Default settings constant
 export const DEFAULT_SETTINGS: AssistantSettings = {
   undo_window: 10,
   max_postpones: 3,
+  max_postpones_before_escalation: 3,
   morning_must_block: true,
+  morning_must_block_default: 60,
   auto_decompose_threshold: 60,
   energy_reminder_interval: 120,
-  focus_reminder_interval: 90
+  focus_reminder_interval: 90,
+  light_task_limit_minutes: 90
 }
 
 // Assistant Configuration
