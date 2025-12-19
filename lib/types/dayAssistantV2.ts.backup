@@ -26,22 +26,22 @@ const isNonArrayObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
 // Helper to safely extract task preview for logging
-const getTaskPreview = (task: unknown): { id?: unknown; title?: unknown; due_date?: unknown } => {
+const getTaskPreview = (task: unknown): { id?:  unknown; title?: unknown; due_date?: unknown } => {
   if (task && typeof task === 'object' && isNonArrayObject(task)) {
     return {
-      id: 'id' in task ? task.id : undefined,
+      id: 'id' in task ? task.id :  undefined,
       title: 'title' in task ? task.title : undefined,
-      due_date: 'due_date' in task ? task.due_date : undefined
+      due_date: 'due_date' in task ? task.due_date :  undefined
     }
   }
   return {}
 }
 
 function isValidTestDayTask(task: unknown): task is TestDayTask {
-  if (!isNonArrayObject(task)) return false
+  if (! isNonArrayObject(task)) return false
   const candidate = task
   return (
-    typeof candidate.id === 'string' &&
+    typeof candidate. id === 'string' &&
     typeof candidate.user_id === 'string' &&
     typeof candidate.assistant_id === 'string' &&
     typeof candidate.title === 'string' &&
@@ -64,9 +64,9 @@ function isValidTestDayTask(task: unknown): task is TestDayTask {
     isNullableString(candidate.completed_at) &&
     isNullableString(candidate.context_type) &&
     isNullableString(candidate.moved_from_date) &&
-    isNullableString(candidate.moved_reason) &&
+    isNullableString(candidate. moved_reason) &&
     isNullableString(candidate.last_moved_at) &&
-    isNullableString(candidate.due_date)
+    isNullableString(candidate. due_date)
   )
 }
 
@@ -80,20 +80,20 @@ export async function getOrCreateDayAssistantV2(
   const db = client || supabaseServer
   
   // Try to find existing assistant
-  const { data: existing, error: fetchError } = await db
-    .from('assistant_config')
+  const { data:  existing, error:  fetchError } = await db
+    . from('assistant_config')
     .select('*')
     .eq('user_id', userId)
     .eq('name', 'asystent dnia v2')
     .single()
   
-  if (existing && !fetchError) {
+  if (existing && ! fetchError) {
     return existing as AssistantConfig
   }
   
   // Create new assistant with default settings
-  const { data: newAssistant, error: createError } = await db
-    .from('assistant_config')
+  const { data:  newAssistant, error: createError } = await db
+    . from('assistant_config')
     .insert({
       user_id: userId,
       name: 'asystent dnia v2',
@@ -139,7 +139,7 @@ export async function getAssistant(
  */
 export async function updateAssistantSettings(
   assistantId: string,
-  settings: Partial<AssistantSettings>,
+  settings:  Partial<AssistantSettings>,
   client?: SupabaseClient
 ): Promise<AssistantConfig | null> {
   const db = client || supabaseServer
@@ -187,11 +187,11 @@ export async function getTasks(
   console.log('[getTasks] Called with:', {
     userId,
     assistantId,
-    options: {
+    options:  {
       includeCompleted: options?.includeCompleted,
       date: options?.date,
-      includeSubtasks: options?.includeSubtasks,
-      includeAllDates: options?.includeAllDates
+      includeSubtasks:  options?.includeSubtasks,
+      includeAllDates:  options?.includeAllDates
     }
   })
   
@@ -205,20 +205,20 @@ export async function getTasks(
     .eq('assistant_id', assistantId)
     .order('position', { ascending: true })
   
-  if (!options?.includeCompleted) {
+  if (! options?.includeCompleted) {
     query = query.eq('completed', false)
   }
   
   // Only filter by date if not includeAllDates
   let targetDate: string | null = null
-  if (options?.includeAllDates) {
+  if (options?. includeAllDates) {
     console.log('[getTasks] includeAllDates=true, skipping date filter')
   } else if (options?.date) {
     console.log('[getTasks] Filtering by due_date:', options.date)
     const safeDate = options.date.trim()
     const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(safeDate)
     const parsed = Date.parse(safeDate)
-    const matchesCalendarDate = !Number.isNaN(parsed) && new Date(parsed).toISOString().split('T')[0] === safeDate
+    const matchesCalendarDate = ! Number.isNaN(parsed) && new Date(parsed).toISOString().split('T')[0] === safeDate
     if (!isValidDate || !matchesCalendarDate) {
       console.warn('[getTasks] Invalid date format provided, returning empty result')
       return []
@@ -230,7 +230,7 @@ export async function getTasks(
   console.log('[getTasks] Query filters:', {
     user_id: userId,
     assistant_id: assistantId,
-    completed: options?.includeCompleted ? 'any' : false,
+    completed: options?.includeCompleted ?  'any' : false,
     due_date: options?.includeAllDates ? 'all dates' : options?.date || 'any',
     include_subtasks: options?.includeSubtasks || false
   })
@@ -243,10 +243,10 @@ export async function getTasks(
   }
   
   // Log results with more details
-  console.log('[getTasks] ✅ Query returned', data?.length || 0, 'tasks')
+  console. log('[getTasks] ✅ Query returned', data?.length || 0, 'tasks')
   
   if (data && data.length === 0) {
-    console.warn('[getTasks] ⚠️  WARNING: Query returned 0 tasks')
+    console.warn('[getTasks] ⚠️  WARNING:  Query returned 0 tasks')
     console.warn('[getTasks] Query parameters:', {
       userId,
       assistantId,
@@ -257,8 +257,8 @@ export async function getTasks(
   }
   
   // Transform the data to match TestDayTask interface
-  if (!data) return []
-  if (!Array.isArray(data)) {
+  if (! data) return []
+  if (! Array.isArray(data)) {
     console.error('[getTasks] Unexpected data format:', data)
     return []
   }
@@ -267,14 +267,14 @@ export async function getTasks(
     if (!valid) {
       // Log detailed validation failure reason
       const reasons: string[] = []
-      if (!isNonArrayObject(task)) {
+      if (! isNonArrayObject(task)) {
         reasons.push('not an object')
         console.warn('[getTasks] ❌ Skipping invalid task - not an object:', task)
       } else {
         const t = task
-        if (typeof t.id !== 'string') reasons.push(`id: ${typeof t.id}`)
-        if (typeof t.user_id !== 'string') reasons.push(`user_id: ${typeof t.user_id}`)
-        if (typeof t.assistant_id !== 'string') reasons.push(`assistant_id: ${typeof t.assistant_id}`)
+        if (typeof t. id !== 'string') reasons.push(`id: ${typeof t.id}`)
+        if (typeof t.user_id !== 'string') reasons.push(`user_id: ${typeof t. user_id}`)
+        if (typeof t.assistant_id !== 'string') reasons.push(`assistant_id: ${typeof t. assistant_id}`)
         if (typeof t.title !== 'string') reasons.push(`title: ${typeof t.title}`)
         if (typeof t.priority !== 'number') reasons.push(`priority: ${typeof t.priority}`)
         if (typeof t.is_must !== 'boolean') reasons.push(`is_must: ${typeof t.is_must}`)
@@ -283,21 +283,21 @@ export async function getTasks(
         if (typeof t.cognitive_load !== 'number') reasons.push(`cognitive_load: ${typeof t.cognitive_load}`)
         if (!Array.isArray(t.tags)) reasons.push(`tags: not array`)
         if (typeof t.position !== 'number') reasons.push(`position: ${typeof t.position}`)
-        if (typeof t.postpone_count !== 'number') reasons.push(`postpone_count: ${typeof t.postpone_count}`)
+        if (typeof t.postpone_count !== 'number') reasons.push(`postpone_count: ${typeof t. postpone_count}`)
         if (typeof t.auto_moved !== 'boolean') reasons.push(`auto_moved: ${typeof t.auto_moved}`)
-        if (!isNonArrayObject(t.metadata)) reasons.push(`metadata: not object`)
+        if (! isNonArrayObject(t.metadata)) reasons.push(`metadata: not object`)
         if (typeof t.created_at !== 'string') reasons.push(`created_at: ${typeof t.created_at}`)
         if (typeof t.updated_at !== 'string') reasons.push(`updated_at: ${typeof t.updated_at}`)
         if (typeof t.completed !== 'boolean') reasons.push(`completed: ${typeof t.completed}`)
         
-        console.warn('[getTasks] ❌ Skipping invalid task payload. Validation failures:', reasons.join(', '))
+        console.warn('[getTasks] ❌ Skipping invalid task payload.  Validation failures:', reasons. join(', '))
         console.warn('[getTasks] Task preview:', getTaskPreview(task))
       }
     }
     return valid
   })
-  // Filter by date: Only include tasks with matching due_date or null due_date (inbox tasks)
-  // When a specific date is requested, we want to show:
+  // Filter by date:  Only include tasks with matching due_date or null due_date (inbox tasks)
+  // When a specific date is requested, we want to show: 
   // 1. Tasks specifically scheduled for that date (due_date === targetDate)
   // 2. Tasks without a due date (due_date === null) to surface inbox items
   const filteredByDate = targetDate
@@ -316,10 +316,10 @@ export async function getTasks(
     console.log('[getTasks] Sample tasks (first 3):', sampleTasks)
   }
   
-  // Diagnostic: If query with date returns 0 tasks, show all tasks
-  if (filteredByDate.length === 0 && options?.date && !options?.includeAllDates) {
+  // Diagnostic:  If query with date returns 0 tasks, show all tasks
+  if (filteredByDate.length === 0 && options?.date && ! options?.includeAllDates) {
     console.log('[getTasks] No tasks found for date', options.date, '- fetching all tasks for diagnostic')
-    const { data: allTasks, error: allError } = await db
+    const { data: allTasks, error:  allError } = await db
       .from('day_assistant_v2_tasks')
       .select('id, title, due_date, completed')
       .eq('user_id', userId)
@@ -346,7 +346,7 @@ export async function getTasks(
       subtasks = Array.isArray(taskWithRelations.day_assistant_v2_subtasks) ? taskWithRelations.day_assistant_v2_subtasks : []
     }
     return {
-      ...taskWithRelations,
+      ... taskWithRelations,
       subtasks
     }
   }) as TestDayTask[]
@@ -360,7 +360,7 @@ export async function getTasks(
 export async function createTask(
   userId: string,
   assistantId: string,
-  task: Partial<TestDayTask>,
+  task:  Partial<TestDayTask>,
   client?: SupabaseClient
 ): Promise<TestDayTask | null> {
   const db = client || supabaseServer
@@ -434,7 +434,7 @@ export async function getOrCreateDayPlan(
   
   // Try to find existing plan
   const { data: existing, error: fetchError } = await db
-    .from('day_assistant_v2_plan')
+    . from('day_assistant_v2_plan')
     .select('*')
     .eq('user_id', userId)
     .eq('assistant_id', assistantId)
@@ -452,7 +452,7 @@ export async function getOrCreateDayPlan(
       user_id: userId,
       assistant_id: assistantId,
       plan_date: date,
-      energy: 3,
+      energy:  3,
       focus: 3,
       blocks: [],
       metadata: {}
@@ -475,7 +475,7 @@ export async function updateDayPlan(
   userId: string,
   assistantId: string,
   date: string,
-  updates: Partial<DayPlan>,
+  updates:  Partial<DayPlan>,
   client?: SupabaseClient
 ): Promise<DayPlan | null> {
   const db = client || supabaseServer
@@ -503,10 +503,10 @@ export async function updateDayPlan(
 export async function postponeTask(
   userId: string,
   assistantId: string,
-  taskId: string,
-  reason?: string,
+  taskId:  string,
+  reason?:  string,
   reserveMorning?: boolean,
-  client?: SupabaseClient
+  client?:  SupabaseClient
 ): Promise<{
   success: boolean
   task?: TestDayTask
@@ -516,7 +516,7 @@ export async function postponeTask(
   const db = client || supabaseServer
   
   // Get current task
-  const { data: task, error: taskError } = await db
+  const { data: task, error:  taskError } = await db
     .from('day_assistant_v2_tasks')
     .select('*')
     .eq('id', taskId)
@@ -553,7 +553,7 @@ export async function postponeTask(
   
   // Get assistant for settings
   const assistant = await getAssistant(assistantId, client)
-  const undoWindow = assistant?.settings?.undo_window || DEFAULT_SETTINGS.undo_window!
+  const undoWindow = assistant?. settings?.undo_window || DEFAULT_SETTINGS.undo_window! 
   
   // Log decision
   const decisionLogEntry = await logDecision(
@@ -565,7 +565,7 @@ export async function postponeTask(
       from_date: task.due_date,
       to_date: tomorrowStr,
       reason: reason,
-      context: {
+      context:  {
         postpone_count: updatedTask.postpone_count,
         reserve_morning: reserveMorning
       }
@@ -573,7 +573,7 @@ export async function postponeTask(
     client
   )
   
-  if (!decisionLogEntry) {
+  if (! decisionLogEntry) {
     return { success: false }
   }
   
@@ -588,14 +588,14 @@ export async function postponeTask(
       assistant_id: assistantId,
       decision_log_id: decisionLogEntry.id,
       previous_state: task,
-      undo_window_expires: undoExpires.toISOString()
+      undo_window_expires: undoExpires. toISOString()
     })
   
   return {
     success: true,
     task: updatedTask as TestDayTask,
-    decision_log_id: decisionLogEntry.id,
-    undo_window_expires: undoExpires.toISOString()
+    decision_log_id:  decisionLogEntry.id,
+    undo_window_expires:  undoExpires.toISOString()
   }
 }
 
@@ -607,11 +607,11 @@ export async function logDecision(
   assistantId: string,
   action: string,
   data: {
-    task_id?: string
+    task_id?:  string
     from_date?: string
     to_date?: string
     reason?: string
-    context?: DecisionContext
+    context?:  DecisionContext
   },
   client?: SupabaseClient
 ): Promise<DecisionLogEntry | null> {
@@ -647,12 +647,12 @@ export async function undoLastAction(
   userId: string,
   assistantId: string,
   client?: SupabaseClient
-): Promise<{ success: boolean; message: string }> {
+): Promise<{ success: boolean; message:  string }> {
   const db = client || supabaseServer
   
   // Find most recent undo-able entry
   const { data: undoEntry, error: fetchError } = await db
-    .from('day_assistant_v2_undo_history')
+    . from('day_assistant_v2_undo_history')
     .select('*')
     .eq('user_id', userId)
     .eq('assistant_id', assistantId)
@@ -663,7 +663,7 @@ export async function undoLastAction(
     .single()
   
   if (fetchError || !undoEntry) {
-    return { success: false, message: 'Brak akcji do cofnięcia (okno undo wygasło)' }
+    return { success: false, message:  'Brak akcji do cofnięcia (okno undo wygasło)' }
   }
   
   const previousState = undoEntry.previous_state as TestDayTask
@@ -722,16 +722,16 @@ export async function createProposal(
   expiresAt.setHours(expiresAt.getHours() + 24)  // Proposals expire after 24 hours
   
   const { data, error } = await db
-    .from('day_assistant_v2_proposals')
+    . from('day_assistant_v2_proposals')
     .insert({
       user_id: userId,
       assistant_id: assistantId,
-      plan_date: planDate,
+      plan_date:  planDate,
       reason: reason,
       primary_action: primaryAction,
       alternatives: alternatives,
       status: 'pending',
-      expires_at: expiresAt.toISOString()
+      expires_at: expiresAt. toISOString()
     })
     .select()
     .single()
@@ -762,7 +762,7 @@ export async function getActiveProposals(
     .eq('assistant_id', assistantId)
     .eq('plan_date', date)
     .eq('status', 'pending')
-    .gte('expires_at', new Date().toISOString())
+    . gte('expires_at', new Date().toISOString())
     .order('created_at', { ascending: false })
   
   if (error) {
@@ -779,7 +779,7 @@ export async function getActiveProposals(
 export async function respondToProposal(
   proposalId: string,
   action: 'accept_primary' | 'accept_alt' | 'reject',
-  alternativeIndex?: number,
+  alternativeIndex?:  number,
   client?: SupabaseClient
 ): Promise<{ success: boolean; message: string }> {
   const db = client || supabaseServer
@@ -809,7 +809,7 @@ export async function getMustTasksCount(
   userId: string,
   assistantId: string,
   date: string,
-  client?: SupabaseClient
+  client?:  SupabaseClient
 ): Promise<number> {
   const db = client || supabaseServer
   
@@ -837,13 +837,13 @@ export async function checkAndDecomposeTask(
   task: TestDayTask,
   assistant: AssistantConfig,
   client?: SupabaseClient
-): Promise<{ shouldDecompose: boolean; reason?: string }> {
-  const threshold = assistant.settings?.auto_decompose_threshold || DEFAULT_SETTINGS.auto_decompose_threshold!
+): Promise<{ shouldDecompose: boolean; reason?:  string }> {
+  const threshold = assistant.settings?. auto_decompose_threshold || DEFAULT_SETTINGS.auto_decompose_threshold!
   
   if (task.estimate_min > threshold) {
     return {
       shouldDecompose: true,
-      reason: `Zadanie ma estymat ${task.estimate_min} min, co przekracza próg ${threshold} min. Zalecam podział na kroki po 25-30 min.`
+      reason: `Zadanie ma estymat ${task.estimate_min} min, co przekracza próg ${threshold} min.  Zalecam podział na kroki po 25-30 min.`
     }
   }
   
@@ -874,12 +874,12 @@ export async function nightlyRollover(
     .eq('due_date', yesterdayStr)
     .eq('completed', false)
   
-  if (fetchError || !overdueTasks || overdueTasks.length === 0) {
+  if (fetchError || ! overdueTasks || overdueTasks.length === 0) {
     return { moved: 0, tasks: [] }
   }
   
   // Move each task to today
-  const movedTasks: TestDayTask[] = []
+  const movedTasks:  TestDayTask[] = []
   for (const task of overdueTasks) {
     const { data: movedTask } = await db
       .from('day_assistant_v2_tasks')
@@ -888,7 +888,7 @@ export async function nightlyRollover(
         auto_moved: true,
         moved_from_date: yesterdayStr,
         moved_reason: 'Nightly rollover - incomplete task',
-        last_moved_at: new Date().toISOString()
+        last_moved_at:  new Date().toISOString()
       })
       .eq('id', task.id)
       .select()
@@ -899,5 +899,5 @@ export async function nightlyRollover(
     }
   }
   
-  return { moved: movedTasks.length, tasks: movedTasks }
+  return { moved: movedTasks. length, tasks: movedTasks }
 }
