@@ -313,7 +313,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Upsert tasks (update existing, insert new)
-    // Use Supabase's upsert with ignoreDuplicates to handle the partial unique index
+    // Process each task individually to handle the partial unique index properly
     // The unique constraint is on (user_id, assistant_id, todoist_id) WHERE todoist_id IS NOT NULL
     if (mappedTasks.length > 0) {
       console.log(`[Sync] Upserting ${mappedTasks.length} tasks with conflict resolution`)
@@ -322,94 +322,88 @@ export async function POST(request: NextRequest) {
       let errorCount = 0
       const errors: string[] = []
 
-      // Process tasks in batches of 10 to avoid overwhelming the database
-      const batchSize = 10
-      for (let i = 0; i < mappedTasks.length; i += batchSize) {
-        const batch = mappedTasks.slice(i, i + batchSize)
-        
-        // For each task, try to upsert individually to handle conflicts properly
-        for (const task of batch) {
-          try {
-            // First, try to find existing task by todoist_id
-            const { data: existingTask } = await supabase
+      // Process each task individually to handle conflicts properly
+      for (const task of mappedTasks) {
+        try {
+          // First, try to find existing task by todoist_id
+          const { data: existingTask } = await supabase
+            .from('day_assistant_v2_tasks')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('assistant_id', assistantId)
+            .eq('todoist_id', task.todoist_id!)
+            .maybeSingle()
+
+          if (existingTask) {
+            // Update existing task
+            const { error: updateError } = await supabase
               .from('day_assistant_v2_tasks')
-              .select('id')
-              .eq('user_id', user.id)
-              .eq('assistant_id', assistantId)
-              .eq('todoist_id', task.todoist_id!)
-              .maybeSingle()
+              .update({
+                ...task,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', existingTask.id)
 
-            if (existingTask) {
-              // Update existing task
-              const { error: updateError } = await supabase
-                .from('day_assistant_v2_tasks')
-                .update({
-                  ...task,
-                  updated_at: new Date().toISOString()
-                })
-                .eq('id', existingTask.id)
-
-              if (updateError) {
-                console.error('[Sync] Error updating task:', task.todoist_id, updateError)
-                errorCount++
-                errors.push(`Update failed for task ${task.todoist_id}: ${updateError.message}`)
-              } else {
-                successCount++
-              }
+            if (updateError) {
+              console.error('[Sync] Error updating task:', task.todoist_id, updateError)
+              errorCount++
+              errors.push(`Update failed for task ${task.todoist_id}: ${updateError.message}`)
             } else {
-              // Insert new task
-              const { error: insertError } = await supabase
-                .from('day_assistant_v2_tasks')
-                .insert(task)
+              successCount++
+            }
+          } else {
+            // Insert new task
+            const { error: insertError } = await supabase
+              .from('day_assistant_v2_tasks')
+              .insert(task)
 
-              if (insertError) {
-                // If it's a duplicate key error, try to update instead
-                if (insertError.code === '23505') {
-                  console.warn('[Sync] Duplicate key on insert, attempting update for:', task.todoist_id)
-                  
-                  // Fetch the task again and update
-                  const { data: retryExisting } = await supabase
+            if (insertError) {
+              // If it's a duplicate key error, try to update instead
+              if (insertError.code === '23505') {
+                console.warn('[Sync] Duplicate key on insert, attempting update for:', task.todoist_id)
+                
+                // Fetch the task again and update
+                const { data: retryExisting } = await supabase
+                  .from('day_assistant_v2_tasks')
+                  .select('id')
+                  .eq('user_id', user.id)
+                  .eq('assistant_id', assistantId)
+                  .eq('todoist_id', task.todoist_id!)
+                  .maybeSingle()
+
+                if (retryExisting) {
+                  const { error: retryError } = await supabase
                     .from('day_assistant_v2_tasks')
-                    .select('id')
-                    .eq('user_id', user.id)
-                    .eq('assistant_id', assistantId)
-                    .eq('todoist_id', task.todoist_id!)
-                    .maybeSingle()
+                    .update({
+                      ...task,
+                      updated_at: new Date().toISOString()
+                    })
+                    .eq('id', retryExisting.id)
 
-                  if (retryExisting) {
-                    const { error: retryError } = await supabase
-                      .from('day_assistant_v2_tasks')
-                      .update({
-                        ...task,
-                        updated_at: new Date().toISOString()
-                      })
-                      .eq('id', retryExisting.id)
-
-                    if (retryError) {
-                      console.error('[Sync] Retry update failed:', task.todoist_id, retryError)
-                      errorCount++
-                      errors.push(`Retry update failed for task ${task.todoist_id}: ${retryError.message}`)
-                    } else {
-                      successCount++
-                    }
-                  } else {
+                  if (retryError) {
+                    console.error('[Sync] Retry update failed:', task.todoist_id, retryError)
                     errorCount++
-                    errors.push(`Could not find duplicate task ${task.todoist_id} after 23505 error`)
+                    errors.push(`Retry update failed for task ${task.todoist_id}: ${retryError.message}`)
+                  } else {
+                    successCount++
                   }
                 } else {
-                  console.error('[Sync] Error inserting task:', task.todoist_id, insertError)
                   errorCount++
-                  errors.push(`Insert failed for task ${task.todoist_id}: ${insertError.message}`)
+                  errors.push(`Could not find duplicate task ${task.todoist_id} after 23505 error`)
                 }
               } else {
-                successCount++
+                console.error('[Sync] Error inserting task:', task.todoist_id, insertError)
+                errorCount++
+                errors.push(`Insert failed for task ${task.todoist_id}: ${insertError.message}`)
               }
+            } else {
+              successCount++
             }
-          } catch (err) {
-            console.error('[Sync] Error processing task:', task.todoist_id, err)
-            errorCount++
-            errors.push(`Processing failed for task ${task.todoist_id}`)
           }
+        } catch (err) {
+          console.error('[Sync] Error processing task:', task.todoist_id, err)
+          errorCount++
+          errors.push(`Processing failed for task ${task.todoist_id}`)
         }
       }
 
@@ -427,8 +421,19 @@ export async function POST(request: NextRequest) {
           { status: 500 }
         )
       } else if (errorCount > 0) {
-        // Partial success - log but continue
-        console.warn('[Sync] Partial sync - some tasks failed:', errors.slice(0, 5))
+        // Partial success - log with error aggregation
+        const errorTypes = errors.reduce((acc, err) => {
+          const type = err.split(':')[0] // Get error type (e.g., "Update failed", "Insert failed")
+          acc[type] = (acc[type] || 0) + 1
+          return acc
+        }, {} as Record<string, number>)
+        
+        console.warn('[Sync] Partial sync - some tasks failed')
+        console.warn('[Sync] Error summary:', errorTypes)
+        console.warn('[Sync] Sample errors (first 3):', errors.slice(0, 3))
+        if (errors.length > 3) {
+          console.warn(`[Sync] ... and ${errors.length - 3} more errors`)
+        }
       }
     }
 
