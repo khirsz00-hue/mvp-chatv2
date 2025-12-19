@@ -5,7 +5,7 @@
 
 let syncPromise: Promise<Response> | null = null
 let lastSyncTime = 0
-const SYNC_DEBOUNCE_MS = 5000 // 5 seconds (reduced from 10s to allow more frequent manual syncs)
+const SYNC_DEBOUNCE_MS = 5000 // 5 seconds - prevents duplicate sync requests while being responsive
 
 /**
  * Coordinated sync that prevents concurrent/redundant syncs

@@ -266,11 +266,16 @@ export async function getTasks(
         if (typeof t.updated_at !== 'string') reasons.push(`updated_at: ${typeof t.updated_at}`)
         if (typeof t.completed !== 'boolean') reasons.push(`completed: ${typeof t.completed}`)
       }
-      console.warn('[getTasks] Skipping invalid task. Reasons:', reasons.join(', '), 'Task preview:', {
-        id: task && typeof task === 'object' ? (task as any).id : undefined,
-        title: task && typeof task === 'object' ? (task as any).title : undefined,
-        due_date: task && typeof task === 'object' ? (task as any).due_date : undefined
-      })
+      // Safe preview extraction with type checking
+      let preview: { id?: unknown; title?: unknown; due_date?: unknown } = {}
+      if (task && typeof task === 'object' && isNonArrayObject(task)) {
+        preview = {
+          id: 'id' in task ? task.id : undefined,
+          title: 'title' in task ? task.title : undefined,
+          due_date: 'due_date' in task ? task.due_date : undefined
+        }
+      }
+      console.warn('[getTasks] Skipping invalid task. Reasons:', reasons.join(', '), 'Task preview:', preview)
     }
     return valid
   })

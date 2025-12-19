@@ -12,6 +12,7 @@ import { createClient } from '@supabase/supabase-js'
 export const dynamic = 'force-dynamic'
 
 const SYNC_INTERVAL_MS = 10000 // 10 seconds cache
+const POSTGRES_UNIQUE_VIOLATION = '23505' // PostgreSQL error code for unique constraint violation
 
 interface TodoistTask {
   id: string
@@ -359,7 +360,7 @@ export async function POST(request: NextRequest) {
 
             if (insertError) {
               // If it's a duplicate key error, try to update instead
-              if (insertError.code === '23505') {
+              if (insertError.code === POSTGRES_UNIQUE_VIOLATION) {
                 console.warn('[Sync] Duplicate key on insert, attempting update for:', task.todoist_id)
                 
                 // Fetch the task again and update

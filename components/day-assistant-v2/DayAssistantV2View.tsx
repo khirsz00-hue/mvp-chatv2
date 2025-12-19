@@ -95,13 +95,16 @@ export function DayAssistantV2View() {
         if (response.ok) {
           const data = await response.json()
           // Only reload if sync was not skipped (skipped syncs don't need refresh)
-          // Check for success_count (successful sync) or synced_at (sync completed)
+          // Check for success_count > 0 (tasks were actually synced) or synced_at (sync completed)
           // Skip reload if data.skipped is true (debounced sync)
-          if (!data.skipped && (data.success_count !== undefined || data.synced_at)) {
-            console.log('[DayAssistantV2] Background sync completed, reloading data')
+          const hasSyncedTasks = (typeof data.success_count === 'number' && data.success_count > 0) || data.synced_at
+          if (!data.skipped && hasSyncedTasks) {
+            console.log('[DayAssistantV2] Background sync completed with changes, reloading data')
             await loadDayPlan(sessionToken)
           } else if (data.skipped) {
             console.log('[DayAssistantV2] Sync skipped (debounced), no reload needed')
+          } else {
+            console.log('[DayAssistantV2] Sync completed but no changes detected')
           }
         }
       } catch (err) {
