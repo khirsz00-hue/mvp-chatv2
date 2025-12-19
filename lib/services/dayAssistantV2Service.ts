@@ -242,10 +242,17 @@ export async function getTasks(
     return []
   }
   
-  // Log results with more details
-  console.log('[getTasks] ✅ Query returned', data?.length || 0, 'tasks')
+  // Transform the data to match TestDayTask interface
+  if (!data) return []
+  if (!Array.isArray(data)) {
+    console.error('[getTasks] Unexpected data format:', data)
+    return []
+  }
   
-  if (data && data.length === 0) {
+  // Log results with more details
+  console.log('[getTasks] ✅ Query returned', data.length, 'tasks')
+  
+  if (data.length === 0) {
     console.warn('[getTasks] ⚠️  WARNING: Query returned 0 tasks')
     console.warn('[getTasks] Query parameters:', {
       userId,
@@ -256,12 +263,6 @@ export async function getTasks(
     })
   }
   
-  // Transform the data to match TestDayTask interface
-  if (!data) return []
-  if (!Array.isArray(data)) {
-    console.error('[getTasks] Unexpected data format:', data)
-    return []
-  }
   const typedData = (data as unknown[]).filter((task) => {
     const valid = isValidTestDayTask(task)
     if (!valid) {
