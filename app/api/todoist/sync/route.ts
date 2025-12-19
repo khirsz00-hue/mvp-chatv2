@@ -26,7 +26,7 @@ interface TodoistTask {
   created_at?: string
 }
 
-interface TestDayTask {
+interface DayAssistantV2Task {
   user_id: string
   assistant_id: string
   todoist_id: string
@@ -44,13 +44,13 @@ interface TestDayTask {
 }
 
 /**
- * Map Todoist task to TestDayTask format
+ * Map Todoist task to DayAssistantV2Task format
  */
-function mapTodoistToTestDayTask(
+function mapTodoistToDayAssistantTask(
   task: TodoistTask,
   userId: string,
   assistantId: string
-): Partial<TestDayTask> {
+): Partial<DayAssistantV2Task> {
   // Determine context_type from labels
   let contextType = 'code' // default
   if (task.labels) {
@@ -209,9 +209,9 @@ export async function POST(request: NextRequest) {
 
     const assistantId = assistant.id
 
-    // Map Todoist tasks to TestDayTask format
+    // Map Todoist tasks to DayAssistantV2Task format
     const mappedTasks = todoistTasks.map(task =>
-      mapTodoistToTestDayTask(task, user.id, assistantId)
+      mapTodoistToDayAssistantTask(task, user.id, assistantId)
     )
 
     // Delete old synced tasks that are no longer in Todoist
