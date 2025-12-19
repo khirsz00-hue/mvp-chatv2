@@ -275,27 +275,38 @@ export async function POST(request: NextRequest) {
     // This is necessary because the unique index has a WHERE clause (WHERE todoist_id IS NOT NULL)
     // which makes it a partial unique index that Supabase's onConflict doesn't handle well
     if (mappedTasks.length > 0) {
+      // Fetch all existing tasks with todoist_id once to avoid N+1 queries
+      const { data: allExistingTasks } = await supabase
+        .from('day_assistant_v2_tasks')
+        .select('id, todoist_id')
+        .eq('user_id', user.id)
+        .eq('assistant_id', assistantId)
+        .not('todoist_id', 'is', null)
+      
+      // Create a map for O(1) lookups
+      const existingTasksMap = new Map<string, string>()
+      if (allExistingTasks) {
+        for (const task of allExistingTasks) {
+          if (task.todoist_id) {
+            existingTasksMap.set(task.todoist_id, task.id)
+          }
+        }
+      }
+
       let successCount = 0
       let errorCount = 0
       const errors: string[] = []
 
       for (const task of mappedTasks) {
         try {
-          // First, try to find existing task by todoist_id
-          const { data: existingTask } = await supabase
-            .from('day_assistant_v2_tasks')
-            .select('id')
-            .eq('user_id', user.id)
-            .eq('assistant_id', assistantId)
-            .eq('todoist_id', task.todoist_id!)
-            .single()
+          const existingTaskId = existingTasksMap.get(task.todoist_id!)
 
-          if (existingTask) {
+          if (existingTaskId) {
             // Update existing task
             const { error: updateError } = await supabase
               .from('day_assistant_v2_tasks')
               .update(task)
-              .eq('id', existingTask.id)
+              .eq('id', existingTaskId)
 
             if (updateError) {
               console.error('[Sync] Error updating task:', updateError)
