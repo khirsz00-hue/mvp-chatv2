@@ -3,6 +3,51 @@
  * Types for the enhanced day planner with ADHD-friendly features
  */
 
+// Context Type
+export type ContextType = 'code' | 'admin' | 'komunikacja' | 'prywatne'
+
+// Energy/Focus Preset
+export interface EnergyFocusPreset {
+  name: string
+  energy: number
+  focus: number
+  description?: string
+}
+
+// Default Energy/Focus Presets
+export const ENERGY_FOCUS_PRESETS: Record<string, EnergyFocusPreset> = {
+  crisis: {
+    name: '🔴 Kryzys',
+    energy: 1,
+    focus: 1,
+    description: 'Minimum energii, maksimum łagodności'
+  },
+  low: {
+    name: '🟡 Niskie',
+    energy: 2,
+    focus: 2,
+    description: 'Zadania lekkie, bez dużych wyzwań'
+  },
+  normal: {
+    name: '🟢 Normalne',
+    energy: 3,
+    focus: 3,
+    description: 'Standardowy dzień pracy'
+  },
+  high: {
+    name: '🚀 Wysoka',
+    energy: 4,
+    focus: 4,
+    description: 'Gotowy na trudniejsze zadania'
+  },
+  flow: {
+    name: '⚡ Flow',
+    energy: 5,
+    focus: 5,
+    description: 'Maksymalna koncentracja i energia'
+  }
+}
+
 // Assistant Settings
 export interface AssistantSettings {
   undo_window?: number  // in seconds, default 10
@@ -171,4 +216,18 @@ export interface UndoHistoryEntry {
   undone: boolean
   undone_at?: string | null
   created_at: string
+}
+
+// Task Scoring
+export interface ScoreBreakdown {
+  base_score: number
+  fit_bonus: number
+  avoidance_penalty: number
+  final_score: number
+}
+
+export interface TaskScore {
+  task_id: string
+  score: number
+  breakdown: ScoreBreakdown
 }
