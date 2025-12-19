@@ -41,6 +41,12 @@ interface DayAssistantV2Task {
   due_date: string | null
   todoist_task_id: string
   synced_at: string
+  tags: string[]
+  position: number
+  postpone_count: number
+  auto_moved: boolean
+  metadata: Record<string, unknown>
+  completed: boolean
 }
 
 /**
