@@ -269,8 +269,7 @@ export function DayAssistantV2View() {
         is_important: newTaskMust,
         due_date: selectedDate,
         context_type: newTaskContext,
-        priority: 3,
-        today_flag: true
+        priority: 3
       })
     })
     if (!response.ok) {
