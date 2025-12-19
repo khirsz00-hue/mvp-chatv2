@@ -246,9 +246,12 @@ export async function getTasks(
     }
     return valid
   })
-  // Include undated tasks alongside the selected day to surface inbox items without due dates
+  // Filter by date: Only include tasks with matching due_date or null due_date (inbox tasks)
+  // When a specific date is requested, we want to show:
+  // 1. Tasks specifically scheduled for that date (due_date === targetDate)
+  // 2. Tasks without a due date (due_date === null) to surface inbox items
   const filteredByDate = targetDate
-    ? typedData.filter(task => !task.due_date || task.due_date === targetDate)
+    ? typedData.filter(task => task.due_date === null || task.due_date === targetDate)
     : typedData
   
   // Log sample tasks (first 3)
