@@ -335,7 +335,7 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      console.log(`[Sync] ✅ Successfully upserted ${data?.length || mappedTasks.length} tasks`)
+      console.log(`[Sync] ✅ Successfully upserted ${mappedTasks.length} tasks`)
     }
 
     // Update sync metadata
