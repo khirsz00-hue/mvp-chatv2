@@ -5,7 +5,7 @@
 
 let syncPromise: Promise<Response> | null = null
 let lastSyncTime = 0
-const SYNC_DEBOUNCE_MS = 10000 // 10 seconds
+const SYNC_DEBOUNCE_MS = 5000 // 5 seconds (reduced from 10s to allow more frequent manual syncs)
 
 /**
  * Coordinated sync that prevents concurrent/redundant syncs
@@ -24,9 +24,15 @@ export async function syncTodoist(authToken: string): Promise<Response> {
   // If last sync was recent, skip
   const timeSinceLastSync = now - lastSyncTime
   if (timeSinceLastSync < SYNC_DEBOUNCE_MS) {
-    console.log(`[SyncCoordinator] Skipping - last sync was ${Math.floor(timeSinceLastSync / 1000)}s ago`)
-    // Return a mock successful response
-    return new Response(JSON.stringify({ message: 'Sync skipped - too soon' }), {
+    const secondsAgo = Math.floor(timeSinceLastSync / 1000)
+    console.log(`[SyncCoordinator] Skipping - last sync was ${secondsAgo}s ago (debounce: ${SYNC_DEBOUNCE_MS / 1000}s)`)
+    // Return a mock successful response indicating sync was skipped
+    return new Response(JSON.stringify({ 
+      message: 'Sync skipped - too soon',
+      skipped: true,
+      seconds_since_last_sync: secondsAgo,
+      debounce_seconds: SYNC_DEBOUNCE_MS / 1000
+    }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     })
