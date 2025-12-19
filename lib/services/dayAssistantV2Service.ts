@@ -226,12 +226,31 @@ export async function getTasks(
   const { data, error } = await query
   
   if (error) {
-    console.error('[getTasks] Error fetching tasks:', error)
+    console.error('[getTasks] ❌ Error fetching tasks:', error)
     return []
   }
   
-  // Log results
-  console.log('[getTasks] Query returned', data?.length || 0, 'tasks')
+  // Log results with more details
+  console.log('[getTasks] ✅ Query returned', data?.length || 0, 'tasks')
+  if (data && data.length > 0) {
+    console.log('[getTasks] First task sample:', {
+      id: data[0].id,
+      title: data[0].title,
+      due_date: data[0].due_date,
+      completed: data[0].completed,
+      priority: data[0].priority,
+      is_must: data[0].is_must
+    })
+  } else if (data && data.length === 0) {
+    console.warn('[getTasks] ⚠️  WARNING: Query returned 0 tasks')
+    console.warn('[getTasks] Query parameters:', {
+      userId,
+      assistantId,
+      date: options?.date || 'any',
+      includeCompleted: options?.includeCompleted || false,
+      includeAllDates: options?.includeAllDates || false
+    })
+  }
   
   // Transform the data to match TestDayTask interface
   if (!data) return []
@@ -246,6 +265,7 @@ export async function getTasks(
       const reasons: string[] = []
       if (!isNonArrayObject(task)) {
         reasons.push('not an object')
+        console.warn('[getTasks] ❌ Skipping invalid task - not an object:', task)
       } else {
         const t = task
         if (typeof t.id !== 'string') reasons.push(`id: ${typeof t.id}`)
@@ -265,17 +285,19 @@ export async function getTasks(
         if (typeof t.created_at !== 'string') reasons.push(`created_at: ${typeof t.created_at}`)
         if (typeof t.updated_at !== 'string') reasons.push(`updated_at: ${typeof t.updated_at}`)
         if (typeof t.completed !== 'boolean') reasons.push(`completed: ${typeof t.completed}`)
-      }
-      // Safe preview extraction with type checking
-      let preview: { id?: unknown; title?: unknown; due_date?: unknown } = {}
-      if (task && typeof task === 'object' && isNonArrayObject(task)) {
-        preview = {
-          id: 'id' in task ? task.id : undefined,
-          title: 'title' in task ? task.title : undefined,
-          due_date: 'due_date' in task ? task.due_date : undefined
+        
+        // Safe preview extraction with type checking
+        let preview: { id?: unknown; title?: unknown; due_date?: unknown } = {}
+        if (task && typeof task === 'object' && isNonArrayObject(task)) {
+          preview = {
+            id: 'id' in task ? task.id : undefined,
+            title: 'title' in task ? task.title : undefined,
+            due_date: 'due_date' in task ? task.due_date : undefined
+          }
         }
+        console.warn('[getTasks] ❌ Skipping invalid task payload. Validation failures:', reasons.join(', '))
+        console.warn('[getTasks] Task preview:', preview)
       }
-      console.warn('[getTasks] Skipping invalid task. Reasons:', reasons.join(', '), 'Task preview:', preview)
     }
     return valid
   })
