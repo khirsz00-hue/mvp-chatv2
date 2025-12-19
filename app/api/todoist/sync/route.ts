@@ -315,6 +315,21 @@ export async function POST(request: NextRequest) {
     // Upsert tasks with native conflict resolution
     if (mappedTasks.length > 0) {
       console.log(`[Sync] Upserting ${mappedTasks.length} tasks`)
+      
+      // Log first task as sample to verify data structure
+      if (mappedTasks.length > 0) {
+        console.log('[Sync] Sample task being upserted:', {
+          todoist_id: mappedTasks[0].todoist_id,
+          title: mappedTasks[0].title,
+          priority: mappedTasks[0].priority,
+          tags: mappedTasks[0].tags,
+          position: mappedTasks[0].position,
+          postpone_count: mappedTasks[0].postpone_count,
+          auto_moved: mappedTasks[0].auto_moved,
+          metadata: mappedTasks[0].metadata,
+          completed: mappedTasks[0].completed
+        })
+      }
 
       const { data, error } = await supabase
         .from('day_assistant_v2_tasks')
@@ -325,17 +340,35 @@ export async function POST(request: NextRequest) {
         .select()
 
       if (error) {
-        console.error('[Sync] Error upserting tasks:', error)
+        console.error('[Sync] ❌ Error upserting tasks:', error)
         return NextResponse.json(
           { 
             error: 'Failed to sync tasks', 
-            details: error.message 
+            details: error.message,
+            error_code: error.code
           },
           { status: 500 }
         )
       }
 
-      console.log(`[Sync] ✅ Successfully upserted ${mappedTasks.length} tasks`)
+      console.log(`[Sync] ✅ Successfully upserted ${data?.length || mappedTasks.length} tasks`)
+      
+      // Log first returned task to verify what was stored
+      if (data && data.length > 0) {
+        console.log('[Sync] Sample task after upsert:', {
+          id: data[0].id,
+          todoist_id: data[0].todoist_id,
+          title: data[0].title,
+          tags: data[0].tags,
+          tags_type: Array.isArray(data[0].tags) ? 'array' : typeof data[0].tags,
+          position: data[0].position,
+          position_type: typeof data[0].position,
+          postpone_count: data[0].postpone_count,
+          postpone_count_type: typeof data[0].postpone_count
+        })
+      } else {
+        console.warn('[Sync] ⚠️  Upsert succeeded but no data returned (this might be normal for ignoreDuplicates mode)')
+      }
     }
 
     // Update sync metadata
