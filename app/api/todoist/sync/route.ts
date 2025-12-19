@@ -317,19 +317,17 @@ export async function POST(request: NextRequest) {
       console.log(`[Sync] Upserting ${mappedTasks.length} tasks`)
       
       // Log first task as sample to verify data structure
-      if (mappedTasks.length > 0) {
-        console.log('[Sync] Sample task being upserted:', {
-          todoist_id: mappedTasks[0].todoist_id,
-          title: mappedTasks[0].title,
-          priority: mappedTasks[0].priority,
-          tags: mappedTasks[0].tags,
-          position: mappedTasks[0].position,
-          postpone_count: mappedTasks[0].postpone_count,
-          auto_moved: mappedTasks[0].auto_moved,
-          metadata: mappedTasks[0].metadata,
-          completed: mappedTasks[0].completed
-        })
-      }
+      console.log('[Sync] Sample task being upserted:', {
+        todoist_id: mappedTasks[0].todoist_id,
+        title: mappedTasks[0].title,
+        priority: mappedTasks[0].priority,
+        tags: mappedTasks[0].tags,
+        position: mappedTasks[0].position,
+        postpone_count: mappedTasks[0].postpone_count,
+        auto_moved: mappedTasks[0].auto_moved,
+        metadata: mappedTasks[0].metadata,
+        completed: mappedTasks[0].completed
+      })
 
       const { data, error } = await supabase
         .from('day_assistant_v2_tasks')

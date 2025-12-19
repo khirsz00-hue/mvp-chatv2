@@ -25,6 +25,18 @@ const isNullableString = (value: unknown) =>
 const isNonArrayObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
+// Helper to safely extract task preview for logging
+const getTaskPreview = (task: unknown): { id?: unknown; title?: unknown; due_date?: unknown } => {
+  if (task && typeof task === 'object' && isNonArrayObject(task)) {
+    return {
+      id: 'id' in task ? task.id : undefined,
+      title: 'title' in task ? task.title : undefined,
+      due_date: 'due_date' in task ? task.due_date : undefined
+    }
+  }
+  return {}
+}
+
 function isValidTestDayTask(task: unknown): task is TestDayTask {
   if (!isNonArrayObject(task)) return false
   const candidate = task
@@ -286,17 +298,8 @@ export async function getTasks(
         if (typeof t.updated_at !== 'string') reasons.push(`updated_at: ${typeof t.updated_at}`)
         if (typeof t.completed !== 'boolean') reasons.push(`completed: ${typeof t.completed}`)
         
-        // Safe preview extraction with type checking
-        let preview: { id?: unknown; title?: unknown; due_date?: unknown } = {}
-        if (task && typeof task === 'object' && isNonArrayObject(task)) {
-          preview = {
-            id: 'id' in task ? task.id : undefined,
-            title: 'title' in task ? task.title : undefined,
-            due_date: 'due_date' in task ? task.due_date : undefined
-          }
-        }
         console.warn('[getTasks] ❌ Skipping invalid task payload. Validation failures:', reasons.join(', '))
-        console.warn('[getTasks] Task preview:', preview)
+        console.warn('[getTasks] Task preview:', getTaskPreview(task))
       }
     }
     return valid
