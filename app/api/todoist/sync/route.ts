@@ -77,6 +77,8 @@ function mapTodoistToDayAssistantTask(
   }
 
   // Convert priority to number for consistent type handling
+  // Default to 1 (lowest priority) if priority is undefined, null, or invalid
+  // Todoist priorities: 1 (lowest) to 4 (highest/P1)
   const priority = Number(task.priority) || 1
 
   // Determine is_must: labels include 'must' OR priority === 4 (P1 in Todoist)
@@ -88,6 +90,8 @@ function mapTodoistToDayAssistantTask(
   // Calculate cognitive_load: Math.min(5 - priority + 1, 5)
   // Priority in Todoist: 1 (lowest) to 4 (highest/P1)
   // Cognitive load: 1 (light) to 5 (heavy)
+  // Formula inverts priority scale: P1 (4) → load 2, P2 (3) → load 3, P3 (2) → load 4, P4 (1) → load 5
+  // Math.min ensures cognitive load never exceeds 5
   const cognitiveLoad = Math.min(5 - priority + 1, 5)
 
   return {
