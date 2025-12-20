@@ -76,16 +76,19 @@ function mapTodoistToDayAssistantTask(
     else if (task.labels.includes('prywatne')) contextType = 'prywatne'
   }
 
+  // Convert priority to number for consistent type handling
+  const priority = Number(task.priority) || 1
+
   // Determine is_must: labels include 'must' OR priority === 4 (P1 in Todoist)
-  const isMust = task.labels?.includes('must') || task.priority === 4
+  const isMust = task.labels?.includes('must') || priority === 4
 
   // Determine is_important: priority >= 3
-  const isImportant = task.priority >= 3
+  const isImportant = priority >= 3
 
   // Calculate cognitive_load: Math.min(5 - priority + 1, 5)
   // Priority in Todoist: 1 (lowest) to 4 (highest/P1)
   // Cognitive load: 1 (light) to 5 (heavy)
-  const cognitiveLoad = Math.min(5 - task.priority + 1, 5)
+  const cognitiveLoad = Math.min(5 - priority + 1, 5)
 
   return {
     user_id: userId,
@@ -94,7 +97,7 @@ function mapTodoistToDayAssistantTask(
     todoist_task_id: task.id, // Legacy field for compatibility with existing code
     title: task.content,
     description: task.description || null,
-    priority: task.priority,
+    priority: priority,
     is_must: isMust,
     is_important: isImportant,
     estimate_min: 30, // default
