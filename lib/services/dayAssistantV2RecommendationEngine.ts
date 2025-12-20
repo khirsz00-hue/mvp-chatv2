@@ -219,7 +219,7 @@ export async function generateTaskAddedRecommendation(
     alternatives.push({
       type: 'decompose_task',
       task_id: newTaskId,
-      params: { target_duration: 25 }
+      metadata: { target_duration: 25 }
     })
   }
   
@@ -286,7 +286,7 @@ export async function generatePostponeRecommendation(
       type: 'reserve_morning',
       task_id: task.id,
       to_date: tomorrowStr,
-      params: {
+      metadata: {
         duration: assistant.settings?.morning_must_block_default || 30,
         time: '08:00'
       }
@@ -296,7 +296,7 @@ export async function generatePostponeRecommendation(
       {
         type: 'decompose_task',
         task_id: task.id,
-        params: { target_duration: 25 }
+        metadata: { target_duration: 25 }
       }
     ]
     
@@ -369,7 +369,7 @@ export async function generateSliderChangeRecommendation(
       primaryAction = {
         type: 'decompose_task',
         task_id: taskToAdjust.id,
-        params: { 
+        metadata: { 
           target_duration: 10,
           start_small: true
         }
