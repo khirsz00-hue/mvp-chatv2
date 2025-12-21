@@ -86,25 +86,28 @@ export function buildQueue(
 
   // Separate overdue tasks (single pass through scoredTasks for performance)
   const overdueTasks: TestDayTask[] = []
-  const regularTasks: TestDayTask[] = []
+  const mustTasks: TestDayTask[] = []
+  const normalTasks: TestDayTask[] = []
   
   for (const task of scoredTasks) {
     if (isTaskOverdue(task)) {
       overdueTasks.push(task)
+    } else if (task.is_must) {
+      mustTasks.push(task)
     } else {
-      regularTasks.push(task)
+      normalTasks.push(task)
     }
   }
 
   // Process tasks in order: overdue → MUST → regular
   const orderedTasks = [
     ...overdueTasks,
-    ...regularTasks.filter(t => t.is_must),
-    ...regularTasks.filter(t => !t.is_must)
+    ...mustTasks,
+    ...normalTasks
   ]
 
   const overdueCount = overdueTasks.length
-  const mustCount = regularTasks.filter(t => t.is_must).length
+  const mustCount = mustTasks.length
 
   for (let i = 0; i < orderedTasks.length; i++) {
     const task = orderedTasks[i]

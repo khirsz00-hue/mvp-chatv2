@@ -230,7 +230,8 @@ export async function POST(request: NextRequest) {
 
     const todoistTasks: TodoistTask[] = await todoistResponse.json()
 
-    // Filter out completed tasks
+    // Filter out completed tasks for upserting (we don't want to add completed tasks)
+    // But keep the full list to identify which tasks were completed since last sync
     const activeTasks = todoistTasks.filter(task => !task.is_completed)
     
     console.log(`[Sync] Fetched ${todoistTasks.length} tasks from Todoist, ${activeTasks.length} active tasks after filtering completed`)
