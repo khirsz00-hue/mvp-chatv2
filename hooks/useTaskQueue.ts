@@ -16,23 +16,32 @@ export interface QueueResult {
 
 /**
  * Check if task is overdue
+ * Note: due_date is stored as PostgreSQL DATE type (date-only, no timezone)
+ * Format is 'YYYY-MM-DD', so string comparison works correctly
  */
 export function isTaskOverdue(task: TestDayTask): boolean {
   if (!task.due_date) return false
   
   // Compare date strings (due_date is stored as DATE, not datetime)
+  // Both are in 'YYYY-MM-DD' format, so lexicographic comparison works
   const today = new Date().toISOString().split('T')[0]
   return task.due_date < today
 }
 
 /**
  * Get days overdue (0 if not overdue)
+ * Note: Converts date strings to Date objects for accurate day calculation
+ * Assumes due_date is in 'YYYY-MM-DD' format (PostgreSQL DATE type)
  */
 export function getDaysOverdue(task: TestDayTask): number {
   if (!task.due_date) return 0
   
   const today = new Date()
+  today.setHours(0, 0, 0, 0) // Normalize to midnight for accurate day comparison
+  
   const dueDate = new Date(task.due_date)
+  dueDate.setHours(0, 0, 0, 0) // Normalize to midnight
+  
   const diffMs = today.getTime() - dueDate.getTime()
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
   
