@@ -328,7 +328,7 @@ export async function POST(request: NextRequest) {
     // Mark tasks as completed if they're completed in Todoist
     const todoistCompletedIds = todoistTasks
       .filter(task => task.is_completed)
-      .map(t => t.id)
+      .map(task => task.id)
 
     if (todoistCompletedIds.length > 0 && existingTasks) {
       const tasksToComplete = existingTasks

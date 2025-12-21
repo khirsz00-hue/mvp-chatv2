@@ -84,9 +84,17 @@ export function buildQueue(
   const queue: TestDayTask[] = []
   const later: TestDayTask[] = []
 
-  // Separate overdue tasks
-  const overdueTasks = scoredTasks.filter(isTaskOverdue)
-  const regularTasks = scoredTasks.filter(task => !isTaskOverdue(task))
+  // Separate overdue tasks (single pass through scoredTasks for performance)
+  const overdueTasks: TestDayTask[] = []
+  const regularTasks: TestDayTask[] = []
+  
+  for (const task of scoredTasks) {
+    if (isTaskOverdue(task)) {
+      overdueTasks.push(task)
+    } else {
+      regularTasks.push(task)
+    }
+  }
 
   // Process tasks in order: overdue → MUST → regular
   const orderedTasks = [
@@ -134,9 +142,12 @@ export function fillQueueWithAvailableTime(
   const queuedMinutes = queue.reduce((sum, t) => sum + t.estimate_min, 0)
   const remainingMinutes = availableMinutes - queuedMinutes
   
+  // Account for current task being worked on
+  const CURRENT_TASK_OFFSET = 1
+  const maxQueueLength = maxNextTasks + CURRENT_TASK_OFFSET
+  
   // If no time remaining or queue already has enough tasks
-  // Note: +1 accounts for the current task being worked on, so maxNextTasks is for additional tasks
-  if (remainingMinutes <= 0 || queue.length >= maxNextTasks + 1) {
+  if (remainingMinutes <= 0 || queue.length >= maxQueueLength) {
     return { queue, later }
   }
   
@@ -146,7 +157,7 @@ export function fillQueueWithAvailableTime(
   const addedIndices = new Set<number>()
   
   // Collect indices of tasks to add (iterate forward to maintain scoring order)
-  for (let i = 0; i < later.length && newQueue.length < maxNextTasks + 1; i++) {
+  for (let i = 0; i < later.length && newQueue.length < maxQueueLength; i++) {
     const task = later[i]
     
     if (addedMinutes + task.estimate_min <= remainingMinutes) {
