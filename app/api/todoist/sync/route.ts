@@ -230,7 +230,8 @@ export async function POST(request: NextRequest) {
 
     const todoistTasks: TodoistTask[] = await todoistResponse.json()
 
-    // Filter out completed tasks
+    // Filter out completed tasks for upserting (we don't want to add completed tasks)
+    // But keep the full list to identify which tasks were completed since last sync
     const activeTasks = todoistTasks.filter(task => !task.is_completed)
     
     console.log(`[Sync] Fetched ${todoistTasks.length} tasks from Todoist, ${activeTasks.length} active tasks after filtering completed`)
@@ -321,6 +322,34 @@ export async function POST(request: NextRequest) {
           console.error('[Sync] Error deleting old tasks:', deleteError)
         } else {
           console.log(`[Sync] Deleted ${tasksToDelete.length} stale tasks`)
+        }
+      }
+    }
+
+    // Mark tasks as completed if they're completed in Todoist
+    const todoistCompletedIds = todoistTasks
+      .filter(task => task.is_completed)
+      .map(task => task.id)
+
+    if (todoistCompletedIds.length > 0 && existingTasks) {
+      const tasksToComplete = existingTasks
+        .filter(task => task.todoist_id && todoistCompletedIds.includes(task.todoist_id))
+        .map(task => task.id)
+      
+      if (tasksToComplete.length > 0) {
+        const { error: completeError } = await supabase
+          .from('day_assistant_v2_tasks')
+          .update({ 
+            completed: true,
+            // ISO timestamp in UTC - PostgreSQL TIMESTAMP stores in UTC and converts on retrieval
+            completed_at: new Date().toISOString() 
+          })
+          .in('id', tasksToComplete)
+
+        if (completeError) {
+          console.error('[Sync] Error marking tasks as completed:', completeError)
+        } else {
+          console.log(`[Sync] Marked ${tasksToComplete.length} tasks as completed`)
         }
       }
     }
