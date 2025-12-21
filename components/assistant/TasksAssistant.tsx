@@ -479,15 +479,15 @@ export function TasksAssistant() {
   filteredTasks = filterByProject(filteredTasks)
   const sortedTasks = sortTasks(filteredTasks)
   const scheduledOverdueTasks = useMemo(() => {
-    if (filter !== 'scheduled') return []
+    if (!isScheduledFilter) return []
     
     const today = startOfDay(new Date())
     return sortedTasks.filter(task => isTaskOverdue(task, today))
-  }, [filter, sortedTasks])
+  }, [isScheduledFilter, sortedTasks])
   const scheduledUndatedTasks = useMemo(() => {
-    if (filter !== 'scheduled') return []
+    if (!isScheduledFilter) return []
     return sortedTasks.filter(task => !getDueDateString(task))
-  }, [filter, sortedTasks])
+  }, [isScheduledFilter, sortedTasks])
   
   // Group tasks
   const groupTasks = (tasks: Task[]) => {
@@ -538,7 +538,8 @@ export function TasksAssistant() {
   // Non-completed tasks for board/week/month views (respecting project filter)
   let activeTasks = tasks.filter(t => !t.completed)
   activeTasks = filterByProject(activeTasks)
-  const isScheduledSplitView = filter === 'scheduled' && groupBy === 'none'
+  const isScheduledFilter = filter === 'scheduled'
+  const isScheduledSplitView = isScheduledFilter && groupBy === 'none'
   
   console.log('🎯 FINAL SORTED TASKS:', sortedTasks)
   
