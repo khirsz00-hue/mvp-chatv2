@@ -1,6 +1,7 @@
 /**
  * Hook: useTaskQueue
  * Manages the task queue based on available work hours and scoring
+ * Note: For intelligent scoring with ML-inspired algorithms, use useIntelligentQueue hook
  */
 
 import { useMemo } from 'react'
