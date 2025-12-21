@@ -579,3 +579,130 @@ function calculateAvailableMinutesForAI(dayPlan: DayPlan): number {
   const diffMs = workEnd.getTime() - now.getTime()
   return Math.floor(diffMs / 1000 / 60)
 }
+
+/**
+ * Calculate detailed score breakdown for tooltip display
+ * This provides human-readable explanation of why a task is at its queue position
+ */
+export function calculateScoreBreakdown(
+  task: TestDayTask,
+  context: { energy: number; focus: number; context: string | null },
+  todayDate: string
+): import('@/lib/types/dayAssistantV2').DetailedScoreBreakdown {
+  const factors: import('@/lib/types/dayAssistantV2').ScoreFactor[] = []
+  
+  // 1. Energy match
+  const energyDiff = Math.abs(task.cognitive_load - context.energy)
+  const energyScore = Math.max(0, 30 - (energyDiff * 10))
+  factors.push({
+    name: 'Dopasowanie energii',
+    points: energyScore,
+    positive: energyScore > 15,
+    detail: `Load ${task.cognitive_load} vs Twoja energia: ${context.energy}`
+  })
+  
+  // 2. Priority
+  let priorityScore = 0
+  let priorityDetail = ''
+  if (task.is_must) {
+    priorityScore = 30
+    priorityDetail = 'MUST task'
+  } else if (task.is_important) {
+    priorityScore = 25
+    priorityDetail = 'Important'
+  } else if (task.priority >= 3) {
+    priorityScore = 15
+    priorityDetail = `Priority ${task.priority}`
+  } else {
+    priorityScore = task.priority * 5
+    priorityDetail = 'Normal priority'
+  }
+  
+  factors.push({
+    name: 'Priorytet',
+    points: priorityScore,
+    positive: priorityScore > 10,
+    detail: priorityDetail
+  })
+  
+  // 3. Deadline urgency
+  let deadlineScore = 0
+  let deadlineDetail = 'Brak deadline'
+  
+  if (task.due_date) {
+    if (task.due_date < todayDate) {
+      const daysOverdue = Math.floor((new Date(todayDate).getTime() - new Date(task.due_date).getTime()) / (1000 * 60 * 60 * 24))
+      deadlineScore = 25 // Overdue = high urgency
+      deadlineDetail = `Przeterminowane (${daysOverdue} ${daysOverdue === 1 ? 'dzień' : 'dni'})`
+    } else if (task.due_date === todayDate) {
+      deadlineScore = 20 // Due today
+      deadlineDetail = 'Due dziś'
+    } else {
+      const daysUntil = Math.floor((new Date(task.due_date).getTime() - new Date(todayDate).getTime()) / (1000 * 60 * 60 * 24))
+      if (daysUntil === 1) {
+        deadlineScore = 15
+        deadlineDetail = 'Due jutro'
+      } else {
+        deadlineScore = 10
+        deadlineDetail = `Due za ${daysUntil} dni`
+      }
+    }
+  }
+  
+  factors.push({
+    name: 'Deadline',
+    points: deadlineScore,
+    positive: deadlineScore > 15,
+    detail: deadlineDetail
+  })
+  
+  // 4. Postpone penalty
+  if (task.postpone_count > 0) {
+    const postponePenalty = -Math.min(task.postpone_count * 5, 20)
+    factors.push({
+      name: 'Postpone penalty',
+      points: postponePenalty,
+      positive: false,
+      detail: `Przełożone ${task.postpone_count}x`
+    })
+  }
+  
+  // 5. Context match
+  let contextScore = 0
+  let contextDetail = ''
+  if (context.context && task.context_type === context.context) {
+    contextScore = 22
+    contextDetail = `Pasuje do filtru: ${task.context_type}`
+  } else if (!context.context) {
+    contextScore = 10 // Neutral if no filter
+    contextDetail = `Kontekst: ${task.context_type || 'brak'}`
+  } else {
+    contextScore = 5
+    contextDetail = `Nie pasuje do filtru (${task.context_type} vs ${context.context})`
+  }
+  
+  factors.push({
+    name: 'Context match',
+    points: contextScore,
+    positive: contextScore > 15,
+    detail: contextDetail
+  })
+  
+  const total = factors.reduce((sum, f) => sum + f.points, 0)
+  
+  return {
+    total: Math.max(0, Math.min(100, total)),
+    factors,
+    explanation: generateExplanation(factors, total)
+  }
+}
+
+/**
+ * Generate explanation text based on score factors
+ */
+function generateExplanation(factors: import('@/lib/types/dayAssistantV2').ScoreFactor[], total: number): string {
+  if (total > 80) return 'Świetne dopasowanie do Twojej obecnej energii i priorytetów!'
+  if (total > 60) return 'Dobre dopasowanie - polecam zacząć od tego zadania.'
+  if (total > 40) return 'Średnie dopasowanie - możesz zrobić teraz lub później.'
+  return 'Słabe dopasowanie - lepiej zostawić na później lub zmienić parametry.'
+}
