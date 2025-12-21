@@ -15,6 +15,30 @@ export interface QueueResult {
 }
 
 /**
+ * Check if task is overdue
+ */
+export function isTaskOverdue(task: TestDayTask): boolean {
+  if (!task.due_date) return false
+  
+  const today = new Date().toISOString().split('T')[0]
+  return task.due_date < today
+}
+
+/**
+ * Get days overdue (0 if not overdue)
+ */
+export function getDaysOverdue(task: TestDayTask): number {
+  if (!task.due_date) return 0
+  
+  const today = new Date()
+  const dueDate = new Date(task.due_date)
+  const diffMs = today.getTime() - dueDate.getTime()
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  
+  return Math.max(0, diffDays)
+}
+
+/**
  * Calculate available minutes until work end time
  * Note: This assumes work hours are within the same day.
  * If work extends past midnight, returns 0.
@@ -50,15 +74,28 @@ export function buildQueue(
   const queue: TestDayTask[] = []
   const later: TestDayTask[] = []
 
-  for (const task of scoredTasks) {
-    // MUST tasks always go in the queue
-    if (task.is_must) {
+  // Separate overdue tasks
+  const overdueTasks = scoredTasks.filter(isTaskOverdue)
+  const regularTasks = scoredTasks.filter(task => !isTaskOverdue(task))
+
+  // Process tasks in order: overdue → MUST → regular
+  const orderedTasks = [
+    ...overdueTasks,
+    ...regularTasks.filter(t => t.is_must),
+    ...regularTasks.filter(t => !t.is_must)
+  ]
+
+  for (const task of orderedTasks) {
+    const isOverdue = isTaskOverdue(task)
+    
+    // Overdue tasks and MUST tasks always go in queue
+    if (isOverdue || task.is_must) {
       queue.push(task)
       queuedMinutes += task.estimate_min
       continue
     }
 
-    // Regular tasks: check if they fit in available time
+    // Regular tasks: check if they fit
     if (queuedMinutes + task.estimate_min <= availableMinutes) {
       queue.push(task)
       queuedMinutes += task.estimate_min
@@ -68,6 +105,43 @@ export function buildQueue(
   }
 
   return { queue, later }
+}
+
+/**
+ * Fill NEXT queue when time is available
+ * Takes top tasks from LATER based on scoring
+ */
+export function fillQueueWithAvailableTime(
+  queue: TestDayTask[],
+  later: TestDayTask[],
+  availableMinutes: number,
+  maxNextTasks: number = 5
+): { queue: TestDayTask[]; later: TestDayTask[] } {
+  const queuedMinutes = queue.reduce((sum, t) => sum + t.estimate_min, 0)
+  const remainingMinutes = availableMinutes - queuedMinutes
+  
+  // If no time remaining or queue already has enough tasks
+  if (remainingMinutes <= 0 || queue.length >= maxNextTasks + 1) {
+    return { queue, later }
+  }
+  
+  // Take top tasks from later that fit
+  const newQueue = [...queue]
+  const newLater = [...later]
+  let addedMinutes = 0
+  
+  for (let i = 0; i < newLater.length && newQueue.length < maxNextTasks + 1; i++) {
+    const task = newLater[i]
+    
+    if (addedMinutes + task.estimate_min <= remainingMinutes) {
+      newQueue.push(task)
+      addedMinutes += task.estimate_min
+      newLater.splice(i, 1)
+      i-- // Adjust index after removal
+    }
+  }
+  
+  return { queue: newQueue, later: newLater }
 }
 
 /**
@@ -81,7 +155,12 @@ export function useTaskQueue(
     const workEndTime = dayPlan?.metadata?.work_end_time as string | undefined
     const availableMinutes = calculateAvailableMinutes(workEndTime)
     
-    const { queue, later } = buildQueue(scoredTasks, availableMinutes)
+    let { queue, later } = buildQueue(scoredTasks, availableMinutes)
+    
+    // Fill queue with next-best tasks if time available
+    const filledQueue = fillQueueWithAvailableTime(queue, later, availableMinutes)
+    queue = filledQueue.queue
+    later = filledQueue.later
     
     const usedMinutes = queue.reduce((sum, task) => sum + task.estimate_min, 0)
     const usagePercentage = availableMinutes > 0 
