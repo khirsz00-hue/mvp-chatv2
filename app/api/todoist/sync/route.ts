@@ -340,7 +340,8 @@ export async function POST(request: NextRequest) {
         const { error: completeError } = await supabase
           .from('day_assistant_v2_tasks')
           .update({ 
-            completed: true, 
+            completed: true,
+            // ISO timestamp in UTC - PostgreSQL TIMESTAMP stores in UTC and converts on retrieval
             completed_at: new Date().toISOString() 
           })
           .in('id', tasksToComplete)

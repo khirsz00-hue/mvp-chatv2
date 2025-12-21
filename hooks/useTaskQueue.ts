@@ -132,6 +132,9 @@ export function buildQueue(
   return { queue, later }
 }
 
+// Configuration: offset for current task being worked on
+const CURRENT_TASK_OFFSET = 1
+
 /**
  * Fill NEXT queue when time is available
  * Takes top tasks from LATER based on scoring
@@ -146,7 +149,6 @@ export function fillQueueWithAvailableTime(
   const remainingMinutes = availableMinutes - queuedMinutes
   
   // Account for current task being worked on
-  const CURRENT_TASK_OFFSET = 1
   const maxQueueLength = maxNextTasks + CURRENT_TASK_OFFSET
   
   // If no time remaining or queue already has enough tasks
