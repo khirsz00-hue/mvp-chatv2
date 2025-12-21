@@ -191,7 +191,12 @@ export function RecommendationPanel({ dayPlan, proposals, onProposalResponse }: 
               <Button variant="ghost" onClick={() => setShowRejectModal(false)}>
                 Anuluj
               </Button>
-              <Button onClick={confirmReject} disabled={!rejectReason}>
+              <Button 
+                onClick={confirmReject} 
+                disabled={!rejectReason}
+                aria-label={!rejectReason ? "Wybierz powód aby kontynuować" : "Zapisz powód odrzucenia"}
+                title={!rejectReason ? "Wybierz powód aby kontynuować" : undefined}
+              >
                 💾 Zapisz
               </Button>
             </div>

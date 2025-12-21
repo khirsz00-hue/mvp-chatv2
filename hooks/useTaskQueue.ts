@@ -16,6 +16,8 @@ export interface QueueResult {
 
 /**
  * Calculate available minutes until work end time
+ * Note: This assumes work hours are within the same day.
+ * If work extends past midnight, returns 0.
  */
 export function calculateAvailableMinutes(workEndTime?: string): number {
   if (!workEndTime) {

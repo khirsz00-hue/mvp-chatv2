@@ -21,7 +21,7 @@ import { Play, XCircle, Clock, ArrowsClockwise, MagicWand, Prohibit, PushPin, Ge
 import { cn } from '@/lib/utils'
 import { useScoredTasks } from '@/hooks/useScoredTasks'
 import { useTaskQueue } from '@/hooks/useTaskQueue'
-import { useTaskTimer } from '@/hooks/useTaskTimer'
+import { useTaskTimer, TimerState } from '@/hooks/useTaskTimer'
 import { TaskBadges } from './TaskBadges'
 import { TaskDetailsModal } from './TaskDetailsModal'
 import { RecommendationPanel } from './RecommendationPanel'
@@ -933,7 +933,7 @@ function TaskRow({
   onClick?: () => void
   focus: number
   selectedDate: string
-  activeTimer?: import('@/hooks/useTaskTimer').TimerState
+  activeTimer?: TimerState
   isCollapsed?: boolean
   onPauseTimer?: () => void
   onResumeTimer?: () => void

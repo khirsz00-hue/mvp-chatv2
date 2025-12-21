@@ -48,10 +48,12 @@ export function useTaskTimer(): UseTaskTimerResult {
 
   // Start timer
   const startTimer = useCallback((task: TestDayTask) => {
-    // Stop any existing timer
+    // Stop any existing timer and clean up state
     if (intervalRef.current) {
       clearInterval(intervalRef.current)
+      intervalRef.current = null
     }
+    setActiveTimer(null) // Reset state first
 
     const newTimer: TimerState = {
       taskId: task.id,
