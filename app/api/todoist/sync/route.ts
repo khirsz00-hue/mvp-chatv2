@@ -63,9 +63,22 @@ interface DayAssistantV2Task {
  */
 function parseEstimateFromTodoist(task: TodoistTask): number {
   // Method 1: Check if task.duration exists (Todoist Premium feature)
-  if (task.duration?.amount && task.duration?.unit === 'minute') {
-    const minutes = task.duration.amount
-    if (minutes > 0 && minutes <= 480) { // Max 8 hours
+  if (task.duration?.amount) {
+    const amount = task.duration.amount
+    const unit = task.duration.unit
+    
+    if (unit === 'minute') {
+      if (amount > 0 && amount <= 480) { // Max 8 hours
+        return amount
+      }
+    } else if (unit === 'hour') {
+      const minutes = amount * 60
+      if (minutes > 0 && minutes <= 480) { // Max 8 hours
+        return minutes
+      }
+    } else if (unit === 'day') {
+      // Assume 8 hour work day, but cap at 480 minutes (8 hours)
+      const minutes = Math.min(amount * 8 * 60, 480)
       return minutes
     }
   }

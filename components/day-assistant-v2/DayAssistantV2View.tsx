@@ -561,7 +561,7 @@ export function DayAssistantV2View() {
       if (response.ok) {
         // Reload tasks to get updated subtask state
         await loadDayPlan(sessionToken)
-        showToast(completed ? '✅ Krok ukończony' : 'Krok odkończony', 'success')
+        showToast(completed ? '✅ Krok ukończony' : 'Krok nieukończony', 'success')
       } else {
         showToast('Nie udało się zaktualizować kroku', 'error')
       }

@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import Button from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Textarea'
 import { TestDayTask } from '@/lib/types/dayAssistantV2'
+import { useToast } from '@/components/ui/Toast'
 
 interface Props {
   task: TestDayTask
@@ -17,10 +18,11 @@ export function ClarifyModal({ task, onClose, onSubmit, sessionToken }: Props) {
   const [userContext, setUserContext] = useState('')
   const [aiSuggestion, setAiSuggestion] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const { showToast } = useToast()
 
   const handleClarify = async () => {
     if (!sessionToken) {
-      alert('Brak autoryzacji')
+      showToast('Brak autoryzacji', 'error')
       return
     }
 
@@ -49,7 +51,7 @@ export function ClarifyModal({ task, onClose, onSubmit, sessionToken }: Props) {
       setAiSuggestion(first_step)
     } catch (error) {
       console.error('Error generating first step:', error)
-      alert('Błąd generowania kroku')
+      showToast('Błąd generowania kroku', 'error')
     } finally {
       setLoading(false)
     }
@@ -81,7 +83,7 @@ export function ClarifyModal({ task, onClose, onSubmit, sessionToken }: Props) {
       onClose()
     } catch (error) {
       console.error('Error creating subtask:', error)
-      alert('Błąd tworzenia kroku')
+      showToast('Błąd tworzenia kroku', 'error')
     }
   }
 
