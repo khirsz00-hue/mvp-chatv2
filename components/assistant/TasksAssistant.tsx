@@ -478,6 +478,17 @@ export function TasksAssistant() {
   let filteredTasks = filterTasks(tasks, filter)
   filteredTasks = filterByProject(filteredTasks)
   const sortedTasks = sortTasks(filteredTasks)
+  const isScheduledFilter = filter === 'scheduled'
+  const scheduledOverdueTasks = useMemo(() => {
+    if (!isScheduledFilter) return []
+    
+    const todayStart = startOfDay(new Date())
+    return sortedTasks.filter(task => isTaskOverdue(task, todayStart))
+  }, [isScheduledFilter, sortedTasks])
+  const scheduledUndatedTasks = useMemo(() => {
+    if (!isScheduledFilter) return []
+    return sortedTasks.filter(task => !getDueDateString(task))
+  }, [isScheduledFilter, sortedTasks])
   
   // Group tasks
   const groupTasks = (tasks: Task[]) => {
@@ -798,6 +809,26 @@ export function TasksAssistant() {
       setSelectedTaskIds(new Set(sortedTasks.map(t => t.id)))
     }
   }
+
+  const renderTaskCards = (list: Task[]) => (
+    <div className="space-y-3">
+      {list.map(task => (
+        <TaskCard 
+          key={task.id}
+          task={task}
+          onComplete={handleComplete}
+          onDelete={handleDelete}
+          onDetails={(t) => {
+            setSelectedTask(t)
+            setShowDetailsModal(true)
+          }}
+          selectable={selectedTaskIds.size > 0}
+          selected={selectedTaskIds.has(task.id)}
+          onToggleSelection={toggleTaskSelection}
+        />
+      ))}
+    </div>
+  )
   
   const handleBulkComplete = async () => {
     if (selectedTaskIds.size === 0) return
@@ -1362,35 +1393,63 @@ export function TasksAssistant() {
             </Card>
           ) : (
             <div className="space-y-6">
-              {Object.entries(groupedTasks).map(([groupName, groupTasks]) => (
-                <div key={groupName}>
-                  {groupBy !== 'none' && (
-                    <div className="mb-3 flex items-center gap-3">
-                      <h3 className="text-lg font-semibold text-gray-700">{groupName}</h3>
-                      <Badge variant="secondary" className="text-xs">
-                        {groupTasks.length}
-                      </Badge>
+              {isScheduledFilter && groupBy === 'none' ? (
+                <>
+                  {scheduledOverdueTasks.length > 0 && (
+                    <div>
+                      <div className="mb-3 flex items-center gap-3">
+                        <h3 className="text-lg font-semibold text-gray-700">Przeterminowane</h3>
+                        <Badge variant="secondary" className="text-xs">
+                          {scheduledOverdueTasks.length}
+                        </Badge>
+                      </div>
+                      {renderTaskCards(scheduledOverdueTasks)}
                     </div>
                   )}
-                  <div className="space-y-3">
-                    {groupTasks.map(task => (
-                      <TaskCard 
-                        key={task.id}
-                        task={task}
-                        onComplete={handleComplete}
-                        onDelete={handleDelete}
-                        onDetails={(t) => {
-                          setSelectedTask(t)
-                          setShowDetailsModal(true)
-                        }}
-                        selectable={selectedTaskIds.size > 0}
-                        selected={selectedTaskIds.has(task.id)}
-                        onToggleSelection={toggleTaskSelection}
-                      />
-                    ))}
+
+                  {scheduledUndatedTasks.length > 0 && (
+                    <div>
+                      <div className="mb-3 flex items-center gap-3">
+                        <h3 className="text-lg font-semibold text-gray-700">Bez daty</h3>
+                        <Badge variant="secondary" className="text-xs">
+                          {scheduledUndatedTasks.length}
+                        </Badge>
+                      </div>
+                      {renderTaskCards(scheduledUndatedTasks)}
+                    </div>
+                  )}
+                </>
+              ) : (
+                Object.entries(groupedTasks).map(([groupName, groupTasks]) => (
+                  <div key={groupName}>
+                    {groupBy !== 'none' && (
+                      <div className="mb-3 flex items-center gap-3">
+                        <h3 className="text-lg font-semibold text-gray-700">{groupName}</h3>
+                        <Badge variant="secondary" className="text-xs">
+                          {groupTasks.length}
+                        </Badge>
+                      </div>
+                    )}
+                    <div className="space-y-3">
+                      {groupTasks.map(task => (
+                        <TaskCard 
+                          key={task.id}
+                          task={task}
+                          onComplete={handleComplete}
+                          onDelete={handleDelete}
+                          onDetails={(t) => {
+                            setSelectedTask(t)
+                            setShowDetailsModal(true)
+                          }}
+                          selectable={selectedTaskIds.size > 0}
+                          selected={selectedTaskIds.has(task.id)}
+                          onToggleSelection={toggleTaskSelection}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           )
         ) : view === 'board' ? (
