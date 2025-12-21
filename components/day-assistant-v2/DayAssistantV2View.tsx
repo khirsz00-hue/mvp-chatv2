@@ -15,9 +15,10 @@ import {
 } from '@/lib/types/dayAssistantV2'
 import {
   checkLightTaskLimit,
-  generateUnmarkMustWarning
+  generateUnmarkMustWarning,
+  calculateScoreBreakdown
 } from '@/lib/services/dayAssistantV2RecommendationEngine'
-import { Play, XCircle, Clock, ArrowsClockwise, MagicWand, Prohibit, PushPin, Gear } from '@phosphor-icons/react'
+import { Play, XCircle, Clock, ArrowsClockwise, MagicWand, Prohibit, PushPin, Gear, DotsThree, Check, Trash, Pencil, Info } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { useScoredTasks } from '@/hooks/useScoredTasks'
 import { useTaskQueue } from '@/hooks/useTaskQueue'
@@ -29,6 +30,8 @@ import { EnergyFocusControls } from './EnergyFocusControls'
 import { WorkHoursConfigModal } from './WorkHoursConfigModal'
 import { TaskTimer } from './TaskTimer'
 import { OverdueTasksSection } from './OverdueTasksSection'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/DropdownMenu'
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/Tooltip'
 
 type DecisionLogEntry = {
   id: string
@@ -64,6 +67,7 @@ export function DayAssistantV2View() {
   const [newTaskMust, setNewTaskMust] = useState(false)
   const [newTaskContext, setNewTaskContext] = useState<ContextType>('code')
   const [showConfigModal, setShowConfigModal] = useState(false)
+  const [showLaterQueue, setShowLaterQueue] = useState(false)
   const undoTimer = useRef<NodeJS.Timeout | null>(null)
 
   // Timer hook
@@ -551,6 +555,23 @@ export function DayAssistantV2View() {
     }
   }
 
+  const handleDelete = async (task: TestDayTask) => {
+    if (!window.confirm('Czy na pewno chcesz usunąć to zadanie?')) return
+    
+    const { error } = await supabase
+      .from('day_assistant_v2_tasks')
+      .delete()
+      .eq('id', task.id)
+    
+    if (!error) {
+      setTasks(prev => prev.filter(t => t.id !== task.id))
+      addDecisionLog(`Usunięto zadanie "${task.title}"`)
+      showToast('🗑️ Zadanie usunięte', 'success')
+    } else {
+      showToast('Nie udało się usunąć zadania', 'error')
+    }
+  }
+
   const presetButtons = (
     <div className="flex flex-wrap gap-2">
       {Object.values(ENERGY_FOCUS_PRESETS).map(preset => (
@@ -580,8 +601,9 @@ export function DayAssistantV2View() {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
-      <div className="space-y-6">
+    <TooltipProvider>
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
+        <div className="space-y-6">
         <Card>
           <CardHeader>
             <div className="flex justify-between items-center">
@@ -697,6 +719,7 @@ export function DayAssistantV2View() {
                 onDecompose={() => handleDecompose(task)}
                 onComplete={() => handleComplete(task)}
                 onPin={() => handlePin(task)}
+                onDelete={() => handleDelete(task)}
                 onClick={() => setSelectedTask(task)}
                 focus={dayPlan?.focus || 3}
                 selectedDate={selectedDate}
@@ -704,6 +727,7 @@ export function DayAssistantV2View() {
                 onPauseTimer={pauseTimer}
                 onResumeTimer={resumeTimer}
                 onCompleteTimer={handleTimerComplete}
+                showActions={true}
               />
             ))}
           </CardContent>
@@ -715,29 +739,70 @@ export function DayAssistantV2View() {
               <CardTitle>📋 Na później ({later.length} {later.length === 1 ? 'task' : 'tasków'})</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Te zadania nie mieszczą się w dostępnym czasie pracy dzisiaj.
-              </p>
-              {later.slice(0, 5).map(task => (
-                <TaskRow
-                  key={task.id}
-                  task={task}
-                  onNotToday={() => handleNotToday(task)}
-                  onStart={() => handleStartTask(task)}
-                  onUnmark={() => openUnmarkWarning(task)}
-                  onDecompose={() => handleDecompose(task)}
-                  onComplete={() => handleComplete(task)}
-                  onPin={() => handlePin(task)}
-                  onClick={() => setSelectedTask(task)}
-                  focus={dayPlan?.focus || 3}
-                  selectedDate={selectedDate}
-                  isCollapsed={true}
-                />
-              ))}
-              {later.length > 5 && (
-                <p className="text-sm text-muted-foreground text-center">
-                  ... i {later.length - 5} więcej
+              <div className="flex justify-between items-center">
+                <p className="text-sm text-muted-foreground">
+                  {showLaterQueue 
+                    ? 'Te zadania nie mieszczą się w dostępnym czasie pracy dzisiaj.' 
+                    : `📋 ${later.length} ${later.length === 1 ? 'zadanie' : 'zadań'} pozostaje na później`}
                 </p>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setShowLaterQueue(!showLaterQueue)}
+                >
+                  {showLaterQueue ? '🔼 Zwiń kolejkę' : '👁️ Pokaż kolejkę'}
+                </Button>
+              </div>
+              
+              {showLaterQueue ? (
+                <>
+                  <div className="border-t pt-3 mt-2">
+                    <h3 className="font-semibold mb-3">📋 KOLEJKA NA PÓŹNIEJ</h3>
+                    {later.map((task, index) => (
+                      <TaskRow
+                        key={task.id}
+                        task={task}
+                        queuePosition={queue.length + index + 1}
+                        onNotToday={() => handleNotToday(task)}
+                        onStart={() => handleStartTask(task)}
+                        onUnmark={() => openUnmarkWarning(task)}
+                        onDecompose={() => handleDecompose(task)}
+                        onComplete={() => handleComplete(task)}
+                        onPin={() => handlePin(task)}
+                        onDelete={() => handleDelete(task)}
+                        onClick={() => setSelectedTask(task)}
+                        focus={dayPlan?.focus || 3}
+                        selectedDate={selectedDate}
+                        showActions={true}
+                      />
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  {later.slice(0, 3).map(task => (
+                    <TaskRow
+                      key={task.id}
+                      task={task}
+                      onNotToday={() => handleNotToday(task)}
+                      onStart={() => handleStartTask(task)}
+                      onUnmark={() => openUnmarkWarning(task)}
+                      onDecompose={() => handleDecompose(task)}
+                      onComplete={() => handleComplete(task)}
+                      onPin={() => handlePin(task)}
+                      onDelete={() => handleDelete(task)}
+                      onClick={() => setSelectedTask(task)}
+                      focus={dayPlan?.focus || 3}
+                      selectedDate={selectedDate}
+                      isCollapsed={true}
+                    />
+                  ))}
+                  {later.length > 3 && (
+                    <p className="text-sm text-muted-foreground text-center">
+                      ... i {later.length - 3} więcej
+                    </p>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
@@ -881,7 +946,8 @@ export function DayAssistantV2View() {
           ai_instructions: dayPlan?.metadata?.ai_instructions as string | undefined
         }}
       />
-    </div>
+      </div>
+    </TooltipProvider>
   )
 }
 
@@ -913,11 +979,13 @@ function TaskRow({
   onDecompose,
   onComplete,
   onPin,
+  onDelete,
   onClick,
   focus,
   selectedDate,
   activeTimer,
   isCollapsed,
+  showActions,
   onPauseTimer,
   onResumeTimer,
   onCompleteTimer
@@ -930,16 +998,25 @@ function TaskRow({
   onDecompose: () => void
   onComplete: () => void
   onPin?: () => void
+  onDelete?: () => void
   onClick?: () => void
   focus: number
   selectedDate: string
   activeTimer?: TimerState
   isCollapsed?: boolean
+  showActions?: boolean
   onPauseTimer?: () => void
   onResumeTimer?: () => void
   onCompleteTimer?: () => void
 }) {
   const shouldSuggestTen = focus <= 2 && task.estimate_min > 20
+  
+  // Calculate score breakdown for tooltip
+  const scoreBreakdown = queuePosition ? calculateScoreBreakdown(
+    task,
+    { energy: focus, focus, context: null },
+    selectedDate
+  ) : null
   
   // Visual distinction based on queue position
   const cardSizeClass = queuePosition === 1 
@@ -970,7 +1047,50 @@ function TaskRow({
       <div className="flex items-start justify-between gap-3" onClick={onClick}>
         <div className="flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            {queuePosition && (
+            {queuePosition && scoreBreakdown && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1">
+                    <span className={cn(
+                      'px-3 py-1 text-sm font-bold rounded-full',
+                      queuePosition === 1 && 'bg-green-500 text-white',
+                      queuePosition === 2 && 'bg-blue-400 text-white',
+                      queuePosition === 3 && 'bg-purple-400 text-white',
+                      queuePosition > 3 && 'bg-gray-300 text-gray-700'
+                    )}>
+                      #{queuePosition}
+                    </span>
+                    <Info size={14} className="text-gray-400" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-sm">
+                    <div className="space-y-2">
+                      <p className="font-semibold">💡 Dlaczego #{queuePosition} w kolejce?</p>
+                      <p className="text-sm">Score: {scoreBreakdown.total}/100</p>
+                      
+                      <div className="space-y-1 text-xs">
+                        {scoreBreakdown.factors.map((factor, idx) => (
+                          <div key={idx} className="flex justify-between gap-2">
+                            <span>
+                              {factor.positive ? '✅' : '⚠️'} {factor.name}:
+                            </span>
+                            <span className={factor.positive ? 'text-green-400' : 'text-orange-400'}>
+                              {factor.points > 0 ? '+' : ''}{factor.points}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      {scoreBreakdown.explanation && (
+                        <p className="text-xs text-gray-300 mt-2">
+                          {scoreBreakdown.explanation}
+                        </p>
+                      )}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+            )}
+            {queuePosition && !scoreBreakdown && (
               <span className={cn(
                 'px-3 py-1 text-sm font-bold rounded-full',
                 queuePosition === 1 && 'bg-green-500 text-white',
@@ -998,7 +1118,60 @@ function TaskRow({
             Estymat: {task.estimate_min} min • Load {task.cognitive_load} • Przeniesienia: {task.postpone_count || 0}
           </p>
         </div>
-        {!isCollapsed && (
+        {!isCollapsed && showActions && (
+          <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+            <Button size="sm" variant="outline" onClick={onStart}>
+              <Play size={16} className="mr-1" /> Start
+            </Button>
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="ghost">
+                  <DotsThree size={20} weight="bold" />
+                </Button>
+              </DropdownMenuTrigger>
+              
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={onComplete}>
+                  <Check size={16} className="mr-2" />
+                  Ukończ
+                </DropdownMenuItem>
+                
+                <DropdownMenuItem onClick={onNotToday}>
+                  <ArrowsClockwise size={16} className="mr-2" />
+                  Nie dziś
+                </DropdownMenuItem>
+                
+                {onPin && (
+                  <DropdownMenuItem onClick={onPin}>
+                    <PushPin size={16} className="mr-2" />
+                    {task.is_must ? 'Odepnij' : 'Przypnij jako MUST'}
+                  </DropdownMenuItem>
+                )}
+                
+                <DropdownMenuItem onClick={onDecompose}>
+                  <MagicWand size={16} className="mr-2" />
+                  Dekomponuj
+                </DropdownMenuItem>
+                
+                <DropdownMenuSeparator />
+                
+                <DropdownMenuItem onClick={onClick}>
+                  <Pencil size={16} className="mr-2" />
+                  Edytuj
+                </DropdownMenuItem>
+                
+                {onDelete && (
+                  <DropdownMenuItem onClick={onDelete} className="text-red-600">
+                    <Trash size={16} className="mr-2" />
+                    Usuń
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
+        {!isCollapsed && !showActions && (
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); onStart(); }}>
               <Play size={16} className="mr-1" /> Start
@@ -1031,7 +1204,7 @@ function TaskRow({
         />
       )}
       
-      {!isCollapsed && (
+      {!isCollapsed && !showActions && (
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); onNotToday(); }}>
             <ArrowsClockwise size={16} className="mr-1" /> Nie dziś
