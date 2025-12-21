@@ -17,12 +17,18 @@ import {
   checkLightTaskLimit,
   generateUnmarkMustWarning
 } from '@/lib/services/dayAssistantV2RecommendationEngine'
-import { Play, XCircle, Clock, ArrowsClockwise, MagicWand, Prohibit, PushPin } from '@phosphor-icons/react'
+import { Play, XCircle, Clock, ArrowsClockwise, MagicWand, Prohibit, PushPin, Gear } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { useScoredTasks } from '@/hooks/useScoredTasks'
+import { useTaskQueue } from '@/hooks/useTaskQueue'
+import { useTaskTimer } from '@/hooks/useTaskTimer'
 import { TaskBadges } from './TaskBadges'
 import { TaskDetailsModal } from './TaskDetailsModal'
 import { RecommendationPanel } from './RecommendationPanel'
+import { EnergyFocusControls } from './EnergyFocusControls'
+import { WorkHoursConfigModal } from './WorkHoursConfigModal'
+import { TaskTimer } from './TaskTimer'
+import { OverdueTasksSection } from './OverdueTasksSection'
 
 type DecisionLogEntry = {
   id: string
@@ -57,7 +63,19 @@ export function DayAssistantV2View() {
   const [newTaskLoad, setNewTaskLoad] = useState(2)
   const [newTaskMust, setNewTaskMust] = useState(false)
   const [newTaskContext, setNewTaskContext] = useState<ContextType>('code')
+  const [showConfigModal, setShowConfigModal] = useState(false)
   const undoTimer = useRef<NodeJS.Timeout | null>(null)
+
+  // Timer hook
+  const {
+    activeTimer,
+    startTimer,
+    pauseTimer,
+    resumeTimer,
+    stopTimer,
+    formatTime,
+    progressPercentage
+  } = useTaskTimer()
 
   useEffect(() => {
     const init = async () => {
@@ -225,8 +243,24 @@ export function DayAssistantV2View() {
   // Apply intelligent scoring to filtered tasks
   const scoredTasks = useScoredTasks(filteredTasks, dayPlan, selectedDate)
 
-  const mustTasks = scoredTasks.filter(t => t.is_must).slice(0, 3)
-  const matchedTasks = scoredTasks.filter(t => !t.is_must && !t.completed)
+  // Separate overdue tasks
+  const overdueTasks = useMemo(() => {
+    return scoredTasks.filter(t => t.due_date && t.due_date < selectedDate && !t.completed)
+  }, [scoredTasks, selectedDate])
+
+  // Non-overdue tasks for queue
+  const nonOverdueTasks = useMemo(() => {
+    return scoredTasks.filter(t => !t.due_date || t.due_date >= selectedDate)
+  }, [scoredTasks, selectedDate])
+
+  // Use queue hook to calculate queue
+  const { queue, later, availableMinutes, usedMinutes, usagePercentage } = useTaskQueue(
+    nonOverdueTasks,
+    dayPlan
+  )
+
+  const mustTasks = queue.filter(t => t.is_must).slice(0, 3)
+  const matchedTasks = queue.filter(t => !t.is_must && !t.completed)
   const autoMoved = scoredTasks.filter(t => t.auto_moved)
 
   const lightUsage = useMemo(() => {
@@ -243,6 +277,31 @@ export function DayAssistantV2View() {
       },
       ...prev
     ].slice(0, 12))
+  }
+
+  const handleSaveConfig = async (config: {
+    work_start_time: string
+    work_end_time: string
+    ai_instructions: string
+  }) => {
+    const response = await authFetch('/api/day-assistant-v2/config', {
+      method: 'POST',
+      body: JSON.stringify({
+        work_start_time: config.work_start_time,
+        work_end_time: config.work_end_time,
+        ai_instructions: config.ai_instructions,
+        plan_date: selectedDate
+      })
+    })
+    
+    if (response.ok) {
+      const data = await response.json()
+      setDayPlan(data.dayPlan)
+      showToast('✅ Konfiguracja zapisana', 'success')
+      addDecisionLog('Zaktualizowano godziny pracy')
+    } else {
+      showToast('Nie udało się zapisać konfiguracji', 'error')
+    }
   }
 
   const updateSliders = async (field: 'energy' | 'focus', value: number) => {
@@ -369,6 +428,11 @@ export function DayAssistantV2View() {
   }
 
   const handleComplete = async (task: TestDayTask) => {
+    // Stop timer if this task is active
+    if (activeTimer && activeTimer.taskId === task.id) {
+      stopTimer()
+    }
+
     const response = await authFetch('/api/day-assistant-v2/complete', {
       method: 'POST',
       body: JSON.stringify({ task_id: task.id })
@@ -377,9 +441,39 @@ export function DayAssistantV2View() {
       setTasks(prev => prev.filter(t => t.id !== task.id))
       addDecisionLog(`Oznaczono "${task.title}" jako wykonane`)
       showToast('✅ Zadanie ukończone', 'success')
+      
+      // TODO: Add celebration animation
+      // showCelebration()
     } else {
       showToast('Nie udało się oznaczyć jako wykonane', 'error')
     }
+  }
+
+  const handleStartTask = (task: TestDayTask) => {
+    startTimer(task)
+    addDecisionLog(`Rozpoczęto timer dla "${task.title}"`)
+  }
+
+  const handleTimerComplete = async () => {
+    if (!activeTimer) return
+    
+    const task = tasks.find(t => t.id === activeTimer.taskId)
+    if (task) {
+      // For now, just complete the task
+      // TODO: Show completion dialog with options
+      await handleComplete(task)
+    }
+  }
+
+  const handleKeepOverdueToday = (task: TestDayTask) => {
+    addDecisionLog(`Zachowano przeterminowane zadanie "${task.title}" na dziś`)
+    showToast('Zadanie pozostanie w kolejce', 'info')
+  }
+
+  const handlePostponeOverdue = async (task: TestDayTask) => {
+    // For now, postpone to tomorrow
+    // TODO: Show date picker modal
+    await handleNotToday(task, 'Przełożono przeterminowane zadanie')
   }
 
   const handlePin = async (task: TestDayTask) => {
@@ -459,22 +553,54 @@ export function DayAssistantV2View() {
       <div className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-3xl text-brand-purple">Asystent Dnia v2</CardTitle>
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-3xl text-brand-purple">Asystent Dnia v2</CardTitle>
+              <button
+                onClick={() => setShowConfigModal(true)}
+                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                title="Konfiguracja dnia pracy"
+              >
+                <Gear size={24} className="text-gray-600" />
+              </button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <SliderField
-                label="Energia"
-                value={dayPlan?.energy || 3}
-                onChange={v => updateSliders('energy', v)}
-              />
-              <SliderField
-                label="Skupienie"
-                value={dayPlan?.focus || 3}
-                onChange={v => updateSliders('focus', v)}
-              />
-            </div>
+            {/* Queue Stats */}
+            {availableMinutes > 0 && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm font-medium text-blue-900">
+                  📊 KOLEJKA NA DZIŚ ({Math.floor(availableMinutes / 60)}h {availableMinutes % 60}min dostępne)
+                </p>
+                <div className="mt-2">
+                  <div className="flex items-center justify-between text-sm text-blue-700 mb-1">
+                    <span>⏱️ Wykorzystane: {Math.floor(usedMinutes / 60)}h {usedMinutes % 60}min / {Math.floor(availableMinutes / 60)}h {availableMinutes % 60}min</span>
+                    <span>{usagePercentage}%</span>
+                  </div>
+                  <div className="w-full bg-blue-200 rounded-full h-2">
+                    <div
+                      className="bg-blue-600 h-2 rounded-full transition-all"
+                      style={{ width: `${Math.min(usagePercentage, 100)}%` }}
+                    />
+                  </div>
+                </div>
+                {later.length > 0 && (
+                  <p className="text-xs text-blue-600 mt-2">
+                    📋 {later.length} {later.length === 1 ? 'task' : 'tasków'} pozostaje na później
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Energy/Focus Controls */}
+            <EnergyFocusControls
+              energy={dayPlan?.energy || 3}
+              focus={dayPlan?.focus || 3}
+              onEnergyChange={v => updateSliders('energy', v)}
+              onFocusChange={v => updateSliders('focus', v)}
+            />
+            
             {presetButtons}
+            
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-sm text-muted-foreground">Filtr kontekstu:</span>
               <div className="flex gap-2 flex-wrap">
@@ -493,6 +619,14 @@ export function DayAssistantV2View() {
             )}
           </CardContent>
         </Card>
+
+        {/* Overdue Tasks Section */}
+        <OverdueTasksSection
+          overdueTasks={overdueTasks}
+          selectedDate={selectedDate}
+          onKeepToday={handleKeepOverdueToday}
+          onPostpone={handlePostponeOverdue}
+        />
 
         {autoMoved.length > 0 && (
           <Card className="border-amber-200 bg-amber-50">
@@ -517,16 +651,17 @@ export function DayAssistantV2View() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Pinned MUST (max 3)</CardTitle>
+            <CardTitle>📊 Kolejka na dziś ({queue.length} {queue.length === 1 ? 'task' : 'tasków'})</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {mustTasks.length === 0 && <p className="text-sm text-muted-foreground">Brak przypiętych zadań MUST</p>}
-            {mustTasks.map(task => (
+            {queue.length === 0 && <p className="text-sm text-muted-foreground">Brak zadań w kolejce</p>}
+            {queue.map((task, index) => (
               <TaskRow
                 key={task.id}
                 task={task}
+                queuePosition={index + 1}
                 onNotToday={() => handleNotToday(task)}
-                onStart={() => showToast(`Start sesji dla "${task.title}"`, 'info')}
+                onStart={() => handleStartTask(task)}
                 onUnmark={() => openUnmarkWarning(task)}
                 onDecompose={() => handleDecompose(task)}
                 onComplete={() => handleComplete(task)}
@@ -534,34 +669,48 @@ export function DayAssistantV2View() {
                 onClick={() => setSelectedTask(task)}
                 focus={dayPlan?.focus || 3}
                 selectedDate={selectedDate}
+                activeTimer={activeTimer?.taskId === task.id ? activeTimer : undefined}
+                onPauseTimer={pauseTimer}
+                onResumeTimer={resumeTimer}
+                onCompleteTimer={handleTimerComplete}
               />
             ))}
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Dopasowane na dziś</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {matchedTasks.length === 0 && <p className="text-sm text-muted-foreground">Dodaj zadanie lub zmień filtry.</p>}
-            {matchedTasks.map(task => (
-              <TaskRow
-                key={task.id}
-                task={task}
-                onNotToday={() => handleNotToday(task)}
-                onStart={() => showToast(`Start sesji dla "${task.title}"`, 'info')}
-                onUnmark={() => openUnmarkWarning(task)}
-                onDecompose={() => handleDecompose(task)}
-                onComplete={() => handleComplete(task)}
-                onPin={() => handlePin(task)}
-                onClick={() => setSelectedTask(task)}
-                focus={dayPlan?.focus || 3}
-                selectedDate={selectedDate}
-              />
-            ))}
-          </CardContent>
-        </Card>
+        {later.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>📋 Na później ({later.length} {later.length === 1 ? 'task' : 'tasków'})</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Te zadania nie mieszczą się w dostępnym czasie pracy dzisiaj.
+              </p>
+              {later.slice(0, 5).map(task => (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  onNotToday={() => handleNotToday(task)}
+                  onStart={() => handleStartTask(task)}
+                  onUnmark={() => openUnmarkWarning(task)}
+                  onDecompose={() => handleDecompose(task)}
+                  onComplete={() => handleComplete(task)}
+                  onPin={() => handlePin(task)}
+                  onClick={() => setSelectedTask(task)}
+                  focus={dayPlan?.focus || 3}
+                  selectedDate={selectedDate}
+                  isCollapsed={true}
+                />
+              ))}
+              {later.length > 5 && (
+                <p className="text-sm text-muted-foreground text-center">
+                  ... i {later.length - 5} więcej
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
@@ -689,6 +838,18 @@ export function DayAssistantV2View() {
           selectedDate={selectedDate}
         />
       )}
+
+      {/* Work Hours Config Modal */}
+      <WorkHoursConfigModal
+        isOpen={showConfigModal}
+        onClose={() => setShowConfigModal(false)}
+        onSave={handleSaveConfig}
+        initialConfig={{
+          work_start_time: dayPlan?.metadata?.work_start_time as string | undefined,
+          work_end_time: dayPlan?.metadata?.work_end_time as string | undefined,
+          ai_instructions: dayPlan?.metadata?.ai_instructions as string | undefined
+        }}
+      />
     </div>
   )
 }
@@ -714,6 +875,7 @@ function SliderField({ label, value, onChange }: { label: string; value: number;
 
 function TaskRow({
   task,
+  queuePosition,
   onNotToday,
   onStart,
   onUnmark,
@@ -722,9 +884,15 @@ function TaskRow({
   onPin,
   onClick,
   focus,
-  selectedDate
+  selectedDate,
+  activeTimer,
+  isCollapsed,
+  onPauseTimer,
+  onResumeTimer,
+  onCompleteTimer
 }: {
   task: TestDayTask
+  queuePosition?: number
   onNotToday: () => void
   onStart: () => void
   onUnmark: () => void
@@ -734,17 +902,54 @@ function TaskRow({
   onClick?: () => void
   focus: number
   selectedDate: string
+  activeTimer?: import('@/hooks/useTaskTimer').TimerState
+  isCollapsed?: boolean
+  onPauseTimer?: () => void
+  onResumeTimer?: () => void
+  onCompleteTimer?: () => void
 }) {
   const shouldSuggestTen = focus <= 2 && task.estimate_min > 20
+  
+  // Visual distinction based on queue position
+  const cardSizeClass = queuePosition === 1 
+    ? 'p-4 border-2' // Large for #1
+    : queuePosition && queuePosition <= 3 
+    ? 'p-3' // Medium for #2-3
+    : isCollapsed 
+    ? 'p-2 opacity-70' // Small/muted for collapsed
+    : 'p-3'
+    
+  const borderColorClass = queuePosition === 1
+    ? 'border-green-500'
+    : queuePosition === 2
+    ? 'border-blue-400'
+    : queuePosition === 3
+    ? 'border-purple-400'
+    : task.is_must 
+    ? 'border-brand-purple/60'
+    : 'border-gray-200'
+
   return (
     <div className={cn(
-      'border rounded-lg p-3 flex flex-col gap-2 bg-white shadow-sm',
-      task.is_must && 'border-brand-purple/60',
-      onClick && 'cursor-pointer hover:shadow-md transition-shadow'
+      'border rounded-lg flex flex-col gap-2 bg-white shadow-sm transition-all',
+      cardSizeClass,
+      borderColorClass,
+      onClick && 'cursor-pointer hover:shadow-md'
     )}>
       <div className="flex items-start justify-between gap-3" onClick={onClick}>
         <div className="flex-1">
           <div className="flex items-center gap-2 flex-wrap">
+            {queuePosition && (
+              <span className={cn(
+                'px-3 py-1 text-sm font-bold rounded-full',
+                queuePosition === 1 && 'bg-green-500 text-white',
+                queuePosition === 2 && 'bg-blue-400 text-white',
+                queuePosition === 3 && 'bg-purple-400 text-white',
+                queuePosition > 3 && 'bg-gray-300 text-gray-700'
+              )}>
+                #{queuePosition}
+              </span>
+            )}
             {task.is_must && <span className="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-700">MUST</span>}
             <TaskBadges task={task} today={selectedDate} />
             {task.context_type && (
@@ -752,44 +957,72 @@ function TaskRow({
                 {task.context_type}
               </span>
             )}
-            <p className="font-semibold">{task.title}</p>
+            <p className={cn(
+              'font-semibold',
+              queuePosition === 1 && 'text-lg',
+              isCollapsed && 'text-sm'
+            )}>{task.title}</p>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
             Estymat: {task.estimate_min} min • Load {task.cognitive_load} • Przeniesienia: {task.postpone_count || 0}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={onStart}>
-            <Play size={16} className="mr-1" /> Start
+        {!isCollapsed && (
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); onStart(); }}>
+              <Play size={16} className="mr-1" /> Start
+            </Button>
+            {task.is_must && (
+              <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onUnmark(); }}>
+                <Prohibit size={16} className="mr-1" /> Odznacz MUST
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+      
+      {/* Timer Display */}
+      {activeTimer && (
+        <TaskTimer
+          timer={activeTimer}
+          formatTime={(seconds) => {
+            const mins = Math.floor(seconds / 60)
+            const secs = seconds % 60
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+          }}
+          progressPercentage={Math.min(
+            100,
+            (activeTimer.elapsedSeconds / (activeTimer.estimatedMinutes * 60)) * 100
+          )}
+          onPause={onPauseTimer || (() => {})}
+          onResume={onResumeTimer || (() => {})}
+          onComplete={onCompleteTimer || (() => {})}
+        />
+      )}
+      
+      {!isCollapsed && (
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); onNotToday(); }}>
+            <ArrowsClockwise size={16} className="mr-1" /> Nie dziś
           </Button>
-          {task.is_must && (
-            <Button size="sm" variant="ghost" onClick={onUnmark}>
-              <Prohibit size={16} className="mr-1" /> Odznacz MUST
+          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onDecompose(); }}>
+            <MagicWand size={16} className="mr-1" /> Dekomponuj
+          </Button>
+          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onComplete(); }}>
+            <Clock size={16} className="mr-1" /> Zakończ
+          </Button>
+          {onPin && (
+            <Button size="sm" variant={task.is_must ? "ghost" : "outline"} onClick={(e) => { e.stopPropagation(); onPin(); }}>
+              <PushPin size={16} className="mr-1" /> {task.is_must ? 'Odpnij' : 'Przypnij'}
+            </Button>
+          )}
+          {shouldSuggestTen && (
+            <Button size="sm" onClick={(e) => { e.stopPropagation(); onStart(); }}>
+              Zacznij 10 min
             </Button>
           )}
         </div>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="outline" onClick={onNotToday}>
-          <ArrowsClockwise size={16} className="mr-1" /> Nie dziś
-        </Button>
-        <Button size="sm" variant="ghost" onClick={onDecompose}>
-          <MagicWand size={16} className="mr-1" /> Dekomponuj
-        </Button>
-        <Button size="sm" variant="ghost" onClick={onComplete}>
-          <Clock size={16} className="mr-1" /> Zakończ
-        </Button>
-        {onPin && (
-          <Button size="sm" variant={task.is_must ? "ghost" : "outline"} onClick={onPin}>
-            <PushPin size={16} className="mr-1" /> {task.is_must ? 'Odpnij' : 'Przypnij'}
-          </Button>
-        )}
-        {shouldSuggestTen && (
-          <Button size="sm" onClick={() => onStart()}>
-            Zacznij 10 min
-          </Button>
-        )}
-      </div>
+      )}
     </div>
   )
 }
