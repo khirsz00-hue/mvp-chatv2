@@ -22,7 +22,7 @@ Silnik scoringowy z wielowymiarowymi metrykami:
 Serwis uczący się z zachowań użytkownika:
 
 - Trackowanie ukończeń zadań
-- Analiza wzorców откładania
+- Analiza wzorców odkładania
 - Aktualizacja profilu energii w ciągu dnia
 - Dostosowywanie preferowanej długości zadań
 - Wykrywanie godzin szczytowej produktywności
@@ -112,7 +112,7 @@ adjustment = postpone_adjustment + duration_fit + streak_bonus
 ```
 
 Faktory:
-- Wysokie откладanie (4+): -20 lub +10 (eskalacja)
+- Wysokie odkładanie (4+): -20 lub +10 (eskalacja)
 - Długość zgodna z preferencjami: +8
 - Dobra passa ukończeń: +5
 

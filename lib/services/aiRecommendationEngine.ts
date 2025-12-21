@@ -218,7 +218,7 @@ export function detectDecompositionNeed(
 
   const reasoning = [
     `Zadanie "${task.title}" jest długie (${task.estimate_min} min)`,
-    `Było już откładane ${task.postpone_count} razy`,
+    `Było już odkładane ${task.postpone_count} razy`,
     `Rozbicie na mniejsze części może pomóc w ukończeniu`,
     `Proponuję sesje po ${targetDuration} minut`
   ]
@@ -336,7 +336,7 @@ export function detectDeferOpportunity(
   tomorrow.setDate(tomorrow.getDate() + 1)
 
   const reasoning = [
-    `Zadanie "${task.title}" było откладane już ${task.postpone_count} razy`,
+    `Zadanie "${task.title}" było odkładane już ${task.postpone_count} razy`,
     `Wymaga ${task.estimate_min} min, a masz tylko ${context.availableMinutes} min`,
     'Lepiej zaplanować je na inny dzień z większą ilością czasu'
   ]

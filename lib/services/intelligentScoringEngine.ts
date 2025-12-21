@@ -300,7 +300,7 @@ function calculateCompletionProbability(
     
     if (pattern && pattern.avg_postpone_count > 2) {
       adjustment -= 20
-      reasoning.push(`Zadania tego typu często откładane (${task.postpone_count}x)`)
+      reasoning.push(`Zadania tego typu często odkładane (${task.postpone_count}x)`)
     } else {
       // Escalate - actually better to do it now
       adjustment += 10
