@@ -36,6 +36,9 @@ const WEIGHTS = {
   postpone_base: 5
 }
 
+// Constants
+const MILLISECONDS_PER_DAY = 1000 * 60 * 60 * 24
+
 /**
  * Calculate task score based on multiple factors
  */
@@ -99,7 +102,7 @@ function calculateDeadlineProximity(dueDate: string | null | undefined, today: s
   
   const due = new Date(dueDate)
   const now = new Date(today)
-  const daysUntil = Math.floor((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  const daysUntil = Math.floor((due.getTime() - now.getTime()) / MILLISECONDS_PER_DAY)
   
   if (daysUntil < 0) return WEIGHTS.deadline_proximity * 2  // Overdue!
   if (daysUntil === 0) return WEIGHTS.deadline_proximity * 1.5  // Due today
@@ -266,7 +269,7 @@ function generateTaskAddedReason(newTask: TestDayTask, taskToMove: TestDayTask, 
   if (newTask.due_date) {
     const due = new Date(newTask.due_date)
     const today = new Date()
-    const daysUntil = Math.floor((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+    const daysUntil = Math.floor((due.getTime() - today.getTime()) / MILLISECONDS_PER_DAY)
     if (daysUntil === 0) {
       reasons.push('Nowe zadanie ma deadline dziś.')
     }
@@ -442,7 +445,7 @@ export function generateUnmarkMustWarning(task: TestDayTask): {
   if (task.due_date) {
     const due = new Date(task.due_date)
     const today = new Date()
-    const daysUntil = Math.floor((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+    const daysUntil = Math.floor((due.getTime() - today.getTime()) / MILLISECONDS_PER_DAY)
     if (daysUntil === 0) {
       details.push('Ma deadline dziś')
     } else if (daysUntil === 1) {
@@ -633,14 +636,14 @@ export function calculateScoreBreakdown(
   
   if (task.due_date) {
     if (task.due_date < todayDate) {
-      const daysOverdue = Math.floor((new Date(todayDate).getTime() - new Date(task.due_date).getTime()) / (1000 * 60 * 60 * 24))
+      const daysOverdue = Math.floor((new Date(todayDate).getTime() - new Date(task.due_date).getTime()) / MILLISECONDS_PER_DAY)
       deadlineScore = 25 // Overdue = high urgency
       deadlineDetail = `Przeterminowane (${daysOverdue} ${daysOverdue === 1 ? 'dzień' : 'dni'})`
     } else if (task.due_date === todayDate) {
       deadlineScore = 20 // Due today
       deadlineDetail = 'Due dziś'
     } else {
-      const daysUntil = Math.floor((new Date(task.due_date).getTime() - new Date(todayDate).getTime()) / (1000 * 60 * 60 * 24))
+      const daysUntil = Math.floor((new Date(task.due_date).getTime() - new Date(todayDate).getTime()) / MILLISECONDS_PER_DAY)
       if (daysUntil === 1) {
         deadlineScore = 15
         deadlineDetail = 'Due jutro'

@@ -7,6 +7,9 @@ import { useMemo } from 'react'
 import { TestDayTask } from '@/lib/types/dayAssistantV2'
 import Badge from '@/components/ui/Badge'
 
+// Constants
+const MILLISECONDS_PER_DAY = 1000 * 60 * 60 * 24
+
 interface TaskBadgesProps {
   task: TestDayTask
   today?: string
@@ -35,7 +38,7 @@ export function TaskBadges({ task, today }: TaskBadgesProps) {
   // Overdue
   if (task.due_date < todayDate) {
     const daysOverdue = Math.floor(
-      (new Date(todayDate).getTime() - new Date(task.due_date).getTime()) / (1000 * 60 * 60 * 24)
+      (new Date(todayDate).getTime() - new Date(task.due_date).getTime()) / MILLISECONDS_PER_DAY
     )
     return (
       <Badge variant="destructive" className="text-xs animate-pulse">

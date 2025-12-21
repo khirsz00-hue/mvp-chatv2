@@ -3,6 +3,23 @@
 import * as React from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 
+// Context definition must come before usage
+interface TooltipContextType {
+  open: boolean
+  setOpen: (open: boolean) => void
+  position: { top: number; left: number }
+  setPosition: (position: { top: number; left: number }) => void
+  triggerRef: React.RefObject<HTMLElement>
+}
+
+const TooltipContext = React.createContext<TooltipContextType>({
+  open: false,
+  setOpen: () => {},
+  position: { top: 0, left: 0 },
+  setPosition: () => {},
+  triggerRef: { current: null }
+})
+
 export interface TooltipProviderProps {
   children: React.ReactNode
 }
@@ -26,22 +43,6 @@ export const Tooltip: React.FC<TooltipProps> = ({ children }) => {
     </TooltipContext.Provider>
   )
 }
-
-interface TooltipContextType {
-  open: boolean
-  setOpen: (open: boolean) => void
-  position: { top: number; left: number }
-  setPosition: (position: { top: number; left: number }) => void
-  triggerRef: React.RefObject<HTMLElement>
-}
-
-const TooltipContext = React.createContext<TooltipContextType>({
-  open: false,
-  setOpen: () => {},
-  position: { top: 0, left: 0 },
-  setPosition: () => {},
-  triggerRef: { current: null }
-})
 
 export interface TooltipTriggerProps {
   asChild?: boolean
