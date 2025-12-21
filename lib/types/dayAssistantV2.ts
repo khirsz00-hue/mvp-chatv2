@@ -231,3 +231,18 @@ export interface TaskScore {
   score: number
   breakdown: ScoreBreakdown
 }
+
+// Detailed Score Factor (for tooltip breakdown)
+export interface ScoreFactor {
+  name: string
+  points: number
+  positive: boolean
+  detail: string
+}
+
+// Detailed Score Breakdown (for tooltip display)
+export interface DetailedScoreBreakdown {
+  total: number
+  factors: ScoreFactor[]
+  explanation: string
+}
