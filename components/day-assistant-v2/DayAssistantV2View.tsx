@@ -21,6 +21,7 @@ import { Play, XCircle, Clock, ArrowsClockwise, MagicWand, Prohibit, PushPin } f
 import { cn } from '@/lib/utils'
 import { useScoredTasks } from '@/hooks/useScoredTasks'
 import { TaskBadges } from './TaskBadges'
+import { TaskDetailsModal } from './TaskDetailsModal'
 
 type DecisionLogEntry = {
   id: string
@@ -49,6 +50,7 @@ export function DayAssistantV2View() {
   const [decisionLog, setDecisionLog] = useState<DecisionLogEntry[]>([])
   const [warningTask, setWarningTask] = useState<TestDayTask | null>(null)
   const [warningDetails, setWarningDetails] = useState<{ title: string; message: string; details: string[] } | null>(null)
+  const [selectedTask, setSelectedTask] = useState<TestDayTask | null>(null)
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskEstimate, setNewTaskEstimate] = useState(25)
   const [newTaskLoad, setNewTaskLoad] = useState(2)
@@ -528,6 +530,7 @@ export function DayAssistantV2View() {
                 onDecompose={() => handleDecompose(task)}
                 onComplete={() => handleComplete(task)}
                 onPin={() => handlePin(task)}
+                onClick={() => setSelectedTask(task)}
                 focus={dayPlan?.focus || 3}
                 selectedDate={selectedDate}
               />
@@ -551,6 +554,7 @@ export function DayAssistantV2View() {
                 onDecompose={() => handleDecompose(task)}
                 onComplete={() => handleComplete(task)}
                 onPin={() => handlePin(task)}
+                onClick={() => setSelectedTask(task)}
                 focus={dayPlan?.focus || 3}
                 selectedDate={selectedDate}
               />
@@ -686,6 +690,14 @@ export function DayAssistantV2View() {
           </div>
         </div>
       )}
+
+      {selectedTask && (
+        <TaskDetailsModal
+          task={selectedTask}
+          onClose={() => setSelectedTask(null)}
+          selectedDate={selectedDate}
+        />
+      )}
     </div>
   )
 }
@@ -717,6 +729,7 @@ function TaskRow({
   onDecompose,
   onComplete,
   onPin,
+  onClick,
   focus,
   selectedDate
 }: {
@@ -727,6 +740,7 @@ function TaskRow({
   onDecompose: () => void
   onComplete: () => void
   onPin?: () => void
+  onClick?: () => void
   focus: number
   selectedDate: string
 }) {
@@ -734,9 +748,10 @@ function TaskRow({
   return (
     <div className={cn(
       'border rounded-lg p-3 flex flex-col gap-2 bg-white shadow-sm',
-      task.is_must && 'border-brand-purple/60'
+      task.is_must && 'border-brand-purple/60',
+      onClick && 'cursor-pointer hover:shadow-md transition-shadow'
     )}>
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-3" onClick={onClick}>
         <div className="flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             {task.is_must && <span className="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-700">MUST</span>}
