@@ -3,6 +3,7 @@
  * Displays visual indicators for task status: OVERDUE, DZISIAJ, INBOX with enhanced formatting
  */
 
+import { useMemo } from 'react'
 import { TestDayTask } from '@/lib/types/dayAssistantV2'
 import Badge from '@/components/ui/Badge'
 
@@ -13,6 +14,14 @@ interface TaskBadgesProps {
 
 export function TaskBadges({ task, today }: TaskBadgesProps) {
   const todayDate = today || new Date().toISOString().split('T')[0]
+  
+  // Memoize formatted date to avoid recalculation on each render
+  const formattedDate = useMemo(() => {
+    if (!task.due_date) return null
+    
+    const futureDate = new Date(task.due_date)
+    return futureDate.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' })
+  }, [task.due_date])
   
   // No due date - INBOX
   if (!task.due_date) {
@@ -45,7 +54,6 @@ export function TaskBadges({ task, today }: TaskBadgesProps) {
   }
   
   // Future date
-  const futureDate = new Date(task.due_date)
   const tomorrow = new Date(todayDate)
   tomorrow.setDate(tomorrow.getDate() + 1)
   const tomorrowStr = tomorrow.toISOString().split('T')[0]
@@ -60,11 +68,9 @@ export function TaskBadges({ task, today }: TaskBadgesProps) {
   }
   
   // Format date as DD.MM
-  const formatted = futureDate.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' })
-  
   return (
     <Badge variant="outline" className="text-xs text-gray-600">
-      📆 {formatted}
+      📆 {formattedDate}
     </Badge>
   )
 }

@@ -601,8 +601,9 @@ export function DayAssistantV2View() {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
-      <div className="space-y-6">
+    <TooltipProvider>
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
+        <div className="space-y-6">
         <Card>
           <CardHeader>
             <div className="flex justify-between items-center">
@@ -945,7 +946,8 @@ export function DayAssistantV2View() {
           ai_instructions: dayPlan?.metadata?.ai_instructions as string | undefined
         }}
       />
-    </div>
+      </div>
+    </TooltipProvider>
   )
 }
 
@@ -1046,23 +1048,22 @@ function TaskRow({
         <div className="flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             {queuePosition && scoreBreakdown && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex items-center gap-1">
-                      <span className={cn(
-                        'px-3 py-1 text-sm font-bold rounded-full',
-                        queuePosition === 1 && 'bg-green-500 text-white',
-                        queuePosition === 2 && 'bg-blue-400 text-white',
-                        queuePosition === 3 && 'bg-purple-400 text-white',
-                        queuePosition > 3 && 'bg-gray-300 text-gray-700'
-                      )}>
-                        #{queuePosition}
-                      </span>
-                      <Info size={14} className="text-gray-400" />
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="max-w-sm">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1">
+                    <span className={cn(
+                      'px-3 py-1 text-sm font-bold rounded-full',
+                      queuePosition === 1 && 'bg-green-500 text-white',
+                      queuePosition === 2 && 'bg-blue-400 text-white',
+                      queuePosition === 3 && 'bg-purple-400 text-white',
+                      queuePosition > 3 && 'bg-gray-300 text-gray-700'
+                    )}>
+                      #{queuePosition}
+                    </span>
+                    <Info size={14} className="text-gray-400" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-sm">
                     <div className="space-y-2">
                       <p className="font-semibold">💡 Dlaczego #{queuePosition} w kolejce?</p>
                       <p className="text-sm">Score: {scoreBreakdown.total}/100</p>
@@ -1088,7 +1089,6 @@ function TaskRow({
                     </div>
                   </TooltipContent>
                 </Tooltip>
-              </TooltipProvider>
             )}
             {queuePosition && !scoreBreakdown && (
               <span className={cn(

@@ -12,7 +12,9 @@ import {
   TaskScore,
   ScoreBreakdown,
   AssistantConfig,
-  DEFAULT_SETTINGS
+  DEFAULT_SETTINGS,
+  DetailedScoreBreakdown,
+  ScoreFactor
 } from '@/lib/types/dayAssistantV2'
 import { createProposal, getTasks } from './dayAssistantV2Service'
 import { 
@@ -588,8 +590,8 @@ export function calculateScoreBreakdown(
   task: TestDayTask,
   context: { energy: number; focus: number; context: string | null },
   todayDate: string
-): import('@/lib/types/dayAssistantV2').DetailedScoreBreakdown {
-  const factors: import('@/lib/types/dayAssistantV2').ScoreFactor[] = []
+): DetailedScoreBreakdown {
+  const factors: ScoreFactor[] = []
   
   // 1. Energy match
   const energyDiff = Math.abs(task.cognitive_load - context.energy)
@@ -700,7 +702,7 @@ export function calculateScoreBreakdown(
 /**
  * Generate explanation text based on score factors
  */
-function generateExplanation(factors: import('@/lib/types/dayAssistantV2').ScoreFactor[], total: number): string {
+function generateExplanation(factors: ScoreFactor[], total: number): string {
   if (total > 80) return 'Świetne dopasowanie do Twojej obecnej energii i priorytetów!'
   if (total > 60) return 'Dobre dopasowanie - polecam zacząć od tego zadania.'
   if (total > 40) return 'Średnie dopasowanie - możesz zrobić teraz lub później.'
