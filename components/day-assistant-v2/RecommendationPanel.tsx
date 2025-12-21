@@ -26,7 +26,7 @@ export function RecommendationPanel({ dayPlan, proposals, onProposalResponse }: 
               <p className="text-sm text-amber-800">
                 💡 <strong>Niska energia ({dayPlan.energy}/5)</strong>
                 <br />
-                Polecam lekkie zadania z kontekstu 'prywatne' (osobiste, niskointensywne)
+                {`Polecam lekkie zadania z kontekstu 'prywatne' (osobiste, niskointensywne)`}
               </p>
             </div>
           )}
@@ -37,7 +37,7 @@ export function RecommendationPanel({ dayPlan, proposals, onProposalResponse }: 
               <p className="text-sm text-blue-800">
                 💡 <strong>Niskie skupienie ({dayPlan.focus}/5)</strong>
                 <br />
-                Trudne zadania lepiej przełożyć lub użyć techniki "Zacznij 10 min"
+                {`Trudne zadania lepiej przełożyć lub użyć techniki "Zacznij 10 min"`}
               </p>
             </div>
           )}
@@ -58,7 +58,7 @@ export function RecommendationPanel({ dayPlan, proposals, onProposalResponse }: 
       {/* System proposals */}
       {proposals.length === 0 && !dayPlan && (
         <p className="text-sm text-muted-foreground">
-          Brak aktywnych rekomendacji. Zmiany suwaków, „Nie dziś" lub nowe zadania wywołają live replanning.
+          {`Brak aktywnych rekomendacji. Zmiany suwaków, „Nie dziś" lub nowe zadania wywołają live replanning.`}
         </p>
       )}
       {proposals.slice(0, 1).map(proposal => (
