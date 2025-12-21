@@ -479,12 +479,12 @@ export function TasksAssistant() {
   filteredTasks = filterByProject(filteredTasks)
   const sortedTasks = sortTasks(filteredTasks)
   const isScheduledFilter = filter === 'scheduled'
+  const todayStart = useMemo(() => startOfDay(new Date()), [])
   const scheduledOverdueTasks = useMemo(() => {
     if (!isScheduledFilter) return []
     
-    const today = startOfDay(new Date())
-    return sortedTasks.filter(task => isTaskOverdue(task, today))
-  }, [isScheduledFilter, sortedTasks])
+    return sortedTasks.filter(task => getDueDateString(task) && isTaskOverdue(task, todayStart))
+  }, [isScheduledFilter, sortedTasks, todayStart])
   const scheduledUndatedTasks = useMemo(() => {
     if (!isScheduledFilter) return []
     return sortedTasks.filter(task => !getDueDateString(task))
