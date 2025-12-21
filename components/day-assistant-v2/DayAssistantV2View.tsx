@@ -141,6 +141,28 @@ export function DayAssistantV2View() {
     return () => clearInterval(interval)
   }, [sessionToken]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Dynamic requeue on energy/focus change
+  useEffect(() => {
+    if (dayPlan && sessionToken) {
+      console.log('[DayAssistantV2] Energy/Focus changed, triggering requeue')
+      // The queue will automatically update via the useMemo dependencies
+      addDecisionLog('Kolejka zaktualizowana po zmianie energii/skupienia')
+    }
+  }, [dayPlan?.energy, dayPlan?.focus]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Periodic requeue every 15 minutes (time advances)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log('[DayAssistantV2] Periodic requeue (15 min)')
+      // Force a reload to recalculate available time
+      if (sessionToken) {
+        loadDayPlan(sessionToken)
+      }
+    }, 15 * 60 * 1000) // 15 minutes
+    
+    return () => clearInterval(interval)
+  }, [sessionToken]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const authFetch = async (url: string, options: RequestInit = {}) => {
     if (!sessionToken) throw new Error('Brak sesji')
     const headers = {
@@ -413,14 +435,23 @@ export function DayAssistantV2View() {
     setWarningDetails(null)
   }
 
-  const handleProposalResponse = async (proposalId: string, action: 'accept_primary' | 'accept_alt' | 'reject', alternativeIndex?: number) => {
+  const handleProposalResponse = async (proposalId: string, action: 'accept_primary' | 'accept_alt' | 'reject', alternativeIndex?: number, rejectReason?: string) => {
     const response = await authFetch('/api/day-assistant-v2/proposal', {
       method: 'POST',
-      body: JSON.stringify({ proposal_id: proposalId, action, alternative_index: alternativeIndex })
+      body: JSON.stringify({ 
+        proposal_id: proposalId, 
+        action, 
+        alternative_index: alternativeIndex,
+        reject_reason: rejectReason
+      })
     })
     if (response.ok) {
       setProposals(prev => prev.filter(p => p.id !== proposalId))
-      addDecisionLog(`Obsłużono rekomendację (${action})`)
+      if (action === 'reject' && rejectReason) {
+        addDecisionLog(`Odrzucono rekomendację: ${rejectReason}`)
+      } else {
+        addDecisionLog(`Obsłużono rekomendację (${action})`)
+      }
       await loadDayPlan()
     } else {
       showToast('Nie udało się zaktualizować rekomendacji', 'error')
