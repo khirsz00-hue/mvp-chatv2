@@ -483,7 +483,7 @@ export function TasksAssistant() {
   const scheduledOverdueTasks = useMemo(() => {
     if (!isScheduledFilter) return []
     
-    return sortedTasks.filter(task => getDueDateString(task) && isTaskOverdue(task, todayStart))
+    return sortedTasks.filter(task => isTaskOverdue(task, todayStart))
   }, [isScheduledFilter, sortedTasks, todayStart])
   const scheduledUndatedTasks = useMemo(() => {
     if (!isScheduledFilter) return []
@@ -810,6 +810,26 @@ export function TasksAssistant() {
       setSelectedTaskIds(new Set(sortedTasks.map(t => t.id)))
     }
   }
+
+  const renderTaskCards = (list: Task[]) => (
+    <div className="space-y-3">
+      {list.map(task => (
+        <TaskCard 
+          key={task.id}
+          task={task}
+          onComplete={handleComplete}
+          onDelete={handleDelete}
+          onDetails={(t) => {
+            setSelectedTask(t)
+            setShowDetailsModal(true)
+          }}
+          selectable={selectedTaskIds.size > 0}
+          selected={selectedTaskIds.has(task.id)}
+          onToggleSelection={toggleTaskSelection}
+        />
+      ))}
+    </div>
+  )
   
   const handleBulkComplete = async () => {
     if (selectedTaskIds.size === 0) return
@@ -1384,23 +1404,7 @@ export function TasksAssistant() {
                           {scheduledOverdueTasks.length}
                         </Badge>
                       </div>
-                      <div className="space-y-3">
-                        {scheduledOverdueTasks.map(task => (
-                          <TaskCard 
-                            key={task.id}
-                            task={task}
-                            onComplete={handleComplete}
-                            onDelete={handleDelete}
-                            onDetails={(t) => {
-                              setSelectedTask(t)
-                              setShowDetailsModal(true)
-                            }}
-                            selectable={selectedTaskIds.size > 0}
-                            selected={selectedTaskIds.has(task.id)}
-                            onToggleSelection={toggleTaskSelection}
-                          />
-                        ))}
-                      </div>
+                      {renderTaskCards(scheduledOverdueTasks)}
                     </div>
                   )}
 
@@ -1412,23 +1416,7 @@ export function TasksAssistant() {
                           {scheduledUndatedTasks.length}
                         </Badge>
                       </div>
-                      <div className="space-y-3">
-                        {scheduledUndatedTasks.map(task => (
-                          <TaskCard 
-                            key={task.id}
-                            task={task}
-                            onComplete={handleComplete}
-                            onDelete={handleDelete}
-                            onDetails={(t) => {
-                              setSelectedTask(t)
-                              setShowDetailsModal(true)
-                            }}
-                            selectable={selectedTaskIds.size > 0}
-                            selected={selectedTaskIds.has(task.id)}
-                            onToggleSelection={toggleTaskSelection}
-                          />
-                        ))}
-                      </div>
+                      {renderTaskCards(scheduledUndatedTasks)}
                     </div>
                   )}
                 </>
