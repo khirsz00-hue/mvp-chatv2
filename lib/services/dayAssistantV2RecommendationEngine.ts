@@ -1,6 +1,7 @@
 /**
  * Day Assistant v2 - Recommendation Engine
  * Implements scoring logic and live replanning with AI-powered recommendations
+ * For advanced ML-inspired recommendations, see aiRecommendationEngine.ts
  */
 
 import {
@@ -14,6 +15,13 @@ import {
   DEFAULT_SETTINGS
 } from '@/lib/types/dayAssistantV2'
 import { createProposal, getTasks } from './dayAssistantV2Service'
+import { 
+  generateSmartRecommendations, 
+  filterConflictingRecommendations,
+  SmartRecommendation 
+} from './aiRecommendationEngine'
+import { getUserBehaviorProfile } from './behaviorLearningService'
+import { getDefaultProfile } from './intelligentScoringEngine'
 
 // Scoring weights
 const WEIGHTS = {
@@ -496,4 +504,78 @@ export function scoreAndSortTasks(
     ...inbox.map(ts => ts.task),
     ...future.map(ts => ts.task)
   ]
+}
+
+/**
+ * Generate AI-powered smart recommendations for current context
+ * This integrates with the aiRecommendationEngine for ML-inspired suggestions
+ */
+export async function generateAISmartRecommendations(
+  userId: string,
+  tasks: TestDayTask[],
+  dayPlan: DayPlan,
+  date: string
+): Promise<SmartRecommendation[]> {
+  try {
+    // Get user behavior profile
+    const profile = await getUserBehaviorProfile(userId)
+    if (!profile) {
+      // Use default profile for new users
+      const defaultProfile = getDefaultProfile(userId)
+      
+      // Generate recommendations with default profile
+      const recommendations = generateSmartRecommendations(
+        tasks,
+        dayPlan,
+        defaultProfile,
+        {
+          currentDate: date,
+          currentHour: new Date().getHours(),
+          availableMinutes: calculateAvailableMinutesForAI(dayPlan)
+        }
+      )
+
+      return filterConflictingRecommendations(recommendations)
+    }
+
+    // Generate recommendations with user profile
+    const recommendations = generateSmartRecommendations(
+      tasks,
+      dayPlan,
+      profile,
+      {
+        currentDate: date,
+        currentHour: new Date().getHours(),
+        availableMinutes: calculateAvailableMinutesForAI(dayPlan)
+      }
+    )
+
+    return filterConflictingRecommendations(recommendations)
+  } catch (error) {
+    console.error('[RecommendationEngine] Error generating AI recommendations:', error)
+    return []
+  }
+}
+
+/**
+ * Helper to calculate available minutes for AI recommendations
+ */
+function calculateAvailableMinutesForAI(dayPlan: DayPlan): number {
+  const workEndTime = dayPlan.metadata?.work_end_time as string | undefined
+  
+  if (!workEndTime) {
+    return 8 * 60 // Default 8 hours
+  }
+
+  const now = new Date()
+  const [hours, minutes] = workEndTime.split(':').map(Number)
+  const workEnd = new Date()
+  workEnd.setHours(hours, minutes, 0, 0)
+
+  if (workEnd <= now) {
+    return 0
+  }
+
+  const diffMs = workEnd.getTime() - now.getTime()
+  return Math.floor(diffMs / 1000 / 60)
 }
