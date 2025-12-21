@@ -20,6 +20,7 @@ export interface QueueResult {
 export function isTaskOverdue(task: TestDayTask): boolean {
   if (!task.due_date) return false
   
+  // Compare date strings (due_date is stored as DATE, not datetime)
   const today = new Date().toISOString().split('T')[0]
   return task.due_date < today
 }
@@ -86,10 +87,9 @@ export function buildQueue(
   ]
 
   for (const task of orderedTasks) {
-    const isOverdue = isTaskOverdue(task)
-    
     // Overdue tasks and MUST tasks always go in queue
-    if (isOverdue || task.is_must) {
+    // Note: overdue tasks are already at the front of orderedTasks
+    if (isTaskOverdue(task) || task.is_must) {
       queue.push(task)
       queuedMinutes += task.estimate_min
       continue
@@ -121,25 +121,29 @@ export function fillQueueWithAvailableTime(
   const remainingMinutes = availableMinutes - queuedMinutes
   
   // If no time remaining or queue already has enough tasks
+  // Note: +1 accounts for the current task being worked on, so maxNextTasks is for additional tasks
   if (remainingMinutes <= 0 || queue.length >= maxNextTasks + 1) {
     return { queue, later }
   }
   
-  // Take top tasks from later that fit
+  // Take top tasks from later that fit in remaining time
   const newQueue = [...queue]
-  const newLater = [...later]
   let addedMinutes = 0
+  const addedIndices: number[] = []
   
-  for (let i = 0; i < newLater.length && newQueue.length < maxNextTasks + 1; i++) {
-    const task = newLater[i]
+  // Collect indices of tasks to add (iterate forward to maintain scoring order)
+  for (let i = 0; i < later.length && newQueue.length < maxNextTasks + 1; i++) {
+    const task = later[i]
     
     if (addedMinutes + task.estimate_min <= remainingMinutes) {
       newQueue.push(task)
       addedMinutes += task.estimate_min
-      newLater.splice(i, 1)
-      i-- // Adjust index after removal
+      addedIndices.push(i)
     }
   }
+  
+  // Create new later array without added tasks
+  const newLater = later.filter((_, index) => !addedIndices.includes(index))
   
   return { queue: newQueue, later: newLater }
 }
