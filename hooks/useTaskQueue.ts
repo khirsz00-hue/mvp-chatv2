@@ -95,10 +95,15 @@ export function buildQueue(
     ...regularTasks.filter(t => !t.is_must)
   ]
 
-  for (const task of orderedTasks) {
+  const overdueCount = overdueTasks.length
+  const mustCount = regularTasks.filter(t => t.is_must).length
+
+  for (let i = 0; i < orderedTasks.length; i++) {
+    const task = orderedTasks[i]
+    
     // Overdue tasks and MUST tasks always go in queue
-    // Note: overdue tasks are already at the front of orderedTasks
-    if (isTaskOverdue(task) || task.is_must) {
+    // First overdueCount tasks are overdue, next mustCount are MUST tasks
+    if (i < overdueCount + mustCount) {
       queue.push(task)
       queuedMinutes += task.estimate_min
       continue
@@ -138,7 +143,7 @@ export function fillQueueWithAvailableTime(
   // Take top tasks from later that fit in remaining time
   const newQueue = [...queue]
   let addedMinutes = 0
-  const addedIndices: number[] = []
+  const addedIndices = new Set<number>()
   
   // Collect indices of tasks to add (iterate forward to maintain scoring order)
   for (let i = 0; i < later.length && newQueue.length < maxNextTasks + 1; i++) {
@@ -147,12 +152,12 @@ export function fillQueueWithAvailableTime(
     if (addedMinutes + task.estimate_min <= remainingMinutes) {
       newQueue.push(task)
       addedMinutes += task.estimate_min
-      addedIndices.push(i)
+      addedIndices.add(i)
     }
   }
   
   // Create new later array without added tasks
-  const newLater = later.filter((_, index) => !addedIndices.includes(index))
+  const newLater = later.filter((_, index) => !addedIndices.has(index))
   
   return { queue: newQueue, later: newLater }
 }
