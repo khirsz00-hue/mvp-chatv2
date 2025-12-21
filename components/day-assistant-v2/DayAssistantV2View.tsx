@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils'
 import { useScoredTasks } from '@/hooks/useScoredTasks'
 import { TaskBadges } from './TaskBadges'
 import { TaskDetailsModal } from './TaskDetailsModal'
+import { RecommendationPanel } from './RecommendationPanel'
 
 type DecisionLogEntry = {
   id: string
@@ -624,21 +625,11 @@ export function DayAssistantV2View() {
             <CardTitle>Rekomendacje</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {proposals.length === 0 && <p className="text-sm text-muted-foreground">Brak aktywnych rekomendacji. Zmiany suwaków, „Nie dziś” lub nowe zadania wywołają live replanning.</p>}
-            {proposals.slice(0, 1).map(proposal => (
-              <div key={proposal.id} className="border rounded-lg p-3 space-y-2">
-                <p className="font-medium">{proposal.reason}</p>
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" onClick={() => handleProposalResponse(proposal.id, 'accept_primary')}>Zastosuj</Button>
-                  {proposal.alternatives?.map((alt, idx) => (
-                    <Button key={idx} size="sm" variant="outline" onClick={() => handleProposalResponse(proposal.id, 'accept_alt', idx)}>
-                      Alternatywa {idx + 1}
-                    </Button>
-                  ))}
-                  <Button size="sm" variant="ghost" onClick={() => handleProposalResponse(proposal.id, 'reject')}>Odrzuć</Button>
-                </div>
-              </div>
-            ))}
+            <RecommendationPanel
+              dayPlan={dayPlan}
+              proposals={proposals}
+              onProposalResponse={handleProposalResponse}
+            />
           </CardContent>
         </Card>
 
