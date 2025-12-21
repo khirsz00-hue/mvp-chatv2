@@ -542,6 +542,35 @@ export function DayAssistantV2View() {
     setClarifyTask(task)
   }
 
+  const handleSubtaskToggle = async (subtaskId: string, completed: boolean) => {
+    if (!sessionToken) return
+    
+    try {
+      const response = await fetch('/api/day-assistant-v2/subtasks', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`
+        },
+        body: JSON.stringify({
+          subtask_id: subtaskId,
+          completed
+        })
+      })
+      
+      if (response.ok) {
+        // Reload tasks to get updated subtask state
+        await loadDayPlan(sessionToken)
+        showToast(completed ? '✅ Krok ukończony' : 'Krok odkończony', 'success')
+      } else {
+        showToast('Nie udało się zaktualizować kroku', 'error')
+      }
+    } catch (error) {
+      console.error('Error toggling subtask:', error)
+      showToast('Błąd podczas aktualizacji kroku', 'error')
+    }
+  }
+
   const presetButtons = (
     <div className="flex flex-wrap gap-2">
       {Object.values(ENERGY_FOCUS_PRESETS).map(preset => (
@@ -695,6 +724,7 @@ export function DayAssistantV2View() {
                 onPauseTimer={pauseTimer}
                 onResumeTimer={resumeTimer}
                 onCompleteTimer={handleTimerComplete}
+                onSubtaskToggle={handleSubtaskToggle}
               />
             ))}
           </CardContent>
@@ -723,6 +753,7 @@ export function DayAssistantV2View() {
                   focus={dayPlan?.focus || 3}
                   selectedDate={selectedDate}
                   isCollapsed={true}
+                  onSubtaskToggle={handleSubtaskToggle}
                 />
               ))}
               {later.length > 5 && (
@@ -944,6 +975,7 @@ function TaskRow({
   onPauseTimer?: () => void
   onResumeTimer?: () => void
   onCompleteTimer?: () => void
+  onSubtaskToggle?: (subtaskId: string, completed: boolean) => void
 }) {
   const shouldSuggestTen = focus <= 2 && task.estimate_min > 20
   
@@ -1015,8 +1047,9 @@ function TaskRow({
                     checked={subtask.completed}
                     onChange={(e) => {
                       e.stopPropagation()
-                      // TODO: Handle subtask toggle
-                      console.log('Toggle subtask', subtask.id)
+                      if (onSubtaskToggle) {
+                        onSubtaskToggle(subtask.id, !subtask.completed)
+                      }
                     }}
                     className="w-4 h-4 text-brand-purple border-gray-300 rounded focus:ring-brand-purple cursor-pointer"
                   />
