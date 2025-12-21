@@ -22,6 +22,10 @@ interface TodoistTask {
   due?: {
     date: string
   } | null
+  duration?: {
+    amount: number
+    unit: string
+  } | null
   project_id?: string
   created_at?: string
   is_completed?: boolean
@@ -48,6 +52,53 @@ interface DayAssistantV2Task {
   auto_moved: boolean
   metadata: Record<string, unknown>
   completed: boolean
+}
+
+/**
+ * Parse estimate from Todoist task
+ * Attempts multiple methods:
+ * 1. Check task.duration (Todoist Premium feature)
+ * 2. Parse from description patterns like [25min], (30 min), "Estymat: 45"
+ * 3. Fallback based on content length
+ */
+function parseEstimateFromTodoist(task: TodoistTask): number {
+  // Method 1: Check if task.duration exists (Todoist Premium feature)
+  if (task.duration?.amount && task.duration?.unit === 'minute') {
+    const minutes = task.duration.amount
+    if (minutes > 0 && minutes <= 480) { // Max 8 hours
+      return minutes
+    }
+  }
+  
+  // Method 2: Parse from description patterns
+  // Examples: "[25min]", "25m", "(30 min)", "Estymat: 45"
+  const description = task.description || ''
+  const content = task.content || ''
+  const searchText = `${description} ${content}`
+  
+  const patterns = [
+    /\[(\d+)\s*min\]/i,           // [25min]
+    /\((\d+)\s*min\)/i,           // (25min)
+    /(\d+)\s*m(?:in)?(?:\s|$)/i,  // 25m or 25min
+    /estymat:\s*(\d+)/i           // Estymat: 45
+  ]
+  
+  for (const pattern of patterns) {
+    const match = searchText.match(pattern)
+    if (match && match[1]) {
+      const minutes = parseInt(match[1], 10)
+      if (minutes > 0 && minutes <= 480) { // Max 8 hours
+        return minutes
+      }
+    }
+  }
+  
+  // Method 3: Estimate based on content length (fallback)
+  const contentLength = content.length
+  if (contentLength > 100) return 60
+  if (contentLength > 50) return 45
+  
+  return 30 // Default
 }
 
 /**
@@ -95,6 +146,9 @@ function mapTodoistToDayAssistantTask(
   // Math.min ensures cognitive load never exceeds 5
   const cognitiveLoad = Math.min(5 - priority + 1, 5)
 
+  // Parse estimate_min from task
+  const estimateMin = parseEstimateFromTodoist(task)
+
   return {
     user_id: userId,
     assistant_id: assistantId,
@@ -105,7 +159,7 @@ function mapTodoistToDayAssistantTask(
     priority: priority,
     is_must: isMust,
     is_important: isImportant,
-    estimate_min: 30, // default
+    estimate_min: estimateMin,
     cognitive_load: cognitiveLoad,
     context_type: contextType,
     due_date: task.due?.date || null,

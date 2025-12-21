@@ -29,6 +29,7 @@ import { EnergyFocusControls } from './EnergyFocusControls'
 import { WorkHoursConfigModal } from './WorkHoursConfigModal'
 import { TaskTimer } from './TaskTimer'
 import { OverdueTasksSection } from './OverdueTasksSection'
+import { ClarifyModal } from './ClarifyModal'
 
 type DecisionLogEntry = {
   id: string
@@ -64,6 +65,7 @@ export function DayAssistantV2View() {
   const [newTaskMust, setNewTaskMust] = useState(false)
   const [newTaskContext, setNewTaskContext] = useState<ContextType>('code')
   const [showConfigModal, setShowConfigModal] = useState(false)
+  const [clarifyTask, setClarifyTask] = useState<TestDayTask | null>(null)
   const undoTimer = useRef<NodeJS.Timeout | null>(null)
 
   // Timer hook
@@ -536,19 +538,8 @@ export function DayAssistantV2View() {
   }
 
   const handleDecompose = async (task: TestDayTask) => {
-    const response = await authFetch('/api/day-assistant-v2/decompose', {
-      method: 'POST',
-      body: JSON.stringify({ task_id: task.id, target_duration: 25 })
-    })
-    
-    if (response.ok) {
-      const data = await response.json()
-      addDecisionLog(`Podzielono "${task.title}" na ${data.subtasks?.length || 0} kroków`)
-      showToast(data.message || '✨ Zadanie podzielone', 'success')
-      await loadDayPlan(sessionToken || undefined)
-    } else {
-      showToast('Nie udało się podzielić zadania', 'error')
-    }
+    // Show the ClarifyModal for first step workflow
+    setClarifyTask(task)
   }
 
   const presetButtons = (
@@ -881,6 +872,21 @@ export function DayAssistantV2View() {
           ai_instructions: dayPlan?.metadata?.ai_instructions as string | undefined
         }}
       />
+
+      {/* Clarify Modal for First Step */}
+      {clarifyTask && (
+        <ClarifyModal
+          task={clarifyTask}
+          onClose={() => setClarifyTask(null)}
+          onSubmit={() => {
+            setClarifyTask(null)
+            loadDayPlan(sessionToken || undefined)
+            addDecisionLog(`Utworzono pierwszy krok dla "${clarifyTask.title}"`)
+            showToast('✅ Pierwszy krok utworzony', 'success')
+          }}
+          sessionToken={sessionToken}
+        />
+      )}
     </div>
   )
 }
@@ -997,6 +1003,30 @@ function TaskRow({
           <p className="text-xs text-muted-foreground mt-1">
             Estymat: {task.estimate_min} min • Load {task.cognitive_load} • Przeniesienia: {task.postpone_count || 0}
           </p>
+          
+          {/* Show subtasks if any */}
+          {task.subtasks && task.subtasks.length > 0 && (
+            <div className="mt-3 p-3 bg-gray-50 rounded-md border border-gray-200">
+              <p className="text-sm font-semibold mb-2">📋 Kroki:</p>
+              {task.subtasks.map(subtask => (
+                <div key={subtask.id} className="flex items-center gap-2 text-sm mb-1">
+                  <input
+                    type="checkbox"
+                    checked={subtask.completed}
+                    onChange={(e) => {
+                      e.stopPropagation()
+                      // TODO: Handle subtask toggle
+                      console.log('Toggle subtask', subtask.id)
+                    }}
+                    className="w-4 h-4 text-brand-purple border-gray-300 rounded focus:ring-brand-purple cursor-pointer"
+                  />
+                  <span className={subtask.completed ? 'line-through text-gray-400' : ''}>
+                    {subtask.content} ({subtask.estimated_duration} min)
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         {!isCollapsed && (
           <div className="flex gap-2">
@@ -1037,7 +1067,7 @@ function TaskRow({
             <ArrowsClockwise size={16} className="mr-1" /> Nie dziś
           </Button>
           <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onDecompose(); }}>
-            <MagicWand size={16} className="mr-1" /> Dekomponuj
+            <MagicWand size={16} className="mr-1" /> 🎯 Zrób pierwszy krok
           </Button>
           <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onComplete(); }}>
             <Clock size={16} className="mr-1" /> Zakończ
