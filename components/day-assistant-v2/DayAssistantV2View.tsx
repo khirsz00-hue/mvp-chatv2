@@ -30,6 +30,7 @@ import { EnergyFocusControls } from './EnergyFocusControls'
 import { WorkHoursConfigModal } from './WorkHoursConfigModal'
 import { TaskTimer } from './TaskTimer'
 import { OverdueTasksSection } from './OverdueTasksSection'
+import { ClarifyModal } from './ClarifyModal'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/DropdownMenu'
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/Tooltip'
 
@@ -67,6 +68,7 @@ export function DayAssistantV2View() {
   const [newTaskMust, setNewTaskMust] = useState(false)
   const [newTaskContext, setNewTaskContext] = useState<ContextType>('code')
   const [showConfigModal, setShowConfigModal] = useState(false)
+  const [clarifyTask, setClarifyTask] = useState<TestDayTask | null>(null)
   const [showLaterQueue, setShowLaterQueue] = useState(false)
   const undoTimer = useRef<NodeJS.Timeout | null>(null)
 
@@ -540,18 +542,36 @@ export function DayAssistantV2View() {
   }
 
   const handleDecompose = async (task: TestDayTask) => {
-    const response = await authFetch('/api/day-assistant-v2/decompose', {
-      method: 'POST',
-      body: JSON.stringify({ task_id: task.id, target_duration: 25 })
-    })
+    // Show the ClarifyModal for first step workflow
+    setClarifyTask(task)
+  }
+
+  const handleSubtaskToggle = async (subtaskId: string, completed: boolean) => {
+    if (!sessionToken) return
     
-    if (response.ok) {
-      const data = await response.json()
-      addDecisionLog(`Podzielono "${task.title}" na ${data.subtasks?.length || 0} kroków`)
-      showToast(data.message || '✨ Zadanie podzielone', 'success')
-      await loadDayPlan(sessionToken || undefined)
-    } else {
-      showToast('Nie udało się podzielić zadania', 'error')
+    try {
+      const response = await fetch('/api/day-assistant-v2/subtasks', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`
+        },
+        body: JSON.stringify({
+          subtask_id: subtaskId,
+          completed
+        })
+      })
+      
+      if (response.ok) {
+        // Reload tasks to get updated subtask state
+        await loadDayPlan(sessionToken)
+        showToast(completed ? '✅ Krok ukończony' : 'Krok nieukończony', 'success')
+      } else {
+        showToast('Nie udało się zaktualizować kroku', 'error')
+      }
+    } catch (error) {
+      console.error('Error toggling subtask:', error)
+      showToast('Błąd podczas aktualizacji kroku', 'error')
     }
   }
 
@@ -727,6 +747,7 @@ export function DayAssistantV2View() {
                 onPauseTimer={pauseTimer}
                 onResumeTimer={resumeTimer}
                 onCompleteTimer={handleTimerComplete}
+                onSubtaskToggle={handleSubtaskToggle}
                 showActions={true}
               />
             ))}
@@ -739,6 +760,29 @@ export function DayAssistantV2View() {
               <CardTitle>📋 Na później ({later.length} {later.length === 1 ? 'task' : 'tasków'})</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Te zadania nie mieszczą się w dostępnym czasie pracy dzisiaj.
+              </p>
+              {later.slice(0, 5).map(task => (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  onNotToday={() => handleNotToday(task)}
+                  onStart={() => handleStartTask(task)}
+                  onUnmark={() => openUnmarkWarning(task)}
+                  onDecompose={() => handleDecompose(task)}
+                  onComplete={() => handleComplete(task)}
+                  onPin={() => handlePin(task)}
+                  onClick={() => setSelectedTask(task)}
+                  focus={dayPlan?.focus || 3}
+                  selectedDate={selectedDate}
+                  isCollapsed={true}
+                  onSubtaskToggle={handleSubtaskToggle}
+                />
+              ))}
+              {later.length > 5 && (
+                <p className="text-sm text-muted-foreground text-center">
+                  ... i {later.length - 5} więcej
               <div className="flex justify-between items-center">
                 <p className="text-sm text-muted-foreground">
                   {showLaterQueue 
@@ -946,6 +990,22 @@ export function DayAssistantV2View() {
           ai_instructions: dayPlan?.metadata?.ai_instructions as string | undefined
         }}
       />
+
+      {/* Clarify Modal for First Step */}
+      {clarifyTask && (
+        <ClarifyModal
+          task={clarifyTask}
+          onClose={() => setClarifyTask(null)}
+          onSubmit={() => {
+            setClarifyTask(null)
+            loadDayPlan(sessionToken || undefined)
+            addDecisionLog(`Utworzono pierwszy krok dla "${clarifyTask.title}"`)
+            showToast('✅ Pierwszy krok utworzony', 'success')
+          }}
+          sessionToken={sessionToken}
+        />
+      )}
+    </div>
       </div>
     </TooltipProvider>
   )
@@ -1008,6 +1068,7 @@ function TaskRow({
   onPauseTimer?: () => void
   onResumeTimer?: () => void
   onCompleteTimer?: () => void
+  onSubtaskToggle?: (subtaskId: string, completed: boolean) => void
 }) {
   const shouldSuggestTen = focus <= 2 && task.estimate_min > 20
   
@@ -1117,6 +1178,31 @@ function TaskRow({
           <p className="text-xs text-muted-foreground mt-1">
             Estymat: {task.estimate_min} min • Load {task.cognitive_load} • Przeniesienia: {task.postpone_count || 0}
           </p>
+          
+          {/* Show subtasks if any */}
+          {task.subtasks && task.subtasks.length > 0 && (
+            <div className="mt-3 p-3 bg-gray-50 rounded-md border border-gray-200">
+              <p className="text-sm font-semibold mb-2">📋 Kroki:</p>
+              {task.subtasks.map(subtask => (
+                <div key={subtask.id} className="flex items-center gap-2 text-sm mb-1">
+                  <input
+                    type="checkbox"
+                    checked={subtask.completed}
+                    onChange={(e) => {
+                      e.stopPropagation()
+                      if (onSubtaskToggle) {
+                        onSubtaskToggle(subtask.id, !subtask.completed)
+                      }
+                    }}
+                    className="w-4 h-4 text-brand-purple border-gray-300 rounded focus:ring-brand-purple cursor-pointer"
+                  />
+                  <span className={subtask.completed ? 'line-through text-gray-400' : ''}>
+                    {subtask.content} ({subtask.estimated_duration} min)
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         {!isCollapsed && showActions && (
           <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
@@ -1210,7 +1296,7 @@ function TaskRow({
             <ArrowsClockwise size={16} className="mr-1" /> Nie dziś
           </Button>
           <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onDecompose(); }}>
-            <MagicWand size={16} className="mr-1" /> Dekomponuj
+            <MagicWand size={16} className="mr-1" /> 🎯 Zrób pierwszy krok
           </Button>
           <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onComplete(); }}>
             <Clock size={16} className="mr-1" /> Zakończ

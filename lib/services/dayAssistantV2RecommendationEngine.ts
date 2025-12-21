@@ -376,31 +376,66 @@ export async function generateSliderChangeRecommendation(
   let primaryAction: ProposalAction
   let reason: string
   
-  if (newPlan.energy <= 2 && newPlan.focus <= 2) {
-    // Low energy/focus - suggest moving heavy task or "Start 10 min"
-    if (taskToAdjust.estimate_min > 30) {
-      primaryAction = {
-        type: 'decompose_task',
-        task_id: taskToAdjust.id,
-        metadata: { 
-          target_duration: 10,
-          start_small: true
+  // LOW FOCUS (1-2) - suggest postponing high cognitive load tasks
+  if (newPlan.focus <= 2) {
+    const highCognitiveLoadTasks = allTasks
+      .filter(t => t.cognitive_load >= 4 && !t.completed)
+      .sort((a, b) => b.cognitive_load - a.cognitive_load)
+    
+    if (highCognitiveLoadTasks.length > 0 && taskToAdjust.cognitive_load >= 4) {
+      if (taskToAdjust.estimate_min > 30) {
+        primaryAction = {
+          type: 'decompose_task',
+          task_id: taskToAdjust.id,
+          metadata: { 
+            target_duration: 10,
+            start_small: true
+          }
         }
+        reason = `Przy niskim skupieniu (${newPlan.focus}/5) proponuję "Zacznij 10 min" dla "${taskToAdjust.title}" (Load ${taskToAdjust.cognitive_load}) zamiast pełnej sesji.`
+      } else {
+        const tomorrow = new Date(date)
+        tomorrow.setDate(tomorrow.getDate() + 1)
+        primaryAction = {
+          type: 'move_task',
+          task_id: taskToAdjust.id,
+          from_date: date,
+          to_date: tomorrow.toISOString().split('T')[0]
+        }
+        reason = `Przy niskim skupieniu (${newPlan.focus}/5) zalecam przełożyć "${taskToAdjust.title}" (Load ${taskToAdjust.cognitive_load}) na jutro.`
       }
-      reason = `Przy niskim skupieniu proponuję "Zacznij 10 min" dla "${taskToAdjust.title}" zamiast pełnej sesji.`
     } else {
-      const tomorrow = new Date(date)
-      tomorrow.setDate(tomorrow.getDate() + 1)
-      primaryAction = {
-        type: 'move_task',
-        task_id: taskToAdjust.id,
-        from_date: date,
-        to_date: tomorrow.toISOString().split('T')[0]
+      return null
+    }
+  } else if (newPlan.focus >= 4) {
+    // HIGH FOCUS (4-5) - suggest tackling hardest task first
+    const hardestTasks = allTasks
+      .filter(t => t.cognitive_load >= 4 && !t.completed)
+      .sort((a, b) => b.cognitive_load - a.cognitive_load)
+    
+    if (hardestTasks.length > 0) {
+      const topTask = allTasks.filter(t => !t.completed)[0]
+      const hardestTask = hardestTasks[0]
+      
+      // Only recommend if hardest task is not already first
+      if (topTask && hardestTask && hardestTask.id !== topTask.id) {
+        primaryAction = {
+          type: 'reorder',
+          task_id: hardestTask.id,
+          metadata: {
+            new_position: 1,
+            reason: 'Wysokie skupienie - wykorzystaj je na trudne zadania'
+          }
+        }
+        reason = `Wysokie skupienie (${newPlan.focus}/5) - idealny moment na trudniejsze zadanie "${hardestTask.title}" (Load ${hardestTask.cognitive_load})!`
+      } else {
+        return null
       }
-      reason = `Przy niskim skupieniu zalecam przełożyć "${taskToAdjust.title}" na jutro.`
+    } else {
+      return null
     }
   } else {
-    // Higher energy/focus - no specific recommendation yet
+    // NORMAL FOCUS (3) - no specific recommendation
     return null
   }
   
