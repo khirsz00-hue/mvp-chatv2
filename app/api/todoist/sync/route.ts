@@ -24,6 +24,7 @@ interface TodoistTask {
   } | null
   project_id?: string
   created_at?: string
+  is_completed?: boolean
 }
 
 interface DayAssistantV2Task {
@@ -229,6 +230,11 @@ export async function POST(request: NextRequest) {
 
     const todoistTasks: TodoistTask[] = await todoistResponse.json()
 
+    // Filter out completed tasks
+    const activeTasks = todoistTasks.filter(task => !task.is_completed)
+    
+    console.log(`[Sync] Fetched ${todoistTasks.length} tasks from Todoist, ${activeTasks.length} active tasks after filtering completed`)
+
     // Get or create assistant
     let { data: assistant } = await supabase
       .from('assistant_config')
@@ -271,7 +277,7 @@ export async function POST(request: NextRequest) {
 
     // Map Todoist tasks to DayAssistantV2Task format
     // Filter out invalid tasks that couldn't be mapped
-    const mappedTasks = todoistTasks
+    const mappedTasks = activeTasks
       .map(task => {
         try {
           return mapTodoistToDayAssistantTask(task, user.id, assistantId)
@@ -282,14 +288,14 @@ export async function POST(request: NextRequest) {
       })
       .filter((task): task is Partial<DayAssistantV2Task> => task !== null)
     
-    const skippedCount = todoistTasks.length - mappedTasks.length
+    const skippedCount = activeTasks.length - mappedTasks.length
     if (skippedCount > 0) {
-      console.warn(`[Sync] Skipped ${skippedCount} invalid tasks out of ${todoistTasks.length}`)
+      console.warn(`[Sync] Skipped ${skippedCount} invalid tasks out of ${activeTasks.length}`)
     }
-    console.log(`[Sync] Mapped ${mappedTasks.length} valid tasks from ${todoistTasks.length} Todoist tasks`)
+    console.log(`[Sync] Mapped ${mappedTasks.length} valid tasks from ${activeTasks.length} active Todoist tasks`)
 
     // Delete old synced tasks that are no longer in Todoist
-    const todoistIds = todoistTasks.map(t => t.id)
+    const todoistIds = activeTasks.map(t => t.id)
     
     // Get all existing synced tasks
     const { data: existingTasks } = await supabase
