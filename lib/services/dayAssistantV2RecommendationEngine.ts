@@ -458,3 +458,42 @@ export function generateUnmarkMustWarning(task: TestDayTask): {
     details
   }
 }
+
+/**
+ * Score and sort tasks by intelligent algorithm
+ * Used by useScoredTasks hook in the UI
+ */
+export function scoreAndSortTasks(
+  tasks: TestDayTask[],
+  dayPlan: DayPlan,
+  todayDate: string
+): TestDayTask[] {
+  // Calculate scores for all tasks
+  const taskScores = tasks.map(task => ({
+    task,
+    score: calculateTaskScore(task, dayPlan, {
+      todayDate,
+      totalTasksToday: tasks.length,
+      lightMinutesToday: 0
+    })
+  }))
+  
+  // Sort by score (highest first)
+  taskScores.sort((a, b) => b.score.score - a.score.score)
+  
+  // Separate into categories for better organization
+  const today = todayDate
+  const overdue = taskScores.filter(ts => ts.task.due_date && ts.task.due_date < today)
+  const dueToday = taskScores.filter(ts => ts.task.due_date === today)
+  const inbox = taskScores.filter(ts => !ts.task.due_date)
+  const future = taskScores.filter(ts => ts.task.due_date && ts.task.due_date > today)
+  
+  // Return in priority order: overdue > today > inbox > future
+  // Each group is already sorted by score
+  return [
+    ...overdue.map(ts => ts.task),
+    ...dueToday.map(ts => ts.task),
+    ...inbox.map(ts => ts.task),
+    ...future.map(ts => ts.task)
+  ]
+}

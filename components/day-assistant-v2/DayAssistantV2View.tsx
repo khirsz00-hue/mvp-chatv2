@@ -17,8 +17,12 @@ import {
   checkLightTaskLimit,
   generateUnmarkMustWarning
 } from '@/lib/services/dayAssistantV2RecommendationEngine'
-import { Play, XCircle, Clock, ArrowsClockwise, MagicWand, Prohibit } from '@phosphor-icons/react'
+import { Play, XCircle, Clock, ArrowsClockwise, MagicWand, Prohibit, PushPin } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
+import { useScoredTasks } from '@/hooks/useScoredTasks'
+import { TaskBadges } from './TaskBadges'
+import { TaskDetailsModal } from './TaskDetailsModal'
+import { RecommendationPanel } from './RecommendationPanel'
 
 type DecisionLogEntry = {
   id: string
@@ -47,6 +51,7 @@ export function DayAssistantV2View() {
   const [decisionLog, setDecisionLog] = useState<DecisionLogEntry[]>([])
   const [warningTask, setWarningTask] = useState<TestDayTask | null>(null)
   const [warningDetails, setWarningDetails] = useState<{ title: string; message: string; details: string[] } | null>(null)
+  const [selectedTask, setSelectedTask] = useState<TestDayTask | null>(null)
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskEstimate, setNewTaskEstimate] = useState(25)
   const [newTaskLoad, setNewTaskLoad] = useState(2)
@@ -217,9 +222,12 @@ export function DayAssistantV2View() {
     return tasks.filter(t => (!t.due_date || t.due_date === selectedDate) && (contextFilter === 'all' || t.context_type === contextFilter))
   }, [tasks, selectedDate, contextFilter])
 
-  const mustTasks = filteredTasks.filter(t => t.is_must).slice(0, 3)
-  const matchedTasks = filteredTasks.filter(t => !t.is_must && !t.completed)
-  const autoMoved = filteredTasks.filter(t => t.auto_moved)
+  // Apply intelligent scoring to filtered tasks
+  const scoredTasks = useScoredTasks(filteredTasks, dayPlan, selectedDate)
+
+  const mustTasks = scoredTasks.filter(t => t.is_must).slice(0, 3)
+  const matchedTasks = scoredTasks.filter(t => !t.is_must && !t.completed)
+  const autoMoved = scoredTasks.filter(t => t.auto_moved)
 
   const lightUsage = useMemo(() => {
     if (!assistant) return null
@@ -361,13 +369,60 @@ export function DayAssistantV2View() {
   }
 
   const handleComplete = async (task: TestDayTask) => {
-    const response = await authFetch('/api/day-assistant-v2/task', {
-      method: 'PUT',
-      body: JSON.stringify({ task_id: task.id, completed: true, completed_at: new Date().toISOString() })
+    const response = await authFetch('/api/day-assistant-v2/complete', {
+      method: 'POST',
+      body: JSON.stringify({ task_id: task.id })
     })
     if (response.ok) {
       setTasks(prev => prev.filter(t => t.id !== task.id))
       addDecisionLog(`Oznaczono "${task.title}" jako wykonane`)
+      showToast('✅ Zadanie ukończone', 'success')
+    } else {
+      showToast('Nie udało się oznaczyć jako wykonane', 'error')
+    }
+  }
+
+  const handlePin = async (task: TestDayTask) => {
+    const newPinState = !task.is_must
+    
+    // Check if trying to pin when already at limit (client-side check)
+    if (newPinState) {
+      const currentPinnedCount = tasks.filter(t => t.is_must).length
+      if (currentPinnedCount >= 3) {
+        showToast('Maksymalnie 3 zadania MUST! Odepnij coś najpierw.', 'warning')
+        return
+      }
+    }
+    
+    const response = await authFetch('/api/day-assistant-v2/pin', {
+      method: 'POST',
+      body: JSON.stringify({ task_id: task.id, pin: newPinState })
+    })
+    
+    if (response.ok) {
+      const data = await response.json()
+      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, is_must: newPinState } : t))
+      addDecisionLog(`${newPinState ? 'Przypięto' : 'Odpięto'} "${task.title}"`)
+      showToast(data.message, 'success')
+    } else {
+      const error = await response.json()
+      showToast(error.error || 'Nie udało się zmienić statusu MUST', 'error')
+    }
+  }
+
+  const handleDecompose = async (task: TestDayTask) => {
+    const response = await authFetch('/api/day-assistant-v2/decompose', {
+      method: 'POST',
+      body: JSON.stringify({ task_id: task.id, target_duration: 25 })
+    })
+    
+    if (response.ok) {
+      const data = await response.json()
+      addDecisionLog(`Podzielono "${task.title}" na ${data.subtasks?.length || 0} kroków`)
+      showToast(data.message || '✨ Zadanie podzielone', 'success')
+      await loadDayPlan(sessionToken || undefined)
+    } else {
+      showToast('Nie udało się podzielić zadania', 'error')
     }
   }
 
@@ -473,9 +528,12 @@ export function DayAssistantV2View() {
                 onNotToday={() => handleNotToday(task)}
                 onStart={() => showToast(`Start sesji dla "${task.title}"`, 'info')}
                 onUnmark={() => openUnmarkWarning(task)}
-                onDecompose={() => showToast('Auto-dekompozycja w przygotowaniu', 'info')}
+                onDecompose={() => handleDecompose(task)}
                 onComplete={() => handleComplete(task)}
+                onPin={() => handlePin(task)}
+                onClick={() => setSelectedTask(task)}
                 focus={dayPlan?.focus || 3}
+                selectedDate={selectedDate}
               />
             ))}
           </CardContent>
@@ -494,9 +552,12 @@ export function DayAssistantV2View() {
                 onNotToday={() => handleNotToday(task)}
                 onStart={() => showToast(`Start sesji dla "${task.title}"`, 'info')}
                 onUnmark={() => openUnmarkWarning(task)}
-                onDecompose={() => showToast('Auto-dekompozycja w przygotowaniu', 'info')}
+                onDecompose={() => handleDecompose(task)}
                 onComplete={() => handleComplete(task)}
+                onPin={() => handlePin(task)}
+                onClick={() => setSelectedTask(task)}
                 focus={dayPlan?.focus || 3}
+                selectedDate={selectedDate}
               />
             ))}
           </CardContent>
@@ -564,21 +625,11 @@ export function DayAssistantV2View() {
             <CardTitle>Rekomendacje</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {proposals.length === 0 && <p className="text-sm text-muted-foreground">Brak aktywnych rekomendacji. Zmiany suwaków, „Nie dziś” lub nowe zadania wywołają live replanning.</p>}
-            {proposals.slice(0, 1).map(proposal => (
-              <div key={proposal.id} className="border rounded-lg p-3 space-y-2">
-                <p className="font-medium">{proposal.reason}</p>
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" onClick={() => handleProposalResponse(proposal.id, 'accept_primary')}>Zastosuj</Button>
-                  {proposal.alternatives?.map((alt, idx) => (
-                    <Button key={idx} size="sm" variant="outline" onClick={() => handleProposalResponse(proposal.id, 'accept_alt', idx)}>
-                      Alternatywa {idx + 1}
-                    </Button>
-                  ))}
-                  <Button size="sm" variant="ghost" onClick={() => handleProposalResponse(proposal.id, 'reject')}>Odrzuć</Button>
-                </div>
-              </div>
-            ))}
+            <RecommendationPanel
+              dayPlan={dayPlan}
+              proposals={proposals}
+              onProposalResponse={handleProposalResponse}
+            />
           </CardContent>
         </Card>
 
@@ -630,6 +681,14 @@ export function DayAssistantV2View() {
           </div>
         </div>
       )}
+
+      {selectedTask && (
+        <TaskDetailsModal
+          task={selectedTask}
+          onClose={() => setSelectedTask(null)}
+          selectedDate={selectedDate}
+        />
+      )}
     </div>
   )
 }
@@ -660,7 +719,10 @@ function TaskRow({
   onUnmark,
   onDecompose,
   onComplete,
-  focus
+  onPin,
+  onClick,
+  focus,
+  selectedDate
 }: {
   task: TestDayTask
   onNotToday: () => void
@@ -668,21 +730,33 @@ function TaskRow({
   onUnmark: () => void
   onDecompose: () => void
   onComplete: () => void
+  onPin?: () => void
+  onClick?: () => void
   focus: number
+  selectedDate: string
 }) {
   const shouldSuggestTen = focus <= 2 && task.estimate_min > 20
   return (
     <div className={cn(
       'border rounded-lg p-3 flex flex-col gap-2 bg-white shadow-sm',
-      task.is_must && 'border-brand-purple/60'
+      task.is_must && 'border-brand-purple/60',
+      onClick && 'cursor-pointer hover:shadow-md transition-shadow'
     )}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
+      <div className="flex items-start justify-between gap-3" onClick={onClick}>
+        <div className="flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
             {task.is_must && <span className="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-700">MUST</span>}
+            <TaskBadges task={task} today={selectedDate} />
+            {task.context_type && (
+              <span className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600">
+                {task.context_type}
+              </span>
+            )}
             <p className="font-semibold">{task.title}</p>
           </div>
-          <p className="text-xs text-muted-foreground">Estymat: {task.estimate_min} min • Load {task.cognitive_load} • Przeniesienia: {task.postpone_count || 0}</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Estymat: {task.estimate_min} min • Load {task.cognitive_load} • Przeniesienia: {task.postpone_count || 0}
+          </p>
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={onStart}>
@@ -705,6 +779,11 @@ function TaskRow({
         <Button size="sm" variant="ghost" onClick={onComplete}>
           <Clock size={16} className="mr-1" /> Zakończ
         </Button>
+        {onPin && (
+          <Button size="sm" variant={task.is_must ? "ghost" : "outline"} onClick={onPin}>
+            <PushPin size={16} className="mr-1" /> {task.is_must ? 'Odpnij' : 'Przypnij'}
+          </Button>
+        )}
         {shouldSuggestTen && (
           <Button size="sm" onClick={() => onStart()}>
             Zacznij 10 min
