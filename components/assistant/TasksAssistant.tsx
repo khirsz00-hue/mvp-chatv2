@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Card from '@/components/ui/Card'
@@ -46,6 +46,19 @@ type ViewType = 'list' | 'board'
 type SortType = 'date' | 'priority' | 'name'
 type GroupByType = 'none' | 'day' | 'project' | 'priority'
 type CompletedTimeFilter = 'today' | 'yesterday' | 'last7days' | 'last30days' | 'thisMonth' | 'custom'
+const OVERDUE_PREVIEW_LIMIT = 3
+
+const formatDueDate = (task: Task) => {
+  const dueStr = typeof task.due === 'string' ? task.due : task.due?.date
+  
+  if (!dueStr) return 'Brak daty'
+  
+  try {
+    return format(parseISO(dueStr), 'd MMM yyyy', { locale: pl })
+  } catch {
+    return dueStr
+  }
+}
 
 /**
  * Formats elapsed time in seconds to HH:MM:SS format
@@ -103,6 +116,7 @@ export function TasksAssistant() {
   const [token, setToken] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
   const [showMobileFilters, setShowMobileFilters] = useState(false)
+  const [showOverduePreview, setShowOverduePreview] = useState(false)
 
   // Fetch Todoist token from database (single source of truth)
   useEffect(() => {
@@ -294,7 +308,7 @@ export function TasksAssistant() {
   }, [])
   
   // Filter tasks by date
-  const filterTasks = (tasks: Task[], filterType: FilterType) => {
+  const filterTasks = useCallback((tasks: Task[], filterType: FilterType) => {
     console.log('🔍 FILTER DEBUG:', {
       totalTasks: tasks.length,
       filterType,
@@ -406,9 +420,9 @@ export function TasksAssistant() {
       }
     })
     
-    console.log('✅ Filtered tasks result:', filtered. length, filtered)
+    console.log('✅ Filtered tasks result:', filtered.length, filtered)
     return filtered
-  }
+  }, [completedTimeFilter])
   
   // Filter by project
   const filterByProject = (tasks: Task[]) => {
@@ -439,6 +453,7 @@ export function TasksAssistant() {
   }
   
   // Apply all filters
+  const overdueTasks = useMemo(() => filterTasks(tasks, 'overdue'), [tasks, filterTasks])
   let filteredTasks = filterTasks(tasks, filter)
   filteredTasks = filterByProject(filteredTasks)
   const sortedTasks = sortTasks(filteredTasks)
@@ -1119,6 +1134,76 @@ export function TasksAssistant() {
             </select>
           </div>
           
+          {/* Overdue hint inside Today view */}
+          {filter === 'today' && overdueTasks.length > 0 && (
+            <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3 md:p-4 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                  <p className="text-sm md:text-base font-semibold text-amber-900">
+                    Masz {overdueTasks.length} przeterminowanych {overdueTasks.length === 1 ? 'zadanie' : 'zadań'} do nadrobienia
+                  </p>
+                  <p className="text-xs md:text-sm text-amber-800">
+                    Zajmij się nimi w pierwszej kolejności, aby odblokować dzisiejsze plany.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-amber-200 text-amber-900 hover:bg-amber-100"
+                    onClick={() => setShowOverduePreview((prev) => !prev)}
+                  >
+                    {showOverduePreview ? 'Ukryj podgląd' : 'Pokaż podgląd'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-amber-900 hover:bg-amber-100"
+                    onClick={() => setFilter('overdue')}
+                  >
+                    Przejdź do listy
+                  </Button>
+                </div>
+              </div>
+
+              {showOverduePreview && (
+                <div className="mt-3 space-y-2">
+                  {overdueTasks.slice(0, OVERDUE_PREVIEW_LIMIT).map((task) => (
+                    <div
+                      key={task.id}
+                      className="flex items-center justify-between gap-2 bg-white border border-amber-100 rounded-md px-3 py-2"
+                    >
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-gray-900 truncate">{task.content}</span>
+                        <span className="text-xs text-amber-800">Termin: {formatDueDate(task)}</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-amber-900 hover:bg-amber-100"
+                        onClick={() => setFilter('overdue')}
+                        aria-label="Przejdź do listy przeterminowanych zadań"
+                      >
+                        <ArrowRight size={14} weight="bold" />
+                      </Button>
+                    </div>
+                  ))}
+
+                  {overdueTasks.length > OVERDUE_PREVIEW_LIMIT && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="w-full text-amber-900 hover:bg-amber-100"
+                      onClick={() => setFilter('overdue')}
+                    >
+                      Zobacz wszystkie przeterminowane zadania
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Completed Tasks Time Filter */}
           {filter === 'completed' && (
             <div className="bg-white rounded-lg border border-gray-200 p-3 md:p-4 shadow-sm animate-fade-in">
