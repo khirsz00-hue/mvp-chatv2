@@ -41,20 +41,34 @@ interface Project {
   color?:  string
 }
 
-type FilterType = 'today' | 'tomorrow' | 'week' | 'month' | 'overdue' | 'all' | 'completed' | 'scheduled'
+type FilterType = 'today' | 'tomorrow' | 'week' | 'month' | 'all' | 'completed' | 'scheduled'
 type ViewType = 'list' | 'board'
 type SortType = 'date' | 'priority' | 'name'
 type GroupByType = 'none' | 'day' | 'project' | 'priority'
 type CompletedTimeFilter = 'today' | 'yesterday' | 'last7days' | 'last30days' | 'thisMonth' | 'custom'
 const OVERDUE_PREVIEW_LIMIT = 3
 
+const getDueDateString = (task: Task) => (typeof task.due === 'string' ? task.due : task.due?.date || null)
+
+const parseDueDateString = (dueStr: string | null) => {
+  if (!dueStr) return null
+  try {
+    return parseISO(dueStr)
+  } catch {
+    return null
+  }
+}
+
 const formatDueDate = (task: Task) => {
-  const dueStr = typeof task.due === 'string' ? task.due : task.due?.date
+  const dueStr = getDueDateString(task)
   
   if (!dueStr) return 'Brak daty'
   
+  const parsedDue = parseDueDateString(dueStr)
+  if (!parsedDue) return dueStr
+  
   try {
-    return format(parseISO(dueStr), 'd MMM yyyy', { locale: pl })
+    return format(parsedDue, 'd MMM yyyy', { locale: pl })
   } catch {
     return dueStr
   }
@@ -91,6 +105,12 @@ const calculateElapsedSeconds = (startTime: number): number => {
  */
 const isWithinLastNDays = (date: Date, days: number, referenceDate: Date): boolean => {
   return isAfter(date, subDays(referenceDate, days)) || isSameDay(date, subDays(referenceDate, days))
+}
+
+const isTaskOverdue = (task: Task, referenceDay: Date): boolean => {
+  const dueDate = parseDueDateString(getDueDateString(task))
+  if (!dueDate) return false
+  return isBefore(startOfDay(dueDate), referenceDay)
 }
 
 export function TasksAssistant() {
@@ -363,9 +383,10 @@ export function TasksAssistant() {
       
       if (filterType === 'all') return true
       
-      // Show tasks without due dates for 'scheduled' filter
+      // Show overdue and undated tasks for 'scheduled' filter
       if (filterType === 'scheduled') {
-        return !dueStr
+        if (!dueStr) return true
+        return isTaskOverdue(task, now)
       }
       
       if (! dueStr) {
@@ -407,10 +428,6 @@ export function TasksAssistant() {
             })
             console.log('  → isInMonth:', isInMonth)
             return isInMonth
-          case 'overdue':
-            const isOverdue = isBefore(dueDate, now)
-            console.log('  → isOverdue:', isOverdue)
-            return isOverdue
           default:
             return true
         }
@@ -453,7 +470,11 @@ export function TasksAssistant() {
   }
   
   // Apply all filters
-  const overdueTasks = useMemo(() => filterTasks(tasks, 'overdue'), [tasks, filterTasks])
+  const overdueTasks = useMemo(() => {
+    const now = startOfDay(new Date())
+    
+    return tasks.filter(task => !task.completed && isTaskOverdue(task, now))
+  }, [tasks])
   let filteredTasks = filterTasks(tasks, filter)
   filteredTasks = filterByProject(filteredTasks)
   const sortedTasks = sortTasks(filteredTasks)
@@ -1105,12 +1126,12 @@ export function TasksAssistant() {
           {/* Desktop: Tabs */}
           <div className="hidden md:block">
             <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterType)}>
-              <TabsList className="grid grid-cols-7 w-full gap-1">
+              {/* 6 tabs: today, tomorrow, week, month, scheduled, completed */}
+              <TabsList className="grid grid-cols-6 w-full gap-1">
                 <TabsTrigger value="today" className="text-sm py-2">Dziś</TabsTrigger>
                 <TabsTrigger value="tomorrow" className="text-sm py-2">Jutro</TabsTrigger>
                 <TabsTrigger value="week" className="text-sm py-2">Tydzień</TabsTrigger>
                 <TabsTrigger value="month" className="text-sm py-2">Miesiąc</TabsTrigger>
-                <TabsTrigger value="overdue" className="text-sm py-2">Przeterminowane</TabsTrigger>
                 <TabsTrigger value="scheduled" className="text-sm py-2">Do zaplanowania</TabsTrigger>
                 <TabsTrigger value="completed" className="text-sm py-2">Ukończone</TabsTrigger>
               </TabsList>
@@ -1128,7 +1149,6 @@ export function TasksAssistant() {
               <option value="tomorrow">📅 Jutro</option>
               <option value="week">📅 Tydzień</option>
               <option value="month">📅 Miesiąc</option>
-              <option value="overdue">⚠️ Przeterminowane</option>
               <option value="scheduled">📋 Do zaplanowania</option>
               <option value="completed">✅ Ukończone</option>
             </select>
@@ -1159,7 +1179,7 @@ export function TasksAssistant() {
                     size="sm"
                     variant="ghost"
                     className="text-amber-900 hover:bg-amber-100"
-                    onClick={() => setFilter('overdue')}
+                    onClick={() => setFilter('scheduled')}
                   >
                     Przejdź do listy
                   </Button>
@@ -1181,8 +1201,8 @@ export function TasksAssistant() {
                         size="sm"
                         variant="ghost"
                         className="text-amber-900 hover:bg-amber-100"
-                        onClick={() => setFilter('overdue')}
-                        aria-label="Przejdź do listy przeterminowanych zadań"
+                        onClick={() => setFilter('scheduled')}
+                        aria-label="Przejdź do listy zadań do zaplanowania"
                       >
                         <ArrowRight size={14} weight="bold" />
                       </Button>
@@ -1194,9 +1214,9 @@ export function TasksAssistant() {
                       size="sm"
                       variant="ghost"
                       className="w-full text-amber-900 hover:bg-amber-100"
-                      onClick={() => setFilter('overdue')}
+                      onClick={() => setFilter('scheduled')}
                     >
-                      Zobacz wszystkie przeterminowane zadania
+                      Zobacz wszystkie zadania do zaplanowania
                     </Button>
                   )}
                 </div>
@@ -1332,8 +1352,7 @@ export function TasksAssistant() {
                 {filter === 'tomorrow' && 'Nie masz zadań na jutro'}
                 {filter === 'week' && 'Nie masz zadań w tym tygodniu'}
                 {filter === 'month' && 'Nie masz zadań w tym miesiącu'}
-                {filter === 'overdue' && 'Nie masz przeterminowanych zadań'}
-                {filter === 'scheduled' && 'Nie masz zaplanowanych zadań bez daty'}
+                {filter === 'scheduled' && 'Nie masz zadań do zaplanowania'}
                 {filter === 'completed' && 'Nie masz ukończonych zadań'}
               </p>
               <Button onClick={() => setShowCreateModal(true)} className="gap-2">
