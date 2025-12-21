@@ -100,12 +100,16 @@ async function fetchAndFilterTasks(token: any, filter: string, date?: string) {
       if (t?.completed === true || t?.is_completed === true || t?.completed_at) {
         return false
       }
+      if (filter === 'overdue') {
+        console.warn('[todoist/tasks] Deprecated filter "overdue" received, mapping to "scheduled"')
+      }
+      // Map legacy "overdue" filter to "scheduled" (overdue now handled together with planning)
+      // TODO(Q2 2026): Remove this mapping once all callers send "scheduled" instead of "overdue"
+      const effectiveFilter = filter === 'overdue' ? 'scheduled' : filter
       // unify due source: Todoist may return object with .date or a string
       const dueStr = t?.due?.date || t?.due || null
-      if (!dueStr) {
-        // show tasks without due only when filter == all
-        return filter === 'all'
-      }
+      if (effectiveFilter === 'scheduled' && !dueStr) return true
+      if (!dueStr) return effectiveFilter === 'all'
 
       // parse date (prefer parseISO for date-only strings)
       let dueDate: Date
@@ -116,13 +120,15 @@ async function fetchAndFilterTasks(token: any, filter: string, date?: string) {
         dueDate = new Date(dueStr)
       }
 
-      switch (filter) {
+      if (effectiveFilter === 'scheduled') {
+        return isBefore(dueDate, todayStart)
+      }
+
+      switch (effectiveFilter) {
         case 'today':
           return dueDate >= todayStart && dueDate <= todayEnd
         case 'tomorrow':
           return dueDate >= tomorrowStart && dueDate <= tomorrowEnd
-        case 'overdue':
-          return isBefore(dueDate, todayStart)
         case '7 days':
         case 'week':
           return isWithinInterval(dueDate, { start: todayStart, end: sevenDaysEnd })
