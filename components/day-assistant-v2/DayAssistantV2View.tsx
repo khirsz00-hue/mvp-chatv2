@@ -65,6 +65,18 @@ type UndoToast = {
 
 const todayIso = () => new Date().toISOString().split('T')[0]
 
+// Helper: Format milliseconds to MM:SS
+const formatTimeBlockRemaining = (milliseconds: number): string => {
+  const minutes = Math.floor(milliseconds / 60000)
+  const seconds = Math.floor((milliseconds % 60000) / 1000)
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
+// Helper: Calculate time block progress percentage
+const calculateTimeBlockProgress = (remaining: number, total: number): number => {
+  return Math.max(0, (remaining / (total * 60000)) * 100)
+}
+
 // Inner content component (will be wrapped with QueryClientProvider)
 function DayAssistantV2Content() {
   const { showToast } = useToast()
@@ -878,7 +890,7 @@ function DayAssistantV2Content() {
                 
                 <div className="text-center mb-3">
                   <p className="text-4xl font-bold text-purple-700 tabular-nums">
-                    {Math.floor(timeBlockRemaining / 60000)}:{String(Math.floor((timeBlockRemaining % 60000) / 1000)).padStart(2, '0')}
+                    {formatTimeBlockRemaining(timeBlockRemaining)}
                   </p>
                   <p className="text-sm text-purple-600 mt-1">
                     pozostało z {activeTimeBlock.totalMinutes} min
@@ -889,7 +901,7 @@ function DayAssistantV2Content() {
                   <div
                     className="bg-gradient-to-r from-purple-500 to-blue-500 h-3 rounded-full transition-all duration-1000"
                     style={{ 
-                      width: `${Math.max(0, (timeBlockRemaining / (activeTimeBlock.totalMinutes * 60000)) * 100)}%` 
+                      width: `${calculateTimeBlockProgress(timeBlockRemaining, activeTimeBlock.totalMinutes)}%` 
                     }}
                   />
                 </div>
