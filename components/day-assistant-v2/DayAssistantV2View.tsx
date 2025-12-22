@@ -171,10 +171,18 @@ export function DayAssistantV2View() {
   }, [sessionToken]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const authFetch = async (url: string, options: RequestInit = {}) => {
-    if (!sessionToken) throw new Error('Brak sesji')
+    // Get fresh token from Supabase to avoid JWT expiration issues
+    const { data: { session } } = await supabase.auth.getSession()
+    
+    if (!session) {
+      console.error('[DayAssistantV2] No active session')
+      showToast('Sesja wygasła. Zaloguj się ponownie.', 'error')
+      throw new Error('Brak sesji')
+    }
+    
     const headers = {
       ...(options.headers || {}),
-      Authorization: `Bearer ${sessionToken}`,
+      Authorization: `Bearer ${session.access_token}`,
       'Content-Type': 'application/json'
     }
     return fetch(url, { ...options, headers })
@@ -579,17 +587,22 @@ export function DayAssistantV2View() {
   const handleDelete = async (task: TestDayTask) => {
     if (!window.confirm('Czy na pewno chcesz usunąć to zadanie?')) return
     
-    const { error } = await supabase
-      .from('day_assistant_v2_tasks')
-      .delete()
-      .eq('id', task.id)
-    
-    if (!error) {
-      setTasks(prev => prev.filter(t => t.id !== task.id))
-      addDecisionLog(`Usunięto zadanie "${task.title}"`)
-      showToast('🗑️ Zadanie usunięte', 'success')
-    } else {
-      showToast('Nie udało się usunąć zadania', 'error')
+    try {
+      const response = await authFetch(`/api/day-assistant-v2/tasks/${task.id}`, {
+        method: 'DELETE'
+      })
+      
+      if (response.ok) {
+        setTasks(prev => prev.filter(t => t.id !== task.id))
+        addDecisionLog(`Usunięto zadanie "${task.title}"`)
+        showToast('🗑️ Zadanie usunięte', 'success')
+      } else {
+        const error = await response.json()
+        showToast(error.error || 'Nie udało się usunąć zadania', 'error')
+      }
+    } catch (error) {
+      console.error('[DayAssistantV2] Delete error:', error)
+      showToast('Wystąpił błąd podczas usuwania zadania', 'error')
     }
   }
 
