@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient'
 import Button from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { useToast } from '@/components/ui/Toast'
+import { Toaster, toast } from 'sonner'
 import { syncTodoist, startBackgroundSync } from '@/lib/todoistSync'
 import {
   ENERGY_FOCUS_PRESETS,
@@ -32,6 +33,7 @@ import { WorkHoursConfigModal } from './WorkHoursConfigModal'
 import { TaskTimer } from './TaskTimer'
 import { OverdueTasksSection } from './OverdueTasksSection'
 import { ClarifyModal } from './ClarifyModal'
+import { QueueReorderingOverlay } from './LoadingStates'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/DropdownMenu'
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 
@@ -71,6 +73,7 @@ export function DayAssistantV2View() {
   const [showConfigModal, setShowConfigModal] = useState(false)
   const [clarifyTask, setClarifyTask] = useState<TestDayTask | null>(null)
   const [showLaterQueue, setShowLaterQueue] = useState(false)
+  const [isReorderingQueue, setIsReorderingQueue] = useState(false)
   const undoTimer = useRef<NodeJS.Timeout | null>(null)
 
   // Timer hook
@@ -343,7 +346,14 @@ export function DayAssistantV2View() {
 
   const updateSliders = async (field: 'energy' | 'focus', value: number) => {
     if (!dayPlan) return
+    
+    // Set loading state for instant feedback
+    setIsReorderingQueue(true)
     setDayPlan(prev => prev ? { ...prev, [field]: value } : prev)
+    
+    // Clear loading after a short delay (instant visual feedback)
+    setTimeout(() => setIsReorderingQueue(false), 300)
+    
     const response = await authFetch('/api/day-assistant-v2/dayplan', {
       method: 'POST',
       body: JSON.stringify({ date: selectedDate, [field]: value })
@@ -486,12 +496,12 @@ export function DayAssistantV2View() {
     if (response.ok) {
       setTasks(prev => prev.filter(t => t.id !== task.id))
       addDecisionLog(`Oznaczono "${task.title}" jako wykonane`)
-      showToast('✅ Zadanie ukończone', 'success')
+      toast.success('✅ Zadanie ukończone!')
       
       // TODO: Add celebration animation
       // showCelebration()
     } else {
-      showToast('Nie udało się oznaczyć jako wykonane', 'error')
+      toast.error('Nie udało się oznaczyć jako wykonane')
     }
   }
 
@@ -529,7 +539,7 @@ export function DayAssistantV2View() {
     if (newPinState) {
       const currentPinnedCount = tasks.filter(t => t.is_must).length
       if (currentPinnedCount >= 3) {
-        showToast('Maksymalnie 3 zadania MUST! Odepnij coś najpierw.', 'warning')
+        toast.warning('Maksymalnie 3 zadania MUST! Odepnij coś najpierw.')
         return
       }
     }
@@ -543,10 +553,10 @@ export function DayAssistantV2View() {
       const data = await response.json()
       setTasks(prev => prev.map(t => t.id === task.id ? { ...t, is_must: newPinState } : t))
       addDecisionLog(`${newPinState ? 'Przypięto' : 'Odpięto'} "${task.title}"`)
-      showToast(data.message, 'success')
+      toast.success(newPinState ? '📌 Przypięto jako MUST' : '📌 Odpięto z MUST')
     } else {
       const error = await response.json()
-      showToast(error.error || 'Nie udało się zmienić statusu MUST', 'error')
+      toast.error(error.error || 'Nie udało się zmienić statusu MUST')
     }
   }
 
@@ -585,7 +595,9 @@ export function DayAssistantV2View() {
   }
 
   const handleDelete = async (task: TestDayTask) => {
-    if (!window.confirm('Czy na pewno chcesz usunąć to zadanie?')) return
+    // Use sonner toast for confirmation instead of browser alert
+    const confirmed = window.confirm('Czy na pewno chcesz usunąć to zadanie?')
+    if (!confirmed) return
     
     try {
       const response = await authFetch(`/api/day-assistant-v2/tasks/${task.id}`, {
@@ -595,14 +607,21 @@ export function DayAssistantV2View() {
       if (response.ok) {
         setTasks(prev => prev.filter(t => t.id !== task.id))
         addDecisionLog(`Usunięto zadanie "${task.title}"`)
-        showToast('🗑️ Zadanie usunięte', 'success')
+        toast.success('🗑️ Zadanie usunięte')
+        
+        // CRITICAL: Invalidate stale recommendation if it mentions deleted task
+        setProposals(prev => prev.filter(p => {
+          const mentionsTask = p.primary_action?.task_id === task.id ||
+            p.alternatives?.some((a: any) => a.task_id === task.id)
+          return !mentionsTask
+        }))
       } else {
         const error = await response.json()
-        showToast(error.error || 'Nie udało się usunąć zadania', 'error')
+        toast.error(error.error || 'Nie udało się usunąć zadania')
       }
     } catch (error) {
       console.error('[DayAssistantV2] Delete error:', error)
-      showToast('Wystąpił błąd podczas usuwania zadania', 'error')
+      toast.error('Wystąpił błąd podczas usuwania zadania')
     }
   }
 
@@ -636,6 +655,7 @@ export function DayAssistantV2View() {
 
   return (
     <TooltipProvider>
+      <Toaster position="top-right" />
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
         <div className="space-y-6">
         <Card>
@@ -684,6 +704,7 @@ export function DayAssistantV2View() {
               focus={dayPlan?.focus || 3}
               onEnergyChange={v => updateSliders('energy', v)}
               onFocusChange={v => updateSliders('focus', v)}
+              isUpdating={isReorderingQueue}
             />
             
             {presetButtons}
@@ -742,37 +763,129 @@ export function DayAssistantV2View() {
           </Card>
         )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle>📊 Kolejka na dziś ({queue.length} {queue.length === 1 ? 'task' : 'tasków'})</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {queue.length === 0 && <p className="text-sm text-muted-foreground">Brak zadań w kolejce</p>}
-            {queue.map((task, index) => (
-              <TaskRow
-                key={task.id}
-                task={task}
-                queuePosition={index + 1}
-                onNotToday={() => handleNotToday(task)}
-                onStart={() => handleStartTask(task)}
-                onUnmark={() => openUnmarkWarning(task)}
-                onDecompose={() => handleDecompose(task)}
-                onComplete={() => handleComplete(task)}
-                onPin={() => handlePin(task)}
-                onDelete={() => handleDelete(task)}
-                onClick={() => setSelectedTask(task)}
-                focus={dayPlan?.focus || 3}
-                selectedDate={selectedDate}
-                activeTimer={activeTimer?.taskId === task.id ? activeTimer : undefined}
-                onPauseTimer={pauseTimer}
-                onResumeTimer={resumeTimer}
-                onCompleteTimer={handleTimerComplete}
-                onSubtaskToggle={handleSubtaskToggle}
-                showActions={true}
-              />
-            ))}
-          </CardContent>
-        </Card>
+        {/* MUST Tasks Section */}
+        {mustTasks.length > 0 && (
+          <Card className="border-brand-purple/40 relative">
+            {isReorderingQueue && <QueueReorderingOverlay />}
+            <CardHeader>
+              <CardTitle>📌 MUST (najpilniejsze) — {mustTasks.length}/3</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {mustTasks.map((task, index) => (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  queuePosition={index + 1}
+                  onNotToday={() => handleNotToday(task)}
+                  onStart={() => handleStartTask(task)}
+                  onUnmark={() => openUnmarkWarning(task)}
+                  onDecompose={() => handleDecompose(task)}
+                  onComplete={() => handleComplete(task)}
+                  onPin={() => handlePin(task)}
+                  onDelete={() => handleDelete(task)}
+                  onClick={() => setSelectedTask(task)}
+                  focus={dayPlan?.focus || 3}
+                  selectedDate={selectedDate}
+                  activeTimer={activeTimer?.taskId === task.id ? activeTimer : undefined}
+                  onPauseTimer={pauseTimer}
+                  onResumeTimer={resumeTimer}
+                  onCompleteTimer={handleTimerComplete}
+                  onSubtaskToggle={handleSubtaskToggle}
+                  showActions={true}
+                />
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Top 3 Queue Section */}
+        {matchedTasks.length > 0 && (
+          <Card className="relative">
+            {isReorderingQueue && <QueueReorderingOverlay />}
+            <CardHeader>
+              <CardTitle>📊 Kolejka na dziś (Top 3) — {Math.min(matchedTasks.length, 3)} zadań</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {matchedTasks.slice(0, 3).map((task, index) => (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  queuePosition={mustTasks.length + index + 1}
+                  onNotToday={() => handleNotToday(task)}
+                  onStart={() => handleStartTask(task)}
+                  onUnmark={() => openUnmarkWarning(task)}
+                  onDecompose={() => handleDecompose(task)}
+                  onComplete={() => handleComplete(task)}
+                  onPin={() => handlePin(task)}
+                  onDelete={() => handleDelete(task)}
+                  onClick={() => setSelectedTask(task)}
+                  focus={dayPlan?.focus || 3}
+                  selectedDate={selectedDate}
+                  activeTimer={activeTimer?.taskId === task.id ? activeTimer : undefined}
+                  onPauseTimer={pauseTimer}
+                  onResumeTimer={resumeTimer}
+                  onCompleteTimer={handleTimerComplete}
+                  onSubtaskToggle={handleSubtaskToggle}
+                  showActions={true}
+                />
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Rest of Queue (expandable) */}
+        {matchedTasks.length > 3 && (
+          <Card className="relative">
+            {isReorderingQueue && <QueueReorderingOverlay />}
+            <CardContent className="pt-4 space-y-3">
+              <button
+                onClick={() => setShowLaterQueue(!showLaterQueue)}
+                className="flex items-center gap-2 text-sm font-semibold hover:text-brand-purple transition-colors"
+              >
+                {showLaterQueue ? '🔼 Zwiń kolejkę' : '👁️ Pokaż pozostałe zadania w kolejce'}
+                <span className="text-muted-foreground">({matchedTasks.length - 3} zadań)</span>
+              </button>
+
+              {showLaterQueue && (
+                <div className="space-y-2 pt-2 border-t">
+                  {matchedTasks.slice(3).map((task, index) => (
+                    <TaskRow
+                      key={task.id}
+                      task={task}
+                      queuePosition={mustTasks.length + 3 + index + 1}
+                      onNotToday={() => handleNotToday(task)}
+                      onStart={() => handleStartTask(task)}
+                      onUnmark={() => openUnmarkWarning(task)}
+                      onDecompose={() => handleDecompose(task)}
+                      onComplete={() => handleComplete(task)}
+                      onPin={() => handlePin(task)}
+                      onDelete={() => handleDelete(task)}
+                      onClick={() => setSelectedTask(task)}
+                      focus={dayPlan?.focus || 3}
+                      selectedDate={selectedDate}
+                      activeTimer={activeTimer?.taskId === task.id ? activeTimer : undefined}
+                      onPauseTimer={pauseTimer}
+                      onResumeTimer={resumeTimer}
+                      onCompleteTimer={handleTimerComplete}
+                      onSubtaskToggle={handleSubtaskToggle}
+                      showActions={true}
+                      isCollapsed={true}
+                    />
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Empty state */}
+        {mustTasks.length === 0 && matchedTasks.length === 0 && queue.length === 0 && (
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-muted-foreground text-center">Brak zadań w kolejce</p>
+            </CardContent>
+          </Card>
+        )}
 
         {later.length > 0 && (
           <Card>
