@@ -773,6 +773,71 @@ export function generateRecommendation(
 ): Proposal | null {
   if (tasks.length === 0) return null
   
+  // ========================================
+  // CRITICAL: LOW ENERGY + LOW FOCUS
+  // ========================================
+  if (context.energy === 1 && context.focus === 1) {
+    // Find easiest task (lowest cognitive load + shortest duration)
+    const easiestTask = tasks
+      .filter(t => t.cognitive_load <= 2)
+      .sort((a, b) => {
+        // Prefer: low cognitive load + short duration
+        const scoreA = a.cognitive_load + (a.estimate_min / 100)
+        const scoreB = b.cognitive_load + (b.estimate_min / 100)
+        return scoreA - scoreB
+      })[0]
+
+    if (easiestTask && tasks[0] && easiestTask.id !== tasks[0].id) {
+      return {
+        id: `low-energy-focus-${easiestTask.id}-${Date.now()}`,
+        user_id: easiestTask.user_id,
+        assistant_id: easiestTask.assistant_id,
+        plan_date: new Date().toISOString().split('T')[0],
+        reason: `🟡 Niska energia i skupienie - zacznij od najłatwiejszego zadania "${easiestTask.title}" (Load ${easiestTask.cognitive_load}, ${easiestTask.estimate_min} min) żeby w ogóle ruszyć!`,
+        primary_action: {
+          type: 'reorder',
+          task_id: easiestTask.id,
+          metadata: {
+            new_position: 1,
+            reason: 'Start od łatwego zadania da Ci momentum'
+          }
+        },
+        alternatives: [
+          {
+            type: 'suggest_break',
+            metadata: {
+              duration_minutes: 10,
+              reason: 'Lub zrób krótką przerwę (10 min) i wróć z większą energią'
+            }
+          }
+        ],
+        status: 'pending',
+        expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        created_at: new Date().toISOString(),
+      }
+    } else if (!easiestTask) {
+      // No easy tasks - suggest break
+      return {
+        id: `suggest-break-${Date.now()}`,
+        user_id: tasks[0].user_id,
+        assistant_id: tasks[0].assistant_id,
+        plan_date: new Date().toISOString().split('T')[0],
+        reason: `🟡 Niska energia i skupienie, a wszystkie zadania wymagające. Weź krótką przerwę żeby się zregenerować.`,
+        primary_action: {
+          type: 'suggest_break',
+          metadata: {
+            duration_minutes: 15,
+            reason: 'Przerwa pomoże Ci odzyskać energię'
+          }
+        },
+        alternatives: [],
+        status: 'pending',
+        expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        created_at: new Date().toISOString(),
+      }
+    }
+  }
+  
   // STEP 1: Calculate available time
   const now = new Date()
   const [endHour, endMin] = context.workEndTime.split(':').map(Number)
@@ -821,7 +886,6 @@ export function generateRecommendation(
         status: 'pending',
         expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 minutes
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
       }
     }
   }
@@ -855,7 +919,6 @@ export function generateRecommendation(
       status: 'pending',
       expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
     }
   }
   
@@ -884,7 +947,6 @@ export function generateRecommendation(
         status: 'pending',
         expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
       }
     }
   }
@@ -914,7 +976,78 @@ export function generateRecommendation(
         status: 'pending',
         expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+      }
+    }
+  }
+  
+  // ========================================
+  // CONTEXT BATCHING
+  // ========================================
+  // Note: topTask already defined above
+  
+  if (topTask && topTask.context_type) {
+    // Find tasks with same context
+    const sameContextTasks = tasks.filter(t => 
+      t.context_type === topTask.context_type &&
+      t.id !== topTask.id
+    )
+
+    if (sameContextTasks.length >= 2) {
+      // Check if batching is safe
+      const batchTotalTime = [topTask, ...sameContextTasks.slice(0, 2)]
+        .reduce((sum, t) => sum + t.estimate_min, 0)
+
+      // Calculate available time
+      const now = new Date()
+      const [endHour, endMin] = context.workEndTime.split(':').map(Number)
+      const workEnd = new Date()
+      workEnd.setHours(endHour, endMin, 0, 0)
+      const availableMinutes = Math.max(0, (workEnd.getTime() - now.getTime()) / 1000 / 60)
+
+      // Check if any task is a meeting scheduled soon
+      const hasMeetingSoon = tasks.some(t => 
+        t.title.toLowerCase().includes('spotkanie') ||
+        t.title.toLowerCase().includes('meeting')
+      )
+
+      // Only suggest batching if:
+      // - Batch fits in available time (with 30% buffer)
+      // - No meeting soon
+      // - Batch is < 2 hours (avoid too long context switching)
+      if (
+        batchTotalTime <= availableMinutes * 0.7 &&
+        !hasMeetingSoon &&
+        batchTotalTime <= 120
+      ) {
+        const batchTaskNames = [topTask, ...sameContextTasks.slice(0, 2)]
+          .map(t => `"${t.title}"`)
+          .join(', ')
+
+        return {
+          id: `context-batch-${topTask.id}-${Date.now()}`,
+          user_id: topTask.user_id,
+          assistant_id: topTask.assistant_id,
+          plan_date: new Date().toISOString().split('T')[0],
+          reason: `🎯 Masz ${sameContextTasks.length + 1} zadania kontekstu "${topTask.context_type}": ${batchTaskNames}. Zrobić je w jednym bloku (${batchTotalTime} min) żeby nie tracić kontekstu?`,
+          primary_action: {
+            type: 'create_batch',
+            metadata: {
+              task_ids: [topTask.id, ...sameContextTasks.slice(0, 2).map(t => t.id)],
+              reason: 'Praca w jednym kontekście zwiększa efektywność'
+            }
+          },
+          alternatives: [
+            {
+              type: 'keep_current_order',
+              metadata: {
+                reason: 'Lub zachowaj obecną kolejność (mieszane konteksty)'
+              }
+            }
+          ],
+          status: 'pending',
+          expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+          created_at: new Date().toISOString(),
+        }
       }
     }
   }

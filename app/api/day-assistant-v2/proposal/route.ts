@@ -113,6 +113,27 @@ async function applyProposalAction(action: ProposalAction): Promise<boolean> {
         }
         break
       
+      case 'reorder':
+        if (action.task_id && action.metadata?.new_position) {
+          await updateTask(action.task_id, {
+            position: action.metadata.new_position
+          })
+          return true
+        }
+        break
+      
+      case 'create_batch':
+        if (action.metadata?.task_ids && Array.isArray(action.metadata.task_ids)) {
+          // Reorder tasks to be consecutive
+          for (let i = 0; i < action.metadata.task_ids.length; i++) {
+            await updateTask(action.metadata.task_ids[i], {
+              position: i + 1
+            })
+          }
+          return true
+        }
+        break
+      
       case 'reserve_morning':
         // TODO: Implement morning slot reservation in day plan blocks
         console.log('Morning slot reservation not yet implemented')
@@ -126,6 +147,16 @@ async function applyProposalAction(action: ProposalAction): Promise<boolean> {
       case 'swap_tasks':
         // TODO: Implement task swapping
         console.log('Task swapping not yet implemented')
+        return true
+      
+      case 'suggest_break':
+        // This is just a suggestion, no actual action needed
+        console.log('Break suggestion acknowledged')
+        return true
+      
+      case 'keep_current_order':
+        // No action needed - user wants to keep current order
+        console.log('Keeping current order')
         return true
     }
     
