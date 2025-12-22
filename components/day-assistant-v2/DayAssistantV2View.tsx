@@ -343,6 +343,12 @@ function DayAssistantV2Content() {
     if (!assistant) return null
     return checkLightTaskLimit(filteredTasks, assistant)
   }, [assistant, filteredTasks])
+  
+  // Memoize easiest task calculation for fallback display
+  const easiestTask = useMemo(() => {
+    if (later.length === 0) return null
+    return [...later].sort((a, b) => a.cognitive_load - b.cognitive_load)[0]
+  }, [later])
 
   const addDecisionLog = (message: string) => {
     setDecisionLog(prev => [
@@ -631,6 +637,13 @@ function DayAssistantV2Content() {
   }
 
   const handleSubtaskToggle = async (subtaskId: string, completed: boolean) => {
+    // Helper function to check if all subtasks are completed
+    const checkAllSubtasksCompleted = (subtasks: any[], updatedSubtaskId: string) => {
+      return subtasks.map(sub =>
+        sub.id === updatedSubtaskId ? { ...sub, completed: true } : sub
+      ).every(sub => sub.completed)
+    }
+    
     // Find the task containing this subtask
     const parentTask = tasks.find(task => 
       task.subtasks?.some(sub => sub.id === subtaskId)
@@ -642,9 +655,6 @@ function DayAssistantV2Content() {
         const updatedSubtasks = task.subtasks.map(sub =>
           sub.id === subtaskId ? { ...sub, completed } : sub
         )
-        
-        // Check if all subtasks are now completed
-        const allSubtasksCompleted = updatedSubtasks.every(sub => sub.completed)
         
         return {
           ...task,
@@ -658,21 +668,36 @@ function DayAssistantV2Content() {
       await toggleSubtaskMutation.mutateAsync({ subtaskId, completed })
       
       // After successful subtask toggle, check if all subtasks are completed
-      if (parentTask && completed) {
-        const updatedSubtasks = parentTask.subtasks?.map(sub =>
-          sub.id === subtaskId ? { ...sub, completed: true } : sub
-        ) || []
-        
-        const allSubtasksCompleted = updatedSubtasks.every(sub => sub.completed)
+      if (parentTask && completed && parentTask.subtasks) {
+        const allSubtasksCompleted = checkAllSubtasksCompleted(parentTask.subtasks, subtaskId)
         
         if (allSubtasksCompleted) {
-          // Auto-complete the parent task
-          toast.success('🎉 Wszystkie kroki ukończone! Ukończono zadanie.')
+          // Auto-complete the parent task after successful subtask update
           await handleComplete(parentTask)
+          toast.success('🎉 Wszystkie kroki ukończone! Zadanie zostało ukończone.')
         }
       }
     } catch (error) {
       console.error('Toggle subtask error:', error)
+    }
+  }
+
+  const performTaskDeletion = async (task: TestDayTask) => {
+    // Optimistic update
+    setTasks(prev => prev.filter(t => t.id !== task.id))
+    addDecisionLog(`Usunięto zadanie "${task.title}"`)
+    
+    // Filter out recommendations mentioning this task
+    setProposals(prev => prev.filter(p => {
+      const mentionsTask = p.primary_action?.task_id === task.id ||
+        p.alternatives?.some((a: any) => a.task_id === task.id)
+      return !mentionsTask
+    }))
+    
+    try {
+      await deleteTaskMutation.mutateAsync(task.id)
+    } catch (error) {
+      console.error('Delete task error:', error)
     }
   }
 
@@ -686,24 +711,7 @@ function DayAssistantV2Content() {
       {
         action: {
           label: 'Usuń',
-          onClick: async () => {
-            // Optimistic update
-            setTasks(prev => prev.filter(t => t.id !== task.id))
-            addDecisionLog(`Usunięto zadanie "${task.title}"`)
-            
-            // Filter out recommendations mentioning this task
-            setProposals(prev => prev.filter(p => {
-              const mentionsTask = p.primary_action?.task_id === task.id ||
-                p.alternatives?.some((a: any) => a.task_id === task.id)
-              return !mentionsTask
-            }))
-            
-            try {
-              await deleteTaskMutation.mutateAsync(task.id)
-            } catch (error) {
-              console.error('Delete task error:', error)
-            }
-          }
+          onClick: () => performTaskDeletion(task)
         },
         cancel: {
           label: 'Anuluj',
@@ -985,7 +993,7 @@ function DayAssistantV2Content() {
             <CardContent className="pt-6 space-y-4">
               <div className="text-center">
                 <p className="text-sm font-semibold text-orange-800 mb-2">
-                  😊 Brak zadań pasujących do obecnego trybu
+                  <span aria-label="uśmiech">😊</span> Brak zadań pasujących do obecnego trybu
                 </p>
                 <p className="text-xs text-orange-700 mb-4">
                   Spróbuj zmienić tryb pracy lub rozpocznij od najprostszego zadania
@@ -993,44 +1001,44 @@ function DayAssistantV2Content() {
               </div>
               
               {/* Show easiest task if available */}
-              {later.length > 0 && (() => {
-                const easiestTask = [...later].sort((a, b) => a.cognitive_load - b.cognitive_load)[0]
-                return easiestTask ? (
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold text-orange-800">💡 Najłatwiejsze zadanie:</p>
-                    <TaskRow
-                      key={easiestTask.id}
-                      task={easiestTask}
-                      onNotToday={() => handleNotToday(easiestTask)}
-                      onStart={() => handleStartTask(easiestTask)}
-                      onUnmark={() => openUnmarkWarning(easiestTask)}
-                      onDecompose={() => handleDecompose(easiestTask)}
-                      onComplete={() => handleComplete(easiestTask)}
-                      onPin={() => handlePin(easiestTask)}
-                      onDelete={() => handleDelete(easiestTask)}
-                      onClick={() => setSelectedTask(easiestTask)}
-                      focus={dayPlan?.focus || 3}
-                      selectedDate={selectedDate}
-                      onSubtaskToggle={handleSubtaskToggle}
-                    />
-                    <div className="text-center mt-3">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setHelpMeTask(easiestTask)}
-                        className="border-brand-purple text-brand-purple hover:bg-brand-purple/10"
-                      >
-                        <MagicWand size={16} className="mr-2" />
-                        ⚡ Pomóż mi z tym zadaniem
-                      </Button>
-                    </div>
+              {easiestTask && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-orange-800">
+                    <span aria-label="żarówka">💡</span> Najłatwiejsze zadanie:
+                  </p>
+                  <TaskRow
+                    key={easiestTask.id}
+                    task={easiestTask}
+                    onNotToday={() => handleNotToday(easiestTask)}
+                    onStart={() => handleStartTask(easiestTask)}
+                    onUnmark={() => openUnmarkWarning(easiestTask)}
+                    onDecompose={() => handleDecompose(easiestTask)}
+                    onComplete={() => handleComplete(easiestTask)}
+                    onPin={() => handlePin(easiestTask)}
+                    onDelete={() => handleDelete(easiestTask)}
+                    onClick={() => setSelectedTask(easiestTask)}
+                    focus={dayPlan?.focus || 3}
+                    selectedDate={selectedDate}
+                    onSubtaskToggle={handleSubtaskToggle}
+                  />
+                  <div className="text-center mt-3">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setHelpMeTask(easiestTask)}
+                      className="border-brand-purple text-brand-purple hover:bg-brand-purple/10"
+                      aria-label="Pomóż mi z tym zadaniem"
+                    >
+                      <MagicWand size={16} className="mr-2" />
+                      <span aria-label="błyskawica">⚡</span> Pomóż mi z tym zadaniem
+                    </Button>
                   </div>
-                ) : null
-              })()}
+                </div>
+              )}
               
               {later.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center">
-                  Brak zadań do wykonania 🎉
+                  Brak zadań do wykonania <span aria-label="świętowanie">🎉</span>
                 </p>
               )}
             </CardContent>
