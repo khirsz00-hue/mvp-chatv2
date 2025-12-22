@@ -6,10 +6,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-})
-
 export async function POST(request: NextRequest) {
   try {
     const { task_title, what_to_do, completion_criteria, blockers } = await request.json()
@@ -17,6 +13,15 @@ export async function POST(request: NextRequest) {
     if (!task_title || !what_to_do || !completion_criteria) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
+
+    // Initialize OpenAI client at runtime
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 })
+    }
+
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY
+    })
 
     const prompt = `
 Zadanie: "${task_title}"

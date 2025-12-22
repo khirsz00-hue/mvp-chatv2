@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import Button from '@/components/ui/Button'
-import { Textarea } from '@/components/ui/Textarea'
+import Textarea from '@/components/ui/Textarea'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ArrowsClockwise } from '@phosphor-icons/react'
@@ -12,7 +12,7 @@ import { toast } from 'sonner'
 interface Task {
   id: string
   title: string
-  description: string | null
+  description?: string | null | undefined
 }
 
 interface Step {
