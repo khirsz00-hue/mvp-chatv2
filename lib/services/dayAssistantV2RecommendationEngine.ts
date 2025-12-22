@@ -746,3 +746,178 @@ function generateExplanation(factors: ScoreFactor[], total: number): string {
   if (total > 40) return 'Średnie dopasowanie - możesz zrobić teraz lub później.'
   return 'Słabe dopasowanie - lepiej zostawić na później lub zmienić parametry.'
 }
+
+/**
+ * Helper function to get tomorrow's date in ISO format
+ */
+function getTomorrow(): string {
+  const tomorrow = new Date()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  return tomorrow.toISOString().split('T')[0]
+}
+
+/**
+ * Generate time-aware recommendation based on current context and available time
+ * This addresses ISSUE 1: Only suggests postponing when > 90% time utilized
+ */
+export function generateRecommendation(
+  tasks: TestDayTask[],
+  context: {
+    energy: number
+    focus: number
+    currentTime: Date
+    workStartTime: string  // "09:00"
+    workEndTime: string    // "17:00"
+    contextFilter: string | null
+  }
+): Proposal | null {
+  if (tasks.length === 0) return null
+  
+  // STEP 1: Calculate available time
+  const now = new Date()
+  const [endHour, endMin] = context.workEndTime.split(':').map(Number)
+  const workEnd = new Date()
+  workEnd.setHours(endHour, endMin, 0, 0)
+  
+  const availableMinutes = Math.max(0, (workEnd.getTime() - now.getTime()) / 1000 / 60)
+  
+  // STEP 2: Calculate total estimated time
+  const totalEstimatedTime = tasks.reduce((sum, t) => sum + t.estimate_min, 0)
+  const utilizationPercent = availableMinutes > 0 ? (totalEstimatedTime / availableMinutes) * 100 : 100
+  
+  console.log('[Recommendation] Available:', Math.round(availableMinutes), 'min')
+  console.log('[Recommendation] Estimated:', totalEstimatedTime, 'min')
+  console.log('[Recommendation] Utilization:', utilizationPercent.toFixed(0), '%')
+  
+  // STEP 3: Only suggest postponing if > 90% utilized
+  if (utilizationPercent > 90) {
+    const candidatesToPostpone = tasks
+      .filter(t => !t.is_must)
+      .filter(t => t.cognitive_load <= 3)
+      .sort((a, b) => {
+        if (a.is_important !== b.is_important) return a.is_important ? 1 : -1
+        return a.priority - b.priority
+      })
+    
+    const taskToPostpone = candidatesToPostpone[0]
+    
+    if (taskToPostpone) {
+      return {
+        id: `postpone-${taskToPostpone.id}-${Date.now()}`,
+        user_id: taskToPostpone.user_id,
+        assistant_id: taskToPostpone.assistant_id,
+        plan_date: new Date().toISOString().split('T')[0],
+        reason: `Masz ${Math.round(availableMinutes)} min dostępnych, a tasków na ${totalEstimatedTime} min (${utilizationPercent.toFixed(0)}% wykorzystania). Proponuję przesunąć "${taskToPostpone.title}" na jutro.`,
+        primary_action: {
+          type: 'move_task',
+          task_id: taskToPostpone.id,
+          from_date: new Date().toISOString().split('T')[0],
+          to_date: getTomorrow(),
+          metadata: {
+            reason: 'Za dużo tasków na dzisiaj'
+          }
+        },
+        alternatives: [],
+        status: 'pending',
+        expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 minutes
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+    }
+  }
+  
+  // STEP 4: If < 70% utilized - NO postpone recommendation
+  if (utilizationPercent < 70) {
+    console.log('[Recommendation] Plenty of time, no postpone needed')
+  }
+  
+  // STEP 5: Energy/focus based recommendations
+  const topTask = tasks[0]
+  
+  // LOW FOCUS (1) + HIGH COGNITIVE LOAD
+  if (context.focus === 1 && topTask.cognitive_load >= 4) {
+    return {
+      id: `low-focus-${topTask.id}-${Date.now()}`,
+      user_id: topTask.user_id,
+      assistant_id: topTask.assistant_id,
+      plan_date: new Date().toISOString().split('T')[0],
+      reason: `Przy niskim skupieniu task "${topTask.title}" (Load ${topTask.cognitive_load}) może być zbyt trudny.`,
+      primary_action: {
+        type: 'move_task',
+        task_id: topTask.id,
+        from_date: new Date().toISOString().split('T')[0],
+        to_date: getTomorrow(),
+        metadata: {
+          reason: 'Niskie skupienie - lepiej przełożyć'
+        }
+      },
+      alternatives: [],
+      status: 'pending',
+      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }
+  }
+  
+  // HIGH FOCUS (5) - suggest hardest task first
+  if (context.focus === 5) {
+    const hardestTask = tasks
+      .filter(t => t.cognitive_load >= 4)
+      .sort((a, b) => b.cognitive_load - a.cognitive_load)[0]
+    
+    if (hardestTask && hardestTask.id !== topTask.id) {
+      return {
+        id: `high-focus-${hardestTask.id}-${Date.now()}`,
+        user_id: hardestTask.user_id,
+        assistant_id: hardestTask.assistant_id,
+        plan_date: new Date().toISOString().split('T')[0],
+        reason: `Wysokie skupienie - idealny moment na "${hardestTask.title}" (Load ${hardestTask.cognitive_load})!`,
+        primary_action: {
+          type: 'reorder',
+          task_id: hardestTask.id,
+          metadata: {
+            new_position: 1,
+            reason: 'Wykorzystaj wysokie skupienie'
+          }
+        },
+        alternatives: [],
+        status: 'pending',
+        expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+    }
+  }
+  
+  // LOW ENERGY (1) - suggest easy task
+  if (context.energy === 1) {
+    const easiestTask = tasks
+      .filter(t => t.cognitive_load <= 2)
+      .sort((a, b) => a.cognitive_load - b.cognitive_load)[0]
+    
+    if (easiestTask && easiestTask.id !== topTask.id) {
+      return {
+        id: `low-energy-${easiestTask.id}-${Date.now()}`,
+        user_id: easiestTask.user_id,
+        assistant_id: easiestTask.assistant_id,
+        plan_date: new Date().toISOString().split('T')[0],
+        reason: `Niska energia - lepiej "${easiestTask.title}" (Load ${easiestTask.cognitive_load}).`,
+        primary_action: {
+          type: 'reorder',
+          task_id: easiestTask.id,
+          metadata: {
+            new_position: 1,
+            reason: 'Dostosuj do niskiej energii'
+          }
+        },
+        alternatives: [],
+        status: 'pending',
+        expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+    }
+  }
+  
+  return null
+}

@@ -18,6 +18,7 @@ import {
   generateUnmarkMustWarning,
   calculateScoreBreakdown
 } from '@/lib/services/dayAssistantV2RecommendationEngine'
+import { CONTEXT_LABELS, CONTEXT_COLORS, TaskContext } from '@/lib/services/contextInferenceService'
 import { Play, XCircle, Clock, ArrowsClockwise, MagicWand, Prohibit, PushPin, Gear, DotsThree, Check, Trash, Pencil, Info } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { useScoredTasks } from '@/hooks/useScoredTasks'
@@ -66,7 +67,7 @@ export function DayAssistantV2View() {
   const [newTaskEstimate, setNewTaskEstimate] = useState(25)
   const [newTaskLoad, setNewTaskLoad] = useState(2)
   const [newTaskMust, setNewTaskMust] = useState(false)
-  const [newTaskContext, setNewTaskContext] = useState<ContextType>('code')
+  const [newTaskContext, setNewTaskContext] = useState<TaskContext>('deep_work')
   const [showConfigModal, setShowConfigModal] = useState(false)
   const [clarifyTask, setClarifyTask] = useState<TestDayTask | null>(null)
   const [showLaterQueue, setShowLaterQueue] = useState(false)
@@ -677,10 +678,17 @@ export function DayAssistantV2View() {
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-sm text-muted-foreground">Filtr kontekstu:</span>
               <div className="flex gap-2 flex-wrap">
-                <ContextPill active={contextFilter === 'all'} onClick={() => setContextFilter('all')}>Wszystko</ContextPill>
-                {['code', 'admin', 'komunikacja', 'prywatne'].map(ctx => (
-                  <ContextPill key={ctx} active={contextFilter === ctx} onClick={() => setContextFilter(ctx as ContextType)}>
-                    {ctx}
+                <ContextPill active={contextFilter === 'all'} onClick={() => setContextFilter('all')}>
+                  Wszystko
+                </ContextPill>
+                {(Object.keys(CONTEXT_LABELS) as TaskContext[]).map(ctx => (
+                  <ContextPill 
+                    key={ctx} 
+                    active={contextFilter === ctx} 
+                    onClick={() => setContextFilter(ctx as ContextType)}
+                    className={contextFilter === ctx ? CONTEXT_COLORS[ctx] : ''}
+                  >
+                    {CONTEXT_LABELS[ctx]}
                   </ContextPill>
                 ))}
               </div>
@@ -894,12 +902,13 @@ export function DayAssistantV2View() {
                 <select
                   className="rounded-lg border px-3 py-2 text-sm"
                   value={newTaskContext}
-                  onChange={e => setNewTaskContext(e.target.value as ContextType)}
+                  onChange={e => setNewTaskContext(e.target.value as TaskContext)}
                 >
-                  <option value="code">code</option>
-                  <option value="admin">admin</option>
-                  <option value="komunikacja">komunikacja</option>
-                  <option value="prywatne">prywatne</option>
+                  {(Object.keys(CONTEXT_LABELS) as TaskContext[]).map(ctx => (
+                    <option key={ctx} value={ctx}>
+                      {CONTEXT_LABELS[ctx]}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
