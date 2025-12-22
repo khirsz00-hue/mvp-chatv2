@@ -13,6 +13,7 @@ interface EnergyFocusControlsProps {
   focus: number
   onEnergyChange: (value: number) => void
   onFocusChange: (value: number) => void
+  isUpdating?: boolean
 }
 
 type EnergyLevel = 1 | 3 | 5
@@ -33,10 +34,18 @@ export function EnergyFocusControls({
   energy,
   focus,
   onEnergyChange,
-  onFocusChange
+  onFocusChange,
+  isUpdating = false
 }: EnergyFocusControlsProps) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 relative">
+      {isUpdating && (
+        <div className="absolute -top-1 -right-1 flex items-center gap-1 text-xs text-brand-purple">
+          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-brand-purple" />
+          <span>Aktualizuję...</span>
+        </div>
+      )}
+      
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
           ⚡ Energia
@@ -46,11 +55,13 @@ export function EnergyFocusControls({
             <button
               key={level.value}
               onClick={() => onEnergyChange(level.value)}
+              disabled={isUpdating}
               className={cn(
                 'flex-1 px-4 py-2 rounded-lg border-2 font-medium transition-all',
                 energy === level.value
                   ? 'bg-brand-purple text-white border-brand-purple'
-                  : 'bg-white text-gray-700 border-gray-300 hover:border-brand-purple'
+                  : 'bg-white text-gray-700 border-gray-300 hover:border-brand-purple',
+                isUpdating && 'opacity-60 cursor-not-allowed'
               )}
             >
               {level.emoji} {level.label}
@@ -68,11 +79,13 @@ export function EnergyFocusControls({
             <button
               key={level.value}
               onClick={() => onFocusChange(level.value)}
+              disabled={isUpdating}
               className={cn(
                 'flex-1 px-4 py-2 rounded-lg border-2 font-medium transition-all',
                 focus === level.value
                   ? 'bg-brand-purple text-white border-brand-purple'
-                  : 'bg-white text-gray-700 border-gray-300 hover:border-brand-purple'
+                  : 'bg-white text-gray-700 border-gray-300 hover:border-brand-purple',
+                isUpdating && 'opacity-60 cursor-not-allowed'
               )}
             >
               {level.emoji} {level.label}
