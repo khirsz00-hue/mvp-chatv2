@@ -478,12 +478,22 @@ function DayAssistantV2Content() {
   const handleUndo = async () => {
     const response = await authFetch('/api/day-assistant-v2/undo', { method: 'POST' })
     if (response.ok) {
-      // Undo requires full reload as it may affect multiple entities
-      await loadDayPlan()
+      // Undo may affect multiple entities - refetch tasks and proposals
+      toast.success('↩️ Cofnięto ostatnią akcję')
       setUndoToast(null)
       addDecisionLog('Cofnięto ostatnią akcję')
+      
+      if (sessionToken) {
+        const tasksResponse = await authFetch(`/api/day-assistant-v2/dayplan?date=${selectedDate}`)
+        if (tasksResponse.ok) {
+          const data = await tasksResponse.json()
+          setTasks(data.tasks || [])
+          setProposals(data.proposals || [])
+          setDayPlan(data.dayPlan || null)
+        }
+      }
     } else {
-      showToast('Nie udało się cofnąć', 'error')
+      toast.error('Nie udało się cofnąć')
     }
   }
 
@@ -519,19 +529,28 @@ function DayAssistantV2Content() {
     
     if (action === 'reject' && rejectReason) {
       addDecisionLog(`Odrzucono rekomendację: ${rejectReason}`)
+      toast.info(`Odrzucono: ${rejectReason}`)
     } else {
       addDecisionLog(`Obsłużono rekomendację (${action})`)
     }
     
     try {
-      await acceptRecommendationMutation.mutateAsync({
+      const response = await acceptRecommendationMutation.mutateAsync({
         proposalId,
         action,
         alternativeIndex,
         rejectReason
       })
-      // Reload tasks to reflect recommendation changes (this is needed as rec might modify tasks)
-      await loadDayPlan(sessionToken || undefined)
+      
+      // If recommendation affected tasks, refresh task list without full reload
+      if (response && sessionToken) {
+        const tasksResponse = await authFetch(`/api/day-assistant-v2/dayplan?date=${selectedDate}`)
+        if (tasksResponse.ok) {
+          const data = await tasksResponse.json()
+          setTasks(data.tasks || [])
+          setProposals(data.proposals || [])
+        }
+      }
     } catch (error) {
       console.error('Proposal response error:', error)
     }
@@ -1106,7 +1125,6 @@ function DayAssistantV2Content() {
                       focus={dayPlan?.focus || 3}
                       selectedDate={selectedDate}
                       onSubtaskToggle={handleSubtaskToggle}
-                      showActions={true}
                       isCollapsed={true}
                     />
                   ))}
@@ -1278,8 +1296,16 @@ function DayAssistantV2Content() {
             const taskId = helpMeTask.id
             setHelpMeTask(null)
             addDecisionLog(`Utworzono kroki dla "${helpMeTask.title}"`)
-            // Reload tasks to show new subtasks
-            await loadDayPlan(sessionToken || undefined)
+            toast.success('✅ Kroki utworzone!')
+            
+            // Refetch only tasks to show new subtasks (no full reload)
+            if (sessionToken) {
+              const tasksResponse = await authFetch(`/api/day-assistant-v2/dayplan?date=${selectedDate}`)
+              if (tasksResponse.ok) {
+                const data = await tasksResponse.json()
+                setTasks(data.tasks || [])
+              }
+            }
           }}
         />
       )}
@@ -1293,9 +1319,16 @@ function DayAssistantV2Content() {
             const taskTitle = clarifyTask.title
             setClarifyTask(null)
             addDecisionLog(`Utworzono pierwszy krok dla "${taskTitle}"`)
-            showToast('✅ Pierwszy krok utworzony', 'success')
-            // Reload tasks to show new subtasks
-            await loadDayPlan(sessionToken || undefined)
+            toast.success('✅ Pierwszy krok utworzony')
+            
+            // Refetch only tasks to show new subtasks (no full reload)
+            if (sessionToken) {
+              const tasksResponse = await authFetch(`/api/day-assistant-v2/dayplan?date=${selectedDate}`)
+              if (tasksResponse.ok) {
+                const data = await tasksResponse.json()
+                setTasks(data.tasks || [])
+              }
+            }
           }}
           sessionToken={sessionToken}
         />
