@@ -75,13 +75,13 @@ export function useCompleteTask() {
       return response.json()
     },
     onMutate: async (taskId) => {
-      // Optimistic update
+      // Optimistic update - remove completed task from list
       await queryClient.cancelQueries({ queryKey: ['tasks'] })
       
       const previousTasks = queryClient.getQueryData(['tasks'])
       
       queryClient.setQueryData(['tasks'], (old: Task[] = []) =>
-        old.map(t => t.id === taskId ? { ...t, completed: true } : t)
+        old.filter(t => t.id !== taskId)
       )
       
       return { previousTasks }
@@ -159,7 +159,11 @@ export function useTogglePinTask() {
         body: JSON.stringify({ task_id: taskId, pin })
       })
 
-      if (!response.ok) throw new Error('Failed to pin task')
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Failed to pin task' }))
+        throw new Error(error.error || 'Failed to pin task')
+      }
+      return response.json()
     },
     onMutate: async ({ taskId, pin }) => {
       await queryClient.cancelQueries({ queryKey: ['tasks'] })
@@ -172,12 +176,204 @@ export function useTogglePinTask() {
       
       return { previousTasks }
     },
-    onError: (err, vars, context) => {
+    onError: (err: any, vars, context) => {
       queryClient.setQueryData(['tasks'], context?.previousTasks)
-      toast.error('Nie udało się zmienić przypięcia')
+      toast.error(err.message || 'Nie udało się zmienić przypięcia')
     },
     onSuccess: (data, { pin }) => {
       toast.success(pin ? '📌 Przypięto jako MUST' : '📌 Odpięto z MUST')
+    }
+  })
+}
+
+export function usePostponeTask() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ taskId, reason }: { taskId: string; reason?: string }) => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('No session')
+
+      const response = await fetch('/api/day-assistant-v2/postpone', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ task_id: taskId, reason: reason || 'Nie dziś', reserve_morning: true })
+      })
+
+      if (!response.ok) throw new Error('Failed to postpone task')
+      return response.json()
+    },
+    onMutate: async ({ taskId }) => {
+      await queryClient.cancelQueries({ queryKey: ['tasks'] })
+      
+      const previousTasks = queryClient.getQueryData(['tasks'])
+      
+      // Optimistically remove from today's list
+      queryClient.setQueryData(['tasks'], (old: Task[] = []) =>
+        old.filter(t => t.id !== taskId)
+      )
+      
+      return { previousTasks }
+    },
+    onError: (err, vars, context) => {
+      queryClient.setQueryData(['tasks'], context?.previousTasks)
+      toast.error('Nie udało się przenieść zadania')
+    },
+    onSuccess: (data) => {
+      toast.success('📅 Przeniesiono na jutro')
+      queryClient.invalidateQueries({ queryKey: ['recommendation'] })
+    }
+  })
+}
+
+export function useToggleSubtask() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ subtaskId, completed }: { subtaskId: string; completed: boolean }) => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('No session')
+
+      const response = await fetch('/api/day-assistant-v2/subtasks', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ subtask_id: subtaskId, completed })
+      })
+
+      if (!response.ok) throw new Error('Failed to toggle subtask')
+      return response.json()
+    },
+    onMutate: async ({ subtaskId, completed }) => {
+      await queryClient.cancelQueries({ queryKey: ['tasks'] })
+      
+      const previousTasks = queryClient.getQueryData(['tasks'])
+      
+      // Optimistically update subtask in task list
+      queryClient.setQueryData(['tasks'], (old: Task[] = []) =>
+        old.map(task => ({
+          ...task,
+          subtasks: task.subtasks?.map(sub =>
+            sub.id === subtaskId ? { ...sub, completed } : sub
+          )
+        }))
+      )
+      
+      return { previousTasks }
+    },
+    onError: (err, vars, context) => {
+      queryClient.setQueryData(['tasks'], context?.previousTasks)
+      toast.error('Nie udało się zaktualizować kroku')
+    },
+    onSuccess: (data, { completed }) => {
+      toast.success(completed ? '✅ Krok ukończony' : '↩️ Krok cofnięty')
+    }
+  })
+}
+
+export function useAcceptRecommendation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ 
+      proposalId, 
+      action, 
+      alternativeIndex, 
+      rejectReason 
+    }: { 
+      proposalId: string
+      action: 'accept_primary' | 'accept_alt' | 'reject'
+      alternativeIndex?: number
+      rejectReason?: string 
+    }) => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('No session')
+
+      const response = await fetch('/api/day-assistant-v2/proposal', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ 
+          proposal_id: proposalId, 
+          action, 
+          alternative_index: alternativeIndex,
+          reject_reason: rejectReason
+        })
+      })
+
+      if (!response.ok) throw new Error('Failed to respond to recommendation')
+      return response.json()
+    },
+    onMutate: async ({ proposalId }) => {
+      await queryClient.cancelQueries({ queryKey: ['recommendations'] })
+      
+      const previousRecs = queryClient.getQueryData(['recommendations'])
+      
+      // Optimistically remove processed recommendation
+      queryClient.setQueryData(['recommendations'], (old: any[] = []) =>
+        old.filter(p => p.id !== proposalId)
+      )
+      
+      return { previousRecs }
+    },
+    onError: (err, vars, context) => {
+      queryClient.setQueryData(['recommendations'], context?.previousRecs)
+      toast.error('Nie udało się zaktualizować rekomendacji')
+    },
+    onSuccess: (data, { action, rejectReason }) => {
+      if (action === 'reject' && rejectReason) {
+        toast.info(`Odrzucono: ${rejectReason}`)
+      } else if (action === 'accept_primary') {
+        toast.success('✅ Rekomendacja zaakceptowana')
+      } else {
+        toast.success('✅ Alternatywa zaakceptowana')
+      }
+      // Refresh tasks to reflect recommendation changes
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+    }
+  })
+}
+
+export function useCreateSubtasks() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ 
+      taskId, 
+      steps 
+    }: { 
+      taskId: string
+      steps: Array<{ content: string; estimated_duration: number; position: number }>
+    }) => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('No session')
+
+      const response = await fetch('/api/day-assistant-v2/subtasks/bulk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ task_id: taskId, steps })
+      })
+
+      if (!response.ok) throw new Error('Failed to create subtasks')
+      return response.json()
+    },
+    onSuccess: (data, { taskId }) => {
+      toast.success('✅ Kroki utworzone!')
+      // Refresh tasks to show new subtasks
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+    },
+    onError: (err) => {
+      toast.error('Nie udało się utworzyć kroków')
     }
   })
 }

@@ -53,25 +53,32 @@ export function getDaysOverdue(task: TestDayTask): number {
  * Calculate available minutes until work end time
  * Note: This assumes work hours are within the same day.
  * If work extends past midnight, returns 0.
+ * @param workEndTime - End time in HH:MM format
+ * @param manualTimeBlock - Additional minutes added manually by user
  */
-export function calculateAvailableMinutes(workEndTime?: string): number {
+export function calculateAvailableMinutes(workEndTime?: string, manualTimeBlock: number = 0): number {
+  let baseMinutes = 0
+  
   if (!workEndTime) {
     // Default: assume 8 hours from now
-    return 8 * 60
+    baseMinutes = 8 * 60
+  } else {
+    const now = new Date()
+    const [hours, minutes] = workEndTime.split(':').map(Number)
+    const workEnd = new Date()
+    workEnd.setHours(hours, minutes, 0, 0)
+
+    // If work end time has passed, return 0 (unless manual time block added)
+    if (workEnd <= now) {
+      baseMinutes = 0
+    } else {
+      const diffMs = workEnd.getTime() - now.getTime()
+      baseMinutes = Math.floor(diffMs / 1000 / 60)
+    }
   }
-
-  const now = new Date()
-  const [hours, minutes] = workEndTime.split(':').map(Number)
-  const workEnd = new Date()
-  workEnd.setHours(hours, minutes, 0, 0)
-
-  // If work end time has passed, return 0
-  if (workEnd <= now) {
-    return 0
-  }
-
-  const diffMs = workEnd.getTime() - now.getTime()
-  return Math.floor(diffMs / 1000 / 60)
+  
+  // Add manual time block
+  return baseMinutes + manualTimeBlock
 }
 
 /**
@@ -181,14 +188,18 @@ export function fillQueueWithAvailableTime(
 
 /**
  * Hook to manage task queue with positions
+ * @param scoredTasks - Tasks with scores
+ * @param dayPlan - Day plan configuration
+ * @param manualTimeBlock - Additional minutes added manually by user
  */
 export function useTaskQueue(
   scoredTasks: TestDayTask[],
-  dayPlan: DayPlan | null
+  dayPlan: DayPlan | null,
+  manualTimeBlock: number = 0
 ): QueueResult {
   return useMemo(() => {
     const workEndTime = dayPlan?.metadata?.work_end_time as string | undefined
-    const availableMinutes = calculateAvailableMinutes(workEndTime)
+    const availableMinutes = calculateAvailableMinutes(workEndTime, manualTimeBlock)
     
     let { queue, later } = buildQueue(scoredTasks, availableMinutes)
     
@@ -209,5 +220,5 @@ export function useTaskQueue(
       usedMinutes,
       usagePercentage
     }
-  }, [scoredTasks, dayPlan])
+  }, [scoredTasks, dayPlan, manualTimeBlock])
 }
