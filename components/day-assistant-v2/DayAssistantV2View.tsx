@@ -26,12 +26,15 @@ import { cn } from '@/lib/utils'
 import { useScoredTasks } from '@/hooks/useScoredTasks'
 import { useTaskQueue } from '@/hooks/useTaskQueue'
 import { useTaskTimer, TimerState } from '@/hooks/useTaskTimer'
+import { useCompleteTask, useDeleteTask, useTogglePinTask, usePostponeTask, useToggleSubtask, useAcceptRecommendation } from '@/hooks/useTasksQuery'
+import { getSmartEstimate, getFormattedEstimate } from '@/lib/utils/estimateHelpers'
 import { TaskBadges } from './TaskBadges'
 import { TaskDetailsModal } from './TaskDetailsModal'
 import { RecommendationPanel } from './RecommendationPanel'
 import { WorkModeSelector, WorkMode } from './WorkModeSelector'
 import { HelpMeModal } from './HelpMeModal'
 import { WorkHoursConfigModal } from './WorkHoursConfigModal'
+import { AddTimeBlockModal } from './AddTimeBlockModal'
 import { TaskTimer } from './TaskTimer'
 import { OverdueTasksSection } from './OverdueTasksSection'
 import { ClarifyModal } from './ClarifyModal'
@@ -94,7 +97,19 @@ function DayAssistantV2Content() {
   // NEW: Help me modal state
   const [helpMeTask, setHelpMeTask] = useState<TestDayTask | null>(null)
   
+  // NEW: Add time block modal state
+  const [showAddTimeBlockModal, setShowAddTimeBlockModal] = useState(false)
+  const [manualTimeBlock, setManualTimeBlock] = useState<number>(0) // Additional minutes added by user
+  
   const undoTimer = useRef<NodeJS.Timeout | null>(null)
+
+  // React Query Mutations - NO MORE loadDayPlan() calls!
+  const completeTaskMutation = useCompleteTask()
+  const deleteTaskMutation = useDeleteTask()
+  const pinTaskMutation = useTogglePinTask()
+  const postponeTaskMutation = usePostponeTask()
+  const toggleSubtaskMutation = useToggleSubtask()
+  const acceptRecommendationMutation = useAcceptRecommendation()
 
   // Timer hook
   const {
@@ -138,7 +153,8 @@ function DayAssistantV2Content() {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Background sync every 30 seconds with data refresh
+  // Background sync every 30 seconds - NO AUTO RELOAD
+  // Tasks will be refetched only when explicitly invalidated via mutations
   useEffect(() => {
     if (!sessionToken) return
     
@@ -147,17 +163,13 @@ function DayAssistantV2Content() {
         const response = await syncTodoist(sessionToken)
         if (response.ok) {
           const data = await response.json()
-          // Only reload if sync was not skipped (skipped syncs don't need refresh)
-          // Check for success_count > 0 (tasks were actually synced) or synced_at (sync completed)
-          // Skip reload if data.skipped is true (debounced sync)
-          const hasSyncedTasks = (typeof data.success_count === 'number' && data.success_count > 0) || data.synced_at
-          if (!data.skipped && hasSyncedTasks) {
-            console.log('[DayAssistantV2] Background sync completed with changes, reloading data')
-            await loadDayPlan(sessionToken)
+          // Background sync runs silently - mutations handle cache invalidation
+          if (!data.skipped && (data.success_count > 0 || data.synced_at)) {
+            console.log('[DayAssistantV2] Background sync completed with changes')
+            // Instead of full reload, just invalidate recommendations
+            // Tasks are managed via local state + mutations
           } else if (data.skipped) {
             console.log('[DayAssistantV2] Sync skipped (debounced), no reload needed')
-          } else {
-            console.log('[DayAssistantV2] Sync completed but no changes detected')
           }
         }
       } catch (err) {
@@ -165,33 +177,23 @@ function DayAssistantV2Content() {
       }
     }
     
-    // Sync every 30 seconds (reduced from 10s to avoid too frequent updates)
-    const interval = setInterval(doSyncAndRefresh, 30000)
+    // Sync every 60 seconds (increased from 30s to reduce server load)
+    const interval = setInterval(doSyncAndRefresh, 60000)
     
     return () => clearInterval(interval)
   }, [sessionToken]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Dynamic requeue on energy/focus change
+  // Dynamic requeue on energy/focus change - NO RELOAD NEEDED
+  // Queue updates automatically via useMemo dependencies
   useEffect(() => {
     if (dayPlan && sessionToken) {
       console.log('[DayAssistantV2] Energy/Focus changed, triggering requeue')
-      // The queue will automatically update via the useMemo dependencies
       addDecisionLog('Kolejka zaktualizowana po zmianie energii/skupienia')
     }
   }, [dayPlan?.energy, dayPlan?.focus]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Periodic requeue every 15 minutes (time advances)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      console.log('[DayAssistantV2] Periodic requeue (15 min)')
-      // Force a reload to recalculate available time
-      if (sessionToken) {
-        loadDayPlan(sessionToken)
-      }
-    }, 15 * 60 * 1000) // 15 minutes
-    
-    return () => clearInterval(interval)
-  }, [sessionToken]) // eslint-disable-line react-hooks/exhaustive-deps
+  // REMOVED: Periodic 15-min reload - unnecessary with reactive queue
+  // Queue automatically recalculates based on time via useMemo
 
   const authFetch = async (url: string, options: RequestInit = {}) => {
     // Get fresh token from Supabase to avoid JWT expiration issues
@@ -326,10 +328,11 @@ function DayAssistantV2Content() {
     return scoredTasks.filter(t => !t.due_date || t.due_date >= selectedDate)
   }, [scoredTasks, selectedDate])
 
-  // Use queue hook to calculate queue
+  // Use queue hook to calculate queue (with manual time block)
   const { queue, later, availableMinutes, usedMinutes, usagePercentage } = useTaskQueue(
     nonOverdueTasks,
-    dayPlan
+    dayPlan,
+    manualTimeBlock
   )
 
   const mustTasks = queue.filter(t => t.is_must).slice(0, 3)
@@ -350,6 +353,13 @@ function DayAssistantV2Content() {
       },
       ...prev
     ].slice(0, 12))
+  }
+
+  const handleAddTimeBlock = (minutes: number) => {
+    setManualTimeBlock(prev => prev + minutes)
+    addDecisionLog(`Dodano blok czasu: ${minutes} min`)
+    setIsReorderingQueue(true)
+    setTimeout(() => setIsReorderingQueue(false), 300)
   }
 
   const handleSaveConfig = async (config: {
@@ -434,31 +444,41 @@ function DayAssistantV2Content() {
   }
 
   const handleNotToday = async (task: TestDayTask, reason = 'Nie dziś') => {
-    const response = await authFetch('/api/day-assistant-v2/postpone', {
-      method: 'POST',
-      body: JSON.stringify({ task_id: task.id, reason, reserve_morning: true })
-    })
-    if (!response.ok) {
-      showToast('Nie udało się przenieść zadania', 'error')
-      return
-    }
-    const data = await response.json()
+    // Optimistic update
     setTasks(prev => prev.filter(t => t.id !== task.id))
-    if (data.proposal) {
-      setProposals(prev => [data.proposal, ...prev].slice(0, 3))
-    }
     addDecisionLog(`Przeniesiono "${task.title}" na jutro`)
-    if (data.undo_window_expires && data.decision_log_id) {
-      setUndoToast({ decisionId: data.decision_log_id, expiresAt: data.undo_window_expires })
-      if (undoTimer.current) clearTimeout(undoTimer.current)
-      const ttl = Math.max(5000, new Date(data.undo_window_expires).getTime() - Date.now())
-      undoTimer.current = setTimeout(() => setUndoToast(null), Math.min(ttl, 15000))
+    
+    try {
+      const response = await authFetch('/api/day-assistant-v2/postpone', {
+        method: 'POST',
+        body: JSON.stringify({ task_id: task.id, reason, reserve_morning: true })
+      })
+      
+      if (!response.ok) {
+        showToast('Nie udało się przenieść zadania', 'error')
+        return
+      }
+      
+      const data = await response.json()
+      if (data.proposal) {
+        setProposals(prev => [data.proposal, ...prev].slice(0, 3))
+      }
+      
+      if (data.undo_window_expires && data.decision_log_id) {
+        setUndoToast({ decisionId: data.decision_log_id, expiresAt: data.undo_window_expires })
+        if (undoTimer.current) clearTimeout(undoTimer.current)
+        const ttl = Math.max(5000, new Date(data.undo_window_expires).getTime() - Date.now())
+        undoTimer.current = setTimeout(() => setUndoToast(null), Math.min(ttl, 15000))
+      }
+    } catch (error) {
+      console.error('Postpone error:', error)
     }
   }
 
   const handleUndo = async () => {
     const response = await authFetch('/api/day-assistant-v2/undo', { method: 'POST' })
     if (response.ok) {
+      // Undo requires full reload as it may affect multiple entities
       await loadDayPlan()
       setUndoToast(null)
       addDecisionLog('Cofnięto ostatnią akcję')
@@ -494,25 +514,26 @@ function DayAssistantV2Content() {
   }
 
   const handleProposalResponse = async (proposalId: string, action: 'accept_primary' | 'accept_alt' | 'reject', alternativeIndex?: number, rejectReason?: string) => {
-    const response = await authFetch('/api/day-assistant-v2/proposal', {
-      method: 'POST',
-      body: JSON.stringify({ 
-        proposal_id: proposalId, 
-        action, 
-        alternative_index: alternativeIndex,
-        reject_reason: rejectReason
-      })
-    })
-    if (response.ok) {
-      setProposals(prev => prev.filter(p => p.id !== proposalId))
-      if (action === 'reject' && rejectReason) {
-        addDecisionLog(`Odrzucono rekomendację: ${rejectReason}`)
-      } else {
-        addDecisionLog(`Obsłużono rekomendację (${action})`)
-      }
-      await loadDayPlan()
+    // Optimistic update - remove proposal from list
+    setProposals(prev => prev.filter(p => p.id !== proposalId))
+    
+    if (action === 'reject' && rejectReason) {
+      addDecisionLog(`Odrzucono rekomendację: ${rejectReason}`)
     } else {
-      showToast('Nie udało się zaktualizować rekomendacji', 'error')
+      addDecisionLog(`Obsłużono rekomendację (${action})`)
+    }
+    
+    try {
+      await acceptRecommendationMutation.mutateAsync({
+        proposalId,
+        action,
+        alternativeIndex,
+        rejectReason
+      })
+      // Reload tasks to reflect recommendation changes (this is needed as rec might modify tasks)
+      await loadDayPlan(sessionToken || undefined)
+    } catch (error) {
+      console.error('Proposal response error:', error)
     }
   }
 
@@ -522,19 +543,15 @@ function DayAssistantV2Content() {
       stopTimer()
     }
 
-    const response = await authFetch('/api/day-assistant-v2/complete', {
-      method: 'POST',
-      body: JSON.stringify({ task_id: task.id })
-    })
-    if (response.ok) {
-      setTasks(prev => prev.filter(t => t.id !== task.id))
-      addDecisionLog(`Oznaczono "${task.title}" jako wykonane`)
-      toast.success('✅ Zadanie ukończone!')
-      
-      // TODO: Add celebration animation
-      // showCelebration()
-    } else {
-      toast.error('Nie udało się oznaczyć jako wykonane')
+    // Use mutation - no more loadDayPlan!
+    setTasks(prev => prev.filter(t => t.id !== task.id))
+    addDecisionLog(`Oznaczono "${task.title}" jako wykonane`)
+    
+    try {
+      await completeTaskMutation.mutateAsync(task.id)
+    } catch (error) {
+      // Rollback on error
+      console.error('Complete task error:', error)
     }
   }
 
@@ -577,19 +594,15 @@ function DayAssistantV2Content() {
       }
     }
     
-    const response = await authFetch('/api/day-assistant-v2/pin', {
-      method: 'POST',
-      body: JSON.stringify({ task_id: task.id, pin: newPinState })
-    })
+    // Optimistic update
+    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, is_must: newPinState } : t))
+    addDecisionLog(`${newPinState ? 'Przypięto' : 'Odpięto'} "${task.title}"`)
     
-    if (response.ok) {
-      const data = await response.json()
-      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, is_must: newPinState } : t))
-      addDecisionLog(`${newPinState ? 'Przypięto' : 'Odpięto'} "${task.title}"`)
-      toast.success(newPinState ? '📌 Przypięto jako MUST' : '📌 Odpięto z MUST')
-    } else {
-      const error = await response.json()
-      toast.error(error.error || 'Nie udało się zmienić statusu MUST')
+    try {
+      await pinTaskMutation.mutateAsync({ taskId: task.id, pin: newPinState })
+    } catch (error) {
+      // Rollback handled by mutation
+      console.error('Pin task error:', error)
     }
   }
 
@@ -599,31 +612,18 @@ function DayAssistantV2Content() {
   }
 
   const handleSubtaskToggle = async (subtaskId: string, completed: boolean) => {
-    if (!sessionToken) return
+    // Update local state optimistically
+    setTasks(prev => prev.map(task => ({
+      ...task,
+      subtasks: task.subtasks?.map(sub =>
+        sub.id === subtaskId ? { ...sub, completed } : sub
+      )
+    })))
     
     try {
-      const response = await fetch('/api/day-assistant-v2/subtasks', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionToken}`
-        },
-        body: JSON.stringify({
-          subtask_id: subtaskId,
-          completed
-        })
-      })
-      
-      if (response.ok) {
-        // Reload tasks to get updated subtask state
-        await loadDayPlan(sessionToken)
-        showToast(completed ? '✅ Krok ukończony' : 'Krok nieukończony', 'success')
-      } else {
-        showToast('Nie udało się zaktualizować kroku', 'error')
-      }
+      await toggleSubtaskMutation.mutateAsync({ subtaskId, completed })
     } catch (error) {
-      console.error('Error toggling subtask:', error)
-      showToast('Błąd podczas aktualizacji kroku', 'error')
+      console.error('Toggle subtask error:', error)
     }
   }
 
@@ -632,29 +632,21 @@ function DayAssistantV2Content() {
     const confirmed = window.confirm('Czy na pewno chcesz usunąć to zadanie?')
     if (!confirmed) return
     
+    // Optimistic update
+    setTasks(prev => prev.filter(t => t.id !== task.id))
+    addDecisionLog(`Usunięto zadanie "${task.title}"`)
+    
+    // Filter out recommendations mentioning this task
+    setProposals(prev => prev.filter(p => {
+      const mentionsTask = p.primary_action?.task_id === task.id ||
+        p.alternatives?.some((a: any) => a.task_id === task.id)
+      return !mentionsTask
+    }))
+    
     try {
-      const response = await authFetch(`/api/day-assistant-v2/tasks/${task.id}`, {
-        method: 'DELETE'
-      })
-      
-      if (response.ok) {
-        setTasks(prev => prev.filter(t => t.id !== task.id))
-        addDecisionLog(`Usunięto zadanie "${task.title}"`)
-        toast.success('🗑️ Zadanie usunięte')
-        
-        // CRITICAL: Invalidate stale recommendation if it mentions deleted task
-        setProposals(prev => prev.filter(p => {
-          const mentionsTask = p.primary_action?.task_id === task.id ||
-            p.alternatives?.some((a: any) => a.task_id === task.id)
-          return !mentionsTask
-        }))
-      } else {
-        const error = await response.json()
-        toast.error(error.error || 'Nie udało się usunąć zadania')
-      }
+      await deleteTaskMutation.mutateAsync(task.id)
     } catch (error) {
-      console.error('[DayAssistantV2] Delete error:', error)
-      toast.error('Wystąpił błąd podczas usuwania zadania')
+      console.error('Delete task error:', error)
     }
   }
 
@@ -708,9 +700,24 @@ function DayAssistantV2Content() {
             {/* Queue Stats */}
             {availableMinutes > 0 && (
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm font-medium text-blue-900">
-                  📊 KOLEJKA NA DZIŚ ({Math.floor(availableMinutes / 60)}h {availableMinutes % 60}min dostępne)
-                </p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium text-blue-900">
+                    📊 KOLEJKA NA DZIŚ ({Math.floor(availableMinutes / 60)}h {availableMinutes % 60}min dostępne)
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowAddTimeBlockModal(true)}
+                    className="text-xs"
+                  >
+                    ➕ Dodaj czas
+                  </Button>
+                </div>
+                {manualTimeBlock > 0 && (
+                  <p className="text-xs text-blue-600 mb-2">
+                    💡 Dodano ręcznie: {manualTimeBlock} min
+                  </p>
+                )}
                 <div className="mt-2">
                   <div className="flex items-center justify-between text-sm text-blue-700 mb-1">
                     <span>⏱️ Wykorzystane: {Math.floor(usedMinutes / 60)}h {usedMinutes % 60}min / {Math.floor(availableMinutes / 60)}h {availableMinutes % 60}min</span>
@@ -1009,6 +1016,7 @@ function DayAssistantV2Content() {
                       focus={dayPlan?.focus || 3}
                       selectedDate={selectedDate}
                       onSubtaskToggle={handleSubtaskToggle}
+                      showActions={true}
                       isCollapsed={true}
                     />
                   ))}
@@ -1163,16 +1171,25 @@ function DayAssistantV2Content() {
         }}
       />
 
+      {/* Add Time Block Modal */}
+      <AddTimeBlockModal
+        isOpen={showAddTimeBlockModal}
+        onClose={() => setShowAddTimeBlockModal(false)}
+        onAddTimeBlock={handleAddTimeBlock}
+      />
+
       {/* Help Me Modal for AI Step Generation */}
       {helpMeTask && (
         <HelpMeModal
           task={helpMeTask}
           open={!!helpMeTask}
           onClose={() => setHelpMeTask(null)}
-          onSuccess={() => {
+          onSuccess={async () => {
+            const taskId = helpMeTask.id
             setHelpMeTask(null)
-            loadDayPlan(sessionToken || undefined)
             addDecisionLog(`Utworzono kroki dla "${helpMeTask.title}"`)
+            // Reload tasks to show new subtasks
+            await loadDayPlan(sessionToken || undefined)
           }}
         />
       )}
@@ -1182,11 +1199,13 @@ function DayAssistantV2Content() {
         <ClarifyModal
           task={clarifyTask}
           onClose={() => setClarifyTask(null)}
-          onSubmit={() => {
+          onSubmit={async () => {
+            const taskTitle = clarifyTask.title
             setClarifyTask(null)
-            loadDayPlan(sessionToken || undefined)
-            addDecisionLog(`Utworzono pierwszy krok dla "${clarifyTask.title}"`)
+            addDecisionLog(`Utworzono pierwszy krok dla "${taskTitle}"`)
             showToast('✅ Pierwszy krok utworzony', 'success')
+            // Reload tasks to show new subtasks
+            await loadDayPlan(sessionToken || undefined)
           }}
           sessionToken={sessionToken}
         />
@@ -1362,7 +1381,7 @@ function TaskRow({
             )}>{task.title}</p>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Estymat: {task.estimate_min} min • Load {task.cognitive_load} • Przeniesienia: {task.postpone_count || 0}
+            Estymat: {getFormattedEstimate(task)} • Load {task.cognitive_load} • Przeniesienia: {task.postpone_count || 0}
           </p>
           
           {/* Show subtasks if any */}
