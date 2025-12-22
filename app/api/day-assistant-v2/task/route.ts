@@ -15,6 +15,7 @@ import {
   getOrCreateDayPlan
 } from '@/lib/services/dayAssistantV2Service'
 import { generateTaskAddedRecommendation } from '@/lib/services/dayAssistantV2RecommendationEngine'
+import { inferTaskContext } from '@/lib/services/contextInferenceService'
 
 async function getTodoistToken(
   supabase: SupabaseClient,
@@ -128,6 +129,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // If user didn't specify context, use AI inference
+    let finalContext = body.context_type
+    
+    if (!finalContext) {
+      try {
+        const inference = await inferTaskContext(body.title, body.description)
+        finalContext = inference.context
+        console.log('[Task Create] AI inferred context:', finalContext, 'confidence:', inference.confidence)
+      } catch (error) {
+        console.error('[Task Create] Error inferring context:', error)
+        finalContext = 'deep_work' // Default fallback
+      }
+    }
+
     const todoistToken = await getTodoistToken(supabase, user.id)
     const todoistTaskId = todoistToken
       ? await createTodoistTask(todoistToken, {
@@ -138,9 +153,10 @@ export async function POST(request: NextRequest) {
         })
       : null
     
-    // Create task
+    // Create task with AI-inferred or user-specified context
     const newTask = await createTask(user.id, assistant.id, {
       ...body,
+      context_type: finalContext,
       // Keep both fields to support legacy consumers that still rely on todoist_task_id
       todoist_task_id: todoistTaskId,
       todoist_id: todoistTaskId

@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { inferTaskContext, TaskContext } from '@/lib/services/contextInferenceService'
 
 export const dynamic = 'force-dynamic'
 
@@ -115,13 +116,14 @@ function parseEstimateFromTodoist(task: TodoistTask): number {
 }
 
 /**
- * Map Todoist task to DayAssistantV2Task format
+ * Map Todoist task to DayAssistantV2Task format with AI-powered context inference
  */
-function mapTodoistToDayAssistantTask(
+async function mapTodoistToDayAssistantTask(
   task: TodoistTask,
   userId: string,
-  assistantId: string
-): Partial<DayAssistantV2Task> | null {
+  assistantId: string,
+  existingContext?: string | null
+): Promise<Partial<DayAssistantV2Task> | null> {
   // Validate required fields
   if (!task.id) {
     console.warn('[Sync] Skipping task without ID:', task)
@@ -133,12 +135,41 @@ function mapTodoistToDayAssistantTask(
     return null
   }
 
-  // Determine context_type from labels
-  let contextType = 'code' // default
-  if (task.labels) {
-    if (task.labels.includes('admin')) contextType = 'admin'
-    else if (task.labels.includes('komunikacja')) contextType = 'komunikacja'
-    else if (task.labels.includes('prywatne')) contextType = 'prywatne'
+  // Determine context_type with AI inference (if not preserving existing)
+  let contextType: string
+  
+  if (existingContext) {
+    // Preserve existing context to avoid changing user's manual categorization
+    contextType = existingContext
+  } else {
+    // Check labels for backward compatibility first
+    if (task.labels) {
+      if (task.labels.includes('admin')) contextType = 'admin'
+      else if (task.labels.includes('komunikacja')) contextType = 'communication'
+      else if (task.labels.includes('prywatne')) contextType = 'personal'
+      else if (task.labels.includes('code')) contextType = 'deep_work'
+      else {
+        // No matching label, use AI inference
+        try {
+          const inference = await inferTaskContext(task.content, task.description)
+          contextType = inference.context
+          console.log(`[Sync] AI inferred context "${contextType}" for "${task.content}"`)
+        } catch (error) {
+          console.error('[Sync] Error inferring context:', error)
+          contextType = 'deep_work' // Default fallback
+        }
+      }
+    } else {
+      // No labels at all, use AI inference
+      try {
+        const inference = await inferTaskContext(task.content, task.description)
+        contextType = inference.context
+        console.log(`[Sync] AI inferred context "${contextType}" for "${task.content}"`)
+      } catch (error) {
+        console.error('[Sync] Error inferring context:', error)
+        contextType = 'deep_work' // Default fallback
+      }
+    }
   }
 
   // Convert priority to number for consistent type handling
@@ -343,17 +374,41 @@ export async function POST(request: NextRequest) {
 
     const assistantId = assistant.id
 
-    // Map Todoist tasks to DayAssistantV2Task format
-    // Filter out invalid tasks that couldn't be mapped
-    const mappedTasks = activeTasks
-      .map(task => {
-        try {
-          return mapTodoistToDayAssistantTask(task, user.id, assistantId)
-        } catch (error) {
-          console.error('[Sync] Error mapping task:', task.id, error)
-          return null
+    // Fetch existing tasks to preserve custom estimate_min AND context_type values
+    const { data: existingTasksData } = await supabase
+      .from('day_assistant_v2_tasks')
+      .select('todoist_id, estimate_min, context_type')
+      .eq('user_id', user.id)
+      .eq('assistant_id', assistantId)
+      .not('todoist_id', 'is', null)
+    
+    // Create maps for quick lookup
+    const existingEstimates = new Map<string, number>()
+    const existingContexts = new Map<string, string>()
+    if (existingTasksData) {
+      existingTasksData.forEach(task => {
+        if (task.todoist_id) {
+          existingEstimates.set(task.todoist_id, task.estimate_min)
+          if (task.context_type) {
+            existingContexts.set(task.todoist_id, task.context_type)
+          }
         }
       })
+    }
+
+    // Map Todoist tasks to DayAssistantV2Task format with AI inference
+    // Filter out invalid tasks that couldn't be mapped
+    const mappedTasksPromises = activeTasks.map(async (task) => {
+      try {
+        const existingContext = task.id ? existingContexts.get(task.id) : undefined
+        return await mapTodoistToDayAssistantTask(task, user.id, assistantId, existingContext)
+      } catch (error) {
+        console.error('[Sync] Error mapping task:', task.id, error)
+        return null
+      }
+    })
+    
+    const mappedTasks = (await Promise.all(mappedTasksPromises))
       .filter((task): task is Partial<DayAssistantV2Task> => task !== null)
     
     const skippedCount = activeTasks.length - mappedTasks.length
@@ -361,6 +416,19 @@ export async function POST(request: NextRequest) {
       console.warn(`[Sync] Skipped ${skippedCount} invalid tasks out of ${activeTasks.length}`)
     }
     console.log(`[Sync] Mapped ${mappedTasks.length} valid tasks from ${activeTasks.length} active Todoist tasks`)
+
+    // Preserve existing estimate_min values for tasks that already exist
+    const mappedTasksWithPreservedEstimates = mappedTasks.map(task => {
+      if (task.todoist_id && existingEstimates.has(task.todoist_id)) {
+        const existingEstimate = existingEstimates.get(task.todoist_id)!
+        console.log(`[Sync] Preserving estimate_min ${existingEstimate} for task "${task.title}"`)
+        return {
+          ...task,
+          estimate_min: existingEstimate
+        }
+      }
+      return task
+    })
 
     // Delete old synced tasks that are no longer in Todoist
     const todoistIds = activeTasks.map(t => t.id)
@@ -422,25 +490,26 @@ export async function POST(request: NextRequest) {
     }
 
     // Upsert tasks with native conflict resolution
-    if (mappedTasks.length > 0) {
-      console.log(`[Sync] Upserting ${mappedTasks.length} tasks`)
+    if (mappedTasksWithPreservedEstimates.length > 0) {
+      console.log(`[Sync] Upserting ${mappedTasksWithPreservedEstimates.length} tasks`)
       
       // Log first task as sample to verify data structure
       console.log('[Sync] Sample task being upserted:', {
-        todoist_id: mappedTasks[0].todoist_id,
-        title: mappedTasks[0].title,
-        priority: mappedTasks[0].priority,
-        tags: mappedTasks[0].tags,
-        position: mappedTasks[0].position,
-        postpone_count: mappedTasks[0].postpone_count,
-        auto_moved: mappedTasks[0].auto_moved,
-        metadata: mappedTasks[0].metadata,
-        completed: mappedTasks[0].completed
+        todoist_id: mappedTasksWithPreservedEstimates[0].todoist_id,
+        title: mappedTasksWithPreservedEstimates[0].title,
+        estimate_min: mappedTasksWithPreservedEstimates[0].estimate_min,
+        priority: mappedTasksWithPreservedEstimates[0].priority,
+        tags: mappedTasksWithPreservedEstimates[0].tags,
+        position: mappedTasksWithPreservedEstimates[0].position,
+        postpone_count: mappedTasksWithPreservedEstimates[0].postpone_count,
+        auto_moved: mappedTasksWithPreservedEstimates[0].auto_moved,
+        metadata: mappedTasksWithPreservedEstimates[0].metadata,
+        completed: mappedTasksWithPreservedEstimates[0].completed
       })
 
       const { data, error } = await supabase
         .from('day_assistant_v2_tasks')
-        .upsert(mappedTasks, {
+        .upsert(mappedTasksWithPreservedEstimates, {
           onConflict: 'user_id,assistant_id,todoist_id',
           ignoreDuplicates: false
         })
@@ -458,7 +527,7 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      console.log(`[Sync] ✅ Successfully upserted ${data?.length || mappedTasks.length} tasks`)
+      console.log(`[Sync] ✅ Successfully upserted ${data?.length || mappedTasksWithPreservedEstimates.length} tasks`)
       
       // Log first returned task to verify what was stored
       if (data && data.length > 0) {
@@ -466,6 +535,7 @@ export async function POST(request: NextRequest) {
           id: data[0].id,
           todoist_id: data[0].todoist_id,
           title: data[0].title,
+          estimate_min: data[0].estimate_min,
           tags: data[0].tags,
           tags_type: Array.isArray(data[0].tags) ? 'array' : typeof data[0].tags,
           position: data[0].position,
@@ -486,7 +556,7 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         sync_type: 'todoist',
         last_synced_at: now,
-        task_count: mappedTasks.length
+        task_count: mappedTasksWithPreservedEstimates.length
       }, {
         onConflict: 'user_id,sync_type'
       })
@@ -495,13 +565,13 @@ export async function POST(request: NextRequest) {
       console.error('[Sync] Error updating sync metadata:', metaError)
     }
 
-    console.log(`[Sync] ✅ Synced ${mappedTasks.length} tasks from Todoist`)
+    console.log(`[Sync] ✅ Synced ${mappedTasksWithPreservedEstimates.length} tasks from Todoist`)
 
     return NextResponse.json({
       success: true,
       synced_at: now,
-      task_count: mappedTasks.length,
-      message: `Successfully synced ${mappedTasks.length} tasks`
+      task_count: mappedTasksWithPreservedEstimates.length,
+      message: `Successfully synced ${mappedTasksWithPreservedEstimates.length} tasks`
     })
 
   } catch (error) {

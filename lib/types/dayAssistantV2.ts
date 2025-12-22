@@ -3,8 +3,20 @@
  * Types for the enhanced day planner with ADHD-friendly features
  */
 
-// Context Type
-export type ContextType = 'code' | 'admin' | 'komunikacja' | 'prywatne'
+// Context Type - AI-powered smart categories
+export type ContextType = 
+  | 'deep_work'        // Deep focus coding, architecture, complex problem solving
+  | 'communication'    // Meetings, emails, calls, Slack responses
+  | 'admin'            // Bureaucracy, invoices, documentation, setup
+  | 'creative'         // Design, writing, brainstorming, planning
+  | 'learning'         // Reading docs, tutorials, research
+  | 'maintenance'      // Bug fixes, code review, refactoring
+  | 'personal'         // Personal errands, shopping, health
+  | 'quick_wins'       // Small tasks < 15 min, easy completions
+  // Legacy contexts (for backward compatibility)
+  | 'code'            // Maps to 'deep_work'
+  | 'komunikacja'     // Maps to 'communication'
+  | 'prywatne'        // Maps to 'personal'
 
 // Energy/Focus Preset
 export interface EnergyFocusPreset {

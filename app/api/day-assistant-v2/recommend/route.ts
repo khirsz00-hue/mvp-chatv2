@@ -10,7 +10,8 @@ import {
   getOrCreateDayPlan
 } from '@/lib/services/dayAssistantV2Service'
 import {
-  generateSliderChangeRecommendation
+  generateSliderChangeRecommendation,
+  generateRecommendation
 } from '@/lib/services/dayAssistantV2RecommendationEngine'
 import { TestDayTask, DayPlan } from '@/lib/types/dayAssistantV2'
 
@@ -66,15 +67,31 @@ export async function POST(request: NextRequest) {
     let recommendation = null
     
     if (trigger === 'slider_changed' || trigger === 'manual_refresh') {
-      recommendation = await generateSliderChangeRecommendation(
-        user.id,
-        assistant.id,
-        assistant,
-        tasks,
-        dayPlan,
-        updatedDayPlan,
-        date
-      )
+      // Try time-aware recommendation first
+      const workStartTime = dayPlan?.metadata?.work_start_time as string || '09:00'
+      const workEndTime = dayPlan?.metadata?.work_end_time as string || '17:00'
+      
+      recommendation = generateRecommendation(tasks, {
+        energy: context.energy || updatedDayPlan.energy,
+        focus: context.focus || updatedDayPlan.focus,
+        currentTime: new Date(),
+        workStartTime,
+        workEndTime,
+        contextFilter: context.context_filter || null
+      })
+      
+      // Fallback to slider-based recommendation if no time-based recommendation
+      if (!recommendation) {
+        recommendation = await generateSliderChangeRecommendation(
+          user.id,
+          assistant.id,
+          assistant,
+          tasks,
+          dayPlan,
+          updatedDayPlan,
+          date
+        )
+      }
     }
     
     // Generate contextual recommendations based on energy/focus state
