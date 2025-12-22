@@ -32,7 +32,7 @@ import { TaskTimer } from './TaskTimer'
 import { OverdueTasksSection } from './OverdueTasksSection'
 import { ClarifyModal } from './ClarifyModal'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/DropdownMenu'
-import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/Tooltip'
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 
 type DecisionLogEntry = {
   id: string
