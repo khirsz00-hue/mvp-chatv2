@@ -343,6 +343,12 @@ function DayAssistantV2Content() {
     if (!assistant) return null
     return checkLightTaskLimit(filteredTasks, assistant)
   }, [assistant, filteredTasks])
+  
+  // Memoize easiest task calculation for fallback display
+  const easiestTask = useMemo(() => {
+    if (later.length === 0) return null
+    return [...later].sort((a, b) => a.cognitive_load - b.cognitive_load)[0]
+  }, [later])
 
   const addDecisionLog = (message: string) => {
     setDecisionLog(prev => [
@@ -478,12 +484,22 @@ function DayAssistantV2Content() {
   const handleUndo = async () => {
     const response = await authFetch('/api/day-assistant-v2/undo', { method: 'POST' })
     if (response.ok) {
-      // Undo requires full reload as it may affect multiple entities
-      await loadDayPlan()
+      // Undo may affect multiple entities - refetch tasks and proposals
+      toast.success('↩️ Cofnięto ostatnią akcję')
       setUndoToast(null)
       addDecisionLog('Cofnięto ostatnią akcję')
+      
+      if (sessionToken) {
+        const tasksResponse = await authFetch(`/api/day-assistant-v2/dayplan?date=${selectedDate}`)
+        if (tasksResponse.ok) {
+          const data = await tasksResponse.json()
+          setTasks(data.tasks || [])
+          setProposals(data.proposals || [])
+          setDayPlan(data.dayPlan || null)
+        }
+      }
     } else {
-      showToast('Nie udało się cofnąć', 'error')
+      toast.error('Nie udało się cofnąć')
     }
   }
 
@@ -519,19 +535,28 @@ function DayAssistantV2Content() {
     
     if (action === 'reject' && rejectReason) {
       addDecisionLog(`Odrzucono rekomendację: ${rejectReason}`)
+      toast.info(`Odrzucono: ${rejectReason}`)
     } else {
       addDecisionLog(`Obsłużono rekomendację (${action})`)
     }
     
     try {
-      await acceptRecommendationMutation.mutateAsync({
+      const response = await acceptRecommendationMutation.mutateAsync({
         proposalId,
         action,
         alternativeIndex,
         rejectReason
       })
-      // Reload tasks to reflect recommendation changes (this is needed as rec might modify tasks)
-      await loadDayPlan(sessionToken || undefined)
+      
+      // If recommendation affected tasks, refresh task list without full reload
+      if (response && sessionToken) {
+        const tasksResponse = await authFetch(`/api/day-assistant-v2/dayplan?date=${selectedDate}`)
+        if (tasksResponse.ok) {
+          const data = await tasksResponse.json()
+          setTasks(data.tasks || [])
+          setProposals(data.proposals || [])
+        }
+      }
     } catch (error) {
       console.error('Proposal response error:', error)
     }
@@ -612,26 +637,52 @@ function DayAssistantV2Content() {
   }
 
   const handleSubtaskToggle = async (subtaskId: string, completed: boolean) => {
+    // Helper function to check if all subtasks are completed
+    const checkAllSubtasksCompleted = (subtasks: any[], updatedSubtaskId: string) => {
+      return subtasks.map(sub =>
+        sub.id === updatedSubtaskId ? { ...sub, completed: true } : sub
+      ).every(sub => sub.completed)
+    }
+    
+    // Find the task containing this subtask
+    const parentTask = tasks.find(task => 
+      task.subtasks?.some(sub => sub.id === subtaskId)
+    )
+    
     // Update local state optimistically
-    setTasks(prev => prev.map(task => ({
-      ...task,
-      subtasks: task.subtasks?.map(sub =>
-        sub.id === subtaskId ? { ...sub, completed } : sub
-      )
-    })))
+    setTasks(prev => prev.map(task => {
+      if (task.subtasks?.some(sub => sub.id === subtaskId)) {
+        const updatedSubtasks = task.subtasks.map(sub =>
+          sub.id === subtaskId ? { ...sub, completed } : sub
+        )
+        
+        return {
+          ...task,
+          subtasks: updatedSubtasks
+        }
+      }
+      return task
+    }))
     
     try {
       await toggleSubtaskMutation.mutateAsync({ subtaskId, completed })
+      
+      // After successful subtask toggle, check if all subtasks are completed
+      if (parentTask && completed && parentTask.subtasks) {
+        const allSubtasksCompleted = checkAllSubtasksCompleted(parentTask.subtasks, subtaskId)
+        
+        if (allSubtasksCompleted) {
+          // Auto-complete the parent task after successful subtask update
+          await handleComplete(parentTask)
+          toast.success('🎉 Wszystkie kroki ukończone! Zadanie zostało ukończone.')
+        }
+      }
     } catch (error) {
       console.error('Toggle subtask error:', error)
     }
   }
 
-  const handleDelete = async (task: TestDayTask) => {
-    // Use sonner toast for confirmation instead of browser alert
-    const confirmed = window.confirm('Czy na pewno chcesz usunąć to zadanie?')
-    if (!confirmed) return
-    
+  const performTaskDeletion = async (task: TestDayTask) => {
     // Optimistic update
     setTasks(prev => prev.filter(t => t.id !== task.id))
     addDecisionLog(`Usunięto zadanie "${task.title}"`)
@@ -648,6 +699,26 @@ function DayAssistantV2Content() {
     } catch (error) {
       console.error('Delete task error:', error)
     }
+  }
+
+  const handleDelete = async (task: TestDayTask) => {
+    // Use toast for confirmation instead of browser alert
+    toast(
+      <div>
+        <p className="font-semibold">Czy na pewno chcesz usunąć to zadanie?</p>
+        <p className="text-sm text-gray-600 mt-1">{task.title}</p>
+      </div>,
+      {
+        action: {
+          label: 'Usuń',
+          onClick: () => performTaskDeletion(task)
+        },
+        cancel: {
+          label: 'Anuluj',
+          onClick: () => {}
+        }
+      }
+    )
   }
 
   const presetButtons = (
@@ -832,7 +903,6 @@ function DayAssistantV2Content() {
                   onResumeTimer={resumeTimer}
                   onCompleteTimer={handleTimerComplete}
                   onSubtaskToggle={handleSubtaskToggle}
-                  showActions={true}
                 />
               ))}
             </CardContent>
@@ -867,7 +937,6 @@ function DayAssistantV2Content() {
                   onResumeTimer={resumeTimer}
                   onCompleteTimer={handleTimerComplete}
                   onSubtaskToggle={handleSubtaskToggle}
-                  showActions={true}
                 />
               ))}
             </CardContent>
@@ -909,7 +978,6 @@ function DayAssistantV2Content() {
                       onResumeTimer={resumeTimer}
                       onCompleteTimer={handleTimerComplete}
                       onSubtaskToggle={handleSubtaskToggle}
-                      showActions={true}
                       isCollapsed={true}
                     />
                   ))}
@@ -919,11 +987,60 @@ function DayAssistantV2Content() {
           </Card>
         )}
 
-        {/* Empty state */}
+        {/* Empty state or Low Focus fallback */}
         {mustTasks.length === 0 && matchedTasks.length === 0 && queue.length === 0 && (
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-sm text-muted-foreground text-center">Brak zadań w kolejce</p>
+          <Card className="border-orange-300 bg-orange-50">
+            <CardContent className="pt-6 space-y-4">
+              <div className="text-center">
+                <p className="text-sm font-semibold text-orange-800 mb-2">
+                  <span aria-label="uśmiech">😊</span> Brak zadań pasujących do obecnego trybu
+                </p>
+                <p className="text-xs text-orange-700 mb-4">
+                  Spróbuj zmienić tryb pracy lub rozpocznij od najprostszego zadania
+                </p>
+              </div>
+              
+              {/* Show easiest task if available */}
+              {easiestTask && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-orange-800">
+                    <span aria-label="żarówka">💡</span> Najłatwiejsze zadanie:
+                  </p>
+                  <TaskRow
+                    key={easiestTask.id}
+                    task={easiestTask}
+                    onNotToday={() => handleNotToday(easiestTask)}
+                    onStart={() => handleStartTask(easiestTask)}
+                    onUnmark={() => openUnmarkWarning(easiestTask)}
+                    onDecompose={() => handleDecompose(easiestTask)}
+                    onComplete={() => handleComplete(easiestTask)}
+                    onPin={() => handlePin(easiestTask)}
+                    onDelete={() => handleDelete(easiestTask)}
+                    onClick={() => setSelectedTask(easiestTask)}
+                    focus={dayPlan?.focus || 3}
+                    selectedDate={selectedDate}
+                    onSubtaskToggle={handleSubtaskToggle}
+                  />
+                  <div className="text-center mt-3">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setHelpMeTask(easiestTask)}
+                      className="border-brand-purple text-brand-purple hover:bg-brand-purple/10"
+                      aria-label="Pomóż mi z tym zadaniem"
+                    >
+                      <MagicWand size={16} className="mr-2" />
+                      <span aria-label="błyskawica">⚡</span> Pomóż mi z tym zadaniem
+                    </Button>
+                  </div>
+                </div>
+              )}
+              
+              {later.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center">
+                  Brak zadań do wykonania <span aria-label="świętowanie">🎉</span>
+                </p>
+              )}
             </CardContent>
           </Card>
         )}
@@ -947,6 +1064,7 @@ function DayAssistantV2Content() {
                   onDecompose={() => handleDecompose(task)}
                   onComplete={() => handleComplete(task)}
                   onPin={() => handlePin(task)}
+                  onDelete={() => handleDelete(task)}
                   onClick={() => setSelectedTask(task)}
                   focus={dayPlan?.focus || 3}
                   selectedDate={selectedDate}
@@ -994,7 +1112,6 @@ function DayAssistantV2Content() {
                         focus={dayPlan?.focus || 3}
                         selectedDate={selectedDate}
                         onSubtaskToggle={handleSubtaskToggle}
-                        showActions={true}
                       />
                     ))}
                   </div>
@@ -1016,7 +1133,6 @@ function DayAssistantV2Content() {
                       focus={dayPlan?.focus || 3}
                       selectedDate={selectedDate}
                       onSubtaskToggle={handleSubtaskToggle}
-                      showActions={true}
                       isCollapsed={true}
                     />
                   ))}
@@ -1188,8 +1304,16 @@ function DayAssistantV2Content() {
             const taskId = helpMeTask.id
             setHelpMeTask(null)
             addDecisionLog(`Utworzono kroki dla "${helpMeTask.title}"`)
-            // Reload tasks to show new subtasks
-            await loadDayPlan(sessionToken || undefined)
+            toast.success('✅ Kroki utworzone!')
+            
+            // Refetch only tasks to show new subtasks (no full reload)
+            if (sessionToken) {
+              const tasksResponse = await authFetch(`/api/day-assistant-v2/dayplan?date=${selectedDate}`)
+              if (tasksResponse.ok) {
+                const data = await tasksResponse.json()
+                setTasks(data.tasks || [])
+              }
+            }
           }}
         />
       )}
@@ -1203,9 +1327,16 @@ function DayAssistantV2Content() {
             const taskTitle = clarifyTask.title
             setClarifyTask(null)
             addDecisionLog(`Utworzono pierwszy krok dla "${taskTitle}"`)
-            showToast('✅ Pierwszy krok utworzony', 'success')
-            // Reload tasks to show new subtasks
-            await loadDayPlan(sessionToken || undefined)
+            toast.success('✅ Pierwszy krok utworzony')
+            
+            // Refetch only tasks to show new subtasks (no full reload)
+            if (sessionToken) {
+              const tasksResponse = await authFetch(`/api/day-assistant-v2/dayplan?date=${selectedDate}`)
+              if (tasksResponse.ok) {
+                const data = await tasksResponse.json()
+                setTasks(data.tasks || [])
+              }
+            }
           }}
           sessionToken={sessionToken}
         />
@@ -1249,7 +1380,6 @@ function TaskRow({
   selectedDate,
   activeTimer,
   isCollapsed,
-  showActions,
   onPauseTimer,
   onResumeTimer,
   onCompleteTimer,
@@ -1269,7 +1399,6 @@ function TaskRow({
   selectedDate: string
   activeTimer?: TimerState
   isCollapsed?: boolean
-  showActions?: boolean
   onPauseTimer?: () => void
   onResumeTimer?: () => void
   onCompleteTimer?: () => void
@@ -1409,7 +1538,7 @@ function TaskRow({
             </div>
           )}
         </div>
-        {!isCollapsed && showActions && (
+        {!isCollapsed && (
           <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
             <Button size="sm" variant="outline" onClick={onStart}>
               <Play size={16} className="mr-1" /> Start
@@ -1462,18 +1591,6 @@ function TaskRow({
             </DropdownMenu>
           </div>
         )}
-        {!isCollapsed && !showActions && (
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); onStart(); }}>
-              <Play size={16} className="mr-1" /> Start
-            </Button>
-            {task.is_must && (
-              <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onUnmark(); }}>
-                <Prohibit size={16} className="mr-1" /> Odznacz MUST
-              </Button>
-            )}
-          </div>
-        )}
       </div>
       
       {/* Timer Display */}
@@ -1495,29 +1612,7 @@ function TaskRow({
         />
       )}
       
-      {!isCollapsed && !showActions && (
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); onNotToday(); }}>
-            <ArrowsClockwise size={16} className="mr-1" /> Nie dziś
-          </Button>
-          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onDecompose(); }}>
-            <MagicWand size={16} className="mr-1" /> 🎯 Zrób pierwszy krok
-          </Button>
-          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onComplete(); }}>
-            <Clock size={16} className="mr-1" /> Zakończ
-          </Button>
-          {onPin && (
-            <Button size="sm" variant={task.is_must ? "ghost" : "outline"} onClick={(e) => { e.stopPropagation(); onPin(); }}>
-              <PushPin size={16} className="mr-1" /> {task.is_must ? 'Odpnij' : 'Przypnij'}
-            </Button>
-          )}
-          {shouldSuggestTen && (
-            <Button size="sm" onClick={(e) => { e.stopPropagation(); onStart(); }}>
-              Zacznij 10 min
-            </Button>
-          )}
-        </div>
-      )}
+
     </div>
   )
 }
