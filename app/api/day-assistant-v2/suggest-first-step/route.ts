@@ -2,10 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient } from '@supabase/supabase-js'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-})
-
 export async function POST(request: NextRequest) {
   try {
     const supabase = createClient(
@@ -26,6 +22,15 @@ export async function POST(request: NextRequest) {
     }
 
     const { task_id, title, description, user_context } = await request.json()
+    
+    // Initialize OpenAI client at runtime
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 })
+    }
+
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY
+    })
     
     const prompt = `
 Zadanie: ${title}

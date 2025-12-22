@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabaseClient'
 import Button from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -28,7 +29,8 @@ import { useTaskTimer, TimerState } from '@/hooks/useTaskTimer'
 import { TaskBadges } from './TaskBadges'
 import { TaskDetailsModal } from './TaskDetailsModal'
 import { RecommendationPanel } from './RecommendationPanel'
-import { EnergyFocusControls } from './EnergyFocusControls'
+import { WorkModeSelector, WorkMode } from './WorkModeSelector'
+import { HelpMeModal } from './HelpMeModal'
 import { WorkHoursConfigModal } from './WorkHoursConfigModal'
 import { TaskTimer } from './TaskTimer'
 import { OverdueTasksSection } from './OverdueTasksSection'
@@ -36,6 +38,16 @@ import { ClarifyModal } from './ClarifyModal'
 import { QueueReorderingOverlay } from './LoadingStates'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/DropdownMenu'
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+
+// Create a query client outside the component to avoid recreation on every render
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30000, // 30 seconds
+      refetchOnWindowFocus: false
+    }
+  }
+})
 
 type DecisionLogEntry = {
   id: string
@@ -50,7 +62,8 @@ type UndoToast = {
 
 const todayIso = () => new Date().toISOString().split('T')[0]
 
-export function DayAssistantV2View() {
+// Inner content component (will be wrapped with QueryClientProvider)
+function DayAssistantV2Content() {
   const { showToast } = useToast()
   const [sessionToken, setSessionToken] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -74,6 +87,13 @@ export function DayAssistantV2View() {
   const [clarifyTask, setClarifyTask] = useState<TestDayTask | null>(null)
   const [showLaterQueue, setShowLaterQueue] = useState(false)
   const [isReorderingQueue, setIsReorderingQueue] = useState(false)
+  
+  // NEW: Work mode state (replaces energy/focus sliders)
+  const [workMode, setWorkMode] = useState<WorkMode>('focus')
+  
+  // NEW: Help me modal state
+  const [helpMeTask, setHelpMeTask] = useState<TestDayTask | null>(null)
+  
   const undoTimer = useRef<NodeJS.Timeout | null>(null)
 
   // Timer hook
@@ -277,8 +297,21 @@ export function DayAssistantV2View() {
   }
 
   const filteredTasks = useMemo(() => {
-    return tasks.filter(t => (!t.due_date || t.due_date === selectedDate) && (contextFilter === 'all' || t.context_type === contextFilter))
-  }, [tasks, selectedDate, contextFilter])
+    let filtered = tasks.filter(t => 
+      (!t.due_date || t.due_date === selectedDate) && 
+      (contextFilter === 'all' || t.context_type === contextFilter) &&
+      !t.completed
+    )
+    
+    // Apply work mode filtering
+    if (workMode === 'low_focus') {
+      filtered = filtered.filter(t => t.cognitive_load <= 2)
+    } else if (workMode === 'quick_wins') {
+      filtered = filtered.filter(t => t.estimate_min <= 20)
+    }
+    
+    return filtered
+  }, [tasks, selectedDate, contextFilter, workMode])
 
   // Apply intelligent scoring to filtered tasks
   const scoredTasks = useScoredTasks(filteredTasks, dayPlan, selectedDate)
@@ -561,8 +594,8 @@ export function DayAssistantV2View() {
   }
 
   const handleDecompose = async (task: TestDayTask) => {
-    // Show the ClarifyModal for first step workflow
-    setClarifyTask(task)
+    // Show the HelpMeModal for AI-powered step generation
+    setHelpMeTask(task)
   }
 
   const handleSubtaskToggle = async (subtaskId: string, completed: boolean) => {
@@ -698,16 +731,17 @@ export function DayAssistantV2View() {
               </div>
             )}
 
-            {/* Energy/Focus Controls */}
-            <EnergyFocusControls
-              energy={dayPlan?.energy || 3}
-              focus={dayPlan?.focus || 3}
-              onEnergyChange={v => updateSliders('energy', v)}
-              onFocusChange={v => updateSliders('focus', v)}
+            {/* Work Mode Selector */}
+            <WorkModeSelector
+              value={workMode}
+              onChange={(mode) => {
+                setWorkMode(mode)
+                setIsReorderingQueue(true)
+                setTimeout(() => setIsReorderingQueue(false), 300)
+                addDecisionLog(`Zmieniono tryb pracy na ${mode}`)
+              }}
               isUpdating={isReorderingQueue}
             />
-            
-            {presetButtons}
             
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-sm text-muted-foreground">Filtr kontekstu:</span>
@@ -1129,7 +1163,21 @@ export function DayAssistantV2View() {
         }}
       />
 
-      {/* Clarify Modal for First Step */}
+      {/* Help Me Modal for AI Step Generation */}
+      {helpMeTask && (
+        <HelpMeModal
+          task={helpMeTask}
+          open={!!helpMeTask}
+          onClose={() => setHelpMeTask(null)}
+          onSuccess={() => {
+            setHelpMeTask(null)
+            loadDayPlan(sessionToken || undefined)
+            addDecisionLog(`Utworzono kroki dla "${helpMeTask.title}"`)
+          }}
+        />
+      )}
+      
+      {/* Keep Clarify Modal for backward compatibility */}
       {clarifyTask && (
         <ClarifyModal
           task={clarifyTask}
@@ -1375,7 +1423,7 @@ function TaskRow({
                 
                 <DropdownMenuItem onClick={onDecompose}>
                   <MagicWand size={16} className="mr-2" />
-                  Dekomponuj
+                  ⚡ Pomóż mi
                 </DropdownMenuItem>
                 
                 <DropdownMenuSeparator />
@@ -1466,5 +1514,14 @@ function ContextPill({ active, children, onClick }: { active: boolean; children:
     >
       {children}
     </button>
+  )
+}
+
+// Wrapper component that provides QueryClient
+export function DayAssistantV2View() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <DayAssistantV2Content />
+    </QueryClientProvider>
   )
 }
