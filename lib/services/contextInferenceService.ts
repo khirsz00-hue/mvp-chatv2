@@ -21,13 +21,32 @@ export interface ContextInference {
   reasoning: string
 }
 
+// Simple in-memory cache for AI inference results (lasts for the lifetime of the process)
+const inferenceCache = new Map<string, ContextInference>()
+
 /**
- * Infer task context using AI (OpenAI GPT-4)
+ * Create a cache key from title and description
+ */
+function createCacheKey(title: string, description?: string): string {
+  const normalized = `${title.toLowerCase().trim()}|${(description || '').toLowerCase().trim()}`
+  return normalized
+}
+
+/**
+ * Infer task context using AI (OpenAI GPT-4) with caching
  */
 export async function inferTaskContext(
   title: string,
   description?: string
 ): Promise<ContextInference> {
+  // Check cache first
+  const cacheKey = createCacheKey(title, description)
+  const cached = inferenceCache.get(cacheKey)
+  if (cached) {
+    console.log(`[Context Inference] Cache hit for "${title}"`)
+    return cached
+  }
+
   try {
     const openai = getOpenAIClient()
     
@@ -74,15 +93,23 @@ Respond ONLY with valid JSON:
 
     const result = JSON.parse(completion.choices[0].message.content || '{}')
     
-    return {
+    const inference: ContextInference = {
       context: result.context || 'deep_work',
       confidence: result.confidence || 0.5,
       reasoning: result.reasoning || 'Default categorization'
     }
+    
+    // Cache the result
+    inferenceCache.set(cacheKey, inference)
+    
+    return inference
   } catch (error) {
     console.error('[Context Inference] Error:', error)
     // Fallback to simple keyword matching
-    return fallbackInference(title, description)
+    const fallback = fallbackInference(title, description)
+    // Cache fallback result too
+    inferenceCache.set(cacheKey, fallback)
+    return fallback
   }
 }
 
