@@ -699,7 +699,6 @@ export function DayAssistantV2View() {
                     key={ctx} 
                     active={contextFilter === ctx} 
                     onClick={() => setContextFilter(ctx as ContextType)}
-                    className={contextFilter === ctx ? CONTEXT_COLORS[ctx] : ''}
                   >
                     {CONTEXT_LABELS[ctx]}
                   </ContextPill>
@@ -804,6 +803,8 @@ export function DayAssistantV2View() {
               {later.length > 5 && (
                 <p className="text-sm text-muted-foreground text-center">
                   ... i {later.length - 5} więcej
+                </p>
+              )}
               <div className="flex justify-between items-center">
                 <p className="text-sm text-muted-foreground">
                   {showLaterQueue 
@@ -838,6 +839,7 @@ export function DayAssistantV2View() {
                         onClick={() => setSelectedTask(task)}
                         focus={dayPlan?.focus || 3}
                         selectedDate={selectedDate}
+                        onSubtaskToggle={handleSubtaskToggle}
                         showActions={true}
                       />
                     ))}
@@ -859,6 +861,7 @@ export function DayAssistantV2View() {
                       onClick={() => setSelectedTask(task)}
                       focus={dayPlan?.focus || 3}
                       selectedDate={selectedDate}
+                      onSubtaskToggle={handleSubtaskToggle}
                       isCollapsed={true}
                     />
                   ))}
@@ -1027,7 +1030,6 @@ export function DayAssistantV2View() {
           sessionToken={sessionToken}
         />
       )}
-    </div>
       </div>
     </TooltipProvider>
   )
@@ -1070,7 +1072,8 @@ function TaskRow({
   showActions,
   onPauseTimer,
   onResumeTimer,
-  onCompleteTimer
+  onCompleteTimer,
+  onSubtaskToggle
 }: {
   task: TestDayTask
   queuePosition?: number

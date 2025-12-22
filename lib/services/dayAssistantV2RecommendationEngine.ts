@@ -814,7 +814,6 @@ export function generateRecommendation(
         status: 'pending',
         expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
       }
     } else if (!easiestTask) {
       // No easy tasks - suggest break
@@ -835,7 +834,6 @@ export function generateRecommendation(
         status: 'pending',
         expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
       }
     }
   }
@@ -888,7 +886,6 @@ export function generateRecommendation(
         status: 'pending',
         expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 minutes
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
       }
     }
   }
@@ -922,7 +919,6 @@ export function generateRecommendation(
       status: 'pending',
       expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
     }
   }
   
@@ -951,7 +947,6 @@ export function generateRecommendation(
         status: 'pending',
         expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
       }
     }
   }
@@ -981,7 +976,6 @@ export function generateRecommendation(
         status: 'pending',
         expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
       }
     }
   }
@@ -989,7 +983,7 @@ export function generateRecommendation(
   // ========================================
   // CONTEXT BATCHING
   // ========================================
-  const topTask = tasks[0]
+  // Note: topTask already defined above
   
   if (topTask && topTask.context_type) {
     // Find tasks with same context
@@ -1053,7 +1047,6 @@ export function generateRecommendation(
           status: 'pending',
           expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
         }
       }
     }

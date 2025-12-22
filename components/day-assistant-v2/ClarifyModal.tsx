@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/Dialog'
 import Button from '@/components/ui/Button'
-import { Textarea } from '@/components/ui/Textarea'
+import Textarea from '@/components/ui/Textarea'
 import { TestDayTask } from '@/lib/types/dayAssistantV2'
 import { useToast } from '@/components/ui/Toast'
 

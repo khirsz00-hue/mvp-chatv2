@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import OpenAI from 'openai'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+// Initialize OpenAI only if API key is available
+const openai = process.env.OPENAI_API_KEY 
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null
 
 // GET - Fetch user's custom categories
 export async function GET(request: NextRequest) {
@@ -154,6 +157,11 @@ Examples of good categories:
 `
 
   try {
+    if (!openai) {
+      console.error('[Context Categories] OpenAI API key not configured')
+      return ['Development', 'Meetings', 'Admin', 'Personal', 'Learning']
+    }
+
     const completion = await openai.chat.completions.create({
       model: 'gpt-4',
       messages: [
@@ -220,6 +228,11 @@ Which category fits best? Respond with ONLY the category name, nothing else.
 `
 
   try {
+    if (!openai) {
+      console.error('[Context Categories] OpenAI API key not configured')
+      return categories[0]
+    }
+
     const completion = await openai.chat.completions.create({
       model: 'gpt-4',
       messages: [{ role: 'user', content: prompt }],
