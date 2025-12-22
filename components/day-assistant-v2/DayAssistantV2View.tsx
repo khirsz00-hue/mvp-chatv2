@@ -612,42 +612,86 @@ function DayAssistantV2Content() {
   }
 
   const handleSubtaskToggle = async (subtaskId: string, completed: boolean) => {
+    // Find the task containing this subtask
+    const parentTask = tasks.find(task => 
+      task.subtasks?.some(sub => sub.id === subtaskId)
+    )
+    
     // Update local state optimistically
-    setTasks(prev => prev.map(task => ({
-      ...task,
-      subtasks: task.subtasks?.map(sub =>
-        sub.id === subtaskId ? { ...sub, completed } : sub
-      )
-    })))
+    setTasks(prev => prev.map(task => {
+      if (task.subtasks?.some(sub => sub.id === subtaskId)) {
+        const updatedSubtasks = task.subtasks.map(sub =>
+          sub.id === subtaskId ? { ...sub, completed } : sub
+        )
+        
+        // Check if all subtasks are now completed
+        const allSubtasksCompleted = updatedSubtasks.every(sub => sub.completed)
+        
+        return {
+          ...task,
+          subtasks: updatedSubtasks
+        }
+      }
+      return task
+    }))
     
     try {
       await toggleSubtaskMutation.mutateAsync({ subtaskId, completed })
+      
+      // After successful subtask toggle, check if all subtasks are completed
+      if (parentTask && completed) {
+        const updatedSubtasks = parentTask.subtasks?.map(sub =>
+          sub.id === subtaskId ? { ...sub, completed: true } : sub
+        ) || []
+        
+        const allSubtasksCompleted = updatedSubtasks.every(sub => sub.completed)
+        
+        if (allSubtasksCompleted) {
+          // Auto-complete the parent task
+          toast.success('🎉 Wszystkie kroki ukończone! Ukończono zadanie.')
+          await handleComplete(parentTask)
+        }
+      }
     } catch (error) {
       console.error('Toggle subtask error:', error)
     }
   }
 
   const handleDelete = async (task: TestDayTask) => {
-    // Use sonner toast for confirmation instead of browser alert
-    const confirmed = window.confirm('Czy na pewno chcesz usunąć to zadanie?')
-    if (!confirmed) return
-    
-    // Optimistic update
-    setTasks(prev => prev.filter(t => t.id !== task.id))
-    addDecisionLog(`Usunięto zadanie "${task.title}"`)
-    
-    // Filter out recommendations mentioning this task
-    setProposals(prev => prev.filter(p => {
-      const mentionsTask = p.primary_action?.task_id === task.id ||
-        p.alternatives?.some((a: any) => a.task_id === task.id)
-      return !mentionsTask
-    }))
-    
-    try {
-      await deleteTaskMutation.mutateAsync(task.id)
-    } catch (error) {
-      console.error('Delete task error:', error)
-    }
+    // Use toast for confirmation instead of browser alert
+    toast(
+      <div>
+        <p className="font-semibold">Czy na pewno chcesz usunąć to zadanie?</p>
+        <p className="text-sm text-gray-600 mt-1">{task.title}</p>
+      </div>,
+      {
+        action: {
+          label: 'Usuń',
+          onClick: async () => {
+            // Optimistic update
+            setTasks(prev => prev.filter(t => t.id !== task.id))
+            addDecisionLog(`Usunięto zadanie "${task.title}"`)
+            
+            // Filter out recommendations mentioning this task
+            setProposals(prev => prev.filter(p => {
+              const mentionsTask = p.primary_action?.task_id === task.id ||
+                p.alternatives?.some((a: any) => a.task_id === task.id)
+              return !mentionsTask
+            }))
+            
+            try {
+              await deleteTaskMutation.mutateAsync(task.id)
+            } catch (error) {
+              console.error('Delete task error:', error)
+            }
+          }
+        },
+        cancel: {
+          label: 'Anuluj',
+          onClick: () => {}
+        }
+      }
+    )
   }
 
   const presetButtons = (
@@ -832,7 +876,6 @@ function DayAssistantV2Content() {
                   onResumeTimer={resumeTimer}
                   onCompleteTimer={handleTimerComplete}
                   onSubtaskToggle={handleSubtaskToggle}
-                  showActions={true}
                 />
               ))}
             </CardContent>
@@ -867,7 +910,6 @@ function DayAssistantV2Content() {
                   onResumeTimer={resumeTimer}
                   onCompleteTimer={handleTimerComplete}
                   onSubtaskToggle={handleSubtaskToggle}
-                  showActions={true}
                 />
               ))}
             </CardContent>
@@ -909,7 +951,6 @@ function DayAssistantV2Content() {
                       onResumeTimer={resumeTimer}
                       onCompleteTimer={handleTimerComplete}
                       onSubtaskToggle={handleSubtaskToggle}
-                      showActions={true}
                       isCollapsed={true}
                     />
                   ))}
@@ -919,11 +960,60 @@ function DayAssistantV2Content() {
           </Card>
         )}
 
-        {/* Empty state */}
+        {/* Empty state or Low Focus fallback */}
         {mustTasks.length === 0 && matchedTasks.length === 0 && queue.length === 0 && (
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-sm text-muted-foreground text-center">Brak zadań w kolejce</p>
+          <Card className="border-orange-300 bg-orange-50">
+            <CardContent className="pt-6 space-y-4">
+              <div className="text-center">
+                <p className="text-sm font-semibold text-orange-800 mb-2">
+                  😊 Brak zadań pasujących do obecnego trybu
+                </p>
+                <p className="text-xs text-orange-700 mb-4">
+                  Spróbuj zmienić tryb pracy lub rozpocznij od najprostszego zadania
+                </p>
+              </div>
+              
+              {/* Show easiest task if available */}
+              {later.length > 0 && (() => {
+                const easiestTask = [...later].sort((a, b) => a.cognitive_load - b.cognitive_load)[0]
+                return easiestTask ? (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-orange-800">💡 Najłatwiejsze zadanie:</p>
+                    <TaskRow
+                      key={easiestTask.id}
+                      task={easiestTask}
+                      onNotToday={() => handleNotToday(easiestTask)}
+                      onStart={() => handleStartTask(easiestTask)}
+                      onUnmark={() => openUnmarkWarning(easiestTask)}
+                      onDecompose={() => handleDecompose(easiestTask)}
+                      onComplete={() => handleComplete(easiestTask)}
+                      onPin={() => handlePin(easiestTask)}
+                      onDelete={() => handleDelete(easiestTask)}
+                      onClick={() => setSelectedTask(easiestTask)}
+                      focus={dayPlan?.focus || 3}
+                      selectedDate={selectedDate}
+                      onSubtaskToggle={handleSubtaskToggle}
+                    />
+                    <div className="text-center mt-3">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setHelpMeTask(easiestTask)}
+                        className="border-brand-purple text-brand-purple hover:bg-brand-purple/10"
+                      >
+                        <MagicWand size={16} className="mr-2" />
+                        ⚡ Pomóż mi z tym zadaniem
+                      </Button>
+                    </div>
+                  </div>
+                ) : null
+              })()}
+              
+              {later.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center">
+                  Brak zadań do wykonania 🎉
+                </p>
+              )}
             </CardContent>
           </Card>
         )}
@@ -947,6 +1037,7 @@ function DayAssistantV2Content() {
                   onDecompose={() => handleDecompose(task)}
                   onComplete={() => handleComplete(task)}
                   onPin={() => handlePin(task)}
+                  onDelete={() => handleDelete(task)}
                   onClick={() => setSelectedTask(task)}
                   focus={dayPlan?.focus || 3}
                   selectedDate={selectedDate}
@@ -994,7 +1085,6 @@ function DayAssistantV2Content() {
                         focus={dayPlan?.focus || 3}
                         selectedDate={selectedDate}
                         onSubtaskToggle={handleSubtaskToggle}
-                        showActions={true}
                       />
                     ))}
                   </div>
@@ -1249,7 +1339,6 @@ function TaskRow({
   selectedDate,
   activeTimer,
   isCollapsed,
-  showActions,
   onPauseTimer,
   onResumeTimer,
   onCompleteTimer,
@@ -1269,7 +1358,6 @@ function TaskRow({
   selectedDate: string
   activeTimer?: TimerState
   isCollapsed?: boolean
-  showActions?: boolean
   onPauseTimer?: () => void
   onResumeTimer?: () => void
   onCompleteTimer?: () => void
@@ -1409,7 +1497,7 @@ function TaskRow({
             </div>
           )}
         </div>
-        {!isCollapsed && showActions && (
+        {!isCollapsed && (
           <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
             <Button size="sm" variant="outline" onClick={onStart}>
               <Play size={16} className="mr-1" /> Start
@@ -1462,18 +1550,6 @@ function TaskRow({
             </DropdownMenu>
           </div>
         )}
-        {!isCollapsed && !showActions && (
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); onStart(); }}>
-              <Play size={16} className="mr-1" /> Start
-            </Button>
-            {task.is_must && (
-              <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onUnmark(); }}>
-                <Prohibit size={16} className="mr-1" /> Odznacz MUST
-              </Button>
-            )}
-          </div>
-        )}
       </div>
       
       {/* Timer Display */}
@@ -1495,29 +1571,7 @@ function TaskRow({
         />
       )}
       
-      {!isCollapsed && !showActions && (
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); onNotToday(); }}>
-            <ArrowsClockwise size={16} className="mr-1" /> Nie dziś
-          </Button>
-          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onDecompose(); }}>
-            <MagicWand size={16} className="mr-1" /> 🎯 Zrób pierwszy krok
-          </Button>
-          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onComplete(); }}>
-            <Clock size={16} className="mr-1" /> Zakończ
-          </Button>
-          {onPin && (
-            <Button size="sm" variant={task.is_must ? "ghost" : "outline"} onClick={(e) => { e.stopPropagation(); onPin(); }}>
-              <PushPin size={16} className="mr-1" /> {task.is_must ? 'Odpnij' : 'Przypnij'}
-            </Button>
-          )}
-          {shouldSuggestTen && (
-            <Button size="sm" onClick={(e) => { e.stopPropagation(); onStart(); }}>
-              Zacznij 10 min
-            </Button>
-          )}
-        </div>
-      )}
+
     </div>
   )
 }
