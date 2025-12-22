@@ -474,10 +474,6 @@ function DayAssistantV2Content() {
       console.error('Postpone error:', error)
     }
   }
-      const ttl = Math.max(5000, new Date(data.undo_window_expires).getTime() - Date.now())
-      undoTimer.current = setTimeout(() => setUndoToast(null), Math.min(ttl, 15000))
-    }
-  }
 
   const handleUndo = async () => {
     const response = await authFetch('/api/day-assistant-v2/undo', { method: 'POST' })
@@ -651,16 +647,6 @@ function DayAssistantV2Content() {
       await deleteTaskMutation.mutateAsync(task.id)
     } catch (error) {
       console.error('Delete task error:', error)
-    }
-  }
-        }))
-      } else {
-        const error = await response.json()
-        toast.error(error.error || 'Nie udało się usunąć zadania')
-      }
-    } catch (error) {
-      console.error('[DayAssistantV2] Delete error:', error)
-      toast.error('Wystąpił błąd podczas usuwania zadania')
     }
   }
 
