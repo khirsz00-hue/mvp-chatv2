@@ -17,6 +17,7 @@
     "@stripe/stripe-js": "^8.5.3",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.39.0",
+    "@tanstack/react-query": "^5.90.12",
     "@types/lodash": "^4.17.21",
     "clsx": "^2.1.0",
     "date-fns": "^3.6.0",
