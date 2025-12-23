@@ -23,10 +23,21 @@ export async function POST(req: NextRequest) {
     )
   } catch (err: any) {
     console.error('Webhook signature verification failed:', err.message)
+    
+    // Log error to database (without sensitive body content)
+    await supabase.from('webhook_errors').insert({
+      event_type: 'signature_verification_failed',
+      error_message: err.message,
+      event_data: { 
+        timestamp: new Date().toISOString(),
+        content_length: body.length
+      }
+    })
+    
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
   }
 
-  // Handle the event
+  // Handle the event with try-catch for each handler
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
@@ -67,6 +78,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true })
   } catch (error: any) {
     console.error('Error handling webhook:', error)
+    
+    // Log error to database
+    await supabase.from('webhook_errors').insert({
+      event_type: event.type,
+      error_message: error.message,
+      event_data: event.data.object
+    })
+    
     return NextResponse.json(
       { error: 'Webhook handler failed' },
       { status: 500 }
@@ -154,11 +173,20 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 
   if (!profile) return
 
+  // Get the subscription end date
+  const subscriptionData = subscription as any
+  const periodEnd = subscriptionData.current_period_end 
+    ? new Date(subscriptionData.current_period_end * 1000).toISOString()
+    : new Date().toISOString()
+
+  // Downgrade to free but keep data
   await supabase
     .from('user_profiles')
     .update({
       subscription_status: 'canceled',
-      subscription_end_date: new Date().toISOString(),
+      subscription_tier: 'free',
+      subscription_end_date: periodEnd,
+      // Keep stripe_customer_id for potential resubscription
     })
     .eq('id', profile.id)
 

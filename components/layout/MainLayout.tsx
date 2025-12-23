@@ -12,14 +12,15 @@ import { DecisionAssistant } from '@/src/features/decision-assistant/components/
 import { DayAssistantV2View } from '@/components/day-assistant-v2/DayAssistantV2View'
 import { WeekAssistantView } from '@/components/week-assistant/WeekAssistantView'
 import SubscriptionWall from '@/components/subscription/SubscriptionWall'
+import TrialBanner from '@/components/subscription/TrialBanner'
 
 /**
- * SubscriptionWall jest teraz WYŁĄCZONY
- * Wyłączono na stałe z powodu powtarzających się problemów z blokowaniem użytkowników
- * SubscriptionWall miał wcześniej: timeout 10 sekund i poprawioną obsługę błędów
+ * SubscriptionWall jest teraz WŁĄCZONY
+ * Dodano pełną funkcjonalność SaaS z limitami użycia, okresami próbnymi i flagami funkcji
+ * Admin bypass jest wbudowany w SubscriptionWall
  */
 // Toggle this to disable subscription wall if it causes issues
-const ENABLE_SUBSCRIPTION_WALL = false
+const ENABLE_SUBSCRIPTION_WALL = true
 
 interface MainLayoutProps {
   children?: ReactNode
@@ -208,6 +209,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               isMobileMenuOpen={isMobileMenuOpen}
             />
+            <TrialBanner />
             <div className="flex relative">
               {/* Mobile overlay */}
               {isMobileMenuOpen && (
