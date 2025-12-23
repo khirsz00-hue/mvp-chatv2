@@ -21,7 +21,7 @@ import {
   calculateScoreBreakdown
 } from '@/lib/services/dayAssistantV2RecommendationEngine'
 import { CONTEXT_LABELS, CONTEXT_COLORS, TaskContext } from '@/lib/services/contextInferenceService'
-import { Play, XCircle, Clock, ArrowsClockwise, MagicWand, Prohibit, PushPin, Gear, DotsThree, Check, Trash, Pencil, Info } from '@phosphor-icons/react'
+import { Play, XCircle, MagicWand, Gear, Info } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { useScoredTasks } from '@/hooks/useScoredTasks'
 import { useTaskQueue } from '@/hooks/useTaskQueue'
@@ -29,6 +29,7 @@ import { useTaskTimer, TimerState } from '@/hooks/useTaskTimer'
 import { useCompleteTask, useDeleteTask, useTogglePinTask, usePostponeTask, useToggleSubtask, useAcceptRecommendation } from '@/hooks/useTasksQuery'
 import { getSmartEstimate, getFormattedEstimate } from '@/lib/utils/estimateHelpers'
 import { TaskBadges } from './TaskBadges'
+import { TaskContextMenu } from './TaskContextMenu'
 import { TaskDetailsModal } from './TaskDetailsModal'
 import { RecommendationPanel } from './RecommendationPanel'
 import { WorkModeSelector, WorkMode } from './WorkModeSelector'
@@ -39,7 +40,6 @@ import { TaskTimer } from './TaskTimer'
 import { OverdueTasksSection } from './OverdueTasksSection'
 import { ClarifyModal } from './ClarifyModal'
 import { QueueReorderingOverlay } from './LoadingStates'
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/DropdownMenu'
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 
 // Create a query client outside the component to avoid recreation on every render
@@ -64,6 +64,8 @@ type UndoToast = {
 }
 
 const todayIso = () => new Date().toISOString().split('T')[0]
+const MAX_COGNITIVE_LOAD = 5
+const DEFAULT_COGNITIVE_LOAD = 3
 
 // Inner content component (will be wrapped with QueryClientProvider)
 function DayAssistantV2Content() {
@@ -346,9 +348,14 @@ function DayAssistantV2Content() {
   
   // Memoize easiest task calculation for fallback display
   const easiestTask = useMemo(() => {
-    if (later.length === 0) return null
-    return [...later].sort((a, b) => a.cognitive_load - b.cognitive_load)[0]
-  }, [later])
+    const candidates = tasks.filter(t => !t.completed)
+    if (candidates.length === 0) return null
+    return [...candidates].sort((a, b) => {
+      const loadDiff = (a.cognitive_load ?? DEFAULT_COGNITIVE_LOAD) - (b.cognitive_load ?? DEFAULT_COGNITIVE_LOAD)
+      if (loadDiff !== 0) return loadDiff
+      return getSmartEstimate(a) - getSmartEstimate(b)
+    })[0]
+  }, [tasks])
 
   const addDecisionLog = (message: string) => {
     setDecisionLog(prev => [
@@ -996,7 +1003,7 @@ function DayAssistantV2Content() {
                   <span aria-label="uśmiech">😊</span> Brak zadań pasujących do obecnego trybu
                 </p>
                 <p className="text-xs text-orange-700 mb-4">
-                  Spróbuj zmienić tryb pracy lub rozpocznij od najprostszego zadania
+                  W trybie Low Focus lub przy blokach czasu zacznij od najprostszego zadania
                 </p>
               </div>
               
@@ -1538,59 +1545,22 @@ function TaskRow({
             </div>
           )}
         </div>
-        {!isCollapsed && (
-          <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+        <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+          {!isCollapsed && (
             <Button size="sm" variant="outline" onClick={onStart}>
               <Play size={16} className="mr-1" /> Start
             </Button>
-            
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="ghost">
-                  <DotsThree size={20} weight="bold" />
-                </Button>
-              </DropdownMenuTrigger>
-              
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={onComplete}>
-                  <Check size={16} className="mr-2" />
-                  Ukończ
-                </DropdownMenuItem>
-                
-                <DropdownMenuItem onClick={onNotToday}>
-                  <ArrowsClockwise size={16} className="mr-2" />
-                  Nie dziś
-                </DropdownMenuItem>
-                
-                {onPin && (
-                  <DropdownMenuItem onClick={onPin}>
-                    <PushPin size={16} className="mr-2" />
-                    {task.is_must ? 'Odepnij' : 'Przypnij jako MUST'}
-                  </DropdownMenuItem>
-                )}
-                
-                <DropdownMenuItem onClick={onDecompose}>
-                  <MagicWand size={16} className="mr-2" />
-                  ⚡ Pomóż mi
-                </DropdownMenuItem>
-                
-                <DropdownMenuSeparator />
-                
-                <DropdownMenuItem onClick={onClick}>
-                  <Pencil size={16} className="mr-2" />
-                  Edytuj
-                </DropdownMenuItem>
-                
-                {onDelete && (
-                  <DropdownMenuItem onClick={onDelete} className="text-red-600">
-                    <Trash size={16} className="mr-2" />
-                    Usuń
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        )}
+          )}
+          <TaskContextMenu
+            task={task}
+            onComplete={onComplete}
+            onNotToday={onNotToday}
+            onPin={onPin}
+            onDecompose={onDecompose}
+            onDelete={onDelete}
+            onEdit={onClick}
+          />
+        </div>
       </div>
       
       {/* Timer Display */}
