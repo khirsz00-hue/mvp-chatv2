@@ -11,6 +11,7 @@ import { Pause, Play, CheckCircle } from '@phosphor-icons/react'
 
 interface CurrentActivityBoxProps {
   activeTimer: TimerState | null
+  taskTitle?: string
   breakActive: boolean
   breakTimeRemaining: number
   formatTime: (seconds: number) => string
@@ -21,6 +22,7 @@ interface CurrentActivityBoxProps {
 
 export function CurrentActivityBox({
   activeTimer,
+  taskTitle,
   breakActive,
   breakTimeRemaining,
   formatTime,
@@ -54,7 +56,7 @@ export function CurrentActivityBox({
         <div className="flex items-center justify-between">
           <div className="flex-1">
             <p className="text-sm text-purple-600 font-semibold">🎯 Aktualnie zajmujesz się:</p>
-            <h3 className="text-lg font-bold mt-1">{activeTimer.taskId}</h3>
+            <h3 className="text-lg font-bold mt-1">{taskTitle || 'Zadanie'}</h3>
             <p className="text-sm text-gray-600 mt-1">
               Czas: {formatTime(activeTimer.elapsedSeconds)} / {activeTimer.estimatedMinutes}min
             </p>

@@ -13,7 +13,8 @@ import {
   DayPlan,
   TestDayTask,
   Proposal,
-  ContextType
+  ContextType,
+  Recommendation
 } from '@/lib/types/dayAssistantV2'
 import {
   checkLightTaskLimit,
@@ -27,6 +28,7 @@ import { useScoredTasks } from '@/hooks/useScoredTasks'
 import { useTaskQueue } from '@/hooks/useTaskQueue'
 import { useTaskTimer, TimerState } from '@/hooks/useTaskTimer'
 import { useCompleteTask, useDeleteTask, useTogglePinTask, usePostponeTask, useToggleSubtask, useAcceptRecommendation } from '@/hooks/useTasksQuery'
+import { useRecommendations } from '@/hooks/useRecommendations'
 import { getSmartEstimate, getFormattedEstimate } from '@/lib/utils/estimateHelpers'
 import { TaskBadges } from './TaskBadges'
 import { TaskContextMenu } from './TaskContextMenu'
@@ -40,6 +42,9 @@ import { TaskTimer } from './TaskTimer'
 import { OverdueTasksSection } from './OverdueTasksSection'
 import { ClarifyModal } from './ClarifyModal'
 import { QueueReorderingOverlay } from './LoadingStates'
+import { CurrentActivityBox } from './CurrentActivityBox'
+import { BreakTimer } from './BreakTimer'
+import { EnergyFocusControls } from './EnergyFocusControls'
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 
 // Create a query client outside the component to avoid recreation on every render
@@ -103,6 +108,11 @@ function DayAssistantV2Content() {
   const [showAddTimeBlockModal, setShowAddTimeBlockModal] = useState(false)
   const [manualTimeBlock, setManualTimeBlock] = useState<number>(0) // Additional minutes added by user
   
+  // NEW: Break timer state
+  const [showBreakModal, setShowBreakModal] = useState(false)
+  const [breakActive, setBreakActive] = useState(false)
+  const [breakTimeRemaining, setBreakTimeRemaining] = useState(0)
+  
   const undoTimer = useRef<NodeJS.Timeout | null>(null)
 
   // React Query Mutations - NO MORE loadDayPlan() calls!
@@ -123,6 +133,17 @@ function DayAssistantV2Content() {
     formatTime,
     progressPercentage
   } = useTaskTimer()
+
+  // Recommendations hook - fetches live recommendations
+  const { recommendations, loading: recLoading, refresh: refreshRecs } = useRecommendations({
+    sessionToken,
+    selectedDate,
+    energy: dayPlan?.energy || 3,
+    focus: dayPlan?.focus || 3,
+    tasks,
+    contextFilter,
+    enabled: !!sessionToken
+  })
 
   useEffect(() => {
     const init = async () => {
@@ -728,6 +749,58 @@ function DayAssistantV2Content() {
     )
   }
 
+  // Handle break timer
+  const handleAddBreak = () => {
+    setShowBreakModal(true)
+  }
+
+  const handleStartBreak = (durationMinutes: number) => {
+    // Pause active timer if running
+    if (activeTimer && !activeTimer.isPaused) {
+      pauseTimer()
+    }
+    
+    setBreakActive(true)
+    setBreakTimeRemaining(durationMinutes)
+    addDecisionLog(`Przerwa ${durationMinutes} min rozpoczęta`)
+  }
+
+  // Handle apply recommendation
+  const handleApplyRecommendation = async (recommendation: Recommendation) => {
+    try {
+      const response = await authFetch('/api/day-assistant-v2/apply-recommendation', {
+        method: 'POST',
+        body: JSON.stringify({
+          recommendation,
+          date: selectedDate
+        })
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        toast.success(`✅ ${result.message}`)
+        
+        // Refresh data
+        await loadDayPlan(sessionToken || undefined)
+        await refreshRecs()
+        
+        addDecisionLog(`Zastosowano rekomendację: ${recommendation.title}`)
+        
+        // Handle ADD_BREAK action
+        const breakAction = recommendation.actions.find(a => a.op === 'ADD_BREAK')
+        if (breakAction && breakAction.durationMinutes) {
+          handleStartBreak(breakAction.durationMinutes)
+        }
+      } else {
+        toast.error(`❌ ${result.error || 'Nie udało się zastosować rekomendacji'}`)
+      }
+    } catch (error) {
+      console.error('[Apply Recommendation] Error:', error)
+      toast.error('Błąd podczas stosowania rekomendacji')
+    }
+  }
+
   const presetButtons = (
     <div className="flex flex-wrap gap-2">
       {Object.values(ENERGY_FOCUS_PRESETS).map(preset => (
@@ -775,6 +848,18 @@ function DayAssistantV2Content() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Current Activity Box */}
+            <CurrentActivityBox
+              activeTimer={activeTimer}
+              taskTitle={activeTimer ? tasks.find(t => t.id === activeTimer.taskId)?.title : undefined}
+              breakActive={breakActive}
+              breakTimeRemaining={breakTimeRemaining}
+              formatTime={formatTime}
+              onPause={pauseTimer}
+              onResume={resumeTimer}
+              onComplete={handleTimerComplete}
+            />
+
             {/* Queue Stats */}
             {availableMinutes > 0 && (
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
@@ -827,6 +912,20 @@ function DayAssistantV2Content() {
               }}
               isUpdating={isReorderingQueue}
             />
+
+            {/* Energy/Focus Controls with Add Break Button */}
+            {dayPlan && (
+              <Card className="p-4">
+                <EnergyFocusControls
+                  energy={dayPlan.energy}
+                  focus={dayPlan.focus}
+                  onEnergyChange={(value) => updateSliders('energy', value)}
+                  onFocusChange={(value) => updateSliders('focus', value)}
+                  onAddBreak={handleAddBreak}
+                  isUpdating={isReorderingQueue}
+                />
+              </Card>
+            )}
             
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-sm text-muted-foreground">Filtr kontekstu:</span>
@@ -1218,9 +1317,9 @@ function DayAssistantV2Content() {
           </CardHeader>
           <CardContent className="space-y-3">
             <RecommendationPanel
-              dayPlan={dayPlan}
-              proposals={proposals}
-              onProposalResponse={handleProposalResponse}
+              recommendations={recommendations}
+              onApply={handleApplyRecommendation}
+              loading={recLoading}
             />
           </CardContent>
         </Card>
@@ -1348,6 +1447,13 @@ function DayAssistantV2Content() {
           sessionToken={sessionToken}
         />
       )}
+
+      {/* Break Timer Modal */}
+      <BreakTimer
+        isOpen={showBreakModal}
+        onClose={() => setShowBreakModal(false)}
+        onStartBreak={handleStartBreak}
+      />
       </div>
     </TooltipProvider>
   )
