@@ -80,9 +80,26 @@ function isValidTestDayTask(task: unknown): task is TestDayTask {
   )
 }
 
+// Timeout constants
+const TODOIST_API_TIMEOUT_MS = 10000 // 10 seconds
+const DEFAULT_RETRY_ATTEMPTS = 3
+const MAX_RETRY_DELAY_MS = 5000 // 5 seconds
+
 /**
  * Sync task changes back to Todoist (bidirectional sync)
  * With retry logic and exponential backoff
+ * 
+ * @param userId - User ID for fetching Todoist token
+ * @param todoistId - Todoist task ID to update
+ * @param updates - Task updates to apply
+ * @param retries - Number of retry attempts (default: 3)
+ * @returns Promise<boolean> - True if sync succeeded, false otherwise
+ * 
+ * Retry behavior:
+ * - Attempts the sync operation up to `retries` times
+ * - Uses exponential backoff between retries (1s, 2s, 4s, max 5s)
+ * - Returns false if all retries fail
+ * - Treats 404 errors as success (task already deleted in Todoist)
  */
 export async function syncTaskChangeToTodoist(
   userId: string,
@@ -95,7 +112,7 @@ export async function syncTaskChangeToTodoist(
     project_id?: string
     completed?: boolean
   },
-  retries: number = 3
+  retries: number = DEFAULT_RETRY_ATTEMPTS
 ): Promise<boolean> {
   let lastError: Error | null = null
   
@@ -129,7 +146,7 @@ export async function syncTaskChangeToTodoist(
           headers: {
             'Authorization': `Bearer ${profile.todoist_token}`
           },
-          signal: AbortSignal.timeout(10000) // 10s timeout
+          signal: AbortSignal.timeout(TODOIST_API_TIMEOUT_MS)
         })
         
         if (!response.ok) {
@@ -179,7 +196,7 @@ export async function syncTaskChangeToTodoist(
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(todoistPayload),
-        signal: AbortSignal.timeout(10000) // 10s timeout
+        signal: AbortSignal.timeout(TODOIST_API_TIMEOUT_MS)
       })
       
       if (!response.ok) {
@@ -204,7 +221,7 @@ export async function syncTaskChangeToTodoist(
       
       // If this is not the last attempt, wait with exponential backoff
       if (attempt < retries) {
-        const delayMs = Math.min(1000 * Math.pow(2, attempt - 1), 5000) // Max 5s delay
+        const delayMs = Math.min(1000 * Math.pow(2, attempt - 1), MAX_RETRY_DELAY_MS)
         console.log(`⏳ [syncTaskChangeToTodoist] Waiting ${delayMs}ms before retry...`)
         await new Promise(resolve => setTimeout(resolve, delayMs))
       }

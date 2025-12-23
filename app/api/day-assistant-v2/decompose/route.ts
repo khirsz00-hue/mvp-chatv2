@@ -6,11 +6,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 
+// Configuration constants
+const OPENAI_API_TIMEOUT_MS = 15000 // 15 seconds
+const DEFAULT_RETRY_ATTEMPTS = 3
+const RETRY_INITIAL_DELAY_MS = 1000 // 1 second
+
 // Retry helper with exponential backoff
 async function retryWithBackoff<T>(
   fn: () => Promise<T>,
-  retries: number = 3,
-  initialDelayMs: number = 1000
+  retries: number = DEFAULT_RETRY_ATTEMPTS,
+  initialDelayMs: number = RETRY_INITIAL_DELAY_MS
 ): Promise<T> {
   let lastError: Error | null = null
   
@@ -126,11 +131,11 @@ Odpowiedz w formacie JSON:
         max_tokens: 500,
         temperature: 0.7
       }, {
-        timeout: 15000 // 15s timeout
+        timeout: OPENAI_API_TIMEOUT_MS
       })
 
       return JSON.parse(completion.choices[0].message.content || '{}')
-    }, 3, 1000) // 3 retries with exponential backoff
+    }, DEFAULT_RETRY_ATTEMPTS, RETRY_INITIAL_DELAY_MS) // 3 retries with exponential backoff
 
     console.log('✅ [Decompose] OpenAI API call successful')
     console.log('🔍 [Decompose] Generated', result.steps?.length || 0, 'steps')
