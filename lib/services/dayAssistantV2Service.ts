@@ -20,12 +20,13 @@ import {
 } from '@/lib/types/dayAssistantV2'
 
 // Type for Todoist API update payload
-interface TodoistUpdatePayload {
+export interface TodoistUpdatePayload {
   due_date?: string | null
   content?: string
   description?: string
   labels?: string[]
   project_id?: string
+  completed?: boolean
 }
 
 const isNullableString = (value: unknown) =>
@@ -144,7 +145,8 @@ export async function syncTaskChangeToTodoist(
       todoistPayload.project_id = updates.project_id
     }
 
-    // Todoist REST API uses POST for updates (not PUT/PATCH) per their API design
+    // Todoist REST API v2 uses POST for task updates (not PUT/PATCH)
+    // See: https://developer.todoist.com/rest/v2/#update-a-task
     const response = await fetch(`https://api.todoist.com/rest/v2/tasks/${todoistId}`, {
       method: 'POST',
       headers: {

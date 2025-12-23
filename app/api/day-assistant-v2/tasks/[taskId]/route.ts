@@ -38,7 +38,7 @@ export async function DELETE(
     }
 
     // Delete from Todoist first
-    const todoistRef = task.todoist_id || task.todoist_task_id
+    const todoistRef = task.todoist_id ?? task.todoist_task_id
     if (todoistRef) {
       try {
         const { data: profile } = await supabase

@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Sync to Todoist
-    const todoistRef = task?.todoist_id || task?.todoist_task_id
+    const todoistRef = task?.todoist_id ?? task?.todoist_task_id
     if (todoistRef) {
       await syncTaskChangeToTodoist(user.id, todoistRef, {
         completed: true
