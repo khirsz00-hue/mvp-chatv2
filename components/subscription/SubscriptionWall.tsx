@@ -58,7 +58,7 @@ export default function SubscriptionWall({ children }: SubscriptionWallProps) {
 
         const { data: profile, error } = await supabase
           .from('user_profiles')
-          .select('subscription_status, subscription_tier, is_admin')
+          .select('subscription_status, subscription_tier, is_admin, trial_end_date, trial_used')
           .eq('id', user.id)
           .single()
 
@@ -107,11 +107,46 @@ export default function SubscriptionWall({ children }: SubscriptionWallProps) {
 
         // Check for active subscription statuses
         const activeStatuses = ['active', 'trialing']
-        const hasAccess = activeStatuses.includes(profile?.subscription_status || '')
-        console.log('🔍 [SubscriptionWall] Subscription status:', profile?.subscription_status, '| Has access:', hasAccess)
+        const hasActiveSubscriptionStatus = activeStatuses.includes(profile?.subscription_status || '')
+        
+        if (hasActiveSubscriptionStatus) {
+          console.log('✅ [SubscriptionWall] User has active subscription:', profile?.subscription_status)
+          clearTimeoutIfExists()
+          if (isMounted) {
+            setHasActiveSubscription(true)
+            setLoading(false)
+          }
+          return
+        }
+
+        // Check trial period
+        if (!profile?.trial_used && profile?.trial_end_date) {
+          const now = new Date()
+          const trialEnd = new Date(profile.trial_end_date)
+          if (now < trialEnd) {
+            const trialDaysRemaining = Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+            console.log('✅ [SubscriptionWall] User has active trial, days remaining:', trialDaysRemaining)
+            clearTimeoutIfExists()
+            if (isMounted) {
+              setHasActiveSubscription(true)
+              setLoading(false)
+            }
+            return
+          } else {
+            // Trial expired, mark as used
+            console.log('⚠️ [SubscriptionWall] Trial expired, marking as used')
+            await supabase
+              .from('user_profiles')
+              .update({ trial_used: true })
+              .eq('id', user.id)
+          }
+        }
+
+        // No active subscription or trial
+        console.log('❌ [SubscriptionWall] No active subscription or trial')
         clearTimeoutIfExists()
         if (isMounted) {
-          setHasActiveSubscription(hasAccess)
+          setHasActiveSubscription(false)
           setLoading(false)
         }
       } catch (error) {
@@ -135,6 +170,10 @@ export default function SubscriptionWall({ children }: SubscriptionWallProps) {
 
   const createMissingProfile = async (userId: string, email: string): Promise<boolean> => {
     try {
+      const trialDays = 7
+      const now = new Date()
+      const trialEnd = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000)
+
       const { error } = await supabase
         .from('user_profiles')
         .insert({
@@ -142,7 +181,10 @@ export default function SubscriptionWall({ children }: SubscriptionWallProps) {
           email: email,
           subscription_status: 'inactive',
           subscription_tier: 'free',
-          is_admin: false
+          is_admin: false,
+          trial_start_date: now.toISOString(),
+          trial_end_date: trialEnd.toISOString(),
+          trial_used: false
         })
 
       if (error) {
