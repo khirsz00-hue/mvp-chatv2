@@ -65,6 +65,7 @@ type UndoToast = {
 
 const todayIso = () => new Date().toISOString().split('T')[0]
 const MAX_COGNITIVE_LOAD = 5
+const DEFAULT_COGNITIVE_LOAD = 3
 
 // Inner content component (will be wrapped with QueryClientProvider)
 function DayAssistantV2Content() {
@@ -349,7 +350,7 @@ function DayAssistantV2Content() {
   const easiestTask = useMemo(() => {
     const candidates = tasks.filter(t => !t.completed)
     if (candidates.length === 0) return null
-    const defaultLoad = MAX_COGNITIVE_LOAD
+    const defaultLoad = DEFAULT_COGNITIVE_LOAD
     return [...candidates].sort((a, b) => {
       const loadDiff = (a.cognitive_load ?? defaultLoad) - (b.cognitive_load ?? defaultLoad)
       if (loadDiff !== 0) return loadDiff
