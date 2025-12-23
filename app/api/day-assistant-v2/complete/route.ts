@@ -73,16 +73,23 @@ export async function POST(request: NextRequest) {
       .from('day_assistant_v2_tasks')
       .update({
         completed: true,
-        completed_at: new Date().toISOString()
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       })
       .eq('id', task_id)
+      .eq('user_id', user.id) // Ensure user owns the task (RLS check)
       .select()
       .single()
     
     if (updateError) {
       console.error('❌ [Complete] Error updating task in database:', updateError)
       console.error('❌ [Complete] Error details:', JSON.stringify(updateError, null, 2))
-      return NextResponse.json({ error: 'Failed to complete task in database' }, { status: 500 })
+      console.error('❌ [Complete] Task ID:', task_id)
+      console.error('❌ [Complete] User ID:', user.id)
+      return NextResponse.json({ 
+        error: 'Nie udało się ukończyć zadania',
+        details: updateError.message || 'Błąd bazy danych' 
+      }, { status: 500 })
     }
     
     console.log('✅ [Complete] Task marked as completed in database')
