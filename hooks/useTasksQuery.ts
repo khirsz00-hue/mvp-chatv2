@@ -7,6 +7,35 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
+/**
+ * Helper function to get session with retry logic
+ * Fixes race condition where session is available but hook doesn't see it
+ */
+async function getSessionWithRetry(maxAttempts = 3) {
+  let session = null
+  let attempts = 0
+  
+  while (!session && attempts < maxAttempts) {
+    attempts++
+    const { data: { session: currentSession }, error } = await supabase.auth.getSession()
+    
+    if (currentSession) {
+      return currentSession
+    }
+    
+    if (error) {
+      console.error(`❌ Session error (attempt ${attempts}/${maxAttempts}):`, error)
+    }
+    
+    // Wait before retrying (exponential backoff)
+    if (attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 100 * attempts))
+    }
+  }
+  
+  throw new Error('Brak sesji - odśwież stronę i spróbuj ponownie')
+}
+
 export interface Task {
   id: string
   title: string
@@ -37,8 +66,7 @@ export function useTasksQuery(date: string) {
   return useQuery({
     queryKey: ['tasks', date],
     queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) throw new Error('No session')
+      const session = await getSessionWithRetry()
 
       const response = await fetch(`/api/day-assistant-v2/dayplan?date=${date}`, {
         headers: {
@@ -59,8 +87,8 @@ export function useCompleteTask() {
 
   return useMutation({
     mutationFn: async (taskId: string) => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) throw new Error('No session')
+      const session = await getSessionWithRetry()
+      console.log('✅ [useCompleteTask] Session obtained, completing task:', taskId)
 
       const response = await fetch('/api/day-assistant-v2/complete', {
         method: 'POST',
@@ -121,8 +149,7 @@ export function useDeleteTask() {
 
   return useMutation({
     mutationFn: async (taskId: string) => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) throw new Error('No session')
+      const session = await getSessionWithRetry()
 
       const response = await fetch(`/api/day-assistant-v2/tasks/${taskId}`, {
         method: 'DELETE',
@@ -165,8 +192,7 @@ export function useTogglePinTask() {
 
   return useMutation({
     mutationFn: async ({ taskId, pin }: { taskId: string; pin: boolean }) => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) throw new Error('No session')
+      const session = await getSessionWithRetry()
 
       const response = await fetch('/api/day-assistant-v2/pin', {
         method: 'POST',
@@ -209,8 +235,7 @@ export function usePostponeTask() {
 
   return useMutation({
     mutationFn: async ({ taskId, reason }: { taskId: string; reason?: string }) => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) throw new Error('No session')
+      const session = await getSessionWithRetry()
 
       const response = await fetch('/api/day-assistant-v2/postpone', {
         method: 'POST',
@@ -252,8 +277,7 @@ export function useToggleSubtask() {
 
   return useMutation({
     mutationFn: async ({ subtaskId, completed }: { subtaskId: string; completed: boolean }) => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) throw new Error('No session')
+      const session = await getSessionWithRetry()
 
       const response = await fetch('/api/day-assistant-v2/subtasks', {
         method: 'PATCH',
@@ -309,8 +333,7 @@ export function useAcceptRecommendation() {
       alternativeIndex?: number
       rejectReason?: string 
     }) => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) throw new Error('No session')
+      const session = await getSessionWithRetry()
 
       const response = await fetch('/api/day-assistant-v2/proposal', {
         method: 'POST',
@@ -370,8 +393,7 @@ export function useCreateSubtasks() {
       taskId: string
       steps: Array<{ content: string; estimated_duration: number; position: number }>
     }) => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) throw new Error('No session')
+      const session = await getSessionWithRetry()
 
       const response = await fetch('/api/day-assistant-v2/subtasks/bulk', {
         method: 'POST',
