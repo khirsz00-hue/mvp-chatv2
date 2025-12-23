@@ -7,7 +7,7 @@
 
 import { TimerState } from '@/hooks/useTaskTimer'
 import Button from '@/components/ui/Button'
-import { Pause, Play, CheckCircle } from '@phosphor-icons/react'
+import { Pause, Play, CheckCircle, XCircle } from '@phosphor-icons/react'
 
 interface CurrentActivityBoxProps {
   activeTimer: TimerState | null
@@ -18,6 +18,7 @@ interface CurrentActivityBoxProps {
   onPause: () => void
   onResume: () => void
   onComplete: () => void
+  onStop: () => void
 }
 
 export function CurrentActivityBox({
@@ -28,7 +29,8 @@ export function CurrentActivityBox({
   formatTime,
   onPause,
   onResume,
-  onComplete
+  onComplete,
+  onStop
 }: CurrentActivityBoxProps) {
   if (!activeTimer && !breakActive) {
     return null
@@ -52,7 +54,7 @@ export function CurrentActivityBox({
   // Active task mode
   if (activeTimer) {
     return (
-      <div className="mb-4 p-4 bg-purple-50 border-2 border-purple-300 rounded-lg">
+      <div className="sticky top-0 z-10 mb-4 p-4 bg-purple-50 border-2 border-purple-300 rounded-lg shadow-md">
         <div className="flex items-center justify-between">
           <div className="flex-1">
             <p className="text-sm text-purple-600 font-semibold">🎯 Aktualnie zajmujesz się:</p>
@@ -87,8 +89,11 @@ export function CurrentActivityBox({
                 <Pause size={16} className="mr-1" weight="fill" /> Pauza
               </Button>
             )}
+            <Button size="sm" variant="outline" onClick={onStop} className="border-red-300 hover:bg-red-50">
+              <XCircle size={16} className="mr-1" weight="fill" /> Stop
+            </Button>
             <Button size="sm" onClick={onComplete} className="bg-green-600 hover:bg-green-700">
-              <CheckCircle size={16} className="mr-1" weight="fill" /> Stop
+              <CheckCircle size={16} className="mr-1" weight="fill" /> Ukończone
             </Button>
           </div>
         </div>
