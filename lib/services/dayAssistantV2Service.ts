@@ -19,6 +19,16 @@ import {
   ProposalAction
 } from '@/lib/types/dayAssistantV2'
 
+// Type for Todoist API update payload
+export interface TodoistUpdatePayload {
+  due_date?: string | null
+  content?: string
+  description?: string
+  labels?: string[]
+  project_id?: string
+  completed?: boolean
+}
+
 const isNullableString = (value: unknown) =>
   value === null || typeof value === 'string' || value === undefined
 
@@ -68,6 +78,96 @@ function isValidTestDayTask(task: unknown): task is TestDayTask {
     isNullableString(candidate.last_moved_at) &&
     isNullableString(candidate.due_date)
   )
+}
+
+/**
+ * Sync task changes back to Todoist (bidirectional sync)
+ */
+export async function syncTaskChangeToTodoist(
+  userId: string,
+  todoistId: string,
+  updates: {
+    due_date?: string | null
+    content?: string
+    description?: string
+    labels?: string[]
+    project_id?: string
+    completed?: boolean
+  }
+): Promise<boolean> {
+  try {
+    // Get Todoist token
+    const { data: profile } = await supabaseServer
+      .from('user_profiles')
+      .select('todoist_token')
+      .eq('id', userId)
+      .single()
+    
+    if (!profile?.todoist_token) {
+      console.warn('[syncTaskChangeToTodoist] No Todoist token found')
+      return false
+    }
+
+    // If completing task, use complete endpoint
+    if (updates.completed) {
+      const response = await fetch(`https://api.todoist.com/rest/v2/tasks/${todoistId}/close`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${profile.todoist_token}`
+        }
+      })
+      
+      if (!response.ok) {
+        console.error('[syncTaskChangeToTodoist] Failed to complete task in Todoist')
+        return false
+      }
+      
+      console.log(`[syncTaskChangeToTodoist] ✅ Completed task in Todoist: ${todoistId}`)
+      return true
+    }
+
+    // Otherwise, update task
+    const todoistPayload: TodoistUpdatePayload = {}
+    
+    if (updates.due_date !== undefined) {
+      todoistPayload.due_date = updates.due_date
+    }
+    if (updates.content !== undefined) {
+      todoistPayload.content = updates.content
+    }
+    if (updates.description !== undefined) {
+      todoistPayload.description = updates.description
+    }
+    if (updates.labels) {
+      todoistPayload.labels = updates.labels
+    }
+    if (updates.project_id) {
+      todoistPayload.project_id = updates.project_id
+    }
+
+    // Todoist REST API v2 uses POST for task updates (not PUT/PATCH)
+    // See: https://developer.todoist.com/rest/v2/#update-a-task
+    const response = await fetch(`https://api.todoist.com/rest/v2/tasks/${todoistId}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${profile.todoist_token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(todoistPayload)
+    })
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('[syncTaskChangeToTodoist] Failed to update Todoist:', errorText)
+      return false
+    }
+    
+    console.log(`[syncTaskChangeToTodoist] ✅ Synced to Todoist: ${todoistId}`)
+    return true
+  } catch (error) {
+    console.error('[syncTaskChangeToTodoist] Error:', error)
+    return false
+  }
 }
 
 /**
@@ -550,6 +650,13 @@ export async function postponeTask(
   if (updateError) {
     console.error('Error postponing task:', updateError)
     return { success: false }
+  }
+  
+  // Sync back to Todoist
+  if (updatedTask.todoist_id) {
+    await syncTaskChangeToTodoist(userId, updatedTask.todoist_id, {
+      due_date: tomorrowStr
+    })
   }
   
   // Get assistant for settings
