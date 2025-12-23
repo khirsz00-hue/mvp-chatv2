@@ -19,6 +19,15 @@ import {
   ProposalAction
 } from '@/lib/types/dayAssistantV2'
 
+// Type for Todoist API update payload
+interface TodoistUpdatePayload {
+  due_date?: string | null
+  content?: string
+  description?: string
+  labels?: string[]
+  project_id?: string
+}
+
 const isNullableString = (value: unknown) =>
   value === null || typeof value === 'string' || value === undefined
 
@@ -117,7 +126,7 @@ export async function syncTaskChangeToTodoist(
     }
 
     // Otherwise, update task
-    const todoistPayload: any = {}
+    const todoistPayload: TodoistUpdatePayload = {}
     
     if (updates.due_date !== undefined) {
       todoistPayload.due_date = updates.due_date

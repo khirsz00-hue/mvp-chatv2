@@ -221,7 +221,13 @@ export async function PUT(request: NextRequest) {
     // Sync to Todoist if task is from Todoist
     const todoistRef = updatedTask.todoist_id ?? updatedTask.todoist_task_id
     if (todoistRef) {
-      const todoistUpdates: any = {}
+      const todoistUpdates: {
+        content?: string
+        description?: string
+        due_date?: string
+        labels?: string[]
+        completed?: boolean
+      } = {}
       
       // Map Supabase fields to Todoist fields
       if (updates.title !== undefined) todoistUpdates.content = updates.title
