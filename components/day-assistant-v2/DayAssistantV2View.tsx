@@ -65,6 +65,18 @@ type UndoToast = {
 
 const todayIso = () => new Date().toISOString().split('T')[0]
 
+// Helper: Format milliseconds to MM:SS
+const formatTimeBlockRemaining = (milliseconds: number): string => {
+  const minutes = Math.floor(milliseconds / 60000)
+  const seconds = Math.floor((milliseconds % 60000) / 1000)
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
+// Helper: Calculate time block progress percentage
+const calculateTimeBlockProgress = (remaining: number, total: number): number => {
+  return Math.max(0, (remaining / (total * 60000)) * 100)
+}
+
 // Inner content component (will be wrapped with QueryClientProvider)
 function DayAssistantV2Content() {
   const { showToast } = useToast()
@@ -100,6 +112,11 @@ function DayAssistantV2Content() {
   // NEW: Add time block modal state
   const [showAddTimeBlockModal, setShowAddTimeBlockModal] = useState(false)
   const [manualTimeBlock, setManualTimeBlock] = useState<number>(0) // Additional minutes added by user
+  const [activeTimeBlock, setActiveTimeBlock] = useState<{
+    totalMinutes: number
+    startTime: number
+    endTime: number
+  } | null>(null)
   
   const undoTimer = useRef<NodeJS.Timeout | null>(null)
 
@@ -182,6 +199,38 @@ function DayAssistantV2Content() {
     
     return () => clearInterval(interval)
   }, [sessionToken]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Time block countdown tracker
+  const [timeBlockRemaining, setTimeBlockRemaining] = useState<number | null>(null)
+  
+  useEffect(() => {
+    if (!activeTimeBlock) {
+      setTimeBlockRemaining(null)
+      return
+    }
+    
+    const updateRemaining = () => {
+      const now = Date.now()
+      const remaining = Math.max(0, activeTimeBlock.endTime - now)
+      
+      if (remaining === 0) {
+        // Time block expired
+        setActiveTimeBlock(null)
+        setTimeBlockRemaining(null)
+        toast.info('⏰ Blok czasu zakończony')
+      } else {
+        setTimeBlockRemaining(remaining)
+      }
+    }
+    
+    // Update immediately
+    updateRemaining()
+    
+    // Update every second
+    const interval = setInterval(updateRemaining, 1000)
+    
+    return () => clearInterval(interval)
+  }, [activeTimeBlock])
 
   // Dynamic requeue on energy/focus change - NO RELOAD NEEDED
   // Queue updates automatically via useMemo dependencies
@@ -362,6 +411,14 @@ function DayAssistantV2Content() {
   }
 
   const handleAddTimeBlock = (minutes: number) => {
+    const now = Date.now()
+    const endTime = now + (minutes * 60 * 1000)
+    
+    setActiveTimeBlock({
+      totalMinutes: minutes,
+      startTime: now,
+      endTime: endTime
+    })
     setManualTimeBlock(prev => prev + minutes)
     addDecisionLog(`Dodano blok czasu: ${minutes} min`)
     setIsReorderingQueue(true)
@@ -806,6 +863,48 @@ function DayAssistantV2Content() {
                     📋 {later.length} {later.length === 1 ? 'task' : 'tasków'} pozostaje na później
                   </p>
                 )}
+              </div>
+            )}
+
+            {/* Active Time Block Timer */}
+            {activeTimeBlock && timeBlockRemaining !== null && (
+              <div className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-300 rounded-lg shadow-sm">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Clock size={24} className="text-purple-600" />
+                    <p className="text-base font-bold text-purple-900">
+                      ⏰ Aktywny blok czasu
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setActiveTimeBlock(null)
+                      setTimeBlockRemaining(null)
+                      toast.info('Zatrzymano licznik bloku czasu')
+                    }}
+                    className="text-xs text-purple-600 hover:text-purple-800 underline"
+                  >
+                    Zakończ
+                  </button>
+                </div>
+                
+                <div className="text-center mb-3">
+                  <p className="text-4xl font-bold text-purple-700 tabular-nums">
+                    {formatTimeBlockRemaining(timeBlockRemaining)}
+                  </p>
+                  <p className="text-sm text-purple-600 mt-1">
+                    pozostało z {activeTimeBlock.totalMinutes} min
+                  </p>
+                </div>
+                
+                <div className="w-full bg-purple-200 rounded-full h-3">
+                  <div
+                    className="bg-gradient-to-r from-purple-500 to-blue-500 h-3 rounded-full transition-all duration-1000"
+                    style={{ 
+                      width: `${calculateTimeBlockProgress(timeBlockRemaining, activeTimeBlock.totalMinutes)}%` 
+                    }}
+                  />
+                </div>
               </div>
             )}
 
@@ -1538,59 +1637,59 @@ function TaskRow({
             </div>
           )}
         </div>
-        {!isCollapsed && (
-          <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+        <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+          {!isCollapsed && (
             <Button size="sm" variant="outline" onClick={onStart}>
               <Play size={16} className="mr-1" /> Start
             </Button>
+          )}
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="ghost">
+                <DotsThree size={20} weight="bold" />
+              </Button>
+            </DropdownMenuTrigger>
             
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="ghost">
-                  <DotsThree size={20} weight="bold" />
-                </Button>
-              </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onComplete}>
+                <Check size={16} className="mr-2" />
+                Ukończ
+              </DropdownMenuItem>
               
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={onComplete}>
-                  <Check size={16} className="mr-2" />
-                  Ukończ
+              <DropdownMenuItem onClick={onNotToday}>
+                <ArrowsClockwise size={16} className="mr-2" />
+                Nie dziś
+              </DropdownMenuItem>
+              
+              {onPin && (
+                <DropdownMenuItem onClick={onPin}>
+                  <PushPin size={16} className="mr-2" />
+                  {task.is_must ? 'Odepnij' : 'Przypnij jako MUST'}
                 </DropdownMenuItem>
-                
-                <DropdownMenuItem onClick={onNotToday}>
-                  <ArrowsClockwise size={16} className="mr-2" />
-                  Nie dziś
+              )}
+              
+              <DropdownMenuItem onClick={onDecompose}>
+                <MagicWand size={16} className="mr-2" />
+                ⚡ Pomóż mi
+              </DropdownMenuItem>
+              
+              <DropdownMenuSeparator />
+              
+              <DropdownMenuItem onClick={onClick}>
+                <Pencil size={16} className="mr-2" />
+                Edytuj
+              </DropdownMenuItem>
+              
+              {onDelete && (
+                <DropdownMenuItem onClick={onDelete} className="text-red-600">
+                  <Trash size={16} className="mr-2" />
+                  Usuń
                 </DropdownMenuItem>
-                
-                {onPin && (
-                  <DropdownMenuItem onClick={onPin}>
-                    <PushPin size={16} className="mr-2" />
-                    {task.is_must ? 'Odepnij' : 'Przypnij jako MUST'}
-                  </DropdownMenuItem>
-                )}
-                
-                <DropdownMenuItem onClick={onDecompose}>
-                  <MagicWand size={16} className="mr-2" />
-                  ⚡ Pomóż mi
-                </DropdownMenuItem>
-                
-                <DropdownMenuSeparator />
-                
-                <DropdownMenuItem onClick={onClick}>
-                  <Pencil size={16} className="mr-2" />
-                  Edytuj
-                </DropdownMenuItem>
-                
-                {onDelete && (
-                  <DropdownMenuItem onClick={onDelete} className="text-red-600">
-                    <Trash size={16} className="mr-2" />
-                    Usuń
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        )}
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
       
       {/* Timer Display */}
