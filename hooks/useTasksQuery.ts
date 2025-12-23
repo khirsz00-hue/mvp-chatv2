@@ -71,7 +71,11 @@ export function useCompleteTask() {
         body: JSON.stringify({ task_id: taskId })
       })
 
-      if (!response.ok) throw new Error('Failed to complete task')
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to complete task' }))
+        throw new Error(errorData.error || 'Failed to complete task')
+      }
+      
       return response.json()
     },
     onMutate: async (taskId) => {
@@ -89,11 +93,25 @@ export function useCompleteTask() {
     onError: (err, taskId, context) => {
       // Rollback on error
       queryClient.setQueryData(['tasks'], context?.previousTasks)
-      toast.error('Nie udało się ukończyć zadania')
+      
+      // Show specific error message
+      const errorMessage = err instanceof Error ? err.message : 'Nie udało się ukończyć zadania'
+      toast.error(`❌ ${errorMessage}`)
+      
+      console.error('❌ [useCompleteTask] Error:', err)
     },
-    onSuccess: () => {
-      toast.success('✅ Zadanie ukończone!')
+    onSuccess: (data) => {
+      // Show success message with warning if Todoist sync failed
+      if (data.warning) {
+        toast.warning(`⚠️ ${data.warning}`)
+      } else {
+        toast.success(data.message || '✅ Zadanie ukończone!')
+      }
+      
+      // Invalidate recommendation cache
       queryClient.invalidateQueries({ queryKey: ['recommendation'] })
+      
+      console.log('✅ [useCompleteTask] Task completed:', data.todoist_synced ? 'with Todoist sync' : 'local only')
     }
   })
 }
