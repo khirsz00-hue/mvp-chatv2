@@ -27,10 +27,23 @@ export async function checkUsageLimit(
 
   const tier = (profile?.subscription_tier || 'free') as SubscriptionTier
   
-  // Get current period
+  // Get current period (daily for tasks, monthly for others)
   const now = new Date()
-  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
-  const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  let periodStart: Date
+  let periodEnd: Date
+  let limitKey: string
+  
+  if (resource === 'tasks') {
+    // Daily period for tasks
+    periodStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    periodEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
+    limitKey = 'tasks_per_day'
+  } else {
+    // Monthly period for other resources
+    periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+    limitKey = `${resource}_per_month`
+  }
 
   // Get current usage
   const { data: usage } = await supabase
@@ -43,7 +56,7 @@ export async function checkUsageLimit(
     .single()
 
   const current = usage?.count || 0
-  const limit = LIMITS[tier][`${resource}_per_month` as keyof typeof LIMITS[typeof tier]]
+  const limit = LIMITS[tier][limitKey as keyof typeof LIMITS[typeof tier]]
 
   return {
     allowed: current < limit,
@@ -57,8 +70,20 @@ export async function incrementUsage(
   resource: RT
 ): Promise<void> {
   const now = new Date()
-  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
-  const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  
+  // Get period (daily for tasks, monthly for others)
+  let periodStart: Date
+  let periodEnd: Date
+  
+  if (resource === 'tasks') {
+    // Daily period for tasks
+    periodStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    periodEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
+  } else {
+    // Monthly period for other resources
+    periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  }
 
   const { data: existing } = await supabase
     .from('usage_tracking')

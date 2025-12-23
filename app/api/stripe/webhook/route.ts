@@ -24,11 +24,14 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     console.error('Webhook signature verification failed:', err.message)
     
-    // Log error to database
+    // Log error to database (without sensitive body content)
     await supabase.from('webhook_errors').insert({
       event_type: 'signature_verification_failed',
       error_message: err.message,
-      event_data: { body: body.substring(0, 500) }
+      event_data: { 
+        timestamp: new Date().toISOString(),
+        content_length: body.length
+      }
     })
     
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
