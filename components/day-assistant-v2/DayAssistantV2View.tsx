@@ -689,10 +689,41 @@ function DayAssistantV2Content() {
   }
 
   // Morning Review Modal handlers
-  const handleMorningAddToday = (task: TestDayTask) => {
-    // Update task due_date to today - task stays in today's queue
+  const handleMorningAddToday = async (task: TestDayTask) => {
+    // Update task due_date to today so it stays in today's queue
+    const todayDate = todayIso()
+    
+    // Optimistic update
+    setTasks(prev => prev.map(t => 
+      t.id === task.id ? { ...t, due_date: todayDate } : t
+    ))
+    
     addDecisionLog(`Dodano przeterminowane zadanie "${task.title}" na dziś`)
     toast.success(`✅ "${task.title}" dodane na dziś`)
+    
+    try {
+      const response = await authFetch('/api/day-assistant-v2/task', {
+        method: 'PUT',
+        body: JSON.stringify({ 
+          task_id: task.id, 
+          due_date: todayDate 
+        })
+      })
+      
+      if (!response.ok) {
+        // Rollback on error
+        setTasks(prev => prev.map(t => 
+          t.id === task.id ? { ...t, due_date: task.due_date } : t
+        ))
+        toast.error('Nie udało się zaktualizować zadania')
+      }
+    } catch (error) {
+      console.error('Update task due date error:', error)
+      // Rollback on error
+      setTasks(prev => prev.map(t => 
+        t.id === task.id ? { ...t, due_date: task.due_date } : t
+      ))
+    }
   }
 
   const handleMorningMoveToTomorrow = async (task: TestDayTask) => {

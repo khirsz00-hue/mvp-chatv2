@@ -5,6 +5,7 @@
 
 import { TestDayTask, DayPlan, ProposalAction } from '@/lib/types/dayAssistantV2'
 import { UserBehaviorProfile } from './intelligentScoringEngine'
+import { normalizeToStartOfDay, getDaysPlural } from '@/lib/utils/polishText'
 
 // Recommendation types
 export type RecommendationType = 
@@ -380,14 +381,12 @@ export function detectOverdueOpportunity(
   context: { currentDate: string; availableMinutes: number; currentHour: number }
 ): SmartRecommendation | null {
   // Find overdue tasks
-  const today = new Date(context.currentDate)
-  today.setHours(0, 0, 0, 0)
+  const today = normalizeToStartOfDay(context.currentDate)
   
   const overdueTasks = tasks.filter(task => {
     if (!task.due_date || task.completed) return false
     
-    const dueDate = new Date(task.due_date)
-    dueDate.setHours(0, 0, 0, 0)
+    const dueDate = normalizeToStartOfDay(task.due_date)
     
     return dueDate < today
   })
@@ -408,7 +407,7 @@ export function detectOverdueOpportunity(
 
   // Calculate days overdue for top tasks
   const getDaysOverdue = (dueDate: string): number => {
-    const due = new Date(dueDate)
+    const due = normalizeToStartOfDay(dueDate)
     const diffTime = today.getTime() - due.getTime()
     return Math.floor(diffTime / (1000 * 60 * 60 * 24))
   }
@@ -431,7 +430,7 @@ export function detectOverdueOpportunity(
     const daysOverdue = getDaysOverdue(topTask.due_date!)
     
     const reasoning = [
-      `Zadanie "${topTask.title}" jest przeterminowane ${daysOverdue} ${daysOverdue === 1 ? 'dzień' : 'dni'}`,
+      `Zadanie "${topTask.title}" jest przeterminowane ${daysOverdue} ${getDaysPlural(daysOverdue)}`,
       `Priorytet: ${topTask.priority}/4`,
       'Warto rozważyć dodanie do kolejki na dziś'
     ]
@@ -462,16 +461,18 @@ export function detectOverdueOpportunity(
   // Multiple suitable tasks
   const totalTime = suitableTasks.reduce((sum, t) => sum + t.estimate_min, 0)
   
+  const taskWord = suitableTasks.length === 1 ? 'zadanie pasuje' : 'zadania pasują'
+  
   const reasoning = [
     `Masz ${context.availableMinutes} min wolnego czasu`,
-    `${suitableTasks.length} przeterminowane ${suitableTasks.length === 1 ? 'zadanie pasuje' : 'zadania pasują'} do Twojego trybu pracy`,
+    `${suitableTasks.length} przeterminowane ${taskWord} do Twojego trybu pracy`,
     `Łączny czas: ${totalTime} min - wyrobisz się!`
   ]
 
   const taskList = suitableTasks
     .map((t, i) => {
       const daysOverdue = getDaysOverdue(t.due_date!)
-      return `${i + 1}. "${t.title}" (${daysOverdue} ${daysOverdue === 1 ? 'dzień' : 'dni'} temu, ${t.estimate_min}min, P:${t.priority})`
+      return `${i + 1}. "${t.title}" (${daysOverdue} ${getDaysPlural(daysOverdue)} temu, ${t.estimate_min}min, P:${t.priority})`
     })
 
   reasoning.push(...taskList)

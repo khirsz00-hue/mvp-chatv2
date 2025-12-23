@@ -8,6 +8,7 @@
 import { useState, useEffect } from 'react'
 import { TestDayTask } from '@/lib/types/dayAssistantV2'
 import { getDaysOverdueText } from '@/hooks/useOverdueTasks'
+import { getTasksPlural } from '@/lib/utils/polishText'
 import Button from '@/components/ui/Button'
 import { TaskBadges } from './TaskBadges'
 import { CalendarBlank, CheckCircle, CaretDown, CaretUp, DotsThree } from '@phosphor-icons/react'
@@ -48,11 +49,7 @@ export function OverdueTasksSection({
     setIsCollapsed(prev => !prev)
   }
 
-  const taskCountText = overdueTasks.length === 1 
-    ? 'zadanie' 
-    : overdueTasks.length < 5 
-      ? 'zadania' 
-      : 'zadań'
+  const taskCountText = getTasksPlural(overdueTasks.length)
 
   return (
     <div 

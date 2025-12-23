@@ -8,6 +8,7 @@
 import { useState, useEffect } from 'react'
 import { TestDayTask } from '@/lib/types/dayAssistantV2'
 import { getDaysOverdueText } from '@/hooks/useOverdueTasks'
+import { getTasksPlural } from '@/lib/utils/polishText'
 import Button from '@/components/ui/Button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { TaskBadges } from './TaskBadges'
@@ -84,8 +85,9 @@ export function MorningReviewModal({
   }
 
   const handleAction = (task: TestDayTask, action: 'today' | 'tomorrow' | 'reschedule' | 'delete') => {
-    // Mark task as processed
-    setProcessedTasks(prev => new Set(prev).add(task.id))
+    // Mark task as processed first
+    const newProcessedTasks = new Set(processedTasks).add(task.id)
+    setProcessedTasks(newProcessedTasks)
 
     // Execute action
     switch (action) {
@@ -104,7 +106,7 @@ export function MorningReviewModal({
     }
 
     // If all tasks processed, close modal
-    if (processedTasks.size + 1 >= overdueTasks.length) {
+    if (newProcessedTasks.size >= overdueTasks.length) {
       markReviewedToday(selectedDate)
       setIsOpen(false)
     }
@@ -124,7 +126,7 @@ export function MorningReviewModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <span>🌅</span>
-            <span>Dzień dobry! Masz {remainingTasks.length} przeterminowane {remainingTasks.length === 1 ? 'zadanie' : 'zadań'}</span>
+            <span>Dzień dobry! Masz {remainingTasks.length} przeterminowane {getTasksPlural(remainingTasks.length)}</span>
           </DialogTitle>
         </DialogHeader>
 
