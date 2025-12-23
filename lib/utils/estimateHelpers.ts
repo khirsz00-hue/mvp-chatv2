@@ -5,6 +5,9 @@
 
 import { TestDayTask } from '@/lib/types/dayAssistantV2'
 
+const CHARS_PER_10_MINUTES = 60
+const MIN_ESTIMATE_MINUTES = 10
+
 /**
  * Calculate smart estimate based on task properties
  * Uses heuristics when no explicit estimate is set
@@ -27,9 +30,9 @@ export function getSmartEstimate(task: TestDayTask): number {
   }
 
   const totalLength = (task.title?.length || 0) + (task.description?.length || 0)
-  const derivedEstimate = Math.ceil(totalLength / 60) * 10
+  const derivedEstimate = Math.ceil(totalLength / CHARS_PER_10_MINUTES) * MIN_ESTIMATE_MINUTES
 
-  return Math.max(derivedEstimate, 10)
+  return Math.max(derivedEstimate, MIN_ESTIMATE_MINUTES)
 }
 
 /**
