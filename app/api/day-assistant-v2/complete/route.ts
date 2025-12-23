@@ -9,24 +9,6 @@ import {
   getOrCreateDayAssistantV2
 } from '@/lib/services/dayAssistantV2Service'
 
-async function completeTodoistTask(token: string, todoistId: string): Promise<boolean> {
-  try {
-    const res = await fetch(`https://api.todoist.com/rest/v2/tasks/${todoistId}/close`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` }
-    })
-
-    if (!res.ok) {
-      console.warn('[day-assistant-v2/complete] Failed to close Todoist task', todoistId, res.status)
-      return false
-    }
-    return true
-  } catch (error) {
-    console.error('[day-assistant-v2/complete] Error closing Todoist task:', error)
-    return false
-  }
-}
-
 export async function POST(request: NextRequest) {
   try {
     const supabase = createClient(
@@ -66,20 +48,6 @@ export async function POST(request: NextRequest) {
       .eq('id', task_id)
       .single()
     
-    // Complete in Todoist if it has a todoist_id
-    if (task?.todoist_id || task?.todoist_task_id) {
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('todoist_token')
-        .eq('id', user.id)
-        .single()
-      
-      if (profile?.todoist_token) {
-        const todoistId = task.todoist_id || task.todoist_task_id
-        await completeTodoistTask(profile.todoist_token, todoistId)
-      }
-    }
-    
     // Mark as completed in our database
     const { data: updatedTask, error: updateError } = await supabase
       .from('day_assistant_v2_tasks')
@@ -94,6 +62,15 @@ export async function POST(request: NextRequest) {
     if (updateError) {
       console.error('[day-assistant-v2/complete] Error updating task:', updateError)
       return NextResponse.json({ error: 'Failed to complete task' }, { status: 500 })
+    }
+    
+    // Sync to Todoist
+    const todoistRef = task?.todoist_id || task?.todoist_task_id
+    if (todoistRef) {
+      const { syncTaskChangeToTodoist } = await import('@/lib/services/dayAssistantV2Service')
+      await syncTaskChangeToTodoist(user.id, todoistRef, {
+        completed: true
+      })
     }
     
     return NextResponse.json({

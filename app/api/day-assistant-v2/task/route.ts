@@ -72,24 +72,6 @@ async function createTodoistTask(
   }
 }
 
-async function completeTodoistTask(token: string, todoistId: string): Promise<boolean> {
-  try {
-    const res = await fetch(`https://api.todoist.com/rest/v2/tasks/${todoistId}/close`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` }
-    })
-
-    if (!res.ok) {
-      console.warn('[day-assistant-v2/task] Failed to close Todoist task', todoistId, res.status)
-      return false
-    }
-    return true
-  } catch (error) {
-    console.error('[day-assistant-v2/task] Error closing Todoist task:', error)
-    return false
-  }
-}
-
 export async function POST(request: NextRequest) {
   try {
     const supabase = createClient(
@@ -235,11 +217,22 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to update task' }, { status: 500 })
     }
     
+    // Sync to Todoist if task is from Todoist
     const todoistRef = updatedTask.todoist_id ?? updatedTask.todoist_task_id
-    if (updates.completed && todoistRef && todoistToken) {
-      const synced = await completeTodoistTask(todoistToken, todoistRef)
-      if (!synced) {
-        console.warn('[day-assistant-v2/task] Todoist completion sync failed for task', todoistRef)
+    if (todoistRef) {
+      const { syncTaskChangeToTodoist } = await import('@/lib/services/dayAssistantV2Service')
+      const todoistUpdates: any = {}
+      
+      // Map Supabase fields to Todoist fields
+      if (updates.title) todoistUpdates.content = updates.title
+      if (updates.description !== undefined) todoistUpdates.description = updates.description
+      if (updates.due_date !== undefined) todoistUpdates.due_date = updates.due_date
+      if (updates.tags) todoistUpdates.labels = updates.tags
+      if (updates.completed !== undefined) todoistUpdates.completed = updates.completed
+      
+      // Only sync if there are actual changes to sync
+      if (Object.keys(todoistUpdates).length > 0) {
+        await syncTaskChangeToTodoist(user.id, todoistRef, todoistUpdates)
       }
     }
     

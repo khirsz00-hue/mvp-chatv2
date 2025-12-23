@@ -26,10 +26,10 @@ export async function DELETE(
 
     const taskId = params.taskId
 
-    // Verify ownership
+    // Get task to check for todoist_id
     const { data: task } = await supabase
       .from('day_assistant_v2_tasks')
-      .select('user_id')
+      .select('*')
       .eq('id', taskId)
       .single()
 
@@ -37,7 +37,37 @@ export async function DELETE(
       return NextResponse.json({ error: 'Task not found' }, { status: 404 })
     }
 
-    // Delete task
+    // Delete from Todoist first
+    const todoistRef = task.todoist_id || task.todoist_task_id
+    if (todoistRef) {
+      try {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('todoist_token')
+          .eq('id', user.id)
+          .single()
+        
+        if (profile?.todoist_token) {
+          const response = await fetch(`https://api.todoist.com/rest/v2/tasks/${todoistRef}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${profile.todoist_token}`
+            }
+          })
+          
+          if (!response.ok) {
+            console.warn('[Delete Task] Failed to delete from Todoist:', response.status)
+          } else {
+            console.log('[Delete Task] ✅ Deleted from Todoist:', todoistRef)
+          }
+        }
+      } catch (error) {
+        console.error('[Delete Task] Error deleting from Todoist:', error)
+        // Continue with local delete even if Todoist fails
+      }
+    }
+
+    // Delete task from Supabase
     const { error: deleteError } = await supabase
       .from('day_assistant_v2_tasks')
       .delete()
