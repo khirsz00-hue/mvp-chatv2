@@ -15,43 +15,6 @@ export function getSmartEstimate(task: TestDayTask): number {
     return task.estimate_min
   }
 
-  // Fallback logic based on task properties
-  let estimate = 30 // Base default
-
-  // Adjust based on cognitive load
-  if (task.cognitive_load) {
-    if (task.cognitive_load <= 2) {
-      estimate = 15 // Light tasks
-    } else if (task.cognitive_load >= 4) {
-      estimate = 45 // Heavy tasks
-    }
-  }
-
-  // Adjust based on title/description length (proxy for complexity)
-  const titleLength = task.title?.length || 0
-  const descLength = task.description?.length || 0
-  const totalLength = titleLength + descLength
-
-  if (totalLength < 30) {
-    estimate = Math.min(estimate, 15) // Very short - likely quick task
-  } else if (totalLength > 200) {
-    estimate = Math.max(estimate, 45) // Detailed description - likely complex
-  }
-
-  // MUST tasks tend to be more important/complex
-  if (task.is_must) {
-    estimate = Math.max(estimate, 30)
-  }
-
-  // Context-based adjustments
-  if (task.context_type === 'quick_wins') {
-    estimate = Math.min(estimate, 15)
-  } else if (task.context_type === 'deep_work') {
-    estimate = Math.max(estimate, 60)
-  } else if (task.context_type === 'admin' || task.context_type === 'communication') {
-    estimate = 20
-  }
-
   // If task has subtasks, sum their estimates
   if (task.subtasks && task.subtasks.length > 0) {
     const subtaskTotal = task.subtasks.reduce(
@@ -63,7 +26,10 @@ export function getSmartEstimate(task: TestDayTask): number {
     }
   }
 
-  return estimate
+  const totalLength = (task.title?.length || 0) + (task.description?.length || 0)
+  const derivedEstimate = Math.ceil(totalLength / 60) * 10
+
+  return derivedEstimate || 10
 }
 
 /**
