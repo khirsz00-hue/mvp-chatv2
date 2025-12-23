@@ -173,7 +173,7 @@ export async function POST(request: NextRequest) {
       .eq('user_id', user.id)
     
     if (appliedError) {
-      console.error('⚠️ [Recommend] Failed to fetch applied recommendations:', appliedError)
+      console.error('⚠️ [Recommend] Failed to fetch applied recommendations:', appliedError, '- continuing without filtering, some recommendations may appear as duplicates')
       // Continue without filtering - better to show duplicate than no recommendations
     }
     

@@ -13,10 +13,9 @@ CREATE TABLE IF NOT EXISTS day_assistant_v2_applied_recommendations (
   UNIQUE(user_id, recommendation_id)
 );
 
--- Create index for faster lookups
-CREATE INDEX IF NOT EXISTS idx_v2_applied_recs_user 
-  ON day_assistant_v2_applied_recommendations(user_id);
-  
+-- Create composite index for faster lookups
+-- Note: Single index on (user_id, recommendation_id) is sufficient
+-- PostgreSQL can use this composite index for queries on user_id alone
 CREATE INDEX IF NOT EXISTS idx_v2_applied_recs_user_rec 
   ON day_assistant_v2_applied_recommendations(user_id, recommendation_id);
 

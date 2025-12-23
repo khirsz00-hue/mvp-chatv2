@@ -97,10 +97,10 @@ export async function POST(request: NextRequest) {
         })
 
       if (persistError) {
-        console.error('❌ [Apply Recommendation] Failed to persist to database:', persistError)
+        console.error(`❌ [Apply Recommendation] Failed to persist recommendation ${recommendation.id} (${recommendation.type}) to database:`, persistError)
         // Don't fail the entire request - recommendation was still applied locally
       } else {
-        console.log('✅ [Apply Recommendation] Persisted to database')
+        console.log(`✅ [Apply Recommendation] Persisted to database: ${recommendation.id} (${recommendation.type})`)
       }
     }
 
