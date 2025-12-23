@@ -240,3 +240,50 @@ $$ language plpgsql;
 create trigger trigger_update_like_counts_and_scores
 after insert or delete on likes
 for each row execute function update_like_counts_and_scores();
+
+-- ========================================
+-- SAAS FUNCTIONALITY
+-- ========================================
+
+-- Usage tracking table
+CREATE TABLE IF NOT EXISTS usage_tracking (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
+  resource_type text NOT NULL, -- 'messages', 'tasks', 'decisions', 'ai_analyses'
+  count integer DEFAULT 1,
+  period_start date NOT NULL,
+  period_end date NOT NULL,
+  created_at timestamp DEFAULT now(),
+  updated_at timestamp DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_usage_tracking_user_resource ON usage_tracking(user_id, resource_type, period_start);
+
+ALTER TABLE usage_tracking ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own usage"
+  ON usage_tracking FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "System can insert usage"
+  ON usage_tracking FOR INSERT
+  WITH CHECK (true);
+
+CREATE POLICY "System can update usage"
+  ON usage_tracking FOR UPDATE
+  USING (true);
+
+-- Webhook errors logging
+CREATE TABLE IF NOT EXISTS webhook_errors (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_type text,
+  error_message text,
+  event_data jsonb,
+  created_at timestamp DEFAULT now()
+);
+
+-- Note: We cannot directly ALTER user_profiles from schema.sql since it's managed by migrations
+-- These columns should be added via a new migration file:
+-- ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS trial_end_date timestamp;
+-- ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS trial_used boolean DEFAULT false;
+-- ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS trial_start_date timestamp;
