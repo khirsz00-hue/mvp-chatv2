@@ -13,6 +13,7 @@ export type RecommendationType =
   | 'DECOMPOSE'       // Break down large task
   | 'REORDER'         // Suggest different order
   | 'DEFER'           // Postpone low-probability tasks
+  | 'OVERDUE'         // Handle overdue tasks
 
 export type ImpactLevel = 'HIGH' | 'MEDIUM' | 'LOW'
 
@@ -46,23 +47,27 @@ export function generateSmartRecommendations(
 ): SmartRecommendation[] {
   const recommendations: SmartRecommendation[] = []
 
-  // 1. Detect batching opportunities
+  // 1. Detect overdue tasks opportunities (HIGH PRIORITY)
+  const overdueRec = detectOverdueOpportunity(tasks, dayPlan, context)
+  if (overdueRec) recommendations.push(overdueRec)
+
+  // 2. Detect batching opportunities
   const batchingRec = detectBatchingOpportunity(tasks, context)
   if (batchingRec) recommendations.push(batchingRec)
 
-  // 2. Detect energy mismatches
+  // 3. Detect energy mismatches
   const energyRec = detectEnergyMismatch(tasks, dayPlan, context)
   if (energyRec) recommendations.push(energyRec)
 
-  // 3. Detect decomposition needs
+  // 4. Detect decomposition needs
   const decomposeRec = detectDecompositionNeed(tasks, profile, context)
   if (decomposeRec) recommendations.push(decomposeRec)
 
-  // 4. Detect reordering opportunities
+  // 5. Detect reordering opportunities
   const reorderRec = detectReorderOpportunity(tasks, dayPlan, profile, context)
   if (reorderRec) recommendations.push(reorderRec)
 
-  // 5. Detect defer candidates
+  // 6. Detect defer candidates
   const deferRec = detectDeferOpportunity(tasks, profile, context)
   if (deferRec) recommendations.push(deferRec)
 
@@ -362,6 +367,132 @@ export function detectDeferOpportunity(
       timeSaved: 0,
       stressReduction: 0.3,
       completionProbability: 0.6
+    }
+  }
+}
+
+/**
+ * Detect overdue opportunity - suggest adding overdue tasks to today's queue
+ */
+export function detectOverdueOpportunity(
+  tasks: TestDayTask[],
+  dayPlan: DayPlan,
+  context: { currentDate: string; availableMinutes: number; currentHour: number }
+): SmartRecommendation | null {
+  // Find overdue tasks
+  const today = new Date(context.currentDate)
+  today.setHours(0, 0, 0, 0)
+  
+  const overdueTasks = tasks.filter(task => {
+    if (!task.due_date || task.completed) return false
+    
+    const dueDate = new Date(task.due_date)
+    dueDate.setHours(0, 0, 0, 0)
+    
+    return dueDate < today
+  })
+
+  if (overdueTasks.length === 0) return null
+
+  // Sort by priority and age
+  const sortedOverdue = [...overdueTasks].sort((a, b) => {
+    // Priority first (descending)
+    if (b.priority !== a.priority) {
+      return b.priority - a.priority
+    }
+    // Then by date (ascending - oldest first)
+    const dateA = new Date(a.due_date || 0).getTime()
+    const dateB = new Date(b.due_date || 0).getTime()
+    return dateA - dateB
+  })
+
+  // Calculate days overdue for top tasks
+  const getDaysOverdue = (dueDate: string): number => {
+    const due = new Date(dueDate)
+    const diffTime = today.getTime() - due.getTime()
+    return Math.floor(diffTime / (1000 * 60 * 60 * 24))
+  }
+
+  // Match overdue tasks to current energy/focus
+  const matchesFocusMode = (task: TestDayTask): boolean => {
+    const avgEnergyFocus = (dayPlan.energy + dayPlan.focus) / 2
+    const loadDiff = Math.abs(task.cognitive_load - avgEnergyFocus)
+    return loadDiff <= 2 // Close match
+  }
+
+  // Find suitable tasks that fit available time and energy
+  const suitableTasks = sortedOverdue.filter(task => 
+    task.estimate_min <= context.availableMinutes && matchesFocusMode(task)
+  ).slice(0, 3)
+
+  if (suitableTasks.length === 0) {
+    // If no suitable tasks, recommend the most important one anyway
+    const topTask = sortedOverdue[0]
+    const daysOverdue = getDaysOverdue(topTask.due_date!)
+    
+    const reasoning = [
+      `Zadanie "${topTask.title}" jest przeterminowane ${daysOverdue} ${daysOverdue === 1 ? 'dzień' : 'dni'}`,
+      `Priorytet: ${topTask.priority}/4`,
+      'Warto rozważyć dodanie do kolejki na dziś'
+    ]
+
+    return {
+      type: 'OVERDUE',
+      title: '⚠️ Przeterminowane zadanie wymaga uwagi',
+      reasoning,
+      confidence: 0.85,
+      impact: 'HIGH',
+      actions: [
+        {
+          type: 'move_task',
+          task_id: topTask.id,
+          from_date: topTask.due_date || undefined,
+          to_date: context.currentDate,
+          reason: 'Overdue task - high priority'
+        }
+      ],
+      expectedOutcome: {
+        timeSaved: 0,
+        stressReduction: 0.4,
+        completionProbability: 0.7
+      }
+    }
+  }
+
+  // Multiple suitable tasks
+  const totalTime = suitableTasks.reduce((sum, t) => sum + t.estimate_min, 0)
+  
+  const reasoning = [
+    `Masz ${context.availableMinutes} min wolnego czasu`,
+    `${suitableTasks.length} przeterminowane ${suitableTasks.length === 1 ? 'zadanie pasuje' : 'zadania pasują'} do Twojego trybu pracy`,
+    `Łączny czas: ${totalTime} min - wyrobisz się!`
+  ]
+
+  const taskList = suitableTasks
+    .map((t, i) => {
+      const daysOverdue = getDaysOverdue(t.due_date!)
+      return `${i + 1}. "${t.title}" (${daysOverdue} ${daysOverdue === 1 ? 'dzień' : 'dni'} temu, ${t.estimate_min}min, P:${t.priority})`
+    })
+
+  reasoning.push(...taskList)
+
+  return {
+    type: 'OVERDUE',
+    title: '💡 Nadrobienie zaległości',
+    reasoning,
+    confidence: 0.9,
+    impact: 'HIGH',
+    actions: suitableTasks.map(task => ({
+      type: 'move_task',
+      task_id: task.id,
+      from_date: task.due_date || undefined,
+      to_date: context.currentDate,
+      reason: 'Add overdue to today'
+    })),
+    expectedOutcome: {
+      timeSaved: 0,
+      stressReduction: 0.5,
+      completionProbability: 0.85
     }
   }
 }

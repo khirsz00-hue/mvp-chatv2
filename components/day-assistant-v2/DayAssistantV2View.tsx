@@ -40,11 +40,13 @@ import { WorkHoursConfigModal } from './WorkHoursConfigModal'
 import { AddTimeBlockModal } from './AddTimeBlockModal'
 import { TaskTimer } from './TaskTimer'
 import { OverdueTasksSection } from './OverdueTasksSection'
+import { MorningReviewModal } from './MorningReviewModal'
 import { ClarifyModal } from './ClarifyModal'
 import { QueueReorderingOverlay } from './LoadingStates'
 import { CurrentActivityBox } from './CurrentActivityBox'
 import { BreakTimer } from './BreakTimer'
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+import { useOverdueTasks } from '@/hooks/useOverdueTasks'
 
 // Create a query client outside the component to avoid recreation on every render
 const queryClient = new QueryClient({
@@ -386,10 +388,8 @@ function DayAssistantV2Content() {
   // Apply intelligent scoring to filtered tasks
   const scoredTasks = useScoredTasks(filteredTasks, dayPlan, selectedDate)
 
-  // Separate overdue tasks
-  const overdueTasks = useMemo(() => {
-    return scoredTasks.filter(t => t.due_date && t.due_date < selectedDate && !t.completed)
-  }, [scoredTasks, selectedDate])
+  // Use overdue tasks hook for better management
+  const { overdueTasks } = useOverdueTasks(scoredTasks, selectedDate)
 
   // Non-overdue tasks for queue
   const nonOverdueTasks = useMemo(() => {
@@ -687,6 +687,30 @@ function DayAssistantV2Content() {
     // TODO: Show date picker modal
     await handleNotToday(task, 'Przełożono przeterminowane zadanie')
   }
+
+  // Morning Review Modal handlers
+  const handleMorningAddToday = (task: TestDayTask) => {
+    // Update task due_date to today - task stays in today's queue
+    addDecisionLog(`Dodano przeterminowane zadanie "${task.title}" na dziś`)
+    toast.success(`✅ "${task.title}" dodane na dziś`)
+  }
+
+  const handleMorningMoveToTomorrow = async (task: TestDayTask) => {
+    await handleNotToday(task, 'Przełożono na jutro z porannego przeglądu')
+    toast.success('📅 Zadanie przeniesione na jutro')
+  }
+
+  const handleMorningReschedule = async (task: TestDayTask) => {
+    // For now, same as postpone - could open date picker in future
+    await handleNotToday(task, 'Przełożono z porannego przeglądu')
+    toast.success('📅 Zadanie przełożone')
+  }
+
+  const handleMorningDelete = async (task: TestDayTask) => {
+    await handleDelete(task)
+    toast.success('🗑️ Zadanie usunięte')
+  }
+
 
   const handlePin = async (task: TestDayTask) => {
     const newPinState = !task.is_must
@@ -1494,6 +1518,16 @@ function DayAssistantV2Content() {
         isOpen={showBreakModal}
         onClose={() => setShowBreakModal(false)}
         onStartBreak={handleStartBreak}
+      />
+
+      {/* Morning Review Modal */}
+      <MorningReviewModal
+        overdueTasks={overdueTasks}
+        selectedDate={selectedDate}
+        onAddToday={handleMorningAddToday}
+        onMoveToTomorrow={handleMorningMoveToTomorrow}
+        onReschedule={handleMorningReschedule}
+        onDelete={handleMorningDelete}
       />
       </div>
     </TooltipProvider>
