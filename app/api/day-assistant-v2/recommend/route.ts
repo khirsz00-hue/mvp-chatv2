@@ -165,9 +165,26 @@ export async function POST(request: NextRequest) {
       }
     }
     
+    // ✅ FILTER OUT already applied recommendations from database
+    // This prevents recommendations from reappearing after background sync
+    const { data: appliedRecs, error: appliedError } = await supabase
+      .from('day_assistant_v2_applied_recommendations')
+      .select('recommendation_id')
+      .eq('user_id', user.id)
+    
+    if (appliedError) {
+      console.error('⚠️ [Recommend] Failed to fetch applied recommendations:', appliedError)
+      // Continue without filtering - better to show duplicate than no recommendations
+    }
+    
+    const appliedIds = new Set(appliedRecs?.map(r => r.recommendation_id) || [])
+    const activeRecommendations = recommendations.filter(rec => !appliedIds.has(rec.id))
+    
+    console.log(`🔍 [Recommend] Generated ${recommendations.length} recommendations, ${appliedIds.size} already applied, returning ${activeRecommendations.length} active`)
+    
     return NextResponse.json({
       success: true,
-      recommendations
+      recommendations: activeRecommendations
     })
   } catch (error) {
     console.error('Error in POST /api/day-assistant-v2/recommend:', error)

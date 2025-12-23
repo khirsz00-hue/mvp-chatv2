@@ -81,6 +81,29 @@ export async function POST(request: NextRequest) {
     const allSucceeded = results.every(r => r.success)
     const someSucceeded = results.some(r => r.success)
 
+    if (allSucceeded || someSucceeded) {
+      // ✅ PERSIST applied recommendation to database
+      // This prevents the recommendation from appearing again after background sync
+      const { error: persistError } = await supabase
+        .from('day_assistant_v2_applied_recommendations')
+        .upsert({
+          user_id: user.id,
+          assistant_id: assistant.id,
+          recommendation_id: recommendation.id,
+          recommendation_type: recommendation.type,
+          applied_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,recommendation_id'
+        })
+
+      if (persistError) {
+        console.error('❌ [Apply Recommendation] Failed to persist to database:', persistError)
+        // Don't fail the entire request - recommendation was still applied locally
+      } else {
+        console.log('✅ [Apply Recommendation] Persisted to database')
+      }
+    }
+
     if (allSucceeded) {
       console.log('✅ [Apply Recommendation] All actions succeeded')
       return NextResponse.json({
