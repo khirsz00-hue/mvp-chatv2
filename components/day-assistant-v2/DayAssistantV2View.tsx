@@ -70,6 +70,7 @@ type UndoToast = {
 const todayIso = () => new Date().toISOString().split('T')[0]
 const MAX_COGNITIVE_LOAD = 5
 const DEFAULT_COGNITIVE_LOAD = 3
+const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000 // 24 hours
 
 // Inner content component (will be wrapped with QueryClientProvider)
 function DayAssistantV2Content() {
@@ -113,7 +114,44 @@ function DayAssistantV2Content() {
   const [breakTimeRemaining, setBreakTimeRemaining] = useState(0)
   
   // Track applied recommendation IDs to filter them out
-  const [appliedRecommendationIds, setAppliedRecommendationIds] = useState<Set<string>>(new Set())
+  // Load from localStorage on mount and persist on change
+  const [appliedRecommendationIds, setAppliedRecommendationIds] = useState<Set<string>>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('appliedRecommendationIds')
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored)
+          if (Array.isArray(parsed)) {
+            return new Set(parsed)
+          }
+        } catch (e) {
+          console.error('Failed to parse applied recommendation IDs from localStorage:', e)
+        }
+      }
+    }
+    return new Set()
+  })
+  
+  // Persist applied recommendation IDs to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('appliedRecommendationIds', JSON.stringify(Array.from(appliedRecommendationIds)))
+    }
+  }, [appliedRecommendationIds])
+  
+  // Clean up old applied recommendation IDs (older than 24 hours)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const lastCleanup = localStorage.getItem('lastRecommendationCleanup')
+      const now = Date.now()
+      
+      if (!lastCleanup || now - parseInt(lastCleanup) > CLEANUP_INTERVAL_MS) {
+        // Clear all applied IDs after 24 hours
+        setAppliedRecommendationIds(new Set())
+        localStorage.setItem('lastRecommendationCleanup', now.toString())
+      }
+    }
+  }, [])
   
   const undoTimer = useRef<NodeJS.Timeout | null>(null)
 
@@ -1187,46 +1225,10 @@ function DayAssistantV2Content() {
               <p className="text-sm text-muted-foreground">
                 Te zadania nie mieszczą się w dostępnym czasie pracy dzisiaj.
               </p>
-              {later.slice(0, 5).map(task => (
-                <TaskRow
-                  key={task.id}
-                  task={task}
-                  onNotToday={() => handleNotToday(task)}
-                  onStart={() => handleStartTask(task)}
-                  onUnmark={() => openUnmarkWarning(task)}
-                  onDecompose={() => handleDecompose(task)}
-                  onComplete={() => handleComplete(task)}
-                  onPin={() => handlePin(task)}
-                  onDelete={() => handleDelete(task)}
-                  onClick={() => setSelectedTask(task)}
-                  focus={dayPlan?.focus || 3}
-                  selectedDate={selectedDate}
-                  isCollapsed={true}
-                  onSubtaskToggle={handleSubtaskToggle}
-                />
-              ))}
-              {later.length > 5 && (
-                <p className="text-sm text-muted-foreground text-center">
-                  ... i {later.length - 5} więcej
-                </p>
-              )}
-              <div className="flex justify-between items-center">
-                <p className="text-sm text-muted-foreground">
-                  {showLaterQueue 
-                    ? 'Te zadania nie mieszczą się w dostępnym czasie pracy dzisiaj.' 
-                    : `📋 ${later.length} ${later.length === 1 ? 'zadanie' : 'zadań'} pozostaje na później`}
-                </p>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => setShowLaterQueue(!showLaterQueue)}
-                >
-                  {showLaterQueue ? '🔼 Zwiń kolejkę' : '👁️ Pokaż kolejkę'}
-                </Button>
-              </div>
               
               {showLaterQueue ? (
                 <>
+                  {/* FULL LIST - Show all tasks when expanded */}
                   <div className="border-t pt-3 mt-2">
                     <h3 className="font-semibold mb-3">📋 KOLEJKA NA PÓŹNIEJ</h3>
                     {later.map((task, index) => (
@@ -1251,6 +1253,7 @@ function DayAssistantV2Content() {
                 </>
               ) : (
                 <>
+                  {/* PREVIEW - Show only first 3 tasks when collapsed */}
                   {later.slice(0, 3).map(task => (
                     <TaskRow
                       key={task.id}
@@ -1276,6 +1279,17 @@ function DayAssistantV2Content() {
                   )}
                 </>
               )}
+              
+              {/* Toggle button */}
+              <div className="flex justify-center pt-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setShowLaterQueue(!showLaterQueue)}
+                >
+                  {showLaterQueue ? '🔼 Zwiń kolejkę' : '👁️ Pokaż pełną kolejkę'}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}

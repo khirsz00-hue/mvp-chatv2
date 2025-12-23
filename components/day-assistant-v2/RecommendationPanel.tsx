@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Recommendation } from '@/lib/types/dayAssistantV2'
 import Button from '@/components/ui/Button'
 import { CheckCircle } from '@phosphor-icons/react'
@@ -18,7 +18,32 @@ interface RecommendationPanelProps {
 
 export function RecommendationPanel({ recommendations, onApply, loading }: RecommendationPanelProps) {
   const [applyingId, setApplyingId] = useState<string | null>(null)
-  const [appliedIds, setAppliedIds] = useState<Set<string>>(new Set())
+  
+  // Load applied IDs from localStorage on mount
+  const [appliedIds, setAppliedIds] = useState<Set<string>>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('appliedRecommendationIds')
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored)
+          // Validate that parsed data is an array before creating Set
+          if (Array.isArray(parsed)) {
+            return new Set(parsed)
+          }
+        } catch (e) {
+          console.error('Failed to parse applied recommendation IDs from localStorage:', e)
+        }
+      }
+    }
+    return new Set()
+  })
+  
+  // Persist applied IDs to localStorage whenever they change
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('appliedRecommendationIds', JSON.stringify(Array.from(appliedIds)))
+    }
+  }, [appliedIds])
 
   const handleApply = async (rec: Recommendation) => {
     // Prevent multiple clicks
