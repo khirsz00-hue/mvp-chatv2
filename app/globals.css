@@ -152,3 +152,27 @@ body {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
+
+/* === Overdue Tasks System === */
+:root {
+  --overdue-critical: #DC2626; /* Red - >3 days */
+  --overdue-warning: #F59E0B;  /* Orange - 1-3 days */
+  --overdue-bg: #FEF2F2;       /* Light red background */
+  --overdue-border: #FCA5A5;   /* Red border */
+}
+
+/* Pulse animation for overdue badge */
+@keyframes pulse-overdue {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+.animate-pulse-overdue {
+  animation: pulse-overdue 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
