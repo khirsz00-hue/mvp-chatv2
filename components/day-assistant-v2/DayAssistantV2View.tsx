@@ -805,8 +805,18 @@ function DayAssistantV2Content() {
         // Refresh recommendations immediately (invalidate cache)
         await refreshRecs()
         
-        // Refresh tasks to reflect changes
-        await loadDayPlan(sessionToken || undefined)
+        // Refresh tasks WITHOUT full reload - just fetch updated task data
+        if (sessionToken) {
+          const tasksResponse = await authFetch(`/api/day-assistant-v2/dayplan?date=${selectedDate}`)
+          if (tasksResponse.ok) {
+            const data = await tasksResponse.json()
+            setTasks(data.tasks || [])
+            setProposals(data.proposals || [])
+          } else {
+            console.warn('⚠️ [Apply Recommendation] Failed to refresh tasks after applying recommendation')
+            toast.warning('Rekomendacja zastosowana, ale nie udało się odświeżyć listy zadań. Odśwież stronę.')
+          }
+        }
         
         addDecisionLog(`Zastosowano rekomendację: ${recommendation.title}`)
         
@@ -961,24 +971,6 @@ function DayAssistantV2Content() {
                 Dodaj przerwę
               </Button>
             </Card>
-            
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="text-sm text-muted-foreground">Filtr kontekstu:</span>
-              <div className="flex gap-2 flex-wrap">
-                <ContextPill active={contextFilter === 'all'} onClick={() => setContextFilter('all')}>
-                  Wszystko
-                </ContextPill>
-                {(Object.keys(CONTEXT_LABELS) as TaskContext[]).map(ctx => (
-                  <ContextPill 
-                    key={ctx} 
-                    active={contextFilter === ctx} 
-                    onClick={() => setContextFilter(ctx as ContextType)}
-                  >
-                    {CONTEXT_LABELS[ctx]}
-                  </ContextPill>
-                ))}
-              </div>
-            </div>
             {lightUsage?.exceeded && (
               <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
                 Po {lightUsage.minutes} min lekkich zadań zaplanuj jedną sesję MUST/deep. Limit: {lightUsage.limit} min.

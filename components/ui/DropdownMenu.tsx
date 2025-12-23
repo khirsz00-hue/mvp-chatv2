@@ -104,7 +104,7 @@ export const DropdownMenuContent: React.FC<DropdownMenuContentProps> = ({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: -10 }}
           transition={{ duration: 0.1 }}
-          className={`absolute ${alignmentClass} mt-2 z-50 min-w-[12rem] rounded-lg bg-white border border-gray-200 shadow-lg ${className}`}
+          className={`absolute ${alignmentClass} mt-2 z-[100] min-w-[12rem] rounded-lg bg-white border border-gray-200 shadow-lg ${className}`}
         >
           <div className="p-1">
             {children}

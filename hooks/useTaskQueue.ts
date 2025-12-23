@@ -117,14 +117,26 @@ export function buildQueue(
   const overdueCount = overdueTasks.length
   const mustCount = mustTasks.length
 
+  // If no available time, move ALL tasks to later queue
+  // This ensures tasks don't show in "today" after work hours have ended
+  // Note: Manual time blocks are added to availableMinutes before this function is called
+  if (availableMinutes <= 0) {
+    return { queue: [], later: orderedTasks }
+  }
+
   for (let i = 0; i < orderedTasks.length; i++) {
     const task = orderedTasks[i]
     
-    // Overdue tasks and MUST tasks always go in queue
-    // First overdueCount tasks are overdue, next mustCount are MUST tasks
+    // Overdue tasks and MUST tasks have priority but still respect time limits
+    // Only add if there's available time remaining
     if (i < overdueCount + mustCount) {
-      queue.push(task)
-      queuedMinutes += task.estimate_min
+      // Prioritize these tasks, but still check if they fit
+      if (queuedMinutes + task.estimate_min <= availableMinutes) {
+        queue.push(task)
+        queuedMinutes += task.estimate_min
+      } else {
+        later.push(task)
+      }
       continue
     }
 
