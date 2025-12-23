@@ -37,6 +37,13 @@ export function RecommendationPanel({ recommendations, onApply, loading }: Recom
       console.log('✅ [RecommendationPanel] Applied recommendation:', rec.id)
     } catch (error) {
       console.error('❌ [RecommendationPanel] Error applying recommendation:', error)
+      
+      // Roll back optimistic update - remove from appliedIds to allow retry
+      setAppliedIds(prev => {
+        const next = new Set(prev)
+        next.delete(rec.id)
+        return next
+      })
     } finally {
       setApplyingId(null)
     }

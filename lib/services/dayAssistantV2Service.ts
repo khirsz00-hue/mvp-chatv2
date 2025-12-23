@@ -116,26 +116,28 @@ export async function syncTaskChangeToTodoist(
 ): Promise<boolean> {
   let lastError: Error | null = null
   
+  // Fetch Todoist token once before retry loop to avoid repeated DB calls
+  const { data: profile, error: profileError } = await supabaseServer
+    .from('user_profiles')
+    .select('todoist_token')
+    .eq('id', userId)
+    .single()
+  
+  if (profileError) {
+    console.error(`❌ [syncTaskChangeToTodoist] Error fetching profile:`, profileError)
+    return false
+  }
+  
+  if (!profile?.todoist_token) {
+    console.warn('⚠️ [syncTaskChangeToTodoist] No Todoist token found - skipping sync')
+    return false
+  }
+  
+  const todoistToken = profile.todoist_token
+  
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       console.log(`🔍 [syncTaskChangeToTodoist] Attempt ${attempt}/${retries} for task ${todoistId}`)
-      
-      // Get Todoist token
-      const { data: profile, error: profileError } = await supabaseServer
-        .from('user_profiles')
-        .select('todoist_token')
-        .eq('id', userId)
-        .single()
-      
-      if (profileError) {
-        console.error(`❌ [syncTaskChangeToTodoist] Error fetching profile:`, profileError)
-        return false
-      }
-      
-      if (!profile?.todoist_token) {
-        console.warn('⚠️ [syncTaskChangeToTodoist] No Todoist token found - skipping sync')
-        return false
-      }
 
       // If completing task, use complete endpoint
       if (updates.completed) {
@@ -144,7 +146,7 @@ export async function syncTaskChangeToTodoist(
         const response = await fetch(`https://api.todoist.com/rest/v2/tasks/${todoistId}/close`, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${profile.todoist_token}`
+            'Authorization': `Bearer ${todoistToken}`
           },
           signal: AbortSignal.timeout(TODOIST_API_TIMEOUT_MS)
         })
@@ -192,7 +194,7 @@ export async function syncTaskChangeToTodoist(
       const response = await fetch(`https://api.todoist.com/rest/v2/tasks/${todoistId}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${profile.todoist_token}`,
+          'Authorization': `Bearer ${todoistToken}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(todoistPayload),

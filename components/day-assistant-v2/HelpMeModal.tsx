@@ -63,15 +63,15 @@ export function HelpMeModal({ task, open, onClose, onSuccess }: Props) {
 
       const data = await response.json()
       
-      // Show warning if fallback steps were used
-      if (data.warning) {
-        toast.warning(data.warning)
-      }
-      
       if (!response.ok) {
         // Show specific error message from API
         const errorMessage = data.error || 'Nie udało się wygenerować kroków'
         throw new Error(errorMessage)
+      }
+      
+      // Show warning if fallback steps were used (only on success)
+      if (data.warning) {
+        toast.warning(data.warning)
       }
 
       if (!data.steps || data.steps.length === 0) {

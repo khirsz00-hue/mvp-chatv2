@@ -61,10 +61,16 @@ function generateFallbackSteps(taskTitle: string): Array<{title: string; estimat
 }
 
 export async function POST(request: NextRequest) {
+  // Store task_title at function scope for error handling
+  let taskTitle = 'Zadanie'
+  
   try {
     console.log('🔍 [Decompose] Starting task decomposition request')
     
     const { task_title, what_to_do, completion_criteria, blockers } = await request.json()
+    
+    // Store for later use in catch block
+    taskTitle = task_title || 'Zadanie'
 
     if (!task_title || !what_to_do || !completion_criteria) {
       console.error('❌ [Decompose] Missing required fields')
@@ -116,7 +122,7 @@ Odpowiedz w formacie JSON:
     // Call OpenAI with retry and timeout
     const result = await retryWithBackoff(async () => {
       const completion = await openai.chat.completions.create({
-        model: 'gpt-4',
+        model: 'gpt-4-turbo-preview', // Use turbo model that supports json_object
         messages: [
           {
             role: 'system',
@@ -134,7 +140,14 @@ Odpowiedz w formacie JSON:
         timeout: OPENAI_API_TIMEOUT_MS
       })
 
-      return JSON.parse(completion.choices[0].message.content || '{}')
+      // Parse JSON and validate - catch JSON errors separately
+      try {
+        const parsedResult = JSON.parse(completion.choices[0].message.content || '{}')
+        return parsedResult
+      } catch (parseError) {
+        console.error('❌ [Decompose] Failed to parse OpenAI response as JSON:', parseError)
+        throw new Error('Invalid JSON response from AI')
+      }
     }, DEFAULT_RETRY_ATTEMPTS, RETRY_INITIAL_DELAY_MS) // 3 retries with exponential backoff
 
     console.log('✅ [Decompose] OpenAI API call successful')
@@ -177,8 +190,7 @@ Odpowiedz w formacie JSON:
     }
     
     // Return fallback steps even on error
-    const { task_title } = await request.json().catch(() => ({ task_title: 'Zadanie' }))
-    const fallbackSteps = generateFallbackSteps(task_title)
+    const fallbackSteps = generateFallbackSteps(taskTitle)
     
     return NextResponse.json({ 
       error: errorMessage,
