@@ -350,9 +350,8 @@ function DayAssistantV2Content() {
   const easiestTask = useMemo(() => {
     const candidates = tasks.filter(t => !t.completed)
     if (candidates.length === 0) return null
-    const defaultLoad = DEFAULT_COGNITIVE_LOAD
     return [...candidates].sort((a, b) => {
-      const loadDiff = (a.cognitive_load ?? defaultLoad) - (b.cognitive_load ?? defaultLoad)
+      const loadDiff = (a.cognitive_load ?? DEFAULT_COGNITIVE_LOAD) - (b.cognitive_load ?? DEFAULT_COGNITIVE_LOAD)
       if (loadDiff !== 0) return loadDiff
       return getSmartEstimate(a) - getSmartEstimate(b)
     })[0]

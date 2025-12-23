@@ -35,7 +35,7 @@ export function getSmartEstimate(task: TestDayTask): number {
   }
   const derivedEstimate = Math.ceil(totalLength / CHARS_PER_10_MINUTES) * MIN_ESTIMATE_MINUTES
 
-  return Math.max(derivedEstimate, MIN_ESTIMATE_MINUTES)
+  return derivedEstimate
 }
 
 /**
