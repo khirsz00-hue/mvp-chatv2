@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Proposal, TestDayTask } from '@/lib/types/dayAssistantV2'
+import { Recommendation, TestDayTask } from '@/lib/types/dayAssistantV2'
 
 interface UseRecommendationsOptions {
   sessionToken: string | null
@@ -27,7 +27,7 @@ export function useRecommendations(options: UseRecommendationsOptions) {
     enabled = true
   } = options
 
-  const [recommendations, setRecommendations] = useState<Proposal[]>([])
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([])
   const [loading, setLoading] = useState(false)
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -56,10 +56,10 @@ export function useRecommendations(options: UseRecommendationsOptions) {
 
       if (response.ok) {
         const data = await response.json()
-        if (data.recommendation) {
-          setRecommendations([data.recommendation])
-        } else if (data.recommendations) {
+        if (data.recommendations && Array.isArray(data.recommendations)) {
           setRecommendations(data.recommendations)
+        } else {
+          setRecommendations([])
         }
       }
     } catch (error) {
@@ -78,13 +78,13 @@ export function useRecommendations(options: UseRecommendationsOptions) {
     return () => clearTimeout(timer)
   }, [fetchRecommendations])
 
-  // Background refresh every 30 minutes
+  // Background refresh every 2 minutes
   useEffect(() => {
     if (!enabled || !sessionToken) return
 
     const interval = setInterval(() => {
       fetchRecommendations()
-    }, 30 * 60 * 1000) // 30 minutes
+    }, 2 * 60 * 1000) // 2 minutes
 
     refreshTimerRef.current = interval
 

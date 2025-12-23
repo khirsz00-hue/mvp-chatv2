@@ -6,6 +6,7 @@
 'use client'
 
 import Button from '@/components/ui/Button'
+import { Coffee } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 
 interface EnergyFocusControlsProps {
@@ -13,6 +14,7 @@ interface EnergyFocusControlsProps {
   focus: number
   onEnergyChange: (value: number) => void
   onFocusChange: (value: number) => void
+  onAddBreak?: () => void
   isUpdating?: boolean
 }
 
@@ -35,6 +37,7 @@ export function EnergyFocusControls({
   focus,
   onEnergyChange,
   onFocusChange,
+  onAddBreak,
   isUpdating = false
 }: EnergyFocusControlsProps) {
   return (
@@ -93,6 +96,20 @@ export function EnergyFocusControls({
           ))}
         </div>
       </div>
+
+      {/* Add Break Button */}
+      {onAddBreak && (
+        <div className="pt-2">
+          <Button
+            onClick={onAddBreak}
+            variant="outline"
+            className="w-full gap-2 border-green-300 hover:bg-green-50"
+          >
+            <Coffee size={20} />
+            Dodaj przerwę
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
