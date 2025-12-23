@@ -12,7 +12,8 @@ import {
   updateTask,
   getTasks,
   getMustTasksCount,
-  getOrCreateDayPlan
+  getOrCreateDayPlan,
+  syncTaskChangeToTodoist
 } from '@/lib/services/dayAssistantV2Service'
 import { generateTaskAddedRecommendation } from '@/lib/services/dayAssistantV2RecommendationEngine'
 import { inferTaskContext } from '@/lib/services/contextInferenceService'
@@ -220,11 +221,10 @@ export async function PUT(request: NextRequest) {
     // Sync to Todoist if task is from Todoist
     const todoistRef = updatedTask.todoist_id ?? updatedTask.todoist_task_id
     if (todoistRef) {
-      const { syncTaskChangeToTodoist } = await import('@/lib/services/dayAssistantV2Service')
       const todoistUpdates: any = {}
       
       // Map Supabase fields to Todoist fields
-      if (updates.title) todoistUpdates.content = updates.title
+      if (updates.title !== undefined) todoistUpdates.content = updates.title
       if (updates.description !== undefined) todoistUpdates.description = updates.description
       if (updates.due_date !== undefined) todoistUpdates.due_date = updates.due_date
       if (updates.tags) todoistUpdates.labels = updates.tags

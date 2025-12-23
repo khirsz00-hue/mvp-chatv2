@@ -122,7 +122,7 @@ export async function syncTaskChangeToTodoist(
     if (updates.due_date !== undefined) {
       todoistPayload.due_date = updates.due_date
     }
-    if (updates.content) {
+    if (updates.content !== undefined) {
       todoistPayload.content = updates.content
     }
     if (updates.description !== undefined) {
@@ -135,6 +135,7 @@ export async function syncTaskChangeToTodoist(
       todoistPayload.project_id = updates.project_id
     }
 
+    // Todoist REST API uses POST for updates (not PUT/PATCH) per their API design
     const response = await fetch(`https://api.todoist.com/rest/v2/tasks/${todoistId}`, {
       method: 'POST',
       headers: {

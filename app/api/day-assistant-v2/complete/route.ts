@@ -6,7 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import {
-  getOrCreateDayAssistantV2
+  getOrCreateDayAssistantV2,
+  syncTaskChangeToTodoist
 } from '@/lib/services/dayAssistantV2Service'
 
 export async function POST(request: NextRequest) {
@@ -67,7 +68,6 @@ export async function POST(request: NextRequest) {
     // Sync to Todoist
     const todoistRef = task?.todoist_id || task?.todoist_task_id
     if (todoistRef) {
-      const { syncTaskChangeToTodoist } = await import('@/lib/services/dayAssistantV2Service')
       await syncTaskChangeToTodoist(user.id, todoistRef, {
         completed: true
       })
