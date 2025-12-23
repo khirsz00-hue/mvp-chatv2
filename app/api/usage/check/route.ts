@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { checkUsageLimit, ResourceType } from '@/lib/usageTracking'
-import { createAuthenticatedSupabaseClient, getAuthenticatedUser } from '@/lib/supabaseServer'
+import { createAuthenticatedSupabaseClient, getAuthenticatedUser } from '@/lib/supabaseAuth'
 
 export const dynamic = 'force-dynamic'
 

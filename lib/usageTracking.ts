@@ -1,9 +1,11 @@
 import { supabase } from './supabaseClient'
-import { LIMITS, ResourceType, SubscriptionTier } from './subscriptionLimits'
+import { LIMITS, ResourceType as RT, SubscriptionTier } from './subscriptionLimits'
+
+export type ResourceType = RT
 
 export async function checkUsageLimit(
   userId: string,
-  resource: ResourceType
+  resource: RT
 ): Promise<{ allowed: boolean; current: number; limit: number }> {
   // Get user tier
   const { data: profile } = await supabase
@@ -52,7 +54,7 @@ export async function checkUsageLimit(
 
 export async function incrementUsage(
   userId: string,
-  resource: ResourceType
+  resource: RT
 ): Promise<void> {
   const now = new Date()
   const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)

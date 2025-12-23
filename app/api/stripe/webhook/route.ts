@@ -170,13 +170,19 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 
   if (!profile) return
 
+  // Get the subscription end date
+  const subscriptionData = subscription as any
+  const periodEnd = subscriptionData.current_period_end 
+    ? new Date(subscriptionData.current_period_end * 1000).toISOString()
+    : new Date().toISOString()
+
   // Downgrade to free but keep data
   await supabase
     .from('user_profiles')
     .update({
       subscription_status: 'canceled',
       subscription_tier: 'free',
-      subscription_end_date: new Date(subscription.current_period_end * 1000).toISOString(),
+      subscription_end_date: periodEnd,
       // Keep stripe_customer_id for potential resubscription
     })
     .eq('id', profile.id)
