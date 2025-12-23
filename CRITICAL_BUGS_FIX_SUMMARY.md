@@ -22,8 +22,8 @@ All mutation hooks in `useTasksQuery.ts` were calling `supabase.auth.getSession(
 **File:** `hooks/useTasksQuery.ts`
 
 1. **Created helper function** `getSessionWithRetry()`:
-   - Implements 3 retry attempts with exponential backoff
-   - Waits 100ms, 200ms, 300ms between retries
+   - Implements 3 retry attempts with TRUE exponential backoff
+   - Waits 100ms, 200ms, 400ms between retries (exponential growth)
    - Throws user-friendly Polish error message if all retries fail
    - Prevents race conditions in session retrieval
 
@@ -61,9 +61,9 @@ async function getSessionWithRetry(maxAttempts = 3) {
       console.error(`❌ Session error (attempt ${attempts}/${maxAttempts}):`, error)
     }
     
-    // Wait before retrying (exponential backoff)
+    // Wait before retrying (true exponential backoff: 100ms, 200ms, 400ms)
     if (attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 100 * attempts))
+      await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempts - 1) * 100))
     }
   }
   
@@ -485,7 +485,7 @@ All changes are in 4 files with no external dependencies.
 ## 📝 Additional Notes
 
 ### Known Limitations
-1. **Session retry timeout:** Max 600ms (3 attempts × 200ms average)
+1. **Session retry timeout:** Max 700ms (100ms + 200ms + 400ms)
    - If session takes longer, user sees error
    - Acceptable tradeoff vs infinite waiting
    
@@ -496,6 +496,10 @@ All changes are in 4 files with no external dependencies.
 3. **Z-index conflicts:** If other components use z-[1000+], menu may be hidden
    - Unlikely in current codebase
    - Can increase to z-[2000] if needed
+
+4. **Code duplication:** localStorage logic is duplicated between DayAssistantV2View and RecommendationPanel
+   - Acceptable for this critical bug fix PR to minimize scope
+   - Should be refactored into a custom hook in a future PR (e.g., `usePersistedRecommendationIds`)
 
 ### Future Improvements
 1. **Session Management:**
@@ -509,6 +513,10 @@ All changes are in 4 files with no external dependencies.
 3. **Recommendations:**
    - Could sync applied IDs to database for multi-device
    - Could add "undo" button for applied recommendations
+   
+4. **Code Quality:**
+   - **Refactor localStorage logic** into a custom hook `usePersistedRecommendationIds()` to eliminate duplication between DayAssistantV2View and RecommendationPanel
+   - This would centralize the initialization, persistence, and cleanup logic
 
 ---
 
