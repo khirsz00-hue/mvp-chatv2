@@ -812,6 +812,9 @@ function DayAssistantV2Content() {
             const data = await tasksResponse.json()
             setTasks(data.tasks || [])
             setProposals(data.proposals || [])
+          } else {
+            console.warn('⚠️ [Apply Recommendation] Failed to refresh tasks after applying recommendation')
+            toast.warning('Rekomendacja zastosowana, ale nie udało się odświeżyć listy zadań. Odśwież stronę.')
           }
         }
         

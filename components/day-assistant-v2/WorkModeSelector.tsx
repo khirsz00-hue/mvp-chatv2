@@ -64,7 +64,7 @@ export function WorkModeSelector({ value, onChange, isUpdating }: Props) {
               <div
                 key={mode.id}
                 className={cn(
-                  "flex-shrink-0 w-[280px] snap-center p-4 rounded-lg border transition-all cursor-pointer",
+                  "flex-shrink-0 w-[85vw] max-w-[320px] snap-center p-4 rounded-lg border transition-all cursor-pointer",
                   value === mode.id 
                     ? "border-brand-purple bg-brand-purple/5 ring-2 ring-brand-purple/20" 
                     : "border-gray-200 hover:border-gray-300"

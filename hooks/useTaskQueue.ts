@@ -117,8 +117,9 @@ export function buildQueue(
   const overdueCount = overdueTasks.length
   const mustCount = mustTasks.length
 
-  // If no available time, move ALL tasks to later queue (unless manual time added)
-  // This ensures tasks don't show in "today" after work hours
+  // If no available time, move ALL tasks to later queue
+  // This ensures tasks don't show in "today" after work hours have ended
+  // Note: Manual time blocks are added to availableMinutes before this function is called
   if (availableMinutes <= 0) {
     return { queue: [], later: orderedTasks }
   }
