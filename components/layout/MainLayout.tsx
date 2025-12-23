@@ -12,6 +12,7 @@ import { DecisionAssistant } from '@/src/features/decision-assistant/components/
 import { DayAssistantV2View } from '@/components/day-assistant-v2/DayAssistantV2View'
 import { WeekAssistantView } from '@/components/week-assistant/WeekAssistantView'
 import SubscriptionWall from '@/components/subscription/SubscriptionWall'
+import { VoiceCapture } from '@/components/voice/VoiceCapture'
 import TrialBanner from '@/components/subscription/TrialBanner'
 
 /**
@@ -230,6 +231,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 {children || renderAssistant()}
               </main>
             </div>
+            
+            {/* 🎮 GAMIFICATION: Voice Capture Button */}
+            <VoiceCapture />
           </div>
         </SubscriptionWall>
       ) : (
@@ -260,6 +264,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
               {children || renderAssistant()}
             </main>
           </div>
+          
+          {/* 🎮 GAMIFICATION: Voice Capture Button */}
+          <VoiceCapture />
         </div>
       )}
     </>

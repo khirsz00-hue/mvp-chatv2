@@ -46,6 +46,10 @@ import { QueueReorderingOverlay } from './LoadingStates'
 import { CurrentActivityBox } from './CurrentActivityBox'
 import { BreakTimer } from './BreakTimer'
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+import { StreakDisplay } from '@/components/gamification/StreakDisplay'
+import { ProgressRing } from '@/components/gamification/ProgressRing'
+import { QuickAddModal } from './QuickAddModal'
+import { updateStreakOnCompletion, updateDailyStats, triggerConfetti, triggerMilestoneToast, recalculateDailyTotal } from '@/lib/gamification'
 import { useOverdueTasks } from '@/hooks/useOverdueTasks'
 
 // Create a query client outside the component to avoid recreation on every render
@@ -114,6 +118,9 @@ function DayAssistantV2Content() {
   const [showBreakModal, setShowBreakModal] = useState(false)
   const [breakActive, setBreakActive] = useState(false)
   const [breakTimeRemaining, setBreakTimeRemaining] = useState(0)
+  
+  // NEW: Quick add modal state
+  const [showQuickAdd, setShowQuickAdd] = useState(false)
   
   // Track applied recommendation IDs to filter them out
   // Load from localStorage on mount and persist on change
@@ -264,6 +271,20 @@ function DayAssistantV2Content() {
 
   // REMOVED: Periodic 15-min reload - unnecessary with reactive queue
   // Queue automatically recalculates based on time via useMemo
+
+  // 🎮 GAMIFICATION: Keyboard shortcut for quick add (Ctrl/Cmd+K)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+K or Cmd+K
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        setShowQuickAdd(true)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   const authFetch = async (url: string, options: RequestInit = {}) => {
     // Get fresh token from Supabase to avoid JWT expiration issues
@@ -520,6 +541,50 @@ function DayAssistantV2Content() {
     }
     setNewTaskTitle('')
     addDecisionLog(`Dodano zadanie "${data.task.title}"`)
+    
+    // 🎮 GAMIFICATION: Recalculate daily stats after adding task
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      await recalculateDailyTotal(user.id)
+    }
+  }
+
+  // 🎮 GAMIFICATION: Quick add handler
+  const handleQuickAdd = async (task: {
+    title: string
+    estimateMin: number
+    context: TaskContext
+    isMust: boolean
+  }) => {
+    const response = await authFetch('/api/day-assistant-v2/task', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: task.title,
+        estimate_min: task.estimateMin,
+        cognitive_load: 2,
+        is_must: task.isMust,
+        is_important: task.isMust,
+        due_date: selectedDate,
+        context_type: task.context,
+        priority: 3
+      })
+    })
+
+    if (!response.ok) {
+      showToast('Nie udało się dodać zadania', 'error')
+      return
+    }
+
+    const data = await response.json()
+    setTasks(prev => [...prev, data.task])
+    showToast('✅ Zadanie dodane!', 'success')
+    addDecisionLog(`Dodano zadanie "${data.task.title}"`)
+    
+    // 🎮 GAMIFICATION: Recalculate daily stats after adding task
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      await recalculateDailyTotal(user.id)
+    }
   }
 
   const handleNotToday = async (task: TestDayTask, reason = 'Nie dziś') => {
@@ -647,6 +712,24 @@ function DayAssistantV2Content() {
     
     try {
       await completeTaskMutation.mutateAsync(task.id)
+      
+      // 🎮 GAMIFICATION: Update streak and stats
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        // Update streak and get milestone
+        const milestone = await updateStreakOnCompletion(user.id)
+        
+        // Update daily stats
+        await updateDailyStats(user.id, true)
+        
+        // Trigger confetti animation
+        triggerConfetti()
+        
+        // Show milestone toast if any
+        if (milestone?.milestone) {
+          triggerMilestoneToast(milestone.milestone, showToast)
+        }
+      }
     } catch (error) {
       // Rollback on error
       console.error('Complete task error:', error)
@@ -975,7 +1058,7 @@ function DayAssistantV2Content() {
         <div className="space-y-6">
         <Card>
           <CardHeader>
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center mb-4">
               <CardTitle className="text-3xl text-brand-purple">Asystent Dnia v2</CardTitle>
               <button
                 onClick={() => setShowConfigModal(true)}
@@ -984,6 +1067,12 @@ function DayAssistantV2Content() {
               >
                 <Gear size={24} className="text-gray-600" />
               </button>
+            </div>
+            
+            {/* 🎮 GAMIFICATION: Streak Display and Progress Ring */}
+            <div className="flex flex-wrap items-center gap-4">
+              <StreakDisplay />
+              <ProgressRing />
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -1551,6 +1640,11 @@ function DayAssistantV2Content() {
         onStartBreak={handleStartBreak}
       />
 
+      {/* 🎮 GAMIFICATION: Quick Add Modal */}
+      <QuickAddModal
+        isOpen={showQuickAdd}
+        onClose={() => setShowQuickAdd(false)}
+        onSubmit={handleQuickAdd}
       {/* Morning Review Modal */}
       <MorningReviewModal
         overdueTasks={overdueTasks}
