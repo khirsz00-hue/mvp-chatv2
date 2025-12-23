@@ -22,7 +22,7 @@ import {
   calculateScoreBreakdown
 } from '@/lib/services/dayAssistantV2RecommendationEngine'
 import { CONTEXT_LABELS, CONTEXT_COLORS, TaskContext } from '@/lib/services/contextInferenceService'
-import { Play, XCircle, MagicWand, Gear, Info } from '@phosphor-icons/react'
+import { Play, XCircle, MagicWand, Gear, Info, Coffee } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { useScoredTasks } from '@/hooks/useScoredTasks'
 import { useTaskQueue } from '@/hooks/useTaskQueue'
@@ -44,7 +44,6 @@ import { ClarifyModal } from './ClarifyModal'
 import { QueueReorderingOverlay } from './LoadingStates'
 import { CurrentActivityBox } from './CurrentActivityBox'
 import { BreakTimer } from './BreakTimer'
-import { EnergyFocusControls } from './EnergyFocusControls'
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 
 // Create a query client outside the component to avoid recreation on every render
@@ -113,6 +112,9 @@ function DayAssistantV2Content() {
   const [breakActive, setBreakActive] = useState(false)
   const [breakTimeRemaining, setBreakTimeRemaining] = useState(0)
   
+  // Track applied recommendation IDs to filter them out
+  const [appliedRecommendationIds, setAppliedRecommendationIds] = useState<Set<string>>(new Set())
+  
   const undoTimer = useRef<NodeJS.Timeout | null>(null)
 
   // React Query Mutations - NO MORE loadDayPlan() calls!
@@ -144,6 +146,11 @@ function DayAssistantV2Content() {
     contextFilter,
     enabled: !!sessionToken
   })
+  
+  // Filter out applied recommendations
+  const filteredRecommendations = useMemo(() => {
+    return recommendations.filter(rec => !appliedRecommendationIds.has(rec.id))
+  }, [recommendations, appliedRecommendationIds])
 
   useEffect(() => {
     const init = async () => {
@@ -624,6 +631,14 @@ function DayAssistantV2Content() {
     }
   }
 
+  const handleTimerStop = () => {
+    if (!activeTimer) return
+    
+    const task = tasks.find(t => t.id === activeTimer.taskId)
+    stopTimer()
+    addDecisionLog(`Zatrzymano timer dla "${task?.title || 'zadania'}"`)
+  }
+
   const handleKeepOverdueToday = (task: TestDayTask) => {
     addDecisionLog(`Zachowano przeterminowane zadanie "${task.title}" na dziś`)
     showToast('Zadanie pozostanie w kolejce', 'info')
@@ -769,6 +784,8 @@ function DayAssistantV2Content() {
   const handleApplyRecommendation = async (recommendation: Recommendation) => {
     try {
       console.log('🔍 [Apply Recommendation] Starting:', recommendation.type)
+      // Optimistically remove the recommendation from view
+      setAppliedRecommendationIds(prev => new Set(prev).add(recommendation.id))
       
       const response = await authFetch('/api/day-assistant-v2/apply-recommendation', {
         method: 'POST',
@@ -801,10 +818,22 @@ function DayAssistantV2Content() {
       } else {
         console.error('❌ [Apply Recommendation] Failed:', result.error)
         toast.error(`❌ ${result.error || 'Nie udało się zastosować rekomendacji'}`)
+        // Rollback - remove from applied set if failed
+        setAppliedRecommendationIds(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(recommendation.id)
+          return newSet
+        })
       }
     } catch (error) {
       console.error('❌ [Apply Recommendation] Error:', error)
       toast.error('Błąd podczas stosowania rekomendacji')
+      // Rollback on error
+      setAppliedRecommendationIds(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(recommendation.id)
+        return newSet
+      })
     }
   }
 
@@ -865,6 +894,7 @@ function DayAssistantV2Content() {
               onPause={pauseTimer}
               onResume={resumeTimer}
               onComplete={handleTimerComplete}
+              onStop={handleTimerStop}
             />
 
             {/* Queue Stats */}
@@ -920,19 +950,17 @@ function DayAssistantV2Content() {
               isUpdating={isReorderingQueue}
             />
 
-            {/* Energy/Focus Controls with Add Break Button */}
-            {dayPlan && (
-              <Card className="p-4">
-                <EnergyFocusControls
-                  energy={dayPlan.energy}
-                  focus={dayPlan.focus}
-                  onEnergyChange={(value) => updateSliders('energy', value)}
-                  onFocusChange={(value) => updateSliders('focus', value)}
-                  onAddBreak={handleAddBreak}
-                  isUpdating={isReorderingQueue}
-                />
-              </Card>
-            )}
+            {/* Add Break Button */}
+            <Card className="p-4">
+              <Button
+                onClick={handleAddBreak}
+                variant="outline"
+                className="w-full gap-2 border-green-300 hover:bg-green-50"
+              >
+                <Coffee size={20} />
+                Dodaj przerwę
+              </Button>
+            </Card>
             
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-sm text-muted-foreground">Filtr kontekstu:</span>
@@ -1324,7 +1352,7 @@ function DayAssistantV2Content() {
           </CardHeader>
           <CardContent className="space-y-3">
             <RecommendationPanel
-              recommendations={recommendations}
+              recommendations={filteredRecommendations}
               onApply={handleApplyRecommendation}
               loading={recLoading}
             />
