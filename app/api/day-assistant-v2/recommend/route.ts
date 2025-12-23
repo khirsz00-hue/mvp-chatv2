@@ -13,7 +13,9 @@ import {
   generateSliderChangeRecommendation,
   generateRecommendation
 } from '@/lib/services/dayAssistantV2RecommendationEngine'
-import { TestDayTask, DayPlan } from '@/lib/types/dayAssistantV2'
+import { TestDayTask, DayPlan, Recommendation } from '@/lib/types/dayAssistantV2'
+import { differenceInHours, isFuture, isToday } from 'date-fns'
+import { groupBy } from 'lodash'
 
 export async function POST(request: NextRequest) {
   try {
@@ -53,97 +55,119 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to get day plan' }, { status: 500 })
     }
     
-    // Create updated day plan with new energy/focus values
-    const updatedDayPlan: DayPlan = {
-      ...dayPlan,
-      energy: context.energy || dayPlan.energy,
-      focus: context.focus || dayPlan.focus
-    }
-    
     // Get current tasks for the day
     const tasks: TestDayTask[] = context.current_tasks || []
+    const incompleteTasks = tasks.filter(t => !t.completed)
     
-    // Generate recommendations based on context
-    let recommendation = null
+    // Generate recommendations
+    const recommendations: Recommendation[] = []
+
+    // 1. Check for work time without break (>2h)
+    const completedToday = tasks.filter(t => t.completed)
+    const workMinutes = completedToday.reduce((sum, t) => sum + t.estimate_min, 0)
     
-    if (trigger === 'slider_changed' || trigger === 'manual_refresh') {
-      // Try time-aware recommendation first
-      const workStartTime = dayPlan?.metadata?.work_start_time as string || '09:00'
-      const workEndTime = dayPlan?.metadata?.work_end_time as string || '17:00'
-      
-      recommendation = generateRecommendation(tasks, {
-        energy: context.energy || updatedDayPlan.energy,
-        focus: context.focus || updatedDayPlan.focus,
-        currentTime: new Date(),
-        workStartTime,
-        workEndTime,
-        contextFilter: context.context_filter || null
+    if (workMinutes >= 120) {
+      recommendations.push({
+        id: `break-${Date.now()}`,
+        type: 'ADD_BREAK',
+        title: 'Czas na przerwę!',
+        reason: `Pracujesz już ${Math.round(workMinutes / 60)}h bez przerwy. Odpoczynek zwiększy produktywność.`,
+        actions: [
+          { op: 'ADD_BREAK', durationMinutes: 15 }
+        ],
+        confidence: 0.9,
+        created_at: new Date().toISOString()
       })
-      
-      // Fallback to slider-based recommendation if no time-based recommendation
-      if (!recommendation) {
-        recommendation = await generateSliderChangeRecommendation(
-          user.id,
-          assistant.id,
-          assistant,
-          tasks,
-          dayPlan,
-          updatedDayPlan,
-          date
-        )
+    }
+
+    // 2. Group similar tasks (3+ with same context_type)
+    const tasksByContext = groupBy(incompleteTasks, 'context_type')
+    for (const [contextType, contextTasks] of Object.entries(tasksByContext)) {
+      if (contextTasks.length >= 3 && contextType && contextType !== 'null') {
+        const taskIds = contextTasks.map(t => t.id)
+        recommendations.push({
+          id: `group-${contextType}-${Date.now()}`,
+          type: 'GROUP_SIMILAR',
+          title: `Zgrupuj ${contextType} (${contextTasks.length} zadań)`,
+          reason: 'Zmniejszysz przełączanie kontekstu. Kolejka zostanie przeorganizowana.',
+          actions: [
+            { op: 'REORDER_TASKS', taskIds, priority: 'group' }
+          ],
+          confidence: 0.85,
+          created_at: new Date().toISOString()
+        })
       }
     }
-    
-    // Generate contextual recommendations based on energy/focus state
-    const recommendations: string[] = []
-    
-    // Low energy recommendations
-    if (context.energy <= 2) {
-      recommendations.push(
-        "Niska energia - polecam lekkie zadania z kontekstu 'prywatne' (osobiste, niskointensywne)"
-      )
-    }
-    
-    // Low focus recommendations
-    if (context.focus <= 2) {
-      const heavyTasks = tasks.filter(t => t.cognitive_load >= 4 && !t.completed)
-      if (heavyTasks.length > 0) {
-        recommendations.push(
-          `Przy niskim skupieniu (${context.focus}/5) lepiej przełożyć trudne zadania (np. "${heavyTasks[0].title}") lub użyć techniki "Zacznij 10 min"`
-        )
+
+    // 3. Energy vs cognitive load mismatch
+    const mustTasks = incompleteTasks.filter(t => t.is_must)
+    for (const task of mustTasks) {
+      if (task.cognitive_load >= 4 && context.energy <= 2) {
+        recommendations.push({
+          id: `energy-mismatch-${task.id}`,
+          type: 'ENERGY_MISMATCH',
+          title: 'Zadanie MUST jest za trudne',
+          reason: `"${task.title}" wymaga dużo energii (${task.cognitive_load}/5), a masz tylko ${context.energy}/5`,
+          actions: [
+            { op: 'CHANGE_MUST', taskId: task.id, pin: false },
+            { op: 'ADD_BREAK', durationMinutes: 10 }
+          ],
+          confidence: 0.75,
+          created_at: new Date().toISOString()
+        })
       }
     }
+
+    // 4. Upcoming meetings - short tasks recommendation
+    // TODO: Integrate with Google Calendar when available
+    // For now, we'll skip this recommendation
     
-    // High energy + high focus recommendations
+    // 5. High energy + focus = tackle hardest tasks
     if (context.energy >= 4 && context.focus >= 4) {
-      const hardestTasks = tasks
-        .filter(t => t.cognitive_load >= 4 && !t.completed)
+      const hardestTasks = incompleteTasks
+        .filter(t => t.cognitive_load >= 4)
         .sort((a, b) => b.cognitive_load - a.cognitive_load)
+        .slice(0, 3)
       
       if (hardestTasks.length > 0) {
-        recommendations.push(
-          `Wysoka energia i skupienie (${context.energy}/5, ${context.focus}/5) - idealny moment na: "${hardestTasks[0].title}"`
-        )
+        recommendations.push({
+          id: `high-energy-${Date.now()}`,
+          type: 'HIGH_ENERGY',
+          title: 'Idealny moment na trudne zadania!',
+          reason: `Wysoka energia i skupienie (${context.energy}/5, ${context.focus}/5) - zacznij od: "${hardestTasks[0].title}"`,
+          actions: [
+            { op: 'REORDER_TASKS', taskIds: hardestTasks.map(t => t.id), priority: 'high' }
+          ],
+          confidence: 0.95,
+          created_at: new Date().toISOString()
+        })
       }
     }
-    
-    // Break recommendation based on time worked
-    // TODO: Track actual work time from completed tasks
-    const estimatedWorkMinutes = tasks
-      .filter(t => t.completed)
-      .reduce((sum, t) => sum + t.estimate_min, 0)
-    
-    if (estimatedWorkMinutes >= 120) {
-      recommendations.push(
-        'Pracujesz już ponad 2h - czas na przerwę! Odpocznij 15 min, wrócisz z większą energią.'
-      )
+
+    // 6. Low energy = suggest light tasks
+    if (context.energy <= 2) {
+      const lightTasks = incompleteTasks
+        .filter(t => t.cognitive_load <= 2)
+        .slice(0, 3)
+      
+      if (lightTasks.length > 0) {
+        recommendations.push({
+          id: `low-energy-${Date.now()}`,
+          type: 'LOW_ENERGY',
+          title: 'Przy niskiej energii - lekkie zadania',
+          reason: `Niska energia (${context.energy}/5) - polecam lekkie zadania (${lightTasks.length} dostępnych)`,
+          actions: [
+            { op: 'REORDER_TASKS', taskIds: lightTasks.map(t => t.id), priority: 'high' }
+          ],
+          confidence: 0.8,
+          created_at: new Date().toISOString()
+        })
+      }
     }
     
     return NextResponse.json({
       success: true,
-      recommendation,
-      recommendations,
-      context_message: recommendations.length > 0 ? recommendations[0] : null
+      recommendations
     })
   } catch (error) {
     console.error('Error in POST /api/day-assistant-v2/recommend:', error)
