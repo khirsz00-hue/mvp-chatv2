@@ -24,20 +24,15 @@ export function getTasksPlural(count: number): string {
 
 /**
  * Format Polish plural form for "dzień" (day)
+ * Polish grammar: 1 = dzień, 2-4 (except 12-14) = dni, others = dni
+ * Note: "dni" is used for most cases in Polish (2-4 and 5+)
  * @param count Number of days
  * @returns Correctly pluralized form
  */
 export function getDaysPlural(count: number): string {
   if (count === 1) return 'dzień'
   
-  const lastDigit = count % 10
-  const lastTwoDigits = count % 100
-  
-  // Numbers ending in 2-4, but not 12-14
-  if (lastDigit >= 2 && lastDigit <= 4 && (lastTwoDigits < 12 || lastTwoDigits > 14)) {
-    return 'dni'
-  }
-  
+  // All other cases use 'dni' in Polish
   return 'dni'
 }
 

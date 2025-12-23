@@ -62,6 +62,10 @@ export function useOverdueTasks(
  * @param dueDate Due date string (YYYY-MM-DD)
  * @param currentDate Current date string (YYYY-MM-DD)
  * @returns Formatted string like "wczoraj", "2 dni temu", etc.
+ * 
+ * Note: Month calculation uses 30-day approximation for simplicity.
+ * This is acceptable for overdue task display where exact precision
+ * is less critical than human-readable formatting.
  */
 export function getDaysOverdueText(dueDate: string, currentDate: string): string {
   const due = normalizeToStartOfDay(dueDate)
@@ -77,6 +81,7 @@ export function getDaysOverdueText(dueDate: string, currentDate: string): string
   const weeks = Math.floor(diffDays / 7)
   if (weeks < 4) return `${weeks} ${getWeeksPlural(weeks)} temu`
   
+  // Approximate months (30 days) - acceptable for UI display
   const months = Math.floor(diffDays / 30)
   return `${months} ${getMonthsPlural(months)} temu`
 }
