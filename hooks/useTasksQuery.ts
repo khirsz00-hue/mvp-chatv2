@@ -11,7 +11,10 @@ const supabase = createClient(
  * Helper function to get session with retry logic
  * Fixes race condition where session is available but hook doesn't see it
  */
-async function getSessionWithRetry(maxAttempts = 3) {
+const MAX_SESSION_RETRY_ATTEMPTS = 3
+const SESSION_ERROR_MESSAGE = 'Brak sesji - odśwież stronę i spróbuj ponownie'
+
+async function getSessionWithRetry(maxAttempts = MAX_SESSION_RETRY_ATTEMPTS) {
   let session = null
   let attempts = 0
   
@@ -27,13 +30,13 @@ async function getSessionWithRetry(maxAttempts = 3) {
       console.error(`❌ Session error (attempt ${attempts}/${maxAttempts}):`, error)
     }
     
-    // Wait before retrying (exponential backoff)
+    // Wait before retrying (true exponential backoff: 100ms, 200ms, 400ms)
     if (attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 100 * attempts))
+      await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempts - 1) * 100))
     }
   }
   
-  throw new Error('Brak sesji - odśwież stronę i spróbuj ponownie')
+  throw new Error(SESSION_ERROR_MESSAGE)
 }
 
 export interface Task {

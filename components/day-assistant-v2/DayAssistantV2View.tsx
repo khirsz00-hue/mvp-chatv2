@@ -70,6 +70,7 @@ type UndoToast = {
 const todayIso = () => new Date().toISOString().split('T')[0]
 const MAX_COGNITIVE_LOAD = 5
 const DEFAULT_COGNITIVE_LOAD = 3
+const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000 // 24 hours
 
 // Inner content component (will be wrapped with QueryClientProvider)
 function DayAssistantV2Content() {
@@ -120,7 +121,9 @@ function DayAssistantV2Content() {
       if (stored) {
         try {
           const parsed = JSON.parse(stored)
-          return new Set(parsed)
+          if (Array.isArray(parsed)) {
+            return new Set(parsed)
+          }
         } catch (e) {
           console.error('Failed to parse applied recommendation IDs from localStorage:', e)
         }
@@ -142,7 +145,7 @@ function DayAssistantV2Content() {
       const lastCleanup = localStorage.getItem('lastRecommendationCleanup')
       const now = Date.now()
       
-      if (!lastCleanup || now - parseInt(lastCleanup) > 24 * 60 * 60 * 1000) {
+      if (!lastCleanup || now - parseInt(lastCleanup) > CLEANUP_INTERVAL_MS) {
         // Clear all applied IDs after 24 hours
         setAppliedRecommendationIds(new Set())
         localStorage.setItem('lastRecommendationCleanup', now.toString())

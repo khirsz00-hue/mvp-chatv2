@@ -26,7 +26,10 @@ export function RecommendationPanel({ recommendations, onApply, loading }: Recom
       if (stored) {
         try {
           const parsed = JSON.parse(stored)
-          return new Set(parsed)
+          // Validate that parsed data is an array before creating Set
+          if (Array.isArray(parsed)) {
+            return new Set(parsed)
+          }
         } catch (e) {
           console.error('Failed to parse applied recommendation IDs from localStorage:', e)
         }
