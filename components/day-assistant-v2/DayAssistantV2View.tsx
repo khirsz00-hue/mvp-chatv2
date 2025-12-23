@@ -783,6 +783,7 @@ function DayAssistantV2Content() {
   // Handle apply recommendation
   const handleApplyRecommendation = async (recommendation: Recommendation) => {
     try {
+      console.log('🔍 [Apply Recommendation] Starting:', recommendation.type)
       // Optimistically remove the recommendation from view
       setAppliedRecommendationIds(prev => new Set(prev).add(recommendation.id))
       
@@ -799,9 +800,13 @@ function DayAssistantV2Content() {
       if (result.success) {
         toast.success(`✅ ${result.message}`)
         
-        // Refresh data
-        await loadDayPlan(sessionToken || undefined)
+        console.log('✅ [Apply Recommendation] Success, refreshing data...')
+        
+        // Refresh recommendations immediately (invalidate cache)
         await refreshRecs()
+        
+        // Refresh tasks to reflect changes
+        await loadDayPlan(sessionToken || undefined)
         
         addDecisionLog(`Zastosowano rekomendację: ${recommendation.title}`)
         
@@ -811,6 +816,7 @@ function DayAssistantV2Content() {
           handleStartBreak(breakAction.durationMinutes)
         }
       } else {
+        console.error('❌ [Apply Recommendation] Failed:', result.error)
         toast.error(`❌ ${result.error || 'Nie udało się zastosować rekomendacji'}`)
         // Rollback - remove from applied set if failed
         setAppliedRecommendationIds(prev => {
@@ -820,7 +826,7 @@ function DayAssistantV2Content() {
         })
       }
     } catch (error) {
-      console.error('[Apply Recommendation] Error:', error)
+      console.error('❌ [Apply Recommendation] Error:', error)
       toast.error('Błąd podczas stosowania rekomendacji')
       // Rollback on error
       setAppliedRecommendationIds(prev => {

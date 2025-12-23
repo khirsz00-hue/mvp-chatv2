@@ -80,8 +80,26 @@ function isValidTestDayTask(task: unknown): task is TestDayTask {
   )
 }
 
+// Timeout constants
+const TODOIST_API_TIMEOUT_MS = 10000 // 10 seconds
+const DEFAULT_RETRY_ATTEMPTS = 3
+const MAX_RETRY_DELAY_MS = 5000 // 5 seconds
+
 /**
  * Sync task changes back to Todoist (bidirectional sync)
+ * With retry logic and exponential backoff
+ * 
+ * @param userId - User ID for fetching Todoist token
+ * @param todoistId - Todoist task ID to update
+ * @param updates - Task updates to apply
+ * @param retries - Number of retry attempts (default: 3)
+ * @returns Promise<boolean> - True if sync succeeded, false otherwise
+ * 
+ * Retry behavior:
+ * - Attempts the sync operation up to `retries` times
+ * - Uses exponential backoff between retries (1s, 2s, 4s, max 5s)
+ * - Returns false if all retries fail
+ * - Treats 404 errors as success (task already deleted in Todoist)
  */
 export async function syncTaskChangeToTodoist(
   userId: string,
@@ -93,81 +111,128 @@ export async function syncTaskChangeToTodoist(
     labels?: string[]
     project_id?: string
     completed?: boolean
-  }
+  },
+  retries: number = DEFAULT_RETRY_ATTEMPTS
 ): Promise<boolean> {
-  try {
-    // Get Todoist token
-    const { data: profile } = await supabaseServer
-      .from('user_profiles')
-      .select('todoist_token')
-      .eq('id', userId)
-      .single()
-    
-    if (!profile?.todoist_token) {
-      console.warn('[syncTaskChangeToTodoist] No Todoist token found')
-      return false
-    }
+  let lastError: Error | null = null
+  
+  // Fetch Todoist token once before retry loop to avoid repeated DB calls
+  const { data: profile, error: profileError } = await supabaseServer
+    .from('user_profiles')
+    .select('todoist_token')
+    .eq('id', userId)
+    .single()
+  
+  if (profileError) {
+    console.error(`❌ [syncTaskChangeToTodoist] Error fetching profile:`, profileError)
+    return false
+  }
+  
+  if (!profile?.todoist_token) {
+    console.warn('⚠️ [syncTaskChangeToTodoist] No Todoist token found - skipping sync')
+    return false
+  }
+  
+  const todoistToken = profile.todoist_token
+  
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      console.log(`🔍 [syncTaskChangeToTodoist] Attempt ${attempt}/${retries} for task ${todoistId}`)
 
-    // If completing task, use complete endpoint
-    if (updates.completed) {
-      const response = await fetch(`https://api.todoist.com/rest/v2/tasks/${todoistId}/close`, {
+      // If completing task, use complete endpoint
+      if (updates.completed) {
+        console.log(`🔍 [syncTaskChangeToTodoist] Completing task in Todoist: ${todoistId}`)
+        
+        const response = await fetch(`https://api.todoist.com/rest/v2/tasks/${todoistId}/close`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${todoistToken}`
+          },
+          signal: AbortSignal.timeout(TODOIST_API_TIMEOUT_MS)
+        })
+        
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error(`❌ [syncTaskChangeToTodoist] Failed to complete task (status ${response.status}):`, errorText)
+          
+          // If 404, task doesn't exist in Todoist - consider it success (already deleted)
+          if (response.status === 404) {
+            console.warn('⚠️ [syncTaskChangeToTodoist] Task not found in Todoist (404) - considering as success')
+            return true
+          }
+          
+          throw new Error(`Todoist API error: ${response.status} - ${errorText}`)
+        }
+        
+        console.log(`✅ [syncTaskChangeToTodoist] Completed task in Todoist: ${todoistId}`)
+        return true
+      }
+
+      // Otherwise, update task
+      const todoistPayload: TodoistUpdatePayload = {}
+      
+      if (updates.due_date !== undefined) {
+        todoistPayload.due_date = updates.due_date
+      }
+      if (updates.content !== undefined) {
+        todoistPayload.content = updates.content
+      }
+      if (updates.description !== undefined) {
+        todoistPayload.description = updates.description
+      }
+      if (updates.labels) {
+        todoistPayload.labels = updates.labels
+      }
+      if (updates.project_id) {
+        todoistPayload.project_id = updates.project_id
+      }
+
+      console.log(`🔍 [syncTaskChangeToTodoist] Updating task in Todoist: ${todoistId}`)
+      
+      // Todoist REST API v2 uses POST for task updates (not PUT/PATCH)
+      // See: https://developer.todoist.com/rest/v2/#update-a-task
+      const response = await fetch(`https://api.todoist.com/rest/v2/tasks/${todoistId}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${profile.todoist_token}`
-        }
+          'Authorization': `Bearer ${todoistToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(todoistPayload),
+        signal: AbortSignal.timeout(TODOIST_API_TIMEOUT_MS)
       })
       
       if (!response.ok) {
-        console.error('[syncTaskChangeToTodoist] Failed to complete task in Todoist')
-        return false
+        const errorText = await response.text()
+        console.error(`❌ [syncTaskChangeToTodoist] Failed to update Todoist (status ${response.status}):`, errorText)
+        
+        // If 404, task doesn't exist in Todoist - consider it success (already deleted)
+        if (response.status === 404) {
+          console.warn('⚠️ [syncTaskChangeToTodoist] Task not found in Todoist (404) - considering as success')
+          return true
+        }
+        
+        throw new Error(`Todoist API error: ${response.status} - ${errorText}`)
       }
       
-      console.log(`[syncTaskChangeToTodoist] ✅ Completed task in Todoist: ${todoistId}`)
+      console.log(`✅ [syncTaskChangeToTodoist] Synced to Todoist: ${todoistId}`)
       return true
+      
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error))
+      console.error(`❌ [syncTaskChangeToTodoist] Attempt ${attempt}/${retries} failed:`, lastError.message)
+      
+      // If this is not the last attempt, wait with exponential backoff
+      if (attempt < retries) {
+        const delayMs = Math.min(1000 * Math.pow(2, attempt - 1), MAX_RETRY_DELAY_MS)
+        console.log(`⏳ [syncTaskChangeToTodoist] Waiting ${delayMs}ms before retry...`)
+        await new Promise(resolve => setTimeout(resolve, delayMs))
+      }
     }
-
-    // Otherwise, update task
-    const todoistPayload: TodoistUpdatePayload = {}
-    
-    if (updates.due_date !== undefined) {
-      todoistPayload.due_date = updates.due_date
-    }
-    if (updates.content !== undefined) {
-      todoistPayload.content = updates.content
-    }
-    if (updates.description !== undefined) {
-      todoistPayload.description = updates.description
-    }
-    if (updates.labels) {
-      todoistPayload.labels = updates.labels
-    }
-    if (updates.project_id) {
-      todoistPayload.project_id = updates.project_id
-    }
-
-    // Todoist REST API v2 uses POST for task updates (not PUT/PATCH)
-    // See: https://developer.todoist.com/rest/v2/#update-a-task
-    const response = await fetch(`https://api.todoist.com/rest/v2/tasks/${todoistId}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${profile.todoist_token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(todoistPayload)
-    })
-    
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('[syncTaskChangeToTodoist] Failed to update Todoist:', errorText)
-      return false
-    }
-    
-    console.log(`[syncTaskChangeToTodoist] ✅ Synced to Todoist: ${todoistId}`)
-    return true
-  } catch (error) {
-    console.error('[syncTaskChangeToTodoist] Error:', error)
-    return false
   }
+  
+  // All retries failed
+  console.error(`❌ [syncTaskChangeToTodoist] All ${retries} attempts failed. Last error:`, lastError?.message)
+  return false
 }
 
 /**

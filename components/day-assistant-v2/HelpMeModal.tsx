@@ -61,14 +61,33 @@ export function HelpMeModal({ task, open, onClose, onSuccess }: Props) {
         })
       })
 
-      if (!response.ok) throw new Error('Failed to generate steps')
+      const data = await response.json()
+      
+      if (!response.ok) {
+        // Show specific error message from API
+        const errorMessage = data.error || 'Nie udało się wygenerować kroków'
+        throw new Error(errorMessage)
+      }
+      
+      // Show warning if fallback steps were used (only on success)
+      if (data.warning) {
+        toast.warning(data.warning)
+      }
 
-      const { steps: generatedSteps } = await response.json()
-      setSteps(generatedSteps)
+      if (!data.steps || data.steps.length === 0) {
+        throw new Error('AI nie wygenerował żadnych kroków')
+      }
+
+      setSteps(data.steps)
       setStage('review')
+      
+      console.log('✅ [HelpMeModal] Generated', data.steps.length, 'steps')
     } catch (error) {
-      console.error('[HelpMeModal] Error:', error)
-      toast.error('Nie udało się wygenerować kroków')
+      console.error('❌ [HelpMeModal] Error:', error)
+      
+      // Show specific error message
+      const errorMessage = error instanceof Error ? error.message : 'Nie udało się wygenerować kroków'
+      toast.error(`❌ ${errorMessage}`)
     } finally {
       setLoading(false)
     }
