@@ -1,15 +1,19 @@
 import { supabase } from './supabaseClient'
 import confetti from 'canvas-confetti'
 
-// Type for toast notifications - must match Toast.tsx
-type ToastType = 'success' | 'error' | 'warning' | 'info'
+/**
+ * Get today's date in ISO format (YYYY-MM-DD)
+ */
+export function getTodayISO(): string {
+  return new Date().toISOString().split('T')[0]
+}
 
 /**
  * Update user streak after task completion
  * Only counts first completion of the day for streak purposes
  */
 export async function updateStreakOnCompletion(userId: string) {
-  const today = new Date().toISOString().split('T')[0]
+  const today = getTodayISO()
 
   // Get or create streak record
   const { data: streak } = await supabase
@@ -77,7 +81,7 @@ export async function updateStreakOnCompletion(userId: string) {
  * Update daily stats when tasks are added or completed
  */
 export async function updateDailyStats(userId: string, increment: boolean = true) {
-  const today = new Date().toISOString().split('T')[0]
+  const today = getTodayISO()
 
   const { data: stats } = await supabase
     .from('daily_stats')
@@ -117,7 +121,7 @@ export async function updateDailyStats(userId: string, increment: boolean = true
  * Recalculate total tasks for today (useful after adding/removing tasks)
  */
 export async function recalculateDailyTotal(userId: string) {
-  const today = new Date().toISOString().split('T')[0]
+  const today = getTodayISO()
 
   // Count total tasks for today
   const { count } = await supabase
@@ -170,6 +174,9 @@ export function triggerConfetti() {
 /**
  * Show milestone toast notification
  */
-export function triggerMilestoneToast(message: string, showToast: (msg: string, type?: ToastType) => void) {
+export function triggerMilestoneToast(
+  message: string, 
+  showToast: (msg: string, type?: 'success' | 'error' | 'warning' | 'info') => void
+) {
   showToast(message, 'success')
 }

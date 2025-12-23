@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { supabase } from '@/lib/supabaseClient'
+import { getTodayISO } from '@/lib/gamification'
 
 export const dynamic = 'force-dynamic'
 
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create task
-    const today = new Date().toISOString().split('T')[0]
+    const today = getTodayISO()
     
     const { data: task, error } = await supabase
       .from('day_assistant_v2_tasks')
@@ -140,7 +141,7 @@ Przykłady:
     tomorrow.setDate(tomorrow.getDate() + 1)
     result.dueDate = tomorrow.toISOString().split('T')[0]
   } else if (result.dueDate === 'DZISIAJ') {
-    result.dueDate = new Date().toISOString().split('T')[0]
+    result.dueDate = getTodayISO()
   }
 
   return result

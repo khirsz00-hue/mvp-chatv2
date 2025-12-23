@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
+import { getTodayISO } from '@/lib/gamification'
 
 interface DailyProgress {
   completed: number
@@ -14,16 +15,41 @@ export function ProgressRing() {
   useEffect(() => {
     loadProgress()
     
-    // Refresh every 5 seconds
-    const interval = setInterval(loadProgress, 5000)
-    return () => clearInterval(interval)
+    // Set up realtime subscription for daily_stats updates
+    const setupSubscription = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      
+      const channel = supabase
+        .channel('daily_stats_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'daily_stats',
+            filter: `user_id=eq.${user.id}`
+          },
+          () => {
+            // Update progress when daily_stats changes
+            loadProgress()
+          }
+        )
+        .subscribe()
+      
+      return () => {
+        supabase.removeChannel(channel)
+      }
+    }
+    
+    setupSubscription()
   }, [])
 
   const loadProgress = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = getTodayISO()
 
     const { data } = await supabase
       .from('daily_stats')
