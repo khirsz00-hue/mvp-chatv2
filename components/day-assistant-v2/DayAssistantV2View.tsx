@@ -45,7 +45,7 @@ import { ClarifyModal } from './ClarifyModal'
 import { QueueReorderingOverlay } from './LoadingStates'
 import { CurrentActivityBox } from './CurrentActivityBox'
 import { BreakTimer } from './BreakTimer'
-import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { StreakDisplay } from '@/components/gamification/StreakDisplay'
 import { ProgressRing } from '@/components/gamification/ProgressRing'
 import { QuickAddModal } from './QuickAddModal'
@@ -1052,7 +1052,7 @@ function DayAssistantV2Content() {
   }
 
   return (
-    <TooltipProvider>
+    <>
       <Toaster position="top-right" />
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
         <div className="space-y-6">
@@ -1645,6 +1645,8 @@ function DayAssistantV2Content() {
         isOpen={showQuickAdd}
         onClose={() => setShowQuickAdd(false)}
         onSubmit={handleQuickAdd}
+      />
+      
       {/* Morning Review Modal */}
       <MorningReviewModal
         overdueTasks={overdueTasks}
@@ -1655,7 +1657,7 @@ function DayAssistantV2Content() {
         onDelete={handleMorningDelete}
       />
       </div>
-    </TooltipProvider>
+    </>
   )
 }
 
