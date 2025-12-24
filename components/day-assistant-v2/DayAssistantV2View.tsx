@@ -286,6 +286,20 @@ function DayAssistantV2Content() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  // 🎤 VOICE RAMBLE: Listen for voice tasks saved and refresh queue
+  useEffect(() => {
+    const handleVoiceTasksSaved = async () => {
+      console.log('🎤 [DayAssistantV2] Voice tasks saved - refreshing queue')
+      if (sessionToken) {
+        await loadDayPlan(sessionToken)
+        showToast('Zadania głosowe dodane do kolejki', 'success')
+      }
+    }
+
+    window.addEventListener('voice-tasks-saved', handleVoiceTasksSaved)
+    return () => window.removeEventListener('voice-tasks-saved', handleVoiceTasksSaved)
+  }, [sessionToken])
+
   const authFetch = async (url: string, options: RequestInit = {}) => {
     // Get fresh token from Supabase to avoid JWT expiration issues
     const { data: { session } } = await supabase.auth.getSession()
