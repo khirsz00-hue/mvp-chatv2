@@ -106,6 +106,8 @@ function DayAssistantV2Content() {
   const [showLaterQueue, setShowLaterQueue] = useState(false)
   const [showRestOfQueue, setShowRestOfQueue] = useState(false)
   const [isReorderingQueue, setIsReorderingQueue] = useState(false)
+  const [showRestOfToday, setShowRestOfToday] = useState(false)
+  const [showAvailable, setShowAvailable] = useState(false)
   
   // NEW: Work mode state (replaces energy/focus sliders)
   const [workMode, setWorkMode] = useState<WorkMode>('focus')
@@ -435,6 +437,41 @@ function DayAssistantV2Content() {
     return scoredTasks.filter(t => !t.due_date || t.due_date >= selectedDate)
   }, [scoredTasks, selectedDate])
 
+  // Split non-overdue tasks into clear categories
+  const tasksByCategory = useMemo(() => {
+    const todayDue: TestDayTask[] = []
+    const available: TestDayTask[] = []  // no date or future
+    
+    nonOverdueTasks.forEach(task => {
+      if (task.due_date === selectedDate) {
+        todayDue.push(task)
+      } else {
+        // No due date or future tasks - available to work on
+        available.push(task)
+      }
+    })
+    
+    return { todayDue, available }
+  }, [nonOverdueTasks, selectedDate])
+
+  // Today tasks (non-MUST) - sorted by score
+  const todayTasks = useMemo(() => {
+    return tasksByCategory.todayDue
+      .filter(t => !t.is_must)
+      .sort((a, b) => ((b as any)._score || 0) - ((a as any)._score || 0))
+  }, [tasksByCategory.todayDue])
+
+  // Available tasks (no date or future) - sorted by score
+  const availableTasks = useMemo(() => {
+    return tasksByCategory.available
+      .sort((a, b) => ((b as any)._score || 0) - ((a as any)._score || 0))
+  }, [tasksByCategory.available])
+
+  // MUST tasks - from ALL non-overdue tasks
+  const mustTasks = useMemo(() => {
+    return nonOverdueTasks.filter(t => t.is_must).slice(0, 3)
+  }, [nonOverdueTasks])
+
   // Use queue hook to calculate queue (with manual time block)
   const { queue, later, availableMinutes, usedMinutes, usagePercentage } = useTaskQueue(
     nonOverdueTasks,
@@ -473,7 +510,7 @@ function DayAssistantV2Content() {
     }
   }, [tasks.length, filteredTasks.length, scoredTasks.length, overdueTasks, nonOverdueTasks.length, queue.length, later, availableMinutes, usedMinutes])
 
-  const mustTasks = queue.filter(t => t.is_must).slice(0, 3)
+  // matchedTasks kept for backward compatibility with existing queue logic
   const matchedTasks = queue.filter(t => !t.is_must && !t.completed)
   const autoMoved = scoredTasks.filter(t => t.auto_moved)
 
@@ -1320,20 +1357,23 @@ function DayAssistantV2Content() {
           </Card>
         )}
 
-        {/* Top 3 Queue Section */}
-        {matchedTasks.length > 0 && (
-          <Card className="relative shadow-md">
+        {/* SEKCJA 3: Kolejka NA DZIŚ (Top 3) */}
+        {todayTasks.length > 0 && (
+          <Card className="shadow-md border-purple-300">
             {isReorderingQueue && <QueueReorderingOverlay />}
             <CardHeader>
               <CardTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent flex items-center gap-2">
-                📊 Kolejka na dziś (Top 3)
-                <Badge variant="purple" className="bg-purple-100 text-purple-800 font-semibold px-3 py-1">
-                  {Math.min(matchedTasks.length, 3)} zadań
+                📊 Kolejka NA DZIŚ (Top 3)
+                <Badge className="bg-purple-100 text-purple-800">
+                  {Math.min(todayTasks.length, 3)} zadań
                 </Badge>
               </CardTitle>
+              <p className="text-sm text-gray-600 mt-1">
+                Zadania zaplanowane na dzisiaj ({selectedDate})
+              </p>
             </CardHeader>
             <CardContent className="space-y-3">
-              {matchedTasks.slice(0, 3).map((task, index) => (
+              {todayTasks.slice(0, 3).map((task, index) => (
                 <TaskRow
                   key={task.id}
                   task={task}
@@ -1359,8 +1399,110 @@ function DayAssistantV2Content() {
           </Card>
         )}
 
-        {/* Rest of Queue (expandable) - Tasks #4+ in today's queue */}
-        {matchedTasks.length > 3 && (
+        {/* SEKCJA 4: Pozostałe NA DZIŚ (collapsible) */}
+        {todayTasks.length > 3 && (
+          <Card className="border-gray-300 bg-gray-50">
+            {isReorderingQueue && <QueueReorderingOverlay />}
+            <CardHeader 
+              className="cursor-pointer hover:bg-gray-100 transition-colors"
+              onClick={() => setShowRestOfToday(!showRestOfToday)}
+            >
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg text-gray-700 flex items-center gap-2">
+                  📋 Pozostałe na dziś
+                  <Badge variant="secondary">{todayTasks.length - 3} zadań</Badge>
+                </CardTitle>
+                <CaretDown className={cn(
+                  "transition-transform text-gray-600",
+                  showRestOfToday && "rotate-180"
+                )} size={24} />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Zadania z terminem {selectedDate} poza Top 3
+              </p>
+            </CardHeader>
+            {showRestOfToday && (
+              <CardContent className="space-y-2">
+                {todayTasks.slice(3).map((task, index) => (
+                  <TaskRow
+                    key={task.id}
+                    task={task}
+                    queuePosition={mustTasks.length + 3 + index + 1}
+                    onNotToday={() => handleNotToday(task)}
+                    onStart={() => handleStartTask(task)}
+                    onUnmark={() => openUnmarkWarning(task)}
+                    onDecompose={() => handleDecompose(task)}
+                    onComplete={() => handleComplete(task)}
+                    onPin={() => handlePin(task)}
+                    onDelete={() => handleDelete(task)}
+                    onClick={() => setSelectedTask(task)}
+                    focus={dayPlan?.focus || 3}
+                    selectedDate={selectedDate}
+                    activeTimer={activeTimer?.taskId === task.id ? activeTimer : undefined}
+                    onPauseTimer={pauseTimer}
+                    onResumeTimer={resumeTimer}
+                    onCompleteTimer={handleTimerComplete}
+                    onSubtaskToggle={handleSubtaskToggle}
+                    isCollapsed={true}
+                  />
+                ))}
+              </CardContent>
+            )}
+          </Card>
+        )}
+
+        {/* SEKCJA 5: DOSTĘPNE (no date or future) */}
+        {availableTasks.length > 0 && (
+          <Card className="border-blue-300 bg-blue-50">
+            <CardHeader 
+              className="cursor-pointer hover:bg-blue-100 transition-colors"
+              onClick={() => setShowAvailable(!showAvailable)}
+            >
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg text-blue-800 flex items-center gap-2">
+                  🗓️ DOSTĘPNE DO ZAPLANOWANIA
+                  <Badge className="bg-blue-600 text-white">{availableTasks.length} zadań</Badge>
+                </CardTitle>
+                <CaretDown className={cn(
+                  "transition-transform text-blue-600",
+                  showAvailable && "rotate-180"
+                )} size={24} />
+              </div>
+              <p className="text-xs text-blue-700 mt-1">
+                Zadania bez terminu lub na przyszłość - możesz zrobić dziś jeśli chcesz
+              </p>
+            </CardHeader>
+            {showAvailable && (
+              <CardContent className="space-y-2">
+                {availableTasks.map((task, index) => (
+                  <TaskRow
+                    key={task.id}
+                    task={task}
+                    queuePosition={mustTasks.length + todayTasks.length + index + 1}
+                    onNotToday={() => handleNotToday(task)}
+                    onStart={() => handleStartTask(task)}
+                    onUnmark={() => openUnmarkWarning(task)}
+                    onDecompose={() => handleDecompose(task)}
+                    onComplete={() => handleComplete(task)}
+                    onPin={() => handlePin(task)}
+                    onDelete={() => handleDelete(task)}
+                    onClick={() => setSelectedTask(task)}
+                    focus={dayPlan?.focus || 3}
+                    selectedDate={selectedDate}
+                    activeTimer={activeTimer?.taskId === task.id ? activeTimer : undefined}
+                    onPauseTimer={pauseTimer}
+                    onResumeTimer={resumeTimer}
+                    onCompleteTimer={handleTimerComplete}
+                    onSubtaskToggle={handleSubtaskToggle}
+                  />
+                ))}
+              </CardContent>
+            )}
+          </Card>
+        )}
+
+        {/* Rest of Queue (expandable) - Old matchedTasks section kept for compatibility */}
+        {matchedTasks.length > 3 && todayTasks.length === 0 && (
           <Card className="relative border-gray-300 bg-gray-50 shadow-sm">
             {isReorderingQueue && <QueueReorderingOverlay />}
             <CardHeader 
@@ -1415,8 +1557,26 @@ function DayAssistantV2Content() {
           </Card>
         )}
 
-        {/* Empty state or Low Focus fallback */}
-        {mustTasks.length === 0 && matchedTasks.length === 0 && queue.length === 0 && (
+        {/* Empty state - ONLY if truly no tasks */}
+        {mustTasks.length === 0 && 
+         todayTasks.length === 0 && 
+         availableTasks.length === 0 && 
+         overdueTasks.length === 0 && (
+          <Card className="border-green-300 bg-green-50">
+            <CardContent className="pt-6 text-center">
+              <p className="text-green-800 font-semibold">
+                🎉 Brak zadań - masz wolne!
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Low Focus fallback - when there are tasks but none match the work mode */}
+        {mustTasks.length === 0 && 
+         todayTasks.length === 0 && 
+         availableTasks.length === 0 && 
+         overdueTasks.length === 0 &&
+         tasks.length > 0 && (
           <Card className="border-orange-300 bg-orange-50">
             <CardContent className="pt-6 space-y-4">
               <div className="text-center">
@@ -1462,12 +1622,6 @@ function DayAssistantV2Content() {
                     </Button>
                   </div>
                 </div>
-              )}
-              
-              {later.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center">
-                  Brak zadań do wykonania <span aria-label="świętowanie">🎉</span>
-                </p>
               )}
             </CardContent>
           </Card>
