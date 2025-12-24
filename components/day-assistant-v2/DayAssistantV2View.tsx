@@ -486,6 +486,9 @@ function DayAssistantV2Content() {
       filteredTasks: filteredTasks.length,
       scoredTasks: scoredTasks.length,
       overdueTasks: overdueTasks.length,
+      mustTasks: mustTasks.length,
+      todayTasks: todayTasks.length,
+      availableTasks: availableTasks.length,
       nonOverdueTasks: nonOverdueTasks.length,
       queueTasks: queue.length,
       laterTasks: later.length,
@@ -501,6 +504,22 @@ function DayAssistantV2Content() {
       })))
     }
     
+    if (todayTasks.length > 0) {
+      console.log('📊 [Today Tasks]', todayTasks.map(t => ({
+        title: t.title,
+        due_date: t.due_date,
+        score: (t as any)._score || 'N/A'
+      })))
+    }
+    
+    if (availableTasks.length > 0) {
+      console.log('🗓️ [Available Tasks]', availableTasks.map(t => ({
+        title: t.title,
+        due_date: t.due_date || 'no date',
+        score: (t as any)._score || 'N/A'
+      })))
+    }
+    
     if (later.length > 0) {
       console.log('📋 [Later Tasks]', later.map(t => ({
         title: t.title,
@@ -508,7 +527,7 @@ function DayAssistantV2Content() {
         score: (t as any)._score || 'N/A'
       })))
     }
-  }, [tasks.length, filteredTasks.length, scoredTasks.length, overdueTasks, nonOverdueTasks.length, queue.length, later, availableMinutes, usedMinutes])
+  }, [tasks.length, filteredTasks.length, scoredTasks.length, overdueTasks, mustTasks.length, todayTasks.length, availableTasks.length, nonOverdueTasks.length, queue.length, later, availableMinutes, usedMinutes])
 
   // matchedTasks kept for backward compatibility with existing queue logic
   const matchedTasks = queue.filter(t => !t.is_must && !t.completed)
