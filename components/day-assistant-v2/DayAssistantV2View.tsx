@@ -1058,7 +1058,8 @@ function DayAssistantV2Content() {
     <>
       <Toaster position="top-right" />
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
-        <div className="space-y-6">{/* Changed from space-y-4 to space-y-6 for better spacing */}
+        {/* Main content area with improved spacing */}
+        <div className="space-y-6">
         <Card>
           <CardHeader>
             <div className="flex justify-between items-center mb-4">

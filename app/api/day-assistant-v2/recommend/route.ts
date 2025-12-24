@@ -17,6 +17,12 @@ import { TestDayTask, DayPlan, Recommendation } from '@/lib/types/dayAssistantV2
 import { differenceInHours, isFuture, isToday } from 'date-fns'
 import { groupBy } from 'lodash'
 
+// Thresholds for overdue task recommendations
+const LOW_ENERGY_THRESHOLD = 2
+const LOW_COGNITIVE_LOAD_THRESHOLD = 2
+const MODERATE_DEBT_THRESHOLD = 5
+const HIGH_DEBT_THRESHOLD = 10
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = createClient(
@@ -177,9 +183,9 @@ export async function POST(request: NextRequest) {
     
     if (overdueTasks.length > 0) {
       // Recommend easy overdue at low energy
-      if (context.energy <= 2) {
+      if (context.energy <= LOW_ENERGY_THRESHOLD) {
         const easyOverdue = overdueTasks
-          .filter(t => t.cognitive_load <= 2)
+          .filter(t => t.cognitive_load <= LOW_COGNITIVE_LOAD_THRESHOLD)
           .sort((a, b) => a.cognitive_load - b.cognitive_load)
         
         if (easyOverdue.length > 0) {
@@ -197,8 +203,8 @@ export async function POST(request: NextRequest) {
         }
       }
       
-      // Task debt warning for 10+ overdue
-      if (overdueTasks.length >= 10) {
+      // Task debt warning for many overdue tasks
+      if (overdueTasks.length >= HIGH_DEBT_THRESHOLD) {
         recommendations.push({
           id: `task-debt-warning-${Date.now()}`,
           type: 'TASK_DEBT_WARNING',
@@ -210,7 +216,7 @@ export async function POST(request: NextRequest) {
           confidence: 0.9,
           created_at: new Date().toISOString()
         })
-      } else if (overdueTasks.length >= 5) {
+      } else if (overdueTasks.length >= MODERATE_DEBT_THRESHOLD) {
         // Moderate debt warning
         recommendations.push({
           id: `overdue-review-${Date.now()}`,
