@@ -1344,9 +1344,9 @@ function DayAssistantV2Content() {
   return (
     <>
       <Toaster position="top-right" />
-      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(600px,2fr)_minmax(400px,1fr)] gap-6">
         {/* Main content area with improved spacing */}
-        <div className="space-y-6">
+        <div className="space-y-6 min-w-0">
         <Card>
           <CardHeader>
             <div className="flex justify-between items-center mb-4">
@@ -1425,13 +1425,6 @@ function DayAssistantV2Content() {
           onComplete={handleCompleteOverdue}
           onKeepToday={handleKeepOverdueToday}
           onPostpone={handlePostponeOverdue}
-          debugInfo={{
-            totalTasks: tasks.length,
-            filteredTasks: filteredTasks.length,
-            scoredTasks: scoredTasks.length,
-            tasksWithDueDate: tasks.filter(t => t.due_date).length,
-            tasksBeforeToday: tasks.filter(t => t.due_date && t.due_date < selectedDate).length
-          }}
         />
 
         {autoMoved.length > 0 && (
@@ -1767,7 +1760,7 @@ function DayAssistantV2Content() {
           </Card>
         )}
 
-        {/* 📋 LATER QUEUE - ALWAYS VISIBLE FOR DEBUGGING */}
+        {/* 📋 LATER QUEUE */}
         <Card className="border-2 border-blue-500 bg-blue-50 shadow-sm">
           <CardHeader 
             className="cursor-pointer hover:bg-blue-100 transition-colors"
@@ -1883,7 +1876,7 @@ function DayAssistantV2Content() {
         </Card>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-6 min-w-0 flex-shrink-0">
         <Card className="shadow-md">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl">
@@ -1906,7 +1899,7 @@ function DayAssistantV2Content() {
           <CardHeader>
             <CardTitle>DecisionLog</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="max-h-[500px] overflow-y-auto space-y-2">
             {decisionLog.length === 0 && <p className="text-sm text-muted-foreground">Brak decyzji — wszystkie akcje użytkownika są dozwolone, system stosuje soft-warnings i undo.</p>}
             {decisionLog.map(entry => (
               <div key={entry.id} className="flex items-center justify-between text-sm border rounded-lg px-3 py-2">

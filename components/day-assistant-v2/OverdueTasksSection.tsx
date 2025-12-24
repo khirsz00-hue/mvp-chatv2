@@ -21,14 +21,6 @@ interface OverdueTasksSectionProps {
   onKeepToday: (task: TestDayTask) => void
   onPostpone: (task: TestDayTask) => void
   onOpenContextMenu?: (task: TestDayTask) => void
-  // Debug props
-  debugInfo?: {
-    totalTasks: number
-    filteredTasks: number
-    scoredTasks: number
-    tasksWithDueDate: number
-    tasksBeforeToday: number
-  }
 }
 
 const COLLAPSED_KEY = 'overdue_section_collapsed'
@@ -39,8 +31,7 @@ export function OverdueTasksSection({
   onComplete,
   onKeepToday,
   onPostpone,
-  onOpenContextMenu,
-  debugInfo
+  onOpenContextMenu
 }: OverdueTasksSectionProps) {
   const [isCollapsed, setIsCollapsed] = useState(() => {
     if (typeof window === 'undefined') return false
