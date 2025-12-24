@@ -298,7 +298,7 @@ function DayAssistantV2Content() {
 
     window.addEventListener('voice-tasks-saved', handleVoiceTasksSaved)
     return () => window.removeEventListener('voice-tasks-saved', handleVoiceTasksSaved)
-  }, [sessionToken])
+  }, [sessionToken]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const authFetch = async (url: string, options: RequestInit = {}) => {
     // Get fresh token from Supabase to avoid JWT expiration issues

@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
   try {
     console.log('🔍 [Save Tasks API] Request received')
 
-    const supabase = createAuthenticatedSupabaseClient()
+    const supabase = await createAuthenticatedSupabaseClient()
     
     // Get authenticated user
     const { data: { user }, error: authError } = await supabase.auth.getUser()

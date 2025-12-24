@@ -54,16 +54,22 @@ export function VoiceRambleModal({ isOpen, onClose }: VoiceRambleModalProps) {
 
       if (e.key === 'Escape') {
         e.preventDefault()
-        handleStop()
+        stopRecording()
       } else if (e.ctrlKey && e.key === 'Enter') {
         e.preventDefault()
-        handleSave()
+        if (parsedTasks.length > 0) {
+          handleSaveAll().then((success) => {
+            if (success) {
+              onClose()
+            }
+          })
+        }
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, parsedTasks])
+  }, [isOpen, parsedTasks, stopRecording, handleSaveAll, onClose])
 
   const handleStop = () => {
     stopRecording()
