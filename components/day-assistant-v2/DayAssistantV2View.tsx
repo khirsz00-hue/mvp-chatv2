@@ -866,15 +866,183 @@ function DayAssistantV2Content() {
     addDecisionLog(`Zatrzymano timer dla "${task?.title || 'zadania'}"`)
   }
 
-  const handleKeepOverdueToday = (task: TestDayTask) => {
-    addDecisionLog(`Zachowano przeterminowane zadanie "${task.title}" na dziś`)
-    showToast('Zadanie pozostanie w kolejce', 'info')
+  const handleCompleteOverdue = async (task: TestDayTask) => {
+    // Stop timer if this task is active
+    if (activeTimer && activeTimer.taskId === task.id) {
+      stopTimer()
+    }
+
+    // Optimistic update - remove from list
+    setTasks(prev => prev.filter(t => t.id !== task.id))
+    addDecisionLog(`Ukończono przeterminowane zadanie "${task.title}"`)
+    
+    try {
+      // Get Todoist token
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        throw new Error('No user session')
+      }
+      
+      const { getTodoistToken } = await import('@/lib/integrations')
+      const todoistToken = await getTodoistToken(user.id)
+      
+      // 1. Close task in Todoist
+      if (task.todoist_task_id && todoistToken) {
+        const todoistResponse = await fetch(`https://api.todoist.com/rest/v2/tasks/${task.todoist_task_id}/close`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${todoistToken}`
+          }
+        })
+        
+        if (!todoistResponse.ok) {
+          console.error('Failed to close Todoist task:', await todoistResponse.text())
+        }
+      }
+      
+      // 2. Update local DB
+      await completeTaskMutation.mutateAsync(task.id)
+      
+      // 🎮 GAMIFICATION: Update streak and stats
+      if (user) {
+        // Update streak and get milestone
+        const milestone = await updateStreakOnCompletion(user.id)
+        
+        // Update daily stats
+        await updateDailyStats(user.id, true)
+        
+        // Trigger confetti animation
+        triggerConfetti()
+        
+        // Show milestone toast if any
+        if (milestone?.milestone) {
+          triggerMilestoneToast(milestone.milestone, showToast)
+        }
+      }
+      
+      toast.success('✅ Zadanie ukończone!')
+    } catch (error) {
+      console.error('Complete overdue task error:', error)
+      // Rollback on error - add task back
+      setTasks(prev => [...prev, task])
+      toast.error('❌ Nie udało się ukończyć zadania')
+    }
+  }
+
+  const handleKeepOverdueToday = async (task: TestDayTask) => {
+    // Optimistic update
+    setTasks(prev => prev.map(t => 
+      t.id === task.id ? { ...t, due_date: selectedDate } : t
+    ))
+    
+    addDecisionLog(`Przeniesiono przeterminowane zadanie "${task.title}" na dziś`)
+    toast.success('✅ Przeniesiono na dziś')
+    
+    try {
+      // Get Todoist token
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        throw new Error('No user session')
+      }
+      
+      const { getTodoistToken } = await import('@/lib/integrations')
+      const todoistToken = await getTodoistToken(user.id)
+      
+      // 1. Update Todoist if token available
+      if (task.todoist_task_id && todoistToken) {
+        const todoistResponse = await fetch(`https://api.todoist.com/rest/v2/tasks/${task.todoist_task_id}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${todoistToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            due_date: selectedDate
+          })
+        })
+        
+        if (!todoistResponse.ok) {
+          console.error('Failed to update Todoist task:', await todoistResponse.text())
+        }
+      }
+      
+      // 2. Update local DB
+      const { error } = await supabase
+        .from('day_assistant_v2_tasks')
+        .update({ due_date: selectedDate })
+        .eq('id', task.id)
+      
+      if (error) {
+        throw error
+      }
+    } catch (error) {
+      console.error('Error updating overdue task:', error)
+      // Rollback on error
+      setTasks(prev => prev.map(t => 
+        t.id === task.id ? { ...t, due_date: task.due_date } : t
+      ))
+      toast.error('❌ Nie udało się przenieść zadania')
+    }
   }
 
   const handlePostponeOverdue = async (task: TestDayTask) => {
-    // For now, postpone to tomorrow
-    // TODO: Show date picker modal
-    await handleNotToday(task, 'Przełożono przeterminowane zadanie')
+    const tomorrow = new Date(selectedDate)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const tomorrowISO = tomorrow.toISOString().split('T')[0]
+    
+    // Optimistic update
+    setTasks(prev => prev.map(t => 
+      t.id === task.id ? { ...t, due_date: tomorrowISO } : t
+    ))
+    
+    addDecisionLog(`Przełożono przeterminowane zadanie "${task.title}" na jutro`)
+    toast.success('✅ Przełożono na jutro')
+    
+    try {
+      // Get Todoist token
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        throw new Error('No user session')
+      }
+      
+      const { getTodoistToken } = await import('@/lib/integrations')
+      const todoistToken = await getTodoistToken(user.id)
+      
+      // 1. Update Todoist if token available
+      if (task.todoist_task_id && todoistToken) {
+        const todoistResponse = await fetch(`https://api.todoist.com/rest/v2/tasks/${task.todoist_task_id}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${todoistToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            due_date: tomorrowISO
+          })
+        })
+        
+        if (!todoistResponse.ok) {
+          console.error('Failed to update Todoist task:', await todoistResponse.text())
+        }
+      }
+      
+      // 2. Update local DB
+      const { error } = await supabase
+        .from('day_assistant_v2_tasks')
+        .update({ due_date: tomorrowISO })
+        .eq('id', task.id)
+      
+      if (error) {
+        throw error
+      }
+    } catch (error) {
+      console.error('Error postponing overdue task:', error)
+      // Rollback on error
+      setTasks(prev => prev.map(t => 
+        t.id === task.id ? { ...t, due_date: task.due_date } : t
+      ))
+      toast.error('❌ Nie udało się przełożyć zadania')
+    }
   }
 
   // Morning Review Modal handlers
@@ -1190,37 +1358,6 @@ function DayAssistantV2Content() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* 🔍 DEBUG PANEL - Development only */}
-            {process.env.NODE_ENV === 'development' && (
-              <Card className="border-2 border-yellow-500 bg-yellow-50">
-                <CardHeader>
-                  <CardTitle className="text-sm text-yellow-800">🔍 Debug Panel</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div><strong>Total tasks:</strong> {tasks.length}</div>
-                    <div><strong>Filtered tasks:</strong> {filteredTasks.length}</div>
-                    <div><strong>Scored tasks:</strong> {scoredTasks.length}</div>
-                    <div><strong>Overdue tasks:</strong> {overdueTasks.length}</div>
-                    <div><strong>Queue tasks:</strong> {queue.length}</div>
-                    <div><strong>Later tasks:</strong> {later.length}</div>
-                    <div><strong>Available min:</strong> {availableMinutes}</div>
-                    <div><strong>Used min:</strong> {usedMinutes}</div>
-                  </div>
-                  <details className="mt-2">
-                    <summary className="cursor-pointer font-semibold text-xs">Raw Data</summary>
-                    <pre className="mt-2 text-xs overflow-auto max-h-40 bg-white p-2 rounded">
-{JSON.stringify({
-  tasks: tasks.map(t => ({ id: t.id, title: t.title, due_date: t.due_date, completed: t.completed })),
-  overdueTasks: overdueTasks.map(t => ({ title: t.title, due_date: t.due_date })),
-  laterTasks: later.map(t => ({ title: t.title, estimate: t.estimate_min }))
-}, null, 2)}
-                    </pre>
-                  </details>
-                </CardContent>
-              </Card>
-            )}
-
             {/* Current Activity Box */}
             <CurrentActivityBox
               activeTimer={activeTimer}
@@ -1269,6 +1406,7 @@ function DayAssistantV2Content() {
         <OverdueTasksSection
           overdueTasks={overdueTasks}
           selectedDate={selectedDate}
+          onComplete={handleCompleteOverdue}
           onKeepToday={handleKeepOverdueToday}
           onPostpone={handlePostponeOverdue}
           debugInfo={{
@@ -1625,9 +1763,6 @@ function DayAssistantV2Content() {
                 <Badge variant="secondary" className="bg-blue-600 text-white font-semibold px-3 py-1">
                   {later.length} zadań
                 </Badge>
-                {later.length === 0 && (
-                  <span className="text-xs text-blue-600 ml-2">(debug: array is empty)</span>
-                )}
               </CardTitle>
               <CaretDown className={cn(
                 "transition-transform text-blue-600",
@@ -1639,23 +1774,9 @@ function DayAssistantV2Content() {
             <CardContent className="space-y-3">
               {later.length === 0 ? (
                 <div className="p-4 text-center">
-                  <p className="text-sm text-blue-700 mb-2">
-                    🔍 DEBUG: Brak zadań w kolejce &quot;later&quot;
+                  <p className="text-sm text-blue-700">
+                    Wszystkie zadania mieszczą się w dostępnym czasie pracy
                   </p>
-                  <details className="text-xs text-left bg-white p-2 rounded">
-                    <summary className="cursor-pointer font-semibold">Debug Info</summary>
-                    <pre className="mt-2 overflow-auto">
-{JSON.stringify({
-  totalTasks: tasks.length,
-  nonOverdueTasks: nonOverdueTasks.length,
-  queueLength: queue.length,
-  laterLength: later.length,
-  availableMinutes,
-  usedMinutes,
-  usagePercentage
-}, null, 2)}
-                    </pre>
-                  </details>
                 </div>
               ) : (
                 <>
