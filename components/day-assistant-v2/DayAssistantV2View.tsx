@@ -468,7 +468,7 @@ function DayAssistantV2Content() {
       console.log('📋 [Later Tasks]', later.map(t => ({
         title: t.title,
         estimate: t.estimate_min,
-        score: t._score
+        score: (t as any)._score || 'N/A'
       })))
     }
   }, [tasks.length, filteredTasks.length, scoredTasks.length, overdueTasks, nonOverdueTasks.length, queue.length, later, availableMinutes, usedMinutes])
