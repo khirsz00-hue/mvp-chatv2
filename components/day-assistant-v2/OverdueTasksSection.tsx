@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils'
 interface OverdueTasksSectionProps {
   overdueTasks: TestDayTask[]
   selectedDate: string
+  onComplete: (task: TestDayTask) => void
   onKeepToday: (task: TestDayTask) => void
   onPostpone: (task: TestDayTask) => void
   onOpenContextMenu?: (task: TestDayTask) => void
@@ -35,6 +36,7 @@ const COLLAPSED_KEY = 'overdue_section_collapsed'
 export function OverdueTasksSection({
   overdueTasks,
   selectedDate,
+  onComplete,
   onKeepToday,
   onPostpone,
   onOpenContextMenu,
@@ -82,9 +84,7 @@ export function OverdueTasksSection({
               ({overdueTasks.length} {taskCountText})
             </span>
           )}
-          {overdueTasks.length === 0 && (
-            <span className="text-xs text-red-600 ml-2">(debug: array is empty)</span>
-          )}
+
         </div>
         <div className="flex items-center gap-2 text-red-700">
           <span className="text-sm">
@@ -98,29 +98,11 @@ export function OverdueTasksSection({
       {!isCollapsed && (
         <div className="px-4 pb-4 space-y-3">
           {overdueTasks.length === 0 ? (
-            <>
-              <div className="p-4 text-center">
-                <p className="text-sm text-red-700 mb-2">
-                  🔍 DEBUG: Brak przeterminowanych zadań w array
-                </p>
-                {debugInfo && (
-                  <details className="text-xs text-left bg-white p-2 rounded">
-                    <summary className="cursor-pointer font-semibold">Debug Info</summary>
-                    <pre className="mt-2 overflow-auto">
-{JSON.stringify({
-  totalTasks: debugInfo.totalTasks,
-  filteredTasks: debugInfo.filteredTasks,
-  scoredTasks: debugInfo.scoredTasks,
-  overdueTasks: overdueTasks.length,
-  tasksWithDueDate: debugInfo.tasksWithDueDate,
-  tasksBeforeToday: debugInfo.tasksBeforeToday,
-  selectedDate
-}, null, 2)}
-                    </pre>
-                  </details>
-                )}
-              </div>
-            </>
+            <div className="p-4 text-center">
+              <p className="text-sm text-red-700">
+                Brak przeterminowanych zadań
+              </p>
+            </div>
           ) : (
             <>
               <p className="text-sm text-red-700">
@@ -166,11 +148,20 @@ export function OverdueTasksSection({
                       <div className="flex gap-2 flex-wrap">
                         <Button
                           size="sm"
+                          onClick={() => onComplete(task)}
+                          className="flex items-center gap-1 text-xs bg-green-600 hover:bg-green-700 text-white"
+                        >
+                          <CheckCircle size={14} weight="fill" />
+                          <span>Ukończ</span>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
                           onClick={() => onKeepToday(task)}
                           className="flex items-center gap-1 text-xs"
                         >
-                          <CheckCircle size={14} />
-                          <span>+ Dziś</span>
+                          <CalendarBlank size={14} />
+                          <span>Dziś</span>
                         </Button>
                         <Button
                           size="sm"
@@ -179,7 +170,7 @@ export function OverdueTasksSection({
                           className="flex items-center gap-1 text-xs"
                         >
                           <CalendarBlank size={14} />
-                          <span>📅</span>
+                          <span>Jutro</span>
                         </Button>
                         {onOpenContextMenu && (
                           <Button
