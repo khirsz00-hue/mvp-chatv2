@@ -41,7 +41,7 @@ export function TaskBadges({ task, today }: TaskBadgesProps) {
       (new Date(todayDate).getTime() - new Date(task.due_date).getTime()) / MILLISECONDS_PER_DAY
     )
     return (
-      <Badge variant="destructive" className="text-xs animate-pulse">
+      <Badge variant="destructive" className="text-xs">
         🔴 Przeterminowane ({daysOverdue} {daysOverdue === 1 ? 'dzień' : 'dni'})
       </Badge>
     )

@@ -61,8 +61,7 @@ export function OverdueTasksSection({
   return (
     <div 
       className={cn(
-        "border-2 border-red-500 bg-red-50 rounded-lg overflow-hidden transition-all",
-        isCollapsed ? "animate-pulse" : ""
+        "border-2 border-red-500 bg-red-50 rounded-lg overflow-hidden transition-all"
       )}
     >
       {/* Header - always visible */}
@@ -75,7 +74,7 @@ export function OverdueTasksSection({
             ⚠️ PRZETERMINOWANE
           </span>
           {isCollapsed ? (
-            <span className="px-2 py-1 bg-red-600 text-white text-sm font-bold rounded-full animate-pulse">
+            <span className="px-2 py-1 bg-red-600 text-white text-sm font-bold rounded-full">
               ! {overdueTasks.length}
             </span>
           ) : (
