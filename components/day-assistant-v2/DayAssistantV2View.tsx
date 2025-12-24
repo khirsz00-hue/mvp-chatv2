@@ -306,6 +306,22 @@ function DayAssistantV2Content() {
     return () => window.removeEventListener('voice-tasks-saved', handleVoiceTasksSaved)
   }, [sessionToken]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ➕ GLOBAL QUICK ADD: Listen for tasks added via global quick add
+  useEffect(() => {
+    const handleTaskAdded = async (e: Event) => {
+      const customEvent = e as CustomEvent
+      console.log('🎉 Task added via global quick add:', customEvent.detail?.task)
+      
+      // Refresh full list to ensure consistency
+      if (sessionToken) {
+        await loadDayPlan(sessionToken)
+      }
+    }
+    
+    window.addEventListener('task-added', handleTaskAdded)
+    return () => window.removeEventListener('task-added', handleTaskAdded)
+  }, [sessionToken]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const authFetch = async (url: string, options: RequestInit = {}) => {
     // Get fresh token from Supabase to avoid JWT expiration issues
     const { data: { session } } = await supabase.auth.getSession()
