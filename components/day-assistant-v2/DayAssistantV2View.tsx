@@ -50,6 +50,7 @@ import { BreakTimer } from './BreakTimer'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { StreakDisplay } from '@/components/gamification/StreakDisplay'
 import { ProgressRing } from '@/components/gamification/ProgressRing'
+import { TimeStatsCompact } from '@/components/gamification/TimeStatsCompact'
 import { QuickAddModal } from './QuickAddModal'
 import { updateStreakOnCompletion, updateDailyStats, triggerConfetti, triggerMilestoneToast, recalculateDailyTotal } from '@/lib/gamification'
 import { useOverdueTasks } from '@/hooks/useOverdueTasks'
@@ -1175,10 +1176,17 @@ function DayAssistantV2Content() {
               </button>
             </div>
             
-            {/* 🎮 GAMIFICATION: Streak Display and Progress Ring */}
+            {/* 🎮 GAMIFICATION: Streak Display, Progress Ring, and Time Stats */}
             <div className="flex flex-wrap items-center gap-4">
               <StreakDisplay />
               <ProgressRing />
+              {availableMinutes > 0 && (
+                <TimeStatsCompact 
+                  usedMinutes={usedMinutes}
+                  availableMinutes={availableMinutes}
+                  usagePercentage={usagePercentage}
+                />
+              )}
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -1225,47 +1233,6 @@ function DayAssistantV2Content() {
               onComplete={handleTimerComplete}
               onStop={handleTimerStop}
             />
-
-            {/* Queue Stats */}
-            {availableMinutes > 0 && (
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-medium text-blue-900">
-                    📊 KOLEJKA NA DZIŚ ({Math.floor(availableMinutes / 60)}h {availableMinutes % 60}min dostępne)
-                  </p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setShowAddTimeBlockModal(true)}
-                    className="text-xs"
-                  >
-                    ➕ Dodaj czas
-                  </Button>
-                </div>
-                {manualTimeBlock > 0 && (
-                  <p className="text-xs text-blue-600 mb-2">
-                    💡 Dodano ręcznie: {manualTimeBlock} min
-                  </p>
-                )}
-                <div className="mt-2">
-                  <div className="flex items-center justify-between text-sm text-blue-700 mb-1">
-                    <span>⏱️ Wykorzystane: {Math.floor(usedMinutes / 60)}h {usedMinutes % 60}min / {Math.floor(availableMinutes / 60)}h {availableMinutes % 60}min</span>
-                    <span>{usagePercentage}%</span>
-                  </div>
-                  <div className="w-full bg-blue-200 rounded-full h-2">
-                    <div
-                      className="bg-blue-600 h-2 rounded-full transition-all"
-                      style={{ width: `${Math.min(usagePercentage, 100)}%` }}
-                    />
-                  </div>
-                </div>
-                {later.length > 0 && (
-                  <p className="text-xs text-blue-600 mt-2">
-                    📋 {later.length} {later.length === 1 ? 'task' : 'tasków'} pozostaje na później
-                  </p>
-                )}
-              </div>
-            )}
 
             {/* Work Mode Selector */}
             <WorkModeSelector
