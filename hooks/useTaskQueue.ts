@@ -83,6 +83,7 @@ export function calculateAvailableMinutes(workEndTime?: string, manualTimeBlock:
 
 /**
  * Build task queue based on available time
+ * Force split: Max 10 tasks in queue, rest go to later
  */
 export function buildQueue(
   scoredTasks: TestDayTask[],
@@ -117,37 +118,74 @@ export function buildQueue(
   const overdueCount = overdueTasks.length
   const mustCount = mustTasks.length
 
+  console.log('🔍 [useTaskQueue] Processing...', {
+    totalTasks: scoredTasks.length,
+    overdueTasks: overdueCount,
+    mustTasks: mustCount,
+    normalTasks: normalTasks.length,
+    availableMinutes
+  })
+
   // If no available time, move ALL tasks to later queue
   // This ensures tasks don't show in "today" after work hours have ended
   // Note: Manual time blocks are added to availableMinutes before this function is called
   if (availableMinutes <= 0) {
+    console.log('⚠️ [useTaskQueue] No available time - all tasks to later')
     return { queue: [], later: orderedTasks }
   }
+
+  const MAX_QUEUE_SIZE = 10 // 🔥 FORCE SPLIT: Max 10 tasks in queue
 
   for (let i = 0; i < orderedTasks.length; i++) {
     const task = orderedTasks[i]
     
-    // Overdue tasks and MUST tasks have priority but still respect time limits
-    // Only add if there's available time remaining
+    // 🔥 FORCE SPLIT: Check queue size limit
+    const queueFull = queue.length >= MAX_QUEUE_SIZE
+    const wouldExceedCapacity = queuedMinutes + task.estimate_min > availableMinutes
+    
+    // Overdue tasks and MUST tasks have priority but still respect limits
     if (i < overdueCount + mustCount) {
       // Prioritize these tasks, but still check if they fit
-      if (queuedMinutes + task.estimate_min <= availableMinutes) {
+      if (queueFull) {
+        console.log('📋 [useTaskQueue] Adding to LATER (queue full):', task.title)
+        later.push(task)
+      } else if (wouldExceedCapacity) {
+        console.log('📋 [useTaskQueue] Adding to LATER (capacity):', task.title)
+        later.push(task)
+      } else {
+        console.log('✅ [useTaskQueue] Adding to QUEUE:', task.title)
         queue.push(task)
         queuedMinutes += task.estimate_min
-      } else {
-        later.push(task)
       }
       continue
     }
 
     // Regular tasks: check if they fit
-    if (queuedMinutes + task.estimate_min <= availableMinutes) {
+    if (queueFull) {
+      console.log('📋 [useTaskQueue] Adding to LATER (queue full):', task.title, {
+        currentQueueSize: queue.length
+      })
+      later.push(task)
+    } else if (wouldExceedCapacity) {
+      console.log('📋 [useTaskQueue] Adding to LATER (would exceed capacity):', task.title, {
+        usedTime: queuedMinutes,
+        taskEstimate: task.estimate_min,
+        availableMinutes
+      })
+      later.push(task)
+    } else {
+      console.log('✅ [useTaskQueue] Adding to QUEUE:', task.title)
       queue.push(task)
       queuedMinutes += task.estimate_min
-    } else {
-      later.push(task)
     }
   }
+
+  console.log('📊 [useTaskQueue] Final result:', {
+    queue: queue.length,
+    later: later.length,
+    usedTime: queuedMinutes,
+    usagePercentage: Math.round((queuedMinutes / availableMinutes) * 100)
+  })
 
   return { queue, later }
 }

@@ -1126,6 +1126,37 @@ function DayAssistantV2Content() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* 🔍 DEBUG PANEL - Development only */}
+            {process.env.NODE_ENV === 'development' && (
+              <Card className="border-2 border-yellow-500 bg-yellow-50">
+                <CardHeader>
+                  <CardTitle className="text-sm text-yellow-800">🔍 Debug Panel</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div><strong>Total tasks:</strong> {tasks.length}</div>
+                    <div><strong>Filtered tasks:</strong> {filteredTasks.length}</div>
+                    <div><strong>Scored tasks:</strong> {scoredTasks.length}</div>
+                    <div><strong>Overdue tasks:</strong> {overdueTasks.length}</div>
+                    <div><strong>Queue tasks:</strong> {queue.length}</div>
+                    <div><strong>Later tasks:</strong> {later.length}</div>
+                    <div><strong>Available min:</strong> {availableMinutes}</div>
+                    <div><strong>Used min:</strong> {usedMinutes}</div>
+                  </div>
+                  <details className="mt-2">
+                    <summary className="cursor-pointer font-semibold text-xs">Raw Data</summary>
+                    <pre className="mt-2 text-xs overflow-auto max-h-40 bg-white p-2 rounded">
+{JSON.stringify({
+  tasks: tasks.map(t => ({ id: t.id, title: t.title, due_date: t.due_date, completed: t.completed })),
+  overdueTasks: overdueTasks.map(t => ({ title: t.title, due_date: t.due_date })),
+  laterTasks: later.map(t => ({ title: t.title, estimate: t.estimate_min }))
+}, null, 2)}
+                    </pre>
+                  </details>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Current Activity Box */}
             <CurrentActivityBox
               activeTimer={activeTimer}
@@ -1211,12 +1242,19 @@ function DayAssistantV2Content() {
           </CardContent>
         </Card>
 
-        {/* Overdue Tasks Section */}
+        {/* Overdue Tasks Section - ALWAYS VISIBLE */}
         <OverdueTasksSection
           overdueTasks={overdueTasks}
           selectedDate={selectedDate}
           onKeepToday={handleKeepOverdueToday}
           onPostpone={handlePostponeOverdue}
+          debugInfo={{
+            totalTasks: tasks.length,
+            filteredTasks: filteredTasks.length,
+            scoredTasks: scoredTasks.length,
+            tasksWithDueDate: tasks.filter(t => t.due_date).length,
+            tasksBeforeToday: tasks.filter(t => t.due_date && t.due_date < selectedDate).length
+          }}
         />
 
         {autoMoved.length > 0 && (
@@ -1435,55 +1473,81 @@ function DayAssistantV2Content() {
           </Card>
         )}
 
-        {later.length > 0 && (
-          <Card className="border-gray-300 bg-gray-50 shadow-sm">
-            <CardHeader 
-              className="cursor-pointer hover:bg-gray-100 transition-colors"
-              onClick={() => setShowLaterQueue(!showLaterQueue)}
-            >
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg text-gray-700 flex items-center gap-2">
-                  📋 Na później
-                  <Badge variant="secondary" className="bg-blue-100 text-blue-800 font-semibold px-3 py-1">
-                    {later.length} zadań
-                  </Badge>
-                </CardTitle>
-                <CaretDown className={cn(
-                  "transition-transform text-gray-600",
-                  showLaterQueue && "rotate-180"
-                )} size={24} />
-              </div>
-            </CardHeader>
-            {showLaterQueue && (
-              <CardContent className="space-y-3">
-                <p className="text-sm text-gray-600">
-                  Te zadania nie mieszczą się w dostępnym czasie pracy dzisiaj.
-                </p>
-                
-                <div className="border-t pt-3 mt-2 border-gray-200">
-                  {later.map((task, index) => (
-                    <TaskRow
-                      key={task.id}
-                      task={task}
-                      queuePosition={queue.length + index + 1}
-                      onNotToday={() => handleNotToday(task)}
-                      onStart={() => handleStartTask(task)}
-                      onUnmark={() => openUnmarkWarning(task)}
-                      onDecompose={() => handleDecompose(task)}
-                      onComplete={() => handleComplete(task)}
-                      onPin={() => handlePin(task)}
-                      onDelete={() => handleDelete(task)}
-                      onClick={() => setSelectedTask(task)}
-                      focus={dayPlan?.focus || 3}
-                      selectedDate={selectedDate}
-                      onSubtaskToggle={handleSubtaskToggle}
-                    />
-                  ))}
+        {/* 📋 LATER QUEUE - ALWAYS VISIBLE FOR DEBUGGING */}
+        <Card className="border-2 border-blue-500 bg-blue-50 shadow-sm">
+          <CardHeader 
+            className="cursor-pointer hover:bg-blue-100 transition-colors"
+            onClick={() => setShowLaterQueue(!showLaterQueue)}
+          >
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg text-blue-800 flex items-center gap-2">
+                📋 Na później
+                <Badge variant="secondary" className="bg-blue-600 text-white font-semibold px-3 py-1">
+                  {later.length} zadań
+                </Badge>
+                {later.length === 0 && (
+                  <span className="text-xs text-blue-600 ml-2">(debug: array is empty)</span>
+                )}
+              </CardTitle>
+              <CaretDown className={cn(
+                "transition-transform text-blue-600",
+                showLaterQueue && "rotate-180"
+              )} size={24} />
+            </div>
+          </CardHeader>
+          {showLaterQueue && (
+            <CardContent className="space-y-3">
+              {later.length === 0 ? (
+                <div className="p-4 text-center">
+                  <p className="text-sm text-blue-700 mb-2">
+                    🔍 DEBUG: Brak zadań w kolejce "later"
+                  </p>
+                  <details className="text-xs text-left bg-white p-2 rounded">
+                    <summary className="cursor-pointer font-semibold">Debug Info</summary>
+                    <pre className="mt-2 overflow-auto">
+{JSON.stringify({
+  totalTasks: tasks.length,
+  nonOverdueTasks: nonOverdueTasks.length,
+  queueLength: queue.length,
+  laterLength: later.length,
+  availableMinutes,
+  usedMinutes,
+  usagePercentage
+}, null, 2)}
+                    </pre>
+                  </details>
                 </div>
-              </CardContent>
-            )}
-          </Card>
-        )}
+              ) : (
+                <>
+                  <p className="text-sm text-blue-700">
+                    Te zadania nie mieszczą się w dostępnym czasie pracy dzisiaj.
+                  </p>
+                  
+                  <div className="border-t pt-3 mt-2 border-blue-200">
+                    {later.map((task, index) => (
+                      <TaskRow
+                        key={task.id}
+                        task={task}
+                        queuePosition={queue.length + index + 1}
+                        onNotToday={() => handleNotToday(task)}
+                        onStart={() => handleStartTask(task)}
+                        onUnmark={() => openUnmarkWarning(task)}
+                        onDecompose={() => handleDecompose(task)}
+                        onComplete={() => handleComplete(task)}
+                        onPin={() => handlePin(task)}
+                        onDelete={() => handleDelete(task)}
+                        onClick={() => setSelectedTask(task)}
+                        focus={dayPlan?.focus || 3}
+                        selectedDate={selectedDate}
+                        onSubtaskToggle={handleSubtaskToggle}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          )}
+        </Card>
 
         <Card>
           <CardHeader>
