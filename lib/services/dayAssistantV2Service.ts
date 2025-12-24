@@ -469,7 +469,7 @@ export async function getTasks(
   // 3. Overdue tasks (due_date < targetDate) - CRITICAL for showing past-due tasks
   const filteredByDate = targetDate
     ? typedData.filter(task => {
-        if (task.due_date === null) return true // Include inbox tasks
+        if (task.due_date === null || task.due_date === undefined) return true // Include inbox tasks
         if (task.due_date === targetDate) return true // Include today's tasks
         if (task.due_date < targetDate) return true // Include OVERDUE tasks (CRITICAL FIX)
         return false // Exclude future tasks
