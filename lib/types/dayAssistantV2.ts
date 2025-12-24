@@ -261,7 +261,7 @@ export interface DetailedScoreBreakdown {
 
 // Recommendation Action (for new recommendation system)
 export interface RecommendationAction {
-  op: 'REORDER_TASKS' | 'GROUP_SIMILAR' | 'ADD_BREAK' | 'DEFER_TASK' | 'CHANGE_MUST'
+  op: 'REORDER_TASKS' | 'GROUP_SIMILAR' | 'ADD_BREAK' | 'DEFER_TASK' | 'CHANGE_MUST' | 'OPEN_MORNING_REVIEW'
   taskIds?: string[]
   taskId?: string
   priority?: 'high' | 'group'

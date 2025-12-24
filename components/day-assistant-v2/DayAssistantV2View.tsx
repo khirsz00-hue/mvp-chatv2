@@ -22,8 +22,10 @@ import {
   calculateScoreBreakdown
 } from '@/lib/services/dayAssistantV2RecommendationEngine'
 import { CONTEXT_LABELS, CONTEXT_COLORS, TaskContext } from '@/lib/services/contextInferenceService'
-import { Play, XCircle, MagicWand, Gear, Info, Coffee } from '@phosphor-icons/react'
+import { Play, XCircle, MagicWand, Gear, Info, Coffee, CaretDown, CaretUp } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
+import Badge from '@/components/ui/Badge'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useScoredTasks } from '@/hooks/useScoredTasks'
 import { useTaskQueue } from '@/hooks/useTaskQueue'
 import { useTaskTimer, TimerState } from '@/hooks/useTaskTimer'
@@ -102,6 +104,7 @@ function DayAssistantV2Content() {
   const [showConfigModal, setShowConfigModal] = useState(false)
   const [clarifyTask, setClarifyTask] = useState<TestDayTask | null>(null)
   const [showLaterQueue, setShowLaterQueue] = useState(false)
+  const [showRestOfQueue, setShowRestOfQueue] = useState(false)
   const [isReorderingQueue, setIsReorderingQueue] = useState(false)
   
   // NEW: Work mode state (replaces energy/focus sliders)
@@ -1055,6 +1058,7 @@ function DayAssistantV2Content() {
     <>
       <Toaster position="top-right" />
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
+        {/* Main content area with improved spacing */}
         <div className="space-y-6">
         <Card>
           <CardHeader>
@@ -1192,10 +1196,18 @@ function DayAssistantV2Content() {
 
         {/* MUST Tasks Section */}
         {mustTasks.length > 0 && (
-          <Card className="border-brand-purple/40 relative">
+          <Card className="border-brand-purple/40 relative shadow-md">
             {isReorderingQueue && <QueueReorderingOverlay />}
             <CardHeader>
-              <CardTitle>📌 MUST (najpilniejsze) — {mustTasks.length}/3</CardTitle>
+              <CardTitle className="text-xl font-bold flex items-center gap-2">
+                <span>📌</span>
+                <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                  MUST (najpilniejsze)
+                </span>
+                <Badge variant="purple" className="bg-purple-100 text-purple-800 font-semibold px-3 py-1">
+                  {mustTasks.length}/3
+                </Badge>
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {mustTasks.map((task, index) => (
@@ -1226,10 +1238,15 @@ function DayAssistantV2Content() {
 
         {/* Top 3 Queue Section */}
         {matchedTasks.length > 0 && (
-          <Card className="relative">
+          <Card className="relative shadow-md">
             {isReorderingQueue && <QueueReorderingOverlay />}
             <CardHeader>
-              <CardTitle>📊 Kolejka na dziś (Top 3) — {Math.min(matchedTasks.length, 3)} zadań</CardTitle>
+              <CardTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent flex items-center gap-2">
+                📊 Kolejka na dziś (Top 3)
+                <Badge variant="purple" className="bg-purple-100 text-purple-800 font-semibold px-3 py-1">
+                  {Math.min(matchedTasks.length, 3)} zadań
+                </Badge>
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {matchedTasks.slice(0, 3).map((task, index) => (
@@ -1258,21 +1275,33 @@ function DayAssistantV2Content() {
           </Card>
         )}
 
-        {/* Rest of Queue (expandable) */}
+        {/* Rest of Queue (expandable) - Tasks #4+ in today's queue */}
         {matchedTasks.length > 3 && (
-          <Card className="relative">
+          <Card className="relative border-gray-300 bg-gray-50 shadow-sm">
             {isReorderingQueue && <QueueReorderingOverlay />}
-            <CardContent className="pt-4 space-y-3">
-              <button
-                onClick={() => setShowLaterQueue(!showLaterQueue)}
-                className="flex items-center gap-2 text-sm font-semibold hover:text-brand-purple transition-colors"
-              >
-                {showLaterQueue ? '🔼 Zwiń kolejkę' : '👁️ Pokaż pozostałe zadania w kolejce'}
-                <span className="text-muted-foreground">({matchedTasks.length - 3} zadań)</span>
-              </button>
-
-              {showLaterQueue && (
-                <div className="space-y-2 pt-2 border-t">
+            <CardHeader 
+              className="cursor-pointer hover:bg-gray-100 transition-colors"
+              onClick={() => setShowRestOfQueue(!showRestOfQueue)}
+            >
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg text-gray-700 flex items-center gap-2">
+                  📋 Pozostałe w kolejce dzisiaj
+                  <Badge variant="secondary" className="bg-gray-200 text-gray-700 font-semibold px-3 py-1">
+                    {matchedTasks.length - 3} zadań
+                  </Badge>
+                </CardTitle>
+                <CaretDown className={cn(
+                  "transition-transform text-gray-600",
+                  showRestOfQueue && "rotate-180"
+                )} size={24} />
+              </div>
+            </CardHeader>
+            {showRestOfQueue && (
+              <CardContent className="space-y-3">
+                <p className="text-sm text-gray-600">
+                  Te zadania są w kolejce na dziś, ale poza Top 3.
+                </p>
+                <div className="space-y-2 pt-2 border-t border-gray-200">
                   {matchedTasks.slice(3).map((task, index) => (
                     <TaskRow
                       key={task.id}
@@ -1297,8 +1326,8 @@ function DayAssistantV2Content() {
                     />
                   ))}
                 </div>
-              )}
-            </CardContent>
+              </CardContent>
+            )}
           </Card>
         )}
 
@@ -1361,47 +1390,36 @@ function DayAssistantV2Content() {
         )}
 
         {later.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>📋 Na później ({later.length} {later.length === 1 ? 'task' : 'tasków'})</CardTitle>
+          <Card className="border-gray-300 bg-gray-50 shadow-sm">
+            <CardHeader 
+              className="cursor-pointer hover:bg-gray-100 transition-colors"
+              onClick={() => setShowLaterQueue(!showLaterQueue)}
+            >
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg text-gray-700 flex items-center gap-2">
+                  📋 Na później
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-800 font-semibold px-3 py-1">
+                    {later.length} zadań
+                  </Badge>
+                </CardTitle>
+                <CaretDown className={cn(
+                  "transition-transform text-gray-600",
+                  showLaterQueue && "rotate-180"
+                )} size={24} />
+              </div>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Te zadania nie mieszczą się w dostępnym czasie pracy dzisiaj.
-              </p>
-              
-              {showLaterQueue ? (
-                <>
-                  {/* FULL LIST - Show all tasks when expanded */}
-                  <div className="border-t pt-3 mt-2">
-                    <h3 className="font-semibold mb-3">📋 KOLEJKA NA PÓŹNIEJ</h3>
-                    {later.map((task, index) => (
-                      <TaskRow
-                        key={task.id}
-                        task={task}
-                        queuePosition={queue.length + index + 1}
-                        onNotToday={() => handleNotToday(task)}
-                        onStart={() => handleStartTask(task)}
-                        onUnmark={() => openUnmarkWarning(task)}
-                        onDecompose={() => handleDecompose(task)}
-                        onComplete={() => handleComplete(task)}
-                        onPin={() => handlePin(task)}
-                        onDelete={() => handleDelete(task)}
-                        onClick={() => setSelectedTask(task)}
-                        focus={dayPlan?.focus || 3}
-                        selectedDate={selectedDate}
-                        onSubtaskToggle={handleSubtaskToggle}
-                      />
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <>
-                  {/* PREVIEW - Show only first 3 tasks when collapsed */}
-                  {later.slice(0, 3).map(task => (
+            {showLaterQueue && (
+              <CardContent className="space-y-3">
+                <p className="text-sm text-gray-600">
+                  Te zadania nie mieszczą się w dostępnym czasie pracy dzisiaj.
+                </p>
+                
+                <div className="border-t pt-3 mt-2 border-gray-200">
+                  {later.map((task, index) => (
                     <TaskRow
                       key={task.id}
                       task={task}
+                      queuePosition={queue.length + index + 1}
                       onNotToday={() => handleNotToday(task)}
                       onStart={() => handleStartTask(task)}
                       onUnmark={() => openUnmarkWarning(task)}
@@ -1413,28 +1431,11 @@ function DayAssistantV2Content() {
                       focus={dayPlan?.focus || 3}
                       selectedDate={selectedDate}
                       onSubtaskToggle={handleSubtaskToggle}
-                      isCollapsed={true}
                     />
                   ))}
-                  {later.length > 3 && (
-                    <p className="text-sm text-muted-foreground text-center">
-                      ... i {later.length - 3} więcej
-                    </p>
-                  )}
-                </>
-              )}
-              
-              {/* Toggle button */}
-              <div className="flex justify-center pt-2">
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => setShowLaterQueue(!showLaterQueue)}
-                >
-                  {showLaterQueue ? '🔼 Zwiń kolejkę' : '👁️ Pokaż pełną kolejkę'}
-                </Button>
-              </div>
-            </CardContent>
+                </div>
+              </CardContent>
+            )}
           </Card>
         )}
 
@@ -1496,9 +1497,14 @@ function DayAssistantV2Content() {
       </div>
 
       <div className="space-y-6">
-        <Card>
+        <Card className="shadow-md">
           <CardHeader>
-            <CardTitle>Rekomendacje</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <span>💡</span>
+              <span className="bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                Rekomendacje
+              </span>
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <RecommendationPanel
@@ -1748,12 +1754,17 @@ function TaskRow({
     : 'border-gray-200'
 
   return (
-    <div className={cn(
-      'border rounded-lg flex flex-col gap-2 bg-white shadow-sm transition-all',
-      cardSizeClass,
-      borderColorClass,
-      onClick && 'cursor-pointer hover:shadow-md'
-    )}>
+    <motion.div 
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className={cn(
+        'border rounded-lg flex flex-col gap-2 bg-white shadow-sm transition-all hover:shadow-lg hover:border-purple-300',
+        cardSizeClass,
+        borderColorClass,
+        onClick && 'cursor-pointer'
+      )}
+    >
       <div className="flex items-start justify-between gap-3" onClick={onClick}>
         <div className="flex-1">
           <div className="flex items-center gap-2 flex-wrap">
@@ -1855,8 +1866,8 @@ function TaskRow({
         </div>
         <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
           {!isCollapsed && (
-            <Button size="sm" variant="outline" onClick={onStart}>
-              <Play size={16} className="mr-1" /> Start
+            <Button size="sm" variant="outline" onClick={onStart} className="hover:bg-green-50 transition-colors">
+              <Play size={16} className="mr-1 text-green-600" weight="fill" /> Start
             </Button>
           )}
           <TaskContextMenu
@@ -1891,7 +1902,7 @@ function TaskRow({
       )}
       
 
-    </div>
+    </motion.div>
   )
 }
 

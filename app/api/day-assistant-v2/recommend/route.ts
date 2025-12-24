@@ -17,6 +17,12 @@ import { TestDayTask, DayPlan, Recommendation } from '@/lib/types/dayAssistantV2
 import { differenceInHours, isFuture, isToday } from 'date-fns'
 import { groupBy } from 'lodash'
 
+// Thresholds for overdue task recommendations
+const LOW_ENERGY_THRESHOLD = 2
+const LOW_COGNITIVE_LOAD_THRESHOLD = 2
+const MODERATE_DEBT_THRESHOLD = 5
+const HIGH_DEBT_THRESHOLD = 10
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = createClient(
@@ -160,6 +166,67 @@ export async function POST(request: NextRequest) {
             { op: 'REORDER_TASKS', taskIds: lightTasks.map(t => t.id), priority: 'high' }
           ],
           confidence: 0.8,
+          created_at: new Date().toISOString()
+        })
+      }
+    }
+    
+    // 7. Overdue tasks - suggest easy ones at low energy
+    const overdueTasks = incompleteTasks.filter(t => {
+      if (!t.due_date) return false
+      const dueDate = new Date(t.due_date)
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      dueDate.setHours(0, 0, 0, 0)
+      return dueDate < today
+    })
+    
+    if (overdueTasks.length > 0) {
+      // Recommend easy overdue at low energy
+      if (context.energy <= LOW_ENERGY_THRESHOLD) {
+        const easyOverdue = overdueTasks
+          .filter(t => t.cognitive_load <= LOW_COGNITIVE_LOAD_THRESHOLD)
+          .sort((a, b) => a.cognitive_load - b.cognitive_load)
+        
+        if (easyOverdue.length > 0) {
+          recommendations.push({
+            id: `overdue-easy-${Date.now()}`,
+            type: 'OVERDUE_EASY',
+            title: 'Zacznij od łatwego przeterminowanego',
+            reason: `"${easyOverdue[0].title}" jest proste (Load ${easyOverdue[0].cognitive_load}) - idealny start przy niskiej energii`,
+            actions: [
+              { op: 'REORDER_TASKS', taskIds: [easyOverdue[0].id], priority: 'high' }
+            ],
+            confidence: 0.85,
+            created_at: new Date().toISOString()
+          })
+        }
+      }
+      
+      // Task debt warning for many overdue tasks
+      if (overdueTasks.length >= HIGH_DEBT_THRESHOLD) {
+        recommendations.push({
+          id: `task-debt-warning-${Date.now()}`,
+          type: 'TASK_DEBT_WARNING',
+          title: `⚠️ Duży dług zadaniowy (${overdueTasks.length} przeterminowanych)`,
+          reason: 'Rozważ przegląd i usunięcie nieaktualnych zadań',
+          actions: [
+            { op: 'OPEN_MORNING_REVIEW' }
+          ],
+          confidence: 0.9,
+          created_at: new Date().toISOString()
+        })
+      } else if (overdueTasks.length >= MODERATE_DEBT_THRESHOLD) {
+        // Moderate debt warning
+        recommendations.push({
+          id: `overdue-review-${Date.now()}`,
+          type: 'OVERDUE_REVIEW',
+          title: `⏰ ${overdueTasks.length} zadań przeterminowanych`,
+          reason: 'Sprawdź przeterminowane zadania i zdecyduj czy są nadal aktualne',
+          actions: [
+            { op: 'OPEN_MORNING_REVIEW' }
+          ],
+          confidence: 0.7,
           created_at: new Date().toISOString()
         })
       }
