@@ -77,6 +77,7 @@ export function useVoiceRamble() {
 
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const fullTranscriptRef = useRef('')
+  const isRecordingRef = useRef(false) // Use ref to avoid stale closure in onend
 
   // Check browser compatibility
   const isSpeechRecognitionSupported = useMemo(() => {
@@ -194,8 +195,8 @@ export function useVoiceRamble() {
 
       recognition.onend = () => {
         console.log('🔍 [Voice Ramble] Recognition ended')
-        // Auto-restart if still recording (unless stopped by user)
-        if (isRecording && recognitionRef.current) {
+        // Auto-restart if still recording (check ref to avoid stale closure)
+        if (isRecordingRef.current && recognitionRef.current) {
           try {
             recognition.start()
           } catch (error) {
@@ -207,6 +208,7 @@ export function useVoiceRamble() {
       recognition.start()
       recognitionRef.current = recognition
       setIsRecording(true)
+      isRecordingRef.current = true
       fullTranscriptRef.current = ''
       setLiveTranscription('')
       setParsedTasks([])
@@ -217,7 +219,7 @@ export function useVoiceRamble() {
       console.error('❌ [Voice Ramble] Failed to start recording:', error)
       toast.error('Nie udało się uruchomić nagrywania')
     }
-  }, [isSpeechRecognitionSupported, debouncedParse, isRecording])
+  }, [isSpeechRecognitionSupported, debouncedParse])
 
   // Stop recording
   const stopRecording = useCallback(() => {
@@ -226,6 +228,7 @@ export function useVoiceRamble() {
       recognitionRef.current = null
     }
     setIsRecording(false)
+    isRecordingRef.current = false
     debouncedParse.cancel()
     console.log('⏹️ [Voice Ramble] Recording stopped')
   }, [debouncedParse])

@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedSupabaseClient } from '@/lib/supabaseAuth'
+import { getOrCreateDayAssistantV2 } from '@/lib/services/dayAssistantV2Service'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,10 +49,21 @@ export async function POST(request: NextRequest) {
 
     console.log('🔍 [Save Tasks API] Saving', tasks.length, 'tasks for user:', user.id)
 
+    // Get or create assistant
+    const assistant = await getOrCreateDayAssistantV2(user.id, supabase)
+    if (!assistant) {
+      console.error('❌ [Save Tasks API] Failed to get assistant')
+      return NextResponse.json(
+        { error: 'Failed to get assistant' },
+        { status: 500 }
+      )
+    }
+
     // Prepare tasks for insertion
     const today = new Date().toISOString().split('T')[0]
     const tasksToInsert = tasks.map(task => ({
       user_id: user.id,
+      assistant_id: assistant.id,
       title: task.title,
       due_date: task.due_date || today,
       context_type: task.context_type || 'deep_work',

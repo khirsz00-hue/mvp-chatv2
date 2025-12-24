@@ -37,31 +37,12 @@ interface ParseResponse {
   message?: string
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    console.log('🔍 [Parse Ramble API] Request received')
-
-    const body: ParseRequest = await request.json()
-    const { transcript, existingTasks } = body
-
-    if (!transcript || transcript.trim().length === 0) {
-      return NextResponse.json(
-        { error: 'No transcript provided' },
-        { status: 400 }
-      )
-    }
-
-    console.log('🔍 [Parse Ramble API] Transcript:', transcript.substring(0, 100))
-    console.log('🔍 [Parse Ramble API] Existing tasks count:', existingTasks.length)
-
-    const openai = getOpenAIClient()
-
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: `Jesteś polskim parserem zadań dla ciągłego dyktowania głosowego (Ramble-style).
+/**
+ * System prompt for parsing Polish continuous voice dictation into tasks
+ * Handles task separators, undo/cancel commands, and date/context inference
+ */
+function getSystemPrompt(existingTasks: ParsedTask[], today: string): string {
+  return `Jesteś polskim parserem zadań dla ciągłego dyktowania głosowego (Ramble-style).
 
 ZADANIE: Parsuj polską mowę na zadania. Użytkownik rozdziela zadania używając:
 - "potem", "następnie", "później", "także", "i" (po dacie)
@@ -125,8 +106,35 @@ WAŻNE:
 - Jeśli user mówi "anuluj wszystko" → {"action": "CANCEL_ALL", "tasks": []}
 - Parsuj WSZYSTKIE zadania z transkryptu, nie tylko nowe
 - due_date jako ISO string YYYY-MM-DD lub null
-- Dzisiaj to ${new Date().toISOString().split('T')[0]}
-`
+- Dzisiaj to ${today}`
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    console.log('🔍 [Parse Ramble API] Request received')
+
+    const body: ParseRequest = await request.json()
+    const { transcript, existingTasks } = body
+
+    if (!transcript || transcript.trim().length === 0) {
+      return NextResponse.json(
+        { error: 'No transcript provided' },
+        { status: 400 }
+      )
+    }
+
+    console.log('🔍 [Parse Ramble API] Transcript:', transcript.substring(0, 100))
+    console.log('🔍 [Parse Ramble API] Existing tasks count:', existingTasks.length)
+
+    const openai = getOpenAIClient()
+    const today = new Date().toISOString().split('T')[0]
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: getSystemPrompt(existingTasks, today)
         },
         {
           role: 'user',
