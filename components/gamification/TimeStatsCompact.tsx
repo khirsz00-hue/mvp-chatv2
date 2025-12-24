@@ -44,7 +44,7 @@ export function TimeStatsCompact({
         usagePercentage >= 70 ? 'bg-orange-200 text-orange-800' :
         'bg-blue-200 text-blue-800'
       }`}>
-        {usagePercentage}%
+        {Math.round(usagePercentage)}%
       </div>
     </div>
   )
