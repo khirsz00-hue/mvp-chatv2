@@ -407,8 +407,9 @@ function DayAssistantV2Content() {
   }
 
   const filteredTasks = useMemo(() => {
+    // Don't filter by due_date here - allow overdue tasks to pass through
+    // The overdue filtering will be done later by useOverdueTasks hook
     let filtered = tasks.filter(t => 
-      (!t.due_date || t.due_date === selectedDate) && 
       (contextFilter === 'all' || t.context_type === contextFilter) &&
       !t.completed
     )
@@ -421,7 +422,7 @@ function DayAssistantV2Content() {
     }
     
     return filtered
-  }, [tasks, selectedDate, contextFilter, workMode])
+  }, [tasks, contextFilter, workMode])
 
   // Apply intelligent scoring to filtered tasks
   const scoredTasks = useScoredTasks(filteredTasks, dayPlan, selectedDate)
@@ -440,6 +441,37 @@ function DayAssistantV2Content() {
     dayPlan,
     manualTimeBlock
   )
+
+  // 🔍 DEBUG LOGGING for queue state
+  useEffect(() => {
+    console.log('📊 [Queue Debug]', {
+      totalTasks: tasks.length,
+      filteredTasks: filteredTasks.length,
+      scoredTasks: scoredTasks.length,
+      overdueTasks: overdueTasks.length,
+      nonOverdueTasks: nonOverdueTasks.length,
+      queueTasks: queue.length,
+      laterTasks: later.length,
+      availableMinutes,
+      usedMinutes
+    })
+    
+    if (overdueTasks.length > 0) {
+      console.log('⚠️ [Overdue Tasks]', overdueTasks.map(t => ({
+        title: t.title,
+        due_date: t.due_date,
+        days_overdue: t.due_date ? Math.floor((new Date().getTime() - new Date(t.due_date).getTime()) / (1000 * 60 * 60 * 24)) : 0
+      })))
+    }
+    
+    if (later.length > 0) {
+      console.log('📋 [Later Tasks]', later.map(t => ({
+        title: t.title,
+        estimate: t.estimate_min,
+        score: (t as any)._score || 'N/A'
+      })))
+    }
+  }, [tasks.length, filteredTasks.length, scoredTasks.length, overdueTasks, nonOverdueTasks.length, queue.length, later, availableMinutes, usedMinutes])
 
   const mustTasks = queue.filter(t => t.is_must).slice(0, 3)
   const matchedTasks = queue.filter(t => !t.is_must && !t.completed)
