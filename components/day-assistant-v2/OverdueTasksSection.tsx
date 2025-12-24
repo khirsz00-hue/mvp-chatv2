@@ -52,9 +52,6 @@ export function OverdueTasksSection({
     }
   }, [isCollapsed])
 
-  // 🔴 ALWAYS RENDER - removed early return for debugging
-  // if (overdueTasks.length === 0) return null
-
   const toggleCollapse = () => {
     setIsCollapsed(prev => !prev)
   }
