@@ -31,13 +31,32 @@ export function useOverdueTasks(
   const overdueTasks = useMemo(() => {
     const today = normalizeToStartOfDay(selectedDate)
     
-    return tasks
+    // Debug logging (development only)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 [useOverdueTasks] Filtering...', {
+        totalTasks: tasks.length,
+        today: today.toISOString().split('T')[0],
+        tasksWithDueDate: tasks.filter(t => t.due_date).length
+      })
+    }
+    
+    const filtered = tasks
       .filter(task => {
         if (!task.due_date || task.completed) return false
         
         const dueDate = normalizeToStartOfDay(task.due_date)
+        const isOverdue = dueDate < today
         
-        return dueDate < today
+        // Debug logging (development only)
+        if (isOverdue && process.env.NODE_ENV === 'development') {
+          console.log('⚠️ [useOverdueTasks] Found overdue:', {
+            title: task.title,
+            due_date: task.due_date,
+            days_overdue: Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24))
+          })
+        }
+        
+        return isOverdue
       })
       .sort((a, b) => {
         // Sort by priority (DESC) then by due_date (ASC - oldest first)
@@ -48,6 +67,13 @@ export function useOverdueTasks(
         const dateB = new Date(b.due_date || 0).getTime()
         return dateA - dateB
       })
+    
+    // Debug logging (development only)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('✅ [useOverdueTasks] Result:', filtered.length, 'overdue tasks')
+    }
+    
+    return filtered
   }, [tasks, selectedDate])
 
   return {

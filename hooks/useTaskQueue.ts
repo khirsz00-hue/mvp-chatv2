@@ -83,6 +83,13 @@ export function calculateAvailableMinutes(workEndTime?: string, manualTimeBlock:
 
 /**
  * Build task queue based on available time
+ * Force split: Max 10 tasks in queue, rest go to later
+ * 
+ * @note MAX_QUEUE_SIZE is set to 10 for optimal UI/UX:
+ *   - Prevents vertical scrolling overload
+ *   - Maintains focus on most important tasks
+ *   - Ensures reasonable completion targets per day
+ *   - Forces prioritization through queue management
  */
 export function buildQueue(
   scoredTasks: TestDayTask[],
@@ -117,36 +124,101 @@ export function buildQueue(
   const overdueCount = overdueTasks.length
   const mustCount = mustTasks.length
 
+  // Debug logging (development only)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🔍 [useTaskQueue] Processing...', {
+      totalTasks: scoredTasks.length,
+      overdueTasks: overdueCount,
+      mustTasks: mustCount,
+      normalTasks: normalTasks.length,
+      availableMinutes
+    })
+  }
+
   // If no available time, move ALL tasks to later queue
   // This ensures tasks don't show in "today" after work hours have ended
   // Note: Manual time blocks are added to availableMinutes before this function is called
   if (availableMinutes <= 0) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('⚠️ [useTaskQueue] No available time - all tasks to later')
+    }
     return { queue: [], later: orderedTasks }
   }
+
+  /**
+   * Maximum queue size for optimal UX
+   * @constant {number} MAX_QUEUE_SIZE
+   * - Prevents UI overflow with too many tasks
+   * - Maintains focus on highest priority items
+   * - Ensures achievable daily goals
+   * - Can be adjusted based on user feedback
+   */
+  const MAX_QUEUE_SIZE = 10
 
   for (let i = 0; i < orderedTasks.length; i++) {
     const task = orderedTasks[i]
     
-    // Overdue tasks and MUST tasks have priority but still respect time limits
-    // Only add if there's available time remaining
+    // 🔥 FORCE SPLIT: Check queue size limit
+    const queueFull = queue.length >= MAX_QUEUE_SIZE
+    const wouldExceedCapacity = queuedMinutes + task.estimate_min > availableMinutes
+    
+    // Overdue tasks and MUST tasks have priority but still respect limits
     if (i < overdueCount + mustCount) {
       // Prioritize these tasks, but still check if they fit
-      if (queuedMinutes + task.estimate_min <= availableMinutes) {
+      if (queueFull) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('📋 [useTaskQueue] Adding to LATER (queue full):', task.title)
+        }
+        later.push(task)
+      } else if (wouldExceedCapacity) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('📋 [useTaskQueue] Adding to LATER (capacity):', task.title)
+        }
+        later.push(task)
+      } else {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('✅ [useTaskQueue] Adding to QUEUE:', task.title)
+        }
         queue.push(task)
         queuedMinutes += task.estimate_min
-      } else {
-        later.push(task)
       }
       continue
     }
 
     // Regular tasks: check if they fit
-    if (queuedMinutes + task.estimate_min <= availableMinutes) {
+    if (queueFull) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📋 [useTaskQueue] Adding to LATER (queue full):', task.title, {
+          currentQueueSize: queue.length
+        })
+      }
+      later.push(task)
+    } else if (wouldExceedCapacity) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📋 [useTaskQueue] Adding to LATER (would exceed capacity):', task.title, {
+          usedTime: queuedMinutes,
+          taskEstimate: task.estimate_min,
+          availableMinutes
+        })
+      }
+      later.push(task)
+    } else {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ [useTaskQueue] Adding to QUEUE:', task.title)
+      }
       queue.push(task)
       queuedMinutes += task.estimate_min
-    } else {
-      later.push(task)
     }
+  }
+
+  // Debug logging (development only)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('📊 [useTaskQueue] Final result:', {
+      queue: queue.length,
+      later: later.length,
+      usedTime: queuedMinutes,
+      usagePercentage: Math.round((queuedMinutes / availableMinutes) * 100)
+    })
   }
 
   return { queue, later }

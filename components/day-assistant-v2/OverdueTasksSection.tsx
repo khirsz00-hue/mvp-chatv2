@@ -20,6 +20,14 @@ interface OverdueTasksSectionProps {
   onKeepToday: (task: TestDayTask) => void
   onPostpone: (task: TestDayTask) => void
   onOpenContextMenu?: (task: TestDayTask) => void
+  // Debug props
+  debugInfo?: {
+    totalTasks: number
+    filteredTasks: number
+    scoredTasks: number
+    tasksWithDueDate: number
+    tasksBeforeToday: number
+  }
 }
 
 const COLLAPSED_KEY = 'overdue_section_collapsed'
@@ -29,7 +37,8 @@ export function OverdueTasksSection({
   selectedDate,
   onKeepToday,
   onPostpone,
-  onOpenContextMenu
+  onOpenContextMenu,
+  debugInfo
 }: OverdueTasksSectionProps) {
   const [isCollapsed, setIsCollapsed] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -43,8 +52,6 @@ export function OverdueTasksSection({
     }
   }, [isCollapsed])
 
-  if (overdueTasks.length === 0) return null
-
   const toggleCollapse = () => {
     setIsCollapsed(prev => !prev)
   }
@@ -54,7 +61,7 @@ export function OverdueTasksSection({
   return (
     <div 
       className={cn(
-        "border-2 border-red-200 bg-red-50 rounded-lg overflow-hidden transition-all",
+        "border-2 border-red-500 bg-red-50 rounded-lg overflow-hidden transition-all",
         isCollapsed ? "animate-pulse" : ""
       )}
     >
@@ -76,6 +83,9 @@ export function OverdueTasksSection({
               ({overdueTasks.length} {taskCountText})
             </span>
           )}
+          {overdueTasks.length === 0 && (
+            <span className="text-xs text-red-600 ml-2">(debug: array is empty)</span>
+          )}
         </div>
         <div className="flex items-center gap-2 text-red-700">
           <span className="text-sm">
@@ -88,79 +98,107 @@ export function OverdueTasksSection({
       {/* Content - shows when expanded */}
       {!isCollapsed && (
         <div className="px-4 pb-4 space-y-3">
-          <p className="text-sm text-red-700">
-            ⚠️ Zadecyduj czy robić dziś
-          </p>
+          {overdueTasks.length === 0 ? (
+            <>
+              <div className="p-4 text-center">
+                <p className="text-sm text-red-700 mb-2">
+                  🔍 DEBUG: Brak przeterminowanych zadań w array
+                </p>
+                {debugInfo && (
+                  <details className="text-xs text-left bg-white p-2 rounded">
+                    <summary className="cursor-pointer font-semibold">Debug Info</summary>
+                    <pre className="mt-2 overflow-auto">
+{JSON.stringify({
+  totalTasks: debugInfo.totalTasks,
+  filteredTasks: debugInfo.filteredTasks,
+  scoredTasks: debugInfo.scoredTasks,
+  overdueTasks: overdueTasks.length,
+  tasksWithDueDate: debugInfo.tasksWithDueDate,
+  tasksBeforeToday: debugInfo.tasksBeforeToday,
+  selectedDate
+}, null, 2)}
+                    </pre>
+                  </details>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-red-700">
+                ⚠️ Zadecyduj czy robić dziś
+              </p>
 
-          <div className="space-y-2">
-            {overdueTasks.map(task => {
-              const daysOverdueText = task.due_date 
-                ? getDaysOverdueText(task.due_date, selectedDate)
-                : 'brak terminu'
+              <div className="space-y-2">
+                {overdueTasks.map(task => {
+                  const daysOverdueText = task.due_date 
+                    ? getDaysOverdueText(task.due_date, selectedDate)
+                    : 'brak terminu'
 
-              return (
-                <div
-                  key={task.id}
-                  className="bg-white rounded-lg p-3 border border-red-200 space-y-2 hover:shadow-md transition-shadow"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-base">🔴</span>
-                        <h4 className="font-medium text-gray-900">{task.title}</h4>
+                  return (
+                    <div
+                      key={task.id}
+                      className="bg-white rounded-lg p-3 border border-red-200 space-y-2 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-base">🔴</span>
+                            <h4 className="font-medium text-gray-900">{task.title}</h4>
+                          </div>
+                          
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                            <span className="text-red-600 font-medium">{daysOverdueText}</span>
+                            <span>•</span>
+                            <span>⏱ {task.estimate_min}min</span>
+                            <span>•</span>
+                            <span>📊 P:{task.priority}</span>
+                            {task.context_type && (
+                              <>
+                                <span>•</span>
+                                <span className="px-1.5 py-0.5 bg-gray-100 rounded">
+                                  {task.context_type}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
                       </div>
                       
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
-                        <span className="text-red-600 font-medium">{daysOverdueText}</span>
-                        <span>•</span>
-                        <span>⏱ {task.estimate_min}min</span>
-                        <span>•</span>
-                        <span>📊 P:{task.priority}</span>
-                        {task.context_type && (
-                          <>
-                            <span>•</span>
-                            <span className="px-1.5 py-0.5 bg-gray-100 rounded">
-                              {task.context_type}
-                            </span>
-                          </>
+                      <div className="flex gap-2 flex-wrap">
+                        <Button
+                          size="sm"
+                          onClick={() => onKeepToday(task)}
+                          className="flex items-center gap-1 text-xs"
+                        >
+                          <CheckCircle size={14} />
+                          <span>+ Dziś</span>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => onPostpone(task)}
+                          className="flex items-center gap-1 text-xs"
+                        >
+                          <CalendarBlank size={14} />
+                          <span>📅</span>
+                        </Button>
+                        {onOpenContextMenu && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onOpenContextMenu(task)}
+                            className="flex items-center gap-1 text-xs"
+                          >
+                            <DotsThree size={14} weight="bold" />
+                          </Button>
                         )}
                       </div>
                     </div>
-                  </div>
-                  
-                  <div className="flex gap-2 flex-wrap">
-                    <Button
-                      size="sm"
-                      onClick={() => onKeepToday(task)}
-                      className="flex items-center gap-1 text-xs"
-                    >
-                      <CheckCircle size={14} />
-                      <span>+ Dziś</span>
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => onPostpone(task)}
-                      className="flex items-center gap-1 text-xs"
-                    >
-                      <CalendarBlank size={14} />
-                      <span>📅</span>
-                    </Button>
-                    {onOpenContextMenu && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => onOpenContextMenu(task)}
-                        className="flex items-center gap-1 text-xs"
-                      >
-                        <DotsThree size={14} weight="bold" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
