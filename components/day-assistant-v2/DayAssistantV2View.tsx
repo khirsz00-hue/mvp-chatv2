@@ -309,11 +309,6 @@ function DayAssistantV2Content() {
       const customEvent = e as CustomEvent
       console.log('🎉 Task added via global quick add:', customEvent.detail?.task)
       
-      // Add to local state if task is provided
-      if (customEvent.detail?.task) {
-        setTasks(prev => [...prev, customEvent.detail.task])
-      }
-      
       // Refresh full list to ensure consistency
       if (sessionToken) {
         await loadDayPlan(sessionToken)

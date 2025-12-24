@@ -148,7 +148,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       // Get fresh session token
       const { data: { session } } = await supabase.auth.getSession()
       
-      if (!session) {
+      if (!session?.user) {
         toast.error('Sesja wygasła - zaloguj się ponownie')
         return
       }
@@ -191,11 +191,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
         detail: { task: data.task } 
       }))
       
-      // 🎮 GAMIFICATION: Recalculate daily stats
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        await recalculateDailyTotal(user.id)
-      }
+      // 🎮 GAMIFICATION: Recalculate daily stats (reuse user from session)
+      await recalculateDailyTotal(session.user.id)
       
     } catch (error) {
       console.error('Quick add error:', error)
