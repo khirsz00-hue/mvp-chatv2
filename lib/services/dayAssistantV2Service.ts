@@ -462,13 +462,44 @@ export async function getTasks(
     }
     return valid
   })
-  // Filter by date: Only include tasks with matching due_date or null due_date (inbox tasks)
+  // Filter by date: Include tasks with matching due_date, null due_date (inbox tasks), AND overdue tasks
   // When a specific date is requested, we want to show:
   // 1. Tasks specifically scheduled for that date (due_date === targetDate)
   // 2. Tasks without a due date (due_date === null) to surface inbox items
+  // 3. Overdue tasks (due_date < targetDate) - CRITICAL for showing past-due tasks
   const filteredByDate = targetDate
-    ? typedData.filter(task => task.due_date === null || task.due_date === targetDate)
+    ? typedData.filter(task => {
+        if (task.due_date === null || task.due_date === undefined) return true // Include inbox tasks
+        if (task.due_date === targetDate) return true // Include today's tasks
+        if (task.due_date < targetDate) return true // Include OVERDUE tasks (CRITICAL FIX)
+        return false // Exclude future tasks
+      })
     : typedData
+  
+  // Log detailed breakdown of filtered tasks (gated for performance)
+  if (targetDate && filteredByDate.length > 0 && process.env.NODE_ENV !== 'production') {
+    const overdueTasks = filteredByDate.filter(task => task.due_date && task.due_date < targetDate)
+    const todayTasks = filteredByDate.filter(task => task.due_date === targetDate)
+    const inboxTasks = filteredByDate.filter(task => task.due_date === null || task.due_date === undefined)
+    
+    console.log('📊 [getTasks] Filtered tasks breakdown:', {
+      total: filteredByDate.length,
+      overdue: overdueTasks.length,
+      today: todayTasks.length,
+      inbox: inboxTasks.length,
+      targetDate
+    })
+    
+    if (overdueTasks.length > 0) {
+      const targetDateTime = new Date(targetDate).getTime()
+      const msPerDay = 1000 * 60 * 60 * 24
+      console.log('⚠️ [getTasks] Overdue tasks found:', overdueTasks.map(t => ({
+        title: t.title,
+        due_date: t.due_date,
+        days_overdue: t.due_date ? Math.floor((targetDateTime - new Date(t.due_date).getTime()) / msPerDay) : 0
+      })))
+    }
+  }
   
   // Log sample tasks (first 3)
   if (filteredByDate.length > 0) {

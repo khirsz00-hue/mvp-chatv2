@@ -327,12 +327,44 @@ export async function POST(request: NextRequest) {
     }
 
     const todoistTasks: TodoistTask[] = await todoistResponse.json()
+    
+    // Calculate today's date for overdue detection
+    const todayISO = new Date().toISOString().split('T')[0]
 
     // Filter out completed tasks for upserting (we don't want to add completed tasks)
     // But keep the full list to identify which tasks were completed since last sync
     const activeTasks = todoistTasks.filter(task => !task.is_completed)
     
-    console.log(`[Sync] Fetched ${todoistTasks.length} tasks from Todoist, ${activeTasks.length} active tasks after filtering completed`)
+    // Detailed breakdown of fetched tasks (gated for performance in production)
+    if (process.env.NODE_ENV !== 'production') {
+      const overdueTasks = activeTasks.filter(task => task.due?.date && task.due.date < todayISO)
+      const todayTasks = activeTasks.filter(task => task.due?.date === todayISO)
+      const futureTasks = activeTasks.filter(task => task.due?.date && task.due.date > todayISO)
+      const noDateTasks = activeTasks.filter(task => !task.due?.date)
+      
+      console.log('📥 [Todoist Sync] Fetching tasks...')
+      console.log('📊 [Todoist Sync] Fetched from API:', {
+        total: todoistTasks.length,
+        active: activeTasks.length,
+        completed: todoistTasks.length - activeTasks.length,
+        overdue: overdueTasks.length,
+        today: todayTasks.length,
+        future: futureTasks.length,
+        noDate: noDateTasks.length
+      })
+      
+      if (overdueTasks.length > 0) {
+        const nowTime = new Date().getTime()
+        const msPerDay = 1000 * 60 * 60 * 24
+        console.log('⚠️ [Todoist Sync] Overdue tasks from Todoist:', overdueTasks.slice(0, 5).map(t => ({
+          content: t.content,
+          due_date: t.due?.date,
+          days_overdue: t.due?.date ? Math.floor((nowTime - new Date(t.due.date).getTime()) / msPerDay) : 0
+        })))
+      }
+    }
+    
+    console.log(`✅ [Todoist Sync] Tasks to import: ${activeTasks.length}`)
 
     // Get or create assistant
     let { data: assistant } = await supabase
@@ -494,18 +526,32 @@ export async function POST(request: NextRequest) {
       console.log(`[Sync] Upserting ${mappedTasksWithPreservedEstimates.length} tasks`)
       
       // Log first task as sample to verify data structure
-      console.log('[Sync] Sample task being upserted:', {
-        todoist_id: mappedTasksWithPreservedEstimates[0].todoist_id,
-        title: mappedTasksWithPreservedEstimates[0].title,
-        estimate_min: mappedTasksWithPreservedEstimates[0].estimate_min,
-        priority: mappedTasksWithPreservedEstimates[0].priority,
-        tags: mappedTasksWithPreservedEstimates[0].tags,
-        position: mappedTasksWithPreservedEstimates[0].position,
-        postpone_count: mappedTasksWithPreservedEstimates[0].postpone_count,
-        auto_moved: mappedTasksWithPreservedEstimates[0].auto_moved,
-        metadata: mappedTasksWithPreservedEstimates[0].metadata,
-        completed: mappedTasksWithPreservedEstimates[0].completed
+      const firstTask = mappedTasksWithPreservedEstimates[0]
+      console.log('💾 [Todoist Sync] Sample task being upserted:', {
+        todoist_id: firstTask.todoist_id,
+        title: firstTask.title,
+        due_date: firstTask.due_date,
+        is_overdue: firstTask.due_date && firstTask.due_date < todayISO,
+        estimate_min: firstTask.estimate_min,
+        priority: firstTask.priority
       })
+      
+      // Log overdue tasks being imported (gated for performance)
+      if (process.env.NODE_ENV !== 'production') {
+        const overdueBeingImported = mappedTasksWithPreservedEstimates.filter(t => t.due_date && t.due_date < todayISO)
+        if (overdueBeingImported.length > 0) {
+          console.log(`⚠️ [Todoist Sync] Importing ${overdueBeingImported.length} overdue tasks:`)
+          const nowTime = new Date().getTime()
+          const msPerDay = 1000 * 60 * 60 * 24
+          overdueBeingImported.slice(0, 5).forEach(t => {
+            console.log('  💾 [Todoist Sync] Importing:', {
+              title: t.title,
+              due_date: t.due_date,
+              days_overdue: t.due_date ? Math.floor((nowTime - new Date(t.due_date).getTime()) / msPerDay) : 0
+            })
+          })
+        }
+      }
 
       const { data, error } = await supabase
         .from('day_assistant_v2_tasks')
