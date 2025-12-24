@@ -1500,7 +1500,7 @@ function DayAssistantV2Content() {
               {later.length === 0 ? (
                 <div className="p-4 text-center">
                   <p className="text-sm text-blue-700 mb-2">
-                    🔍 DEBUG: Brak zadań w kolejce "later"
+                    🔍 DEBUG: Brak zadań w kolejce &quot;later&quot;
                   </p>
                   <details className="text-xs text-left bg-white p-2 rounded">
                     <summary className="cursor-pointer font-semibold">Debug Info</summary>
