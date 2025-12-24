@@ -476,11 +476,11 @@ export async function getTasks(
       })
     : typedData
   
-  // Log detailed breakdown of filtered tasks
-  if (targetDate && filteredByDate.length > 0) {
+  // Log detailed breakdown of filtered tasks (gated for performance)
+  if (targetDate && filteredByDate.length > 0 && process.env.NODE_ENV !== 'production') {
     const overdueTasks = filteredByDate.filter(task => task.due_date && task.due_date < targetDate)
     const todayTasks = filteredByDate.filter(task => task.due_date === targetDate)
-    const inboxTasks = filteredByDate.filter(task => task.due_date === null)
+    const inboxTasks = filteredByDate.filter(task => task.due_date === null || task.due_date === undefined)
     
     console.log('📊 [getTasks] Filtered tasks breakdown:', {
       total: filteredByDate.length,
@@ -491,10 +491,12 @@ export async function getTasks(
     })
     
     if (overdueTasks.length > 0) {
+      const targetDateTime = new Date(targetDate).getTime()
+      const msPerDay = 1000 * 60 * 60 * 24
       console.log('⚠️ [getTasks] Overdue tasks found:', overdueTasks.map(t => ({
         title: t.title,
         due_date: t.due_date,
-        days_overdue: t.due_date ? Math.floor((new Date(targetDate).getTime() - new Date(t.due_date).getTime()) / (1000 * 60 * 60 * 24)) : 0
+        days_overdue: t.due_date ? Math.floor((targetDateTime - new Date(t.due_date).getTime()) / msPerDay) : 0
       })))
     }
   }
