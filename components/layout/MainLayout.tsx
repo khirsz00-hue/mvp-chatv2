@@ -14,6 +14,11 @@ import { WeekAssistantView } from '@/components/week-assistant/WeekAssistantView
 import SubscriptionWall from '@/components/subscription/SubscriptionWall'
 import { VoiceCapture } from '@/components/voice/VoiceCapture'
 import TrialBanner from '@/components/subscription/TrialBanner'
+import { FloatingAddButton } from '@/components/day-assistant-v2/FloatingAddButton'
+import { QuickAddModal } from '@/components/day-assistant-v2/QuickAddModal'
+import { TaskContext } from '@/lib/services/contextInferenceService'
+import { toast } from 'sonner'
+import { recalculateDailyTotal } from '@/lib/gamification'
 
 /**
  * SubscriptionWall jest teraz WŁĄCZONY
@@ -33,6 +38,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [showQuickAdd, setShowQuickAdd] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -109,6 +115,93 @@ export default function MainLayout({ children }: MainLayoutProps) {
       clearTimeout(timeoutId)
     }
   }, [router])
+  
+  // Global keyboard shortcut: Shift+Q
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Shift+Q to open quick add modal
+      if (e.shiftKey && e.key === 'Q') {
+        // Ignore if user is typing in input/textarea
+        const target = e.target as HTMLElement
+        if (target.tagName === 'INPUT' || 
+            target.tagName === 'TEXTAREA' || 
+            target.isContentEditable) {
+          return
+        }
+        
+        e.preventDefault()
+        setShowQuickAdd(true)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+  
+  const handleQuickAdd = async (task: {
+    title: string
+    estimateMin: number
+    context: TaskContext
+    isMust: boolean
+  }) => {
+    try {
+      // Get fresh session token
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        toast.error('Sesja wygasła - zaloguj się ponownie')
+        return
+      }
+      
+      // ✅ VERIFIED API ENDPOINT
+      const response = await fetch('/api/day-assistant-v2/task', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          title: task.title,
+          estimate_min: task.estimateMin,
+          cognitive_load: 2,  // Default
+          is_must: task.isMust,
+          is_important: task.isMust,
+          due_date: new Date().toISOString().split('T')[0],  // Today
+          context_type: task.context,
+          priority: 3  // Default
+        })
+      })
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Nie udało się dodać zadania' }))
+        toast.error(error.message || 'Błąd podczas dodawania zadania')
+        return
+      }
+      
+      const data = await response.json()
+      
+      // Success!
+      toast.success('✅ Zadanie dodane!')
+      
+      // Close modal
+      setShowQuickAdd(false)
+      
+      // Trigger refresh event for Day Assistant V2
+      window.dispatchEvent(new CustomEvent('task-added', { 
+        detail: { task: data.task } 
+      }))
+      
+      // 🎮 GAMIFICATION: Recalculate daily stats
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await recalculateDailyTotal(user.id)
+      }
+      
+    } catch (error) {
+      console.error('Quick add error:', error)
+      toast.error('Wystąpił błąd podczas dodawania zadania')
+    }
+  }
   
   const renderAssistant = () => {
     switch (activeView) {
@@ -234,6 +327,16 @@ export default function MainLayout({ children }: MainLayoutProps) {
             
             {/* 🎮 GAMIFICATION: Voice Capture Button */}
             <VoiceCapture />
+            
+            {/* Global Quick Add Button */}
+            <FloatingAddButton onClick={() => setShowQuickAdd(true)} />
+            
+            {/* Quick Add Modal */}
+            <QuickAddModal
+              isOpen={showQuickAdd}
+              onClose={() => setShowQuickAdd(false)}
+              onSubmit={handleQuickAdd}
+            />
           </div>
         </SubscriptionWall>
       ) : (
@@ -267,6 +370,16 @@ export default function MainLayout({ children }: MainLayoutProps) {
           
           {/* 🎮 GAMIFICATION: Voice Capture Button */}
           <VoiceCapture />
+          
+          {/* Global Quick Add Button */}
+          <FloatingAddButton onClick={() => setShowQuickAdd(true)} />
+          
+          {/* Quick Add Modal */}
+          <QuickAddModal
+            isOpen={showQuickAdd}
+            onClose={() => setShowQuickAdd(false)}
+            onSubmit={handleQuickAdd}
+          />
         </div>
       )}
     </>
