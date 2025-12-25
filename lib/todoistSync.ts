@@ -7,7 +7,7 @@
 import { supabase } from '@/lib/supabaseClient'
 import { toast } from 'sonner'
 
-let syncPromise: Promise<Response> | null = null
+let syncPromise: Promise<{ response: Response; data: any }> | null = null
 let lastSyncTime = 0
 const SYNC_DEBOUNCE_MS = 30000 // 30 seconds - sensible interval for Todoist API to avoid rate limiting
 
@@ -43,9 +43,9 @@ function showErrorToast(errorData: any, statusCode: number) {
  * Coordinated sync that prevents concurrent/redundant syncs
  * Automatically handles token refresh on 401 errors
  * @param authToken - Bearer token for authentication (optional, will get fresh token if not provided)
- * @returns Promise that resolves when sync completes
+ * @returns Promise that resolves with parsed response data
  */
-export async function syncTodoist(authToken?: string): Promise<Response> {
+export async function syncTodoist(authToken?: string): Promise<{ response: Response; data: any }> {
   const now = Date.now()
   
   // If there's an ongoing sync, reuse it
@@ -60,15 +60,19 @@ export async function syncTodoist(authToken?: string): Promise<Response> {
     const secondsAgo = Math.floor(timeSinceLastSync / 1000)
     console.log(`⏭️ [SyncCoordinator] Skipping - last sync was ${secondsAgo}s ago (debounce: ${SYNC_DEBOUNCE_MS / 1000}s)`)
     // Return a mock successful response indicating sync was skipped
-    return new Response(JSON.stringify({ 
+    const mockData = { 
       message: 'Sync skipped - too soon',
       skipped: true,
       seconds_since_last_sync: secondsAgo,
       debounce_seconds: SYNC_DEBOUNCE_MS / 1000
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    })
+    }
+    return { 
+      response: new Response(JSON.stringify(mockData), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      }),
+      data: mockData
+    }
   }
   
   console.log('🔍 [SyncCoordinator] Starting new sync')
@@ -85,7 +89,7 @@ export async function syncTodoist(authToken?: string): Promise<Response> {
 /**
  * Performs sync with automatic token refresh on 401
  */
-async function performSyncWithRetry(authToken?: string): Promise<Response> {
+async function performSyncWithRetry(authToken?: string): Promise<{ response: Response; data: any }> {
   try {
     // Get fresh session token
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
@@ -93,13 +97,17 @@ async function performSyncWithRetry(authToken?: string): Promise<Response> {
     if (sessionError || !session) {
       console.error('❌ [SyncCoordinator] No valid session:', sessionError)
       toast.error('Sesja wygasła. Zaloguj się ponownie.')
-      return new Response(JSON.stringify({ 
+      const errorData = { 
         error: 'No session',
         details: 'Session expired or not found'
-      }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      })
+      }
+      return {
+        response: new Response(JSON.stringify(errorData), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' }
+        }),
+        data: errorData
+      }
     }
     
     const token = authToken || session.access_token
@@ -127,7 +135,7 @@ async function performSyncWithRetry(authToken?: string): Promise<Response> {
         const errorData = await safeParseJson(response)
         showErrorToast(errorData, response.status)
         
-        return response
+        return { response, data: errorData }
       }
       
       console.log('✅ [SyncCoordinator] Token refreshed, retrying sync')
@@ -145,12 +153,12 @@ async function performSyncWithRetry(authToken?: string): Promise<Response> {
         const errorData = await safeParseJson(retryResponse)
         console.error('❌ [SyncCoordinator] Retry failed:', retryResponse.status, errorData)
         showErrorToast(errorData, retryResponse.status)
-        return retryResponse
+        return { response: retryResponse, data: errorData }
       }
       
       const retryData = await retryResponse.json()
       console.log('✅ [SyncCoordinator] Sync successful after retry:', retryData)
-      return retryResponse
+      return { response: retryResponse, data: retryData }
     }
     
     // Handle other errors
@@ -158,7 +166,7 @@ async function performSyncWithRetry(authToken?: string): Promise<Response> {
       const errorData = await safeParseJson(response)
       console.error('❌ [SyncCoordinator] Sync failed:', response.status, errorData)
       showErrorToast(errorData, response.status)
-      return response
+      return { response, data: errorData }
     }
     
     // Success!
@@ -170,19 +178,23 @@ async function performSyncWithRetry(authToken?: string): Promise<Response> {
       // Silent success - no toast for background syncs
     }
     
-    return response
+    return { response, data }
     
   } catch (error) {
     console.error('❌ [SyncCoordinator] Unexpected error:', error)
     toast.error('Nieoczekiwany błąd podczas synchronizacji')
     
-    return new Response(JSON.stringify({ 
+    const errorData = { 
       error: 'Unexpected error',
       details: error instanceof Error ? error.message : 'Unknown error'
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    })
+    }
+    return {
+      response: new Response(JSON.stringify(errorData), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      }),
+      data: errorData
+    }
   }
 }
 

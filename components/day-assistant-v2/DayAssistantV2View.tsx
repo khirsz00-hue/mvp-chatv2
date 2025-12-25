@@ -258,9 +258,8 @@ function DayAssistantV2Content() {
     
     const doSyncAndRefresh = async () => {
       try {
-        const response = await syncTodoist(sessionToken)
+        const { response, data } = await syncTodoist(sessionToken)
         if (response.ok) {
-          const data = await response.json()
           // Background sync runs silently - mutations handle cache invalidation
           if (!data.skipped && (data.success_count > 0 || data.synced_at)) {
             console.log('[DayAssistantV2] Background sync completed with changes')
