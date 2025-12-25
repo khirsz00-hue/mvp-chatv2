@@ -283,7 +283,7 @@ export async function POST(request: NextRequest) {
           error: 'Todoist not connected',
           details: 'Please connect your Todoist account in settings'
         },
-        { status: 401 }
+        { status: 400 }
       )
     }
     
