@@ -153,7 +153,7 @@ export function buildQueue(
    * - Ensures achievable daily goals
    * - Can be adjusted based on user feedback
    */
-  const MAX_QUEUE_SIZE = 10
+  const MAX_QUEUE_SIZE = 15
 
   for (let i = 0; i < orderedTasks.length; i++) {
     const task = orderedTasks[i]
