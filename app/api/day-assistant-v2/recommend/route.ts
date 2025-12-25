@@ -234,14 +234,31 @@ export async function POST(request: NextRequest) {
     
     // ✅ FILTER OUT already applied recommendations from database
     // This prevents recommendations from reappearing after background sync
-    const { data: appliedRecs, error: appliedError } = await supabase
+    // Use authenticated client for RLS policies
+    const supabaseAuth = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        global: {
+          headers: { Authorization: request.headers.get('Authorization') || '' }
+        }
+      }
+    )
+    
+    const { data: appliedRecs, error: appliedError } = await supabaseAuth
       .from('day_assistant_v2_applied_recommendations')
       .select('recommendation_id')
       .eq('user_id', user.id)
     
     if (appliedError) {
-      console.error('⚠️ [Recommend] Failed to fetch applied recommendations:', appliedError, '- continuing without filtering, some recommendations may appear as duplicates')
-      // Continue without filtering - better to show duplicate than no recommendations
+      console.error('⚠️ [Recommend] Failed to fetch applied recommendations:', appliedError)
+      console.error('⚠️ [Recommend] Error details:', { 
+        code: appliedError.code, 
+        message: appliedError.message,
+        details: appliedError.details 
+      })
+      // Continue without filtering - graceful degradation
+      // Better to show duplicate recommendations than none at all
     }
     
     const appliedIds = new Set(appliedRecs?.map(r => r.recommendation_id) || [])
