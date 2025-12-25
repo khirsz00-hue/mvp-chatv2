@@ -443,25 +443,21 @@ function DayAssistantV2Content() {
   // Load burnout assessment when component mounts
   useEffect(() => {
     if (sessionToken) {
-      assessBurnoutRisk(supabase.auth.getUser().then(({ data }) => data.user?.id || ''))
-        .then(assessment => {
-          setBurnoutAssessment(assessment)
-          if (assessment.riskLevel === 'high') {
-            setShowBurnoutModal(true)
-          }
-        })
-        .catch(err => console.error('Failed to assess burnout risk:', err))
+      supabase.auth.getUser().then(({ data }) => {
+        if (data.user) {
+          assessBurnoutRisk(data.user.id)
+            .then(assessment => {
+              setBurnoutAssessment(assessment)
+              if (assessment.riskLevel === 'high') {
+                setShowBurnoutModal(true)
+              }
+            })
+            .catch(err => console.error('Failed to assess burnout risk:', err))
+        }
+      })
     }
   }, [sessionToken])
   
-  // Update task risks when tasks or queue changes
-  useEffect(() => {
-    if (tasks.length > 0 && queue.length > 0) {
-      const risks = assessTasksRisk(tasks, queue, dayPlan)
-      setTaskRisks(risks)
-    }
-  }, [tasks, queue, dayPlan])
-
   const filteredTasks = useMemo(() => {
     // Don't filter by due_date here - allow overdue tasks to pass through
     // The overdue filtering will be done later by useOverdueTasks hook
@@ -532,6 +528,14 @@ function DayAssistantV2Content() {
     dayPlan,
     manualTimeBlock
   )
+
+  // Update task risks when tasks or queue changes
+  useEffect(() => {
+    if (tasks.length > 0 && queue.length > 0) {
+      const risks = assessTasksRisk(tasks, queue, dayPlan)
+      setTaskRisks(risks)
+    }
+  }, [tasks, queue, dayPlan])
 
   // 🔍 DEBUG LOGGING for queue state
   useEffect(() => {
