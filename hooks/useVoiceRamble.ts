@@ -43,6 +43,7 @@ interface SpeechRecognition extends EventTarget {
   onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => any) | null
   onerror: ((this: SpeechRecognition, ev: SpeechRecognitionErrorEvent) => any) | null
   onend: ((this: SpeechRecognition, ev: Event) => any) | null
+  onstart: ((this: SpeechRecognition, ev: Event) => any) | null
   start(): void
   stop(): void
   abort(): void
@@ -85,11 +86,13 @@ export function useVoiceRamble() {
   const [lastAction, setLastAction] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
+  const [isRecognitionActive, setIsRecognitionActive] = useState(false)
 
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const fullTranscriptRef = useRef('')
   const isRecordingRef = useRef(false) // Use ref to avoid stale closure in onend
   const retryCountRef = useRef(0) // Track retry count in ref for onend callback
+  const maxRetries = 3
 
   // Check browser compatibility
   const isSpeechRecognitionSupported = useMemo(() => {
@@ -151,6 +154,155 @@ export function useVoiceRamble() {
     [parseTranscript]
   )
 
+  // Safe start function
+  const safeStartRecognition = useCallback(() => {
+    const recognition = recognitionRef.current
+    if (!recognition) {
+      console.warn('[Voice Ramble] No recognition instance available')
+      return
+    }
+
+    // ✅ Check if already running
+    if (isRecognitionActive) {
+      console.log('[Voice Ramble] Already running, skipping start')
+      return
+    }
+
+    try {
+      recognition.start()
+      console.log('[Voice Ramble] Started successfully')
+    } catch (error: any) {
+      if (error.name === 'InvalidStateError') {
+        console.warn('[Voice Ramble] Recognition already started, ignoring')
+      } else {
+        console.error('[Voice Ramble] Failed to start:', error)
+        toast.error('Nie udało się uruchomić rozpoznawania mowy')
+      }
+    }
+  }, [isRecognitionActive])
+
+  // Network error retry with exponential backoff
+  const handleNetworkError = useCallback(() => {
+    const currentRetry = retryCountRef.current
+    
+    if (currentRetry >= maxRetries) {
+      console.error('[Voice Ramble] Max retries reached')
+      toast.error('Problem z połączeniem. Spróbuj ponownie później.')
+      setIsRecording(false)
+      isRecordingRef.current = false
+      return
+    }
+
+    retryCountRef.current++
+    setRetryCount(retryCountRef.current)
+    const delay = 2000 * currentRetry  // 0s, 2s, 4s
+    
+    console.log(`[Voice Ramble] Network error - retrying in ${delay}ms... (${currentRetry + 1}/${maxRetries})`)
+    toast.info(`Ponawiam próbę (${currentRetry + 1}/${maxRetries})...`)
+
+    setTimeout(() => {
+      // ✅ Check state before retry
+      if (!isRecognitionActive && isRecordingRef.current) {
+        console.log('[Voice Ramble] Retrying after network error')
+        safeStartRecognition()
+      } else {
+        console.log('[Voice Ramble] Recognition already active or stopped, skipping retry')
+      }
+    }, delay)
+  }, [isRecognitionActive, safeStartRecognition])
+
+  // No-speech auto-restart
+  const handleNoSpeech = useCallback(() => {
+    console.log('[Voice Ramble] No speech detected, restarting...')
+    
+    // Short delay before restart
+    setTimeout(() => {
+      if (!isRecognitionActive && isRecordingRef.current) {
+        safeStartRecognition()
+      }
+    }, 500)
+  }, [isRecognitionActive, safeStartRecognition])
+
+  // Setup recognition handlers
+  const setupRecognitionHandlers = useCallback((recognition: SpeechRecognition) => {
+    // Track state changes
+    recognition.onstart = () => {
+      console.log('✅ [Voice Ramble] onstart fired')
+      setIsRecognitionActive(true)
+      retryCountRef.current = 0  // Reset retry counter on successful start
+      setRetryCount(0)
+    }
+
+    recognition.onend = () => {
+      console.log('🔍 [Voice Ramble] onend fired')
+      setIsRecognitionActive(false)
+      
+      // Auto-restart if still recording (check ref to avoid stale closure)
+      if (isRecordingRef.current && recognitionRef.current) {
+        // Use setTimeout to avoid immediate restart issues
+        setTimeout(() => {
+          if (isRecordingRef.current) {
+            safeStartRecognition()
+          }
+        }, 100)
+      }
+    }
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let interimTranscript = ''
+      let finalTranscript = ''
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript + ' '
+        } else {
+          interimTranscript += transcript
+        }
+      }
+
+      if (finalTranscript) {
+        console.log('[Voice Ramble] Final:', finalTranscript)
+        fullTranscriptRef.current += finalTranscript
+      }
+
+      if (interimTranscript) {
+        console.log('[Voice Ramble] Interim:', interimTranscript)
+      }
+
+      const displayTranscript = fullTranscriptRef.current + interimTranscript
+      setLiveTranscription(displayTranscript)
+
+      // Trigger parsing when user stops talking (debounced)
+      if (finalTranscript) {
+        debouncedParse(fullTranscriptRef.current)
+      }
+    }
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      console.error('❌ [Voice Ramble] Error:', event.error, event)
+      setIsRecognitionActive(false)  // ✅ Update state on error
+
+      if (event.error === 'network') {
+        handleNetworkError()
+      } else if (event.error === 'no-speech') {
+        handleNoSpeech()
+      } else if (event.error === 'aborted') {
+        console.log('[Voice Ramble] Recognition aborted')
+      } else if (event.error === 'audio-capture') {
+        toast.error('Nie można uzyskać dostępu do mikrofonu')
+        setIsRecording(false)
+        isRecordingRef.current = false
+      } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        toast.error('Brak uprawnień do mikrofonu')
+        setIsRecording(false)
+        isRecordingRef.current = false
+      } else {
+        toast.error(`Błąd rozpoznawania: ${event.error}`)
+      }
+    }
+  }, [debouncedParse, handleNetworkError, handleNoSpeech, safeStartRecognition])
+
   // Start recording
   const startRecording = useCallback(() => {
     if (!isSpeechRecognitionSupported) {
@@ -170,121 +322,63 @@ export function useVoiceRamble() {
       recognition.continuous = true
       recognition.interimResults = true
 
-      recognition.onresult = (event: SpeechRecognitionEvent) => {
-        let interimTranscript = ''
-        let finalTranscript = ''
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript
-          if (event.results[i].isFinal) {
-            finalTranscript += transcript + ' '
-          } else {
-            interimTranscript += transcript
-          }
-        }
-
-        if (finalTranscript) {
-          fullTranscriptRef.current += finalTranscript
-        }
-
-        const displayTranscript = fullTranscriptRef.current + interimTranscript
-        setLiveTranscription(displayTranscript)
-
-        // Trigger parsing when user stops talking (debounced)
-        if (finalTranscript) {
-          debouncedParse(fullTranscriptRef.current)
-        }
-      }
-
-      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        console.error('❌ [Voice Ramble] Speech recognition error:', event.error)
-        
-        // Only show error toast for critical errors or repeated network errors
-        if (event.error === 'no-speech') {
-          // Don't show error for no-speech, it's normal during pauses
-          return
-        }
-        
-        if (event.error === 'network') {
-          // Retry on network errors (max 3 attempts)
-          if (retryCountRef.current < 3) {
-            console.log(`🔄 [Voice Ramble] Retrying... (${retryCountRef.current + 1}/3)`)
-            retryCountRef.current += 1
-            setRetryCount(retryCountRef.current)
-            
-            // Wait 1 second before retry
-            setTimeout(() => {
-              if (isRecordingRef.current && recognitionRef.current) {
-                try {
-                  recognitionRef.current.start()
-                } catch (error) {
-                  console.error('❌ [Voice Ramble] Failed to restart after network error:', error)
-                }
-              }
-            }, 1000)
-            return
-          } else {
-            // Max retries exceeded - show error
-            toast.error(ERROR_MESSAGES[event.error])
-            setIsRecording(false)
-            isRecordingRef.current = false
-          }
-        } else if (['not-allowed', 'service-not-allowed', 'audio-capture'].includes(event.error)) {
-          // Critical errors - stop recording and show message
-          toast.error(ERROR_MESSAGES[event.error], { duration: 5000 })
-          setIsRecording(false)
-          isRecordingRef.current = false
-        } else {
-          // Other errors - show generic message
-          const message = ERROR_MESSAGES[event.error] || 'Wystąpił nieoczekiwany błąd'
-          toast.error(message)
-        }
-      }
-
-      recognition.onend = () => {
-        console.log('🔍 [Voice Ramble] Recognition ended')
-        // Auto-restart if still recording (check ref to avoid stale closure)
-        if (isRecordingRef.current && recognitionRef.current) {
-          try {
-            // Reset retry count on successful restart
-            retryCountRef.current = 0
-            setRetryCount(0)
-            recognition.start()
-          } catch (error) {
-            console.error('❌ [Voice Ramble] Failed to restart:', error)
-          }
-        }
-      }
-
-      recognition.start()
       recognitionRef.current = recognition
+      
+      // Setup event handlers
+      setupRecognitionHandlers(recognition)
+
+      // Initialize state
       setIsRecording(true)
       isRecordingRef.current = true
-      retryCountRef.current = 0 // Reset retry count on new recording
+      retryCountRef.current = 0
       setRetryCount(0)
       fullTranscriptRef.current = ''
       setLiveTranscription('')
       setParsedTasks([])
       setLastAction(null)
 
-      console.log('✅ [Voice Ramble] Recording started')
+      // Start recognition
+      safeStartRecognition()
+
+      console.log('✅ [Voice Ramble] Recording initialized')
     } catch (error) {
       console.error('❌ [Voice Ramble] Failed to start recording:', error)
       toast.error('Nie udało się uruchomić nagrywania')
     }
-  }, [isSpeechRecognitionSupported, debouncedParse])
+  }, [isSpeechRecognitionSupported, setupRecognitionHandlers, safeStartRecognition])
 
   // Stop recording
   const stopRecording = useCallback(() => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop()
-      recognitionRef.current = null
+    const recognition = recognitionRef.current
+    if (!recognition) {
+      console.log('[Voice Ramble] No recognition instance to stop')
+      return
     }
-    setIsRecording(false)
-    isRecordingRef.current = false
-    debouncedParse.cancel()
-    console.log('⏹️ [Voice Ramble] Recording stopped')
-  }, [debouncedParse])
+
+    // ✅ Check if running before stop
+    if (!isRecognitionActive && !isRecordingRef.current) {
+      console.log('[Voice Ramble] Not running, skipping stop')
+      return
+    }
+
+    try {
+      recognition.stop()
+      recognitionRef.current = null
+      setIsRecording(false)
+      isRecordingRef.current = false
+      setIsRecognitionActive(false)
+      debouncedParse.cancel()
+      console.log('⏹️ [Voice Ramble] Stopped successfully')
+    } catch (error) {
+      console.error('[Voice Ramble] Failed to stop:', error)
+      // Force cleanup even if stop fails
+      recognitionRef.current = null
+      setIsRecording(false)
+      isRecordingRef.current = false
+      setIsRecognitionActive(false)
+      debouncedParse.cancel()
+    }
+  }, [isRecognitionActive, debouncedParse])
 
   // Cancel all tasks
   const handleCancelAll = useCallback(() => {
@@ -293,6 +387,8 @@ export function useVoiceRamble() {
     setLiveTranscription('')
     fullTranscriptRef.current = ''
     setLastAction(null)
+    retryCountRef.current = 0
+    setRetryCount(0)
     toast.info('Anulowano wszystkie zadania')
   }, [stopRecording])
 
@@ -300,7 +396,7 @@ export function useVoiceRamble() {
   const handleSaveAll = useCallback(async () => {
     if (parsedTasks.length === 0) {
       toast.error('Brak zadań do zapisania')
-      return
+      return false
     }
 
     stopRecording()
@@ -328,6 +424,8 @@ export function useVoiceRamble() {
       setLiveTranscription('')
       fullTranscriptRef.current = ''
       setLastAction(null)
+      retryCountRef.current = 0
+      setRetryCount(0)
 
       return true
     } catch (error) {
