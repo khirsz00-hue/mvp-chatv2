@@ -261,13 +261,14 @@ export interface DetailedScoreBreakdown {
 
 // Recommendation Action (for new recommendation system)
 export interface RecommendationAction {
-  op: 'REORDER_TASKS' | 'GROUP_SIMILAR' | 'ADD_BREAK' | 'DEFER_TASK' | 'CHANGE_MUST' | 'OPEN_MORNING_REVIEW'
+  op: 'REORDER_TASKS' | 'GROUP_SIMILAR' | 'ADD_BREAK' | 'DEFER_TASK' | 'CHANGE_MUST' | 'OPEN_MORNING_REVIEW' | 'SHOW_BURNOUT_MODAL' | 'REORDER_QUEUE'
   taskIds?: string[]
   taskId?: string
   priority?: 'high' | 'group'
   durationMinutes?: number
   pin?: boolean
   metadata?: Record<string, any>
+  newQueue?: any[]
 }
 
 // Recommendation (actionable suggestion)

@@ -16,6 +16,8 @@ import {
 import { TestDayTask, DayPlan, Recommendation } from '@/lib/types/dayAssistantV2'
 import { differenceInHours, isFuture, isToday } from 'date-fns'
 import { groupBy } from 'lodash'
+import { analyzeContextSwitching, generateSwitchingRecommendation } from '@/lib/contextSwitching'
+import { assessBurnoutRisk } from '@/lib/burnoutPrevention'
 
 // Thresholds for overdue task recommendations
 const LOW_ENERGY_THRESHOLD = 2
@@ -67,6 +69,49 @@ export async function POST(request: NextRequest) {
     
     // Generate recommendations
     const recommendations: Recommendation[] = []
+
+    // 0. Check burnout risk (high priority check)
+    try {
+      const burnoutRisk = await assessBurnoutRisk(user.id)
+      if (burnoutRisk.riskLevel === 'high') {
+        recommendations.push({
+          id: `burnout-warning-${Date.now()}`,
+          type: 'BURNOUT_WARNING',
+          title: `🚨 UWAGA: Wykryto ryzyko wypalenia (${burnoutRisk.riskScore}/100)`,
+          reason: `${burnoutRisk.warnings.join('. ')}`,
+          actions: [
+            { op: 'SHOW_BURNOUT_MODAL' }
+          ],
+          confidence: 0.95,
+          created_at: new Date().toISOString()
+        })
+      } else if (burnoutRisk.riskLevel === 'medium') {
+        recommendations.push({
+          id: `burnout-warning-${Date.now()}`,
+          type: 'BURNOUT_WARNING',
+          title: `⚠️ Średnie ryzyko wypalenia (${burnoutRisk.riskScore}/100)`,
+          reason: `${burnoutRisk.warnings.join('. ')}`,
+          actions: [
+            { op: 'ADD_BREAK', durationMinutes: 15 }
+          ],
+          confidence: 0.8,
+          created_at: new Date().toISOString()
+        })
+      }
+    } catch (error) {
+      console.error('⚠️ [Recommend] Failed to assess burnout risk:', error)
+    }
+
+    // 0.5. Check context switching in queue
+    const queueTasks = context.queue || incompleteTasks.slice(0, 10)
+    const switchingAnalysis = analyzeContextSwitching(queueTasks)
+    const switchingRec = generateSwitchingRecommendation(switchingAnalysis)
+    if (switchingRec) {
+      recommendations.push({
+        ...switchingRec,
+        created_at: new Date().toISOString()
+      } as Recommendation)
+    }
 
     // 1. Check for work time without break (>2h)
     const completedToday = tasks.filter(t => t.completed)
