@@ -33,7 +33,7 @@
 - State wasn't properly tracked during error conditions
 
 **Solution Implemented:**
-- Exponential backoff: 0s, 2s, 4s (max 10s)
+- Exponential backoff: 0s, 2s, 4s
 - State checks before every retry attempt
 - Proper state cleanup on error (`setIsRecognitionActive(false)`)
 - Better error categorization and user feedback
@@ -143,15 +143,8 @@ recognition.onend = () => {
   // Auto-restart if still recording
   if (isRecordingRef.current && recognitionRef.current) {
     setTimeout(() => {
-      if (isRecordingRef.current && recognitionRef.current && !isRecognitionActive) {
-        try {
-          recognitionRef.current.start()
-          console.log('[Voice Ramble] Auto-restarted after onend')
-        } catch (error: any) {
-          if (error.name !== 'InvalidStateError') {
-            console.error('[Voice Ramble] Failed to auto-restart:', error)
-          }
-        }
+      if (isRecordingRef.current) {
+        safeStartRecognition()
       }
     }, 100)
   }
@@ -200,7 +193,7 @@ const handleNetworkError = useCallback(() => {
 
   retryCountRef.current++
   setRetryCount(retryCountRef.current)
-  const delay = Math.min(2000 * currentRetry, 10000)  // 0s, 2s, 4s (max 10s)
+  const delay = 2000 * currentRetry  // 0s, 2s, 4s
   
   console.log(`[Voice Ramble] Network error - retrying in ${delay}ms... (${currentRetry + 1}/${maxRetries})`)
   toast.info(`Ponawiam próbę (${currentRetry + 1}/${maxRetries})...`)
@@ -218,7 +211,7 @@ const handleNetworkError = useCallback(() => {
 ```
 
 **Key Features:**
-- Exponential backoff: 0s → 2s → 4s (max 10s)
+- Exponential backoff: 0s → 2s → 4s
 - Max 3 retry attempts
 - State checks before each retry
 - User-friendly progress notifications
@@ -391,8 +384,14 @@ const handleSaveAll = useCallback(async () => {
 ```
 ❌ [Voice Ramble] Error: no-speech
 [Voice Ramble] No speech detected, restarting...
-[Voice Ramble] Retrying after network error
+[Voice Ramble] Already running, skipping start
+```
+OR (if recognition had stopped):
+```
+❌ [Voice Ramble] Error: no-speech
+[Voice Ramble] No speech detected, restarting...
 [Voice Ramble] Started successfully
+✅ [Voice Ramble] onstart fired
 ```
 
 ---
