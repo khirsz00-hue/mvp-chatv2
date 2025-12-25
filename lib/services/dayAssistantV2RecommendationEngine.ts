@@ -40,7 +40,7 @@ const WEIGHTS = {
 const MILLISECONDS_PER_DAY = 1000 * 60 * 60 * 24
 
 /**
- * Calculate task score based on multiple factors
+ * Calculate task score based on multiple factors with enhanced context grouping
  */
 export function calculateTaskScore(
   task: TestDayTask,
@@ -49,41 +49,94 @@ export function calculateTaskScore(
     todayDate: string
     totalTasksToday: number
     lightMinutesToday: number
+    tasksAlreadyInQueue?: TestDayTask[]  // NEW: for context grouping
   }
-): TaskScore {
+): TaskScore & { reasoning?: string[] } {
   const breakdown: ScoreBreakdown = {
     base_score: 0,
     fit_bonus: 0,
     avoidance_penalty: 0,
     final_score: 0
   }
+  const reasoning: string[] = []
   
   // 1. Base score: priority + deadline + impact
-  breakdown.base_score += calculatePriorityScore(task.priority)
-  breakdown.base_score += calculateDeadlineProximity(task.due_date, context.todayDate)
-  breakdown.base_score += calculateImpactScore(task)
+  const priorityScore = calculatePriorityScore(task.priority)
+  breakdown.base_score += priorityScore
+  if (task.priority >= 3) {
+    reasoning.push(`Priorytet P${task.priority}: +${priorityScore}`)
+  }
+  
+  const deadlineScore = calculateDeadlineProximity(task.due_date, context.todayDate)
+  breakdown.base_score += deadlineScore
+  if (deadlineScore > 0) {
+    if (!task.due_date) {
+      // Skip deadline reasoning
+    } else if (task.due_date < context.todayDate) {
+      reasoning.push(`🔴 PRZETERMINOWANE: +${deadlineScore}`)
+    } else if (task.due_date === context.todayDate) {
+      reasoning.push(`⏰ Deadline dziś: +${deadlineScore}`)
+    } else {
+      const daysUntil = Math.floor((new Date(task.due_date).getTime() - new Date(context.todayDate).getTime()) / MILLISECONDS_PER_DAY)
+      if (daysUntil === 1) {
+        reasoning.push(`⏰ Deadline jutro: +${deadlineScore}`)
+      } else if (daysUntil <= 3) {
+        reasoning.push(`📅 Deadline za ${daysUntil}d: +${deadlineScore}`)
+      }
+    }
+  }
+  
+  const impactScore = calculateImpactScore(task)
+  breakdown.base_score += impactScore
+  if (task.is_must) {
+    reasoning.push('📌 Przypięty (MUST): +' + (WEIGHTS.impact * 2))
+  }
+  if (task.is_important) {
+    reasoning.push('⭐ Ważny: +' + WEIGHTS.impact)
+  }
   
   // 2. Energy/Focus fit bonus
   breakdown.fit_bonus = calculateEnergyFocusFit(
     dayPlan.energy,
     dayPlan.focus,
     task.cognitive_load,
-    task.estimate_min
+    task.estimate_min,
+    reasoning
   )
   
-  // 3. Avoidance penalty (postpone count)
-  breakdown.avoidance_penalty = calculateAvoidancePenalty(
+  // 3. Context grouping bonus (NEW!)
+  const contextBonus = calculateContextGroupingBonus(
+    task,
+    context.tasksAlreadyInQueue || [],
+    reasoning
+  )
+  breakdown.fit_bonus += contextBonus
+  
+  // 4. Estimate penalty
+  const estimatePenalty = calculateEstimatePenalty(task.estimate_min, reasoning)
+  breakdown.avoidance_penalty += estimatePenalty
+  
+  // 5. Avoidance penalty (postpone count)
+  const postponePenalty = calculateAvoidancePenalty(
     task.postpone_count,
     context.lightMinutesToday
   )
+  breakdown.avoidance_penalty += postponePenalty
+  if (task.postpone_count > 2) {
+    reasoning.push(`Odkładane ${task.postpone_count}x: -${postponePenalty}`)
+  }
   
-  // 4. Final score
-  breakdown.final_score = breakdown.base_score + breakdown.fit_bonus - breakdown.avoidance_penalty
+  // 6. Tie-breaker for unique scores
+  const tieBreaker = calculateTieBreaker(task)
+  
+  // 7. Final score
+  breakdown.final_score = breakdown.base_score + breakdown.fit_bonus - breakdown.avoidance_penalty + tieBreaker
   
   return {
     task_id: task.id,
     score: breakdown.final_score,
-    breakdown
+    breakdown,
+    reasoning
   }
 }
 
@@ -123,14 +176,15 @@ function calculateImpactScore(task: TestDayTask): number {
 }
 
 /**
- * Energy/Focus fit bonus
+ * Energy/Focus fit bonus with reasoning
  * Tasks with matching cognitive load get higher scores
  */
 function calculateEnergyFocusFit(
   energy: number,
   focus: number,
   cognitiveLoad: number,
-  estimateMin: number
+  estimateMin: number,
+  reasoning: string[]
 ): number {
   const avgState = (energy + focus) / 2
   
@@ -138,6 +192,16 @@ function calculateEnergyFocusFit(
   const fitDiff = Math.abs(avgState - cognitiveLoad)
   
   let fitScore = WEIGHTS.energy_focus_bonus * (1 - fitDiff / 5)
+  
+  if (fitDiff === 0) {
+    reasoning.push(`⚡ Idealne dopasowanie energii (${energy}/5): +${Math.round(fitScore)}`)
+  } else if (fitDiff === 1) {
+    reasoning.push(`⚡ Dobre dopasowanie energii: +${Math.round(fitScore)}`)
+  } else if (fitDiff >= 3) {
+    if (cognitiveLoad > avgState) {
+      reasoning.push(`⚡ Za trudne dla obecnej energii (${energy}/5): ${Math.round(fitScore)}`)
+    }
+  }
   
   // Bonus for short tasks when focus is low
   if (focus <= 2 && estimateMin <= 15) {
@@ -167,6 +231,79 @@ function calculateAvoidancePenalty(
   }
   
   return penalty
+}
+
+/**
+ * Calculate context grouping bonus (NEW!)
+ * Rewards continuing same context (flow state)
+ * Penalizes context switches
+ */
+function calculateContextGroupingBonus(
+  task: TestDayTask,
+  tasksAlreadyInQueue: TestDayTask[],
+  reasoning: string[]
+): number {
+  if (tasksAlreadyInQueue.length === 0) {
+    return 0  // First task - no context to group with
+  }
+  
+  // Count consecutive tasks with same context_type (from end of queue)
+  let consecutiveCount = 0
+  for (let i = tasksAlreadyInQueue.length - 1; i >= 0; i--) {
+    if (tasksAlreadyInQueue[i].context_type === task.context_type && task.context_type) {
+      consecutiveCount++
+    } else {
+      break  // Stop at first different context
+    }
+  }
+  
+  if (consecutiveCount > 0) {
+    // Bonus for continuing same context (flow state!)
+    const bonus = Math.min(consecutiveCount * 5, 15)  // +5 per task, max +15
+    reasoning.push(`🎭 Kontynuacja ${task.context_type} (${consecutiveCount} pod rząd): +${bonus} (flow state)`)
+    return bonus
+  }
+  
+  // Check if this would break a context streak
+  const lastTask = tasksAlreadyInQueue[tasksAlreadyInQueue.length - 1]
+  if (lastTask && lastTask.context_type && task.context_type && lastTask.context_type !== task.context_type) {
+    // Penalty for context switch
+    reasoning.push(`🔄 Przełączenie kontekstu (${lastTask.context_type} → ${task.context_type}): -3`)
+    return -3
+  }
+  
+  return 0
+}
+
+/**
+ * Calculate estimate penalty (NEW!)
+ * Penalizes long tasks
+ */
+function calculateEstimatePenalty(estimateMin: number, reasoning: string[]): number {
+  if (estimateMin <= 15) {
+    reasoning.push(`⚡ Szybkie (${estimateMin}min): +0`)
+    return 0
+  } else if (estimateMin <= 30) {
+    reasoning.push(`⏱ Średnie (${estimateMin}min): -3`)
+    return 3
+  } else if (estimateMin <= 60) {
+    reasoning.push(`⏱ Długie (${estimateMin}min): -7`)
+    return 7
+  } else {
+    reasoning.push(`⏱ Bardzo długie (${estimateMin}min): -15`)
+    return 15
+  }
+}
+
+/**
+ * Calculate tie-breaker (NEW!)
+ * Ensures unique scores for deterministic ordering
+ */
+function calculateTieBreaker(task: TestDayTask): number {
+  // Use task ID + created_at for deterministic but unique tie-breaking
+  const createdTimestamp = new Date(task.created_at).getTime()
+  const idHash = task.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+  return ((createdTimestamp + idHash) % 1000) / 1000
 }
 
 /**
@@ -508,7 +645,7 @@ export function generateUnmarkMustWarning(task: TestDayTask): {
 }
 
 /**
- * Score and sort tasks by intelligent algorithm
+ * Score and sort tasks by intelligent algorithm with iterative context awareness
  * Used by useScoredTasks hook in the UI
  */
 export function scoreAndSortTasks(
@@ -516,33 +653,56 @@ export function scoreAndSortTasks(
   dayPlan: DayPlan,
   todayDate: string
 ): TestDayTask[] {
-  // Calculate scores for all tasks
-  const taskScores = tasks.map(task => ({
-    task,
-    score: calculateTaskScore(task, dayPlan, {
-      todayDate,
-      totalTasksToday: tasks.length,
-      lightMinutesToday: 0
-    })
-  }))
-  
-  // Sort by score (highest first)
-  taskScores.sort((a, b) => b.score.score - a.score.score)
-  
-  // Separate into categories for better organization
+  // Separate into date categories first
   const today = todayDate
-  const overdue = taskScores.filter(ts => ts.task.due_date && ts.task.due_date < today)
-  const dueToday = taskScores.filter(ts => ts.task.due_date === today)
-  const inbox = taskScores.filter(ts => !ts.task.due_date)
-  const future = taskScores.filter(ts => ts.task.due_date && ts.task.due_date > today)
+  const overdueTasks = tasks.filter(t => t.due_date && t.due_date < today)
+  const dueTodayTasks = tasks.filter(t => t.due_date === today)
+  const inboxTasks = tasks.filter(t => !t.due_date)
+  const futureTasks = tasks.filter(t => t.due_date && t.due_date > today)
+  
+  // Score tasks iteratively (each task knows about tasks scored before it)
+  const scoreTasksWithContext = (taskList: TestDayTask[], alreadyScored: TestDayTask[]) => {
+    const scored: Array<{ task: TestDayTask; score: any }> = []
+    
+    for (const task of taskList) {
+      const scoreResult = calculateTaskScore(task, dayPlan, {
+        todayDate,
+        totalTasksToday: tasks.length,
+        lightMinutesToday: 0,
+        tasksAlreadyInQueue: [...alreadyScored, ...scored.map(s => s.task)]
+      })
+      
+      scored.push({
+        task: {
+          ...task,
+          // Attach score metadata for UI display
+          metadata: {
+            ...task.metadata,
+            _score: scoreResult.score,
+            _scoreReasoning: scoreResult.reasoning || []
+          }
+        },
+        score: scoreResult
+      })
+    }
+    
+    // Sort by score (highest first)
+    scored.sort((a, b) => b.score.score - a.score.score)
+    return scored.map(s => s.task)
+  }
+  
+  // Score each category with context awareness
+  const scoredOverdue = scoreTasksWithContext(overdueTasks, [])
+  const scoredToday = scoreTasksWithContext(dueTodayTasks, scoredOverdue)
+  const scoredInbox = scoreTasksWithContext(inboxTasks, [...scoredOverdue, ...scoredToday])
+  const scoredFuture = scoreTasksWithContext(futureTasks, [...scoredOverdue, ...scoredToday, ...scoredInbox])
   
   // Return in priority order: overdue > today > inbox > future
-  // Each group is already sorted by score
   return [
-    ...overdue.map(ts => ts.task),
-    ...dueToday.map(ts => ts.task),
-    ...inbox.map(ts => ts.task),
-    ...future.map(ts => ts.task)
+    ...scoredOverdue,
+    ...scoredToday,
+    ...scoredInbox,
+    ...scoredFuture
   ]
 }
 
