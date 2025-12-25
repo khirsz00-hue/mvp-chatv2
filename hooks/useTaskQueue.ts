@@ -9,10 +9,12 @@ import { TestDayTask, DayPlan } from '@/lib/types/dayAssistantV2'
 
 export interface QueueResult {
   queue: TestDayTask[]
+  remainingToday: TestDayTask[]
   later: TestDayTask[]
   availableMinutes: number
   usedMinutes: number
   usagePercentage: number
+  overflowCount: number
 }
 
 /**
@@ -79,6 +81,98 @@ export function calculateAvailableMinutes(workEndTime?: string, manualTimeBlock:
   
   // Add manual time block
   return baseMinutes + manualTimeBlock
+}
+
+/**
+ * Build smart queue with proper task distribution
+ * Separates tasks into: Top 3 Queue, Remaining Today, and Later (overflow + future)
+ * 
+ * @param scoredTasks - All tasks with scores
+ * @param capacity - Available minutes for today
+ * @param todayISO - Today's date in YYYY-MM-DD format
+ * @returns Object with queue, remainingToday, later, and capacity metrics
+ */
+export function buildSmartQueue(
+  scoredTasks: TestDayTask[],
+  capacity: number,
+  todayISO: string
+): {
+  queue: TestDayTask[]
+  remainingToday: TestDayTask[]
+  later: TestDayTask[]
+  usedTime: number
+  capacity: number
+  overflowCount: number
+} {
+  // 1. Split by date
+  const todayTasks = scoredTasks.filter(t => t.due_date === todayISO)
+  const futureTasks = scoredTasks.filter(t => t.due_date && t.due_date > todayISO)
+  
+  // 2. Separate pinned from unpinned
+  const pinnedTasks = todayTasks.filter(t => t.is_must)
+  const unpinnedTodayTasks = todayTasks
+    .filter(t => !t.is_must)
+    .sort((a, b) => ((b as any)._score || 0) - ((a as any)._score || 0))  // Sort by score DESC
+  
+  // 3. Build Top 3 Queue
+  const queue: TestDayTask[] = []
+  
+  // Add pinned first
+  pinnedTasks.forEach(task => {
+    if (queue.length < 3) {
+      queue.push(task)
+    }
+  })
+  
+  // Fill remaining slots with top scored unpinned
+  for (const task of unpinnedTodayTasks) {
+    if (queue.length < 3) {
+      queue.push(task)
+    } else {
+      break
+    }
+  }
+  
+  // 4. Calculate capacity usage
+  let usedTime = queue.reduce((sum, t) => sum + t.estimate_min, 0)
+  
+  // 5. Split remaining today's tasks by capacity
+  const tasksNotInQueue = unpinnedTodayTasks.filter(t => !queue.includes(t))
+  const remainingToday: TestDayTask[] = []
+  const overflowToday: TestDayTask[] = []
+  
+  for (const task of tasksNotInQueue) {
+    if (usedTime + task.estimate_min <= capacity) {
+      // FITS in capacity
+      remainingToday.push(task)
+      usedTime += task.estimate_min
+    } else {
+      // DOESN'T FIT - overflow
+      overflowToday.push(task)
+    }
+  }
+  
+  // 6. "Na później" = overflow + future tasks
+  const later = [...overflowToday, ...futureTasks]
+    .sort((a, b) => {
+      // Sort: today's overflow first, then by due_date
+      if (a.due_date === todayISO && b.due_date !== todayISO) return -1
+      if (a.due_date !== todayISO && b.due_date === todayISO) return 1
+      if (!a.due_date && b.due_date) return 1
+      if (a.due_date && !b.due_date) return -1
+      if (!a.due_date && !b.due_date) return 0
+      // Both have due_date at this point (TypeScript knows this from checks above)
+      return new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime()
+    })
+  
+  return {
+    queue,           // Top 3 (pinned + top scored)
+    remainingToday,  // Rest of today that FIT in capacity
+    later,           // Overflow + future
+    usedTime,
+    capacity,
+    overflowCount: overflowToday.length
+  }
 }
 
 /**
@@ -285,24 +379,24 @@ export function useTaskQueue(
     const workEndTime = dayPlan?.metadata?.work_end_time as string | undefined
     const availableMinutes = calculateAvailableMinutes(workEndTime, manualTimeBlock)
     
-    let { queue, later } = buildQueue(scoredTasks, availableMinutes)
+    // Get today's date
+    const todayISO = new Date().toISOString().split('T')[0]
     
-    // Fill queue with next-best tasks if time available
-    const filledQueue = fillQueueWithAvailableTime(queue, later, availableMinutes)
-    queue = filledQueue.queue
-    later = filledQueue.later
+    // Use new smart queue logic
+    const result = buildSmartQueue(scoredTasks, availableMinutes, todayISO)
     
-    const usedMinutes = queue.reduce((sum, task) => sum + task.estimate_min, 0)
     const usagePercentage = availableMinutes > 0 
-      ? Math.round((usedMinutes / availableMinutes) * 100) 
+      ? Math.round((result.usedTime / availableMinutes) * 100) 
       : 0
 
     return {
-      queue,
-      later,
+      queue: result.queue,
+      remainingToday: result.remainingToday,
+      later: result.later,
       availableMinutes,
-      usedMinutes,
-      usagePercentage
+      usedMinutes: result.usedTime,
+      usagePercentage,
+      overflowCount: result.overflowCount
     }
   }, [scoredTasks, dayPlan, manualTimeBlock])
 }

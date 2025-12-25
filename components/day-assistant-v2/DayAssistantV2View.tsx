@@ -523,7 +523,7 @@ function DayAssistantV2Content() {
   }, [nonOverdueTasks])
 
   // Use queue hook to calculate queue (with manual time block)
-  const { queue, later, availableMinutes, usedMinutes, usagePercentage } = useTaskQueue(
+  const { queue, remainingToday, later, availableMinutes, usedMinutes, usagePercentage, overflowCount } = useTaskQueue(
     nonOverdueTasks,
     dayPlan,
     manualTimeBlock
@@ -549,7 +549,9 @@ function DayAssistantV2Content() {
       availableTasks: availableTasks.length,
       nonOverdueTasks: nonOverdueTasks.length,
       queueTasks: queue.length,
+      remainingTodayTasks: remainingToday.length,
       laterTasks: later.length,
+      overflowCount,
       availableMinutes,
       usedMinutes
     })
@@ -578,14 +580,23 @@ function DayAssistantV2Content() {
       })))
     }
     
-    if (later.length > 0) {
-      console.log('📋 [Later Tasks]', later.map(t => ({
+    if (remainingToday.length > 0) {
+      console.log('✅ [Remaining Today Tasks]', remainingToday.map(t => ({
         title: t.title,
         estimate: t.estimate_min,
         score: (t as any)._score || 'N/A'
       })))
     }
-  }, [tasks.length, filteredTasks.length, scoredTasks.length, overdueTasks, mustTasks.length, todayTasks.length, availableTasks.length, nonOverdueTasks.length, queue.length, later, availableMinutes, usedMinutes])
+    
+    if (later.length > 0) {
+      console.log('📋 [Later Tasks]', later.map(t => ({
+        title: t.title,
+        estimate: t.estimate_min,
+        due_date: t.due_date || 'no date',
+        score: (t as any)._score || 'N/A'
+      })))
+    }
+  }, [tasks.length, filteredTasks.length, scoredTasks.length, overdueTasks, mustTasks.length, todayTasks.length, availableTasks.length, nonOverdueTasks.length, queue.length, remainingToday.length, later, overflowCount, availableMinutes, usedMinutes])
 
   // matchedTasks kept for backward compatibility with existing queue logic
   const matchedTasks = queue.filter(t => !t.is_must && !t.completed)
@@ -1547,22 +1558,22 @@ function DayAssistantV2Content() {
         )}
 
         {/* SEKCJA 3: Kolejka NA DZIŚ (Top 3) */}
-        {todayTasks.length > 0 && (
+        {queue.filter(t => !t.is_must).length > 0 && (
           <Card className="shadow-md border-purple-300">
             {isReorderingQueue && <QueueReorderingOverlay />}
             <CardHeader>
               <CardTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent flex items-center gap-2">
                 📊 Kolejka NA DZIŚ (Top 3)
                 <Badge className="bg-purple-100 text-purple-800">
-                  {Math.min(todayTasks.length, 3)} zadań
+                  {queue.filter(t => !t.is_must).length} zadań
                 </Badge>
               </CardTitle>
               <p className="text-sm text-gray-600 mt-1">
-                Zadania zaplanowane na dzisiaj ({selectedDate})
+                📌 Przypięte + 🎯 Top scored na dziś • {usedMinutes} / {availableMinutes} min ({usagePercentage}%)
               </p>
             </CardHeader>
             <CardContent className="space-y-3">
-              {todayTasks.slice(0, 3).map((task, index) => (
+              {queue.filter(t => !t.is_must).map((task, index) => (
                 <TaskRow
                   key={task.id}
                   task={task}
@@ -1588,8 +1599,8 @@ function DayAssistantV2Content() {
           </Card>
         )}
 
-        {/* SEKCJA 4: Pozostałe NA DZIŚ (collapsible) */}
-        {todayTasks.length > 3 && (
+        {/* SEKCJA 4: Pozostałe NA DZIŚ (collapsible) - Tasks that FIT in capacity */}
+        {remainingToday.length > 0 && (
           <Card className="border-gray-300 bg-gray-50">
             {isReorderingQueue && <QueueReorderingOverlay />}
             <CardHeader 
@@ -1599,7 +1610,10 @@ function DayAssistantV2Content() {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg text-gray-700 flex items-center gap-2">
                   📋 Pozostałe na dziś
-                  <Badge variant="secondary">{todayTasks.length - 3} zadań</Badge>
+                  <Badge variant="secondary">{remainingToday.length} zadań</Badge>
+                  <Badge variant="success" className="bg-green-100 text-green-700">
+                    Mieszczą się w capacity
+                  </Badge>
                 </CardTitle>
                 <CaretDown className={cn(
                   "transition-transform text-gray-600",
@@ -1607,16 +1621,16 @@ function DayAssistantV2Content() {
                 )} size={24} />
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                Zadania z terminem {selectedDate} poza Top 3
+                Reszta zadań na dzisiaj które mieszczą się w {availableMinutes} min capacity
               </p>
             </CardHeader>
             {showRestOfToday && (
               <CardContent className="space-y-2">
-                {todayTasks.slice(3).map((task, index) => (
+                {remainingToday.map((task, index) => (
                   <TaskRow
                     key={task.id}
                     task={task}
-                    queuePosition={mustTasks.length + 3 + index + 1}
+                    queuePosition={queue.length + index + 1}
                     onNotToday={() => handleNotToday(task)}
                     onStart={() => handleStartTask(task)}
                     onUnmark={() => openUnmarkWarning(task)}
@@ -1828,6 +1842,11 @@ function DayAssistantV2Content() {
                 <Badge variant="secondary" className="bg-blue-600 text-white font-semibold px-3 py-1">
                   {later.length} zadań
                 </Badge>
+                {overflowCount > 0 && (
+                  <Badge variant="warning" className="bg-orange-100 text-orange-700 font-semibold px-3 py-1">
+                    {overflowCount} z dzisiaj (nie mieszczą się)
+                  </Badge>
+                )}
               </CardTitle>
               <CaretDown className={cn(
                 "transition-transform text-blue-600",
@@ -1846,28 +1865,39 @@ function DayAssistantV2Content() {
               ) : (
                 <>
                   <p className="text-sm text-blue-700">
-                    Te zadania nie mieszczą się w dostępnym czasie pracy dzisiaj.
+                    Zadania z dzisiaj które nie mieszczą się + przyszłe daty
                   </p>
                   
                   <div className="border-t pt-3 mt-2 border-blue-200">
-                    {later.map((task, index) => (
-                      <TaskRow
-                        key={task.id}
-                        task={task}
-                        queuePosition={queue.length + index + 1}
-                        onNotToday={() => handleNotToday(task)}
-                        onStart={() => handleStartTask(task)}
-                        onUnmark={() => openUnmarkWarning(task)}
-                        onDecompose={() => handleDecompose(task)}
-                        onComplete={() => handleComplete(task)}
-                        onPin={() => handlePin(task)}
-                        onDelete={() => handleDelete(task)}
-                        onClick={() => setSelectedTask(task)}
-                        focus={dayPlan?.focus || 3}
-                        selectedDate={selectedDate}
-                        onSubtaskToggle={handleSubtaskToggle}
-                      />
-                    ))}
+                    {later.map((task, index) => {
+                      const isOverflowToday = task.due_date === selectedDate
+                      return (
+                        <div key={task.id} className="mb-2">
+                          {isOverflowToday && (
+                            <div className="flex items-center gap-2 mb-1">
+                              <Badge variant="warning" className="bg-orange-100 text-orange-700 text-xs">
+                                ⚠️ Dzisiaj (overflow)
+                              </Badge>
+                            </div>
+                          )}
+                          <TaskRow
+                            task={task}
+                            queuePosition={queue.length + remainingToday.length + index + 1}
+                            onNotToday={() => handleNotToday(task)}
+                            onStart={() => handleStartTask(task)}
+                            onUnmark={() => openUnmarkWarning(task)}
+                            onDecompose={() => handleDecompose(task)}
+                            onComplete={() => handleComplete(task)}
+                            onPin={() => handlePin(task)}
+                            onDelete={() => handleDelete(task)}
+                            onClick={() => setSelectedTask(task)}
+                            focus={dayPlan?.focus || 3}
+                            selectedDate={selectedDate}
+                            onSubtaskToggle={handleSubtaskToggle}
+                          />
+                        </div>
+                      )
+                    })}
                   </div>
                 </>
               )}
