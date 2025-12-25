@@ -214,7 +214,7 @@ function observeEnergyMatch(queue: ScoredTask[], userEnergy: number) {
   if (diff <= 1) {
     return {
       title: 'Dobre dopasowanie energii',
-      message: `Pierwsze 3 zadania mają średni cognitive load ${avgCognitiveLoad.toFixed(1)}, co dobrze pasuje do Twojej energii (${userEnergy}/5).`,
+      message: `Pierwsze 3 zadania mają średnie cognitive load ${avgCognitiveLoad.toFixed(1)}, co dobrze pasuje do Twojej energii (${userEnergy}/5).`,
       taskIds: topTasks.map(t => t.id)
     }
   } else if (avgCognitiveLoad > userEnergy + 2) {

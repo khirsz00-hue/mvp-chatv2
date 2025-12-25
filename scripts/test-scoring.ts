@@ -11,10 +11,10 @@ const mockDayPlan: DayPlan = {
   id: 'test-plan',
   user_id: 'test-user',
   assistant_id: 'test-assistant',
-  date: '2025-12-25',
+  plan_date: '2025-12-25',
   energy: 3,
   focus: 3,
-  work_hours: 8,
+  blocks: [],
   metadata: {},
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString()
@@ -44,7 +44,7 @@ const createTestTask = (id: string, title: string, context: string, priority: nu
 })
 
 console.log('🧪 Testing Enhanced Scoring System\n')
-console.log('=' .repeat(60))
+console.log('='.repeat(60))
 
 // Test 1: Unique Scores
 console.log('\n📊 TEST 1: Unique Scores (No More All 45!)')

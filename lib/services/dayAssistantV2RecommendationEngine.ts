@@ -69,10 +69,8 @@ export function calculateTaskScore(
   
   const deadlineScore = calculateDeadlineProximity(task.due_date, context.todayDate)
   breakdown.base_score += deadlineScore
-  if (deadlineScore > 0) {
-    if (!task.due_date) {
-      // Skip deadline reasoning
-    } else if (task.due_date < context.todayDate) {
+  if (deadlineScore > 0 && task.due_date) {
+    if (task.due_date < context.todayDate) {
       reasoning.push(`🔴 PRZETERMINOWANE: +${deadlineScore}`)
     } else if (task.due_date === context.todayDate) {
       reasoning.push(`⏰ Deadline dziś: +${deadlineScore}`)
