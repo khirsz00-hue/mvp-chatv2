@@ -62,6 +62,9 @@ import { trackMomentum } from '@/lib/momentumTracking'
 import { assessTasksRisk, RiskAssessment } from '@/lib/riskPrediction'
 import { assessBurnoutRisk, BurnoutAssessment } from '@/lib/burnoutPrevention'
 import { calculateQueueWithOverflow, generateOverflowAlert, OverflowAlert } from '@/lib/capacityManager'
+import { generatePassiveInsights, PassiveInsight } from '@/lib/services/passiveInsightEngine'
+import { saveInsightFeedback } from '@/lib/services/insightFeedbackService'
+import { Sparkles } from '@phosphor-icons/react'
 
 // Create a query client outside the component to avoid recreation on every render
 const queryClient = new QueryClient({
@@ -161,6 +164,10 @@ function DayAssistantV2Content() {
     }
     return new Set()
   })
+  
+  // NEW: Passive Insights State
+  const [insights, setInsights] = useState<PassiveInsight[]>([])
+  const [dismissedInsightIds, setDismissedInsightIds] = useState<Set<string>>(new Set())
   
   // Persist applied recommendation IDs to localStorage
   useEffect(() => {
@@ -535,6 +542,22 @@ function DayAssistantV2Content() {
       setTaskRisks(risks)
     }
   }, [tasks, queue, dayPlan])
+  
+  // Generate passive insights when queue changes (NEW!)
+  useEffect(() => {
+    if (queue.length === 0 || !dayPlan) return
+    
+    const newInsights = generatePassiveInsights(queue, tasks, {
+      energy: dayPlan.energy,
+      capacity: availableMinutes,
+      usedTime: usedMinutes
+    })
+    
+    // Filter out dismissed insights
+    setInsights(newInsights.filter(i => !dismissedInsightIds.has(i.id)))
+    
+    console.log('💡 [Passive Insights] Generated:', newInsights.length)
+  }, [queue, tasks, dayPlan, availableMinutes, usedMinutes, dismissedInsightIds])
 
   // 🔍 DEBUG LOGGING for queue state
   useEffect(() => {
@@ -1194,6 +1217,38 @@ function DayAssistantV2Content() {
   const handleDecompose = async (task: TestDayTask) => {
     // Show the HelpMeModal for AI-powered step generation
     setHelpMeTask(task)
+  }
+  
+  // NEW: Handle passive insight feedback
+  const handleInsightFeedback = async (
+    insight: PassiveInsight,
+    feedback: 'helpful' | 'not_helpful' | 'neutral'
+  ) => {
+    if (!sessionToken) return
+    
+    // Get user ID from session
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+    
+    // Save feedback to database
+    const result = await saveInsightFeedback(session.user.id, insight, feedback)
+    
+    if (result.success) {
+      // Dismiss the insight
+      setDismissedInsightIds(prev => new Set(prev).add(insight.id))
+      setInsights(prev => prev.filter(i => i.id !== insight.id))
+      
+      // Show appropriate toast
+      if (feedback === 'helpful') {
+        toast.success('Dzięki za feedback!')
+      } else if (feedback === 'not_helpful') {
+        toast.info('OK, nie pokażę już dzisiaj')
+      }
+      
+      console.log('✅ [Insight Feedback] Saved:', { type: insight.type, feedback })
+    } else {
+      console.error('❌ [Insight Feedback] Failed to save:', result.error)
+    }
   }
 
   const handleSubtaskToggle = async (subtaskId: string, completed: boolean) => {
@@ -1980,6 +2035,65 @@ function DayAssistantV2Content() {
           </CardContent>
         </Card>
 
+        {/* NEW: Passive Insights Panel */}
+        {insights.length > 0 && (
+          <Card className="border-purple-200 bg-purple-50 shadow-md">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Sparkles className="text-purple-600" size={20} />
+                <CardTitle className="text-base">
+                  💡 AI zauważyło wzorce
+                </CardTitle>
+              </div>
+              <p className="text-xs text-gray-600 mt-1">
+                Sugestie oparte na analizie kolejki (nie zmieniają kolejności)
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {insights.map(insight => (
+                <div
+                  key={insight.id}
+                  className="p-4 bg-white rounded-lg border border-purple-200 shadow-sm"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl">{insight.icon}</span>
+                    <div className="flex-1">
+                      <h4 className="font-medium text-purple-900">{insight.title}</h4>
+                      <p className="text-sm text-gray-700 mt-1">{insight.message}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2 mt-3">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleInsightFeedback(insight, 'helpful')}
+                      className="text-green-700 border-green-300 hover:bg-green-50"
+                    >
+                      👍 Przydatne
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleInsightFeedback(insight, 'not_helpful')}
+                      className="text-red-700 border-red-300 hover:bg-red-50"
+                    >
+                      👎 Nieprzydatne
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleInsightFeedback(insight, 'neutral')}
+                    >
+                      🤷 Nie wiem
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader>
             <CardTitle>DecisionLog</CardTitle>
@@ -2328,6 +2442,21 @@ function TaskRow({
           <p className="text-xs text-muted-foreground mt-1">
             Estymat: {getFormattedEstimate(task)} • Load {task.cognitive_load} • Przeniesienia: {task.postpone_count || 0}
           </p>
+          
+          {/* Score breakdown (collapsible) */}
+          {task.metadata?._score && task.metadata?._scoreReasoning && (
+            <details className="mt-2">
+              <summary className="text-xs text-blue-600 hover:underline cursor-pointer flex items-center gap-1">
+                Score: {task.metadata._score.toFixed(2)} 
+                <CaretDown size={12} />
+              </summary>
+              <ul className="text-xs text-gray-700 mt-2 space-y-1 bg-gray-50 p-2 rounded">
+                {task.metadata._scoreReasoning.map((reason: string, i: number) => (
+                  <li key={i}>• {reason}</li>
+                ))}
+              </ul>
+            </details>
+          )}
           
           {/* Show subtasks if any */}
           {task.subtasks && task.subtasks.length > 0 && (
