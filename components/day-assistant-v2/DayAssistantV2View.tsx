@@ -64,7 +64,7 @@ import { assessBurnoutRisk, BurnoutAssessment } from '@/lib/burnoutPrevention'
 import { calculateQueueWithOverflow, generateOverflowAlert, OverflowAlert } from '@/lib/capacityManager'
 import { generatePassiveInsights, PassiveInsight } from '@/lib/services/passiveInsightEngine'
 import { saveInsightFeedback } from '@/lib/services/insightFeedbackService'
-import { Sparkles } from '@phosphor-icons/react'
+import { Sparkle } from '@phosphor-icons/react'
 
 // Create a query client outside the component to avoid recreation on every render
 const queryClient = new QueryClient({
@@ -2040,7 +2040,7 @@ function DayAssistantV2Content() {
           <Card className="border-purple-200 bg-purple-50 shadow-md">
             <CardHeader>
               <div className="flex items-center gap-2">
-                <Sparkles className="text-purple-600" size={20} />
+                <Sparkle className="text-purple-600" size={20} />
                 <CardTitle className="text-base">
                   💡 AI zauważyło wzorce
                 </CardTitle>

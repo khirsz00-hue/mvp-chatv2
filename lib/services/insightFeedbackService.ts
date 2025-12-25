@@ -3,7 +3,7 @@
  * Saves user feedback on passive insights to help improve recommendations
  */
 
-import { createClient } from '@/lib/supabaseClient'
+import { supabase } from '@/lib/supabaseClient'
 import { PassiveInsight } from './passiveInsightEngine'
 
 export async function saveInsightFeedback(
@@ -11,8 +11,6 @@ export async function saveInsightFeedback(
   insight: PassiveInsight,
   feedback: 'helpful' | 'not_helpful' | 'neutral'
 ): Promise<{ success: boolean; error?: string }> {
-  
-  const supabase = createClient()
   
   const { error } = await supabase
     .from('day_assistant_v2_recommendation_feedback')
