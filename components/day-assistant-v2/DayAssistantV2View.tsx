@@ -54,6 +54,14 @@ import { TimeStatsCompact } from '@/components/gamification/TimeStatsCompact'
 import { QuickAddModal } from './QuickAddModal'
 import { updateStreakOnCompletion, updateDailyStats, triggerConfetti, triggerMilestoneToast, recalculateDailyTotal } from '@/lib/gamification'
 import { useOverdueTasks } from '@/hooks/useOverdueTasks'
+import { MomentumStatusBar } from './MomentumStatusBar'
+import { RiskBadge } from './RiskBadge'
+import { BurnoutWarningModal } from './BurnoutWarningModal'
+import { SmartAlertDialog } from './SmartAlertDialog'
+import { trackMomentum } from '@/lib/momentumTracking'
+import { assessTasksRisk, RiskAssessment } from '@/lib/riskPrediction'
+import { assessBurnoutRisk, BurnoutAssessment } from '@/lib/burnoutPrevention'
+import { calculateQueueWithOverflow, generateOverflowAlert, OverflowAlert } from '@/lib/capacityManager'
 
 // Create a query client outside the component to avoid recreation on every render
 const queryClient = new QueryClient({
@@ -127,6 +135,13 @@ function DayAssistantV2Content() {
   
   // NEW: Quick add modal state
   const [showQuickAdd, setShowQuickAdd] = useState(false)
+  
+  // NEW: AI Features state
+  const [burnoutAssessment, setBurnoutAssessment] = useState<BurnoutAssessment | null>(null)
+  const [showBurnoutModal, setShowBurnoutModal] = useState(false)
+  const [taskRisks, setTaskRisks] = useState<Map<string, RiskAssessment>>(new Map())
+  const [overflowAlert, setOverflowAlert] = useState<OverflowAlert | null>(null)
+  const [showOverflowAlert, setShowOverflowAlert] = useState(false)
   
   // Track applied recommendation IDs to filter them out
   // Load from localStorage on mount and persist on change
@@ -424,6 +439,28 @@ function DayAssistantV2Content() {
       console.log('[DayAssistantV2] loadDayPlan() completed, loading state set to false')
     }
   }
+
+  // Load burnout assessment when component mounts
+  useEffect(() => {
+    if (sessionToken) {
+      assessBurnoutRisk(supabase.auth.getUser().then(({ data }) => data.user?.id || ''))
+        .then(assessment => {
+          setBurnoutAssessment(assessment)
+          if (assessment.riskLevel === 'high') {
+            setShowBurnoutModal(true)
+          }
+        })
+        .catch(err => console.error('Failed to assess burnout risk:', err))
+    }
+  }, [sessionToken])
+  
+  // Update task risks when tasks or queue changes
+  useEffect(() => {
+    if (tasks.length > 0 && queue.length > 0) {
+      const risks = assessTasksRisk(tasks, queue, dayPlan)
+      setTaskRisks(risks)
+    }
+  }, [tasks, queue, dayPlan])
 
   const filteredTasks = useMemo(() => {
     // Don't filter by due_date here - allow overdue tasks to pass through
@@ -1399,6 +1436,20 @@ function DayAssistantV2Content() {
               isUpdating={isReorderingQueue}
             />
 
+            {/* Momentum Status Bar - NEW! */}
+            {tasks.length > 0 && (
+              <MomentumStatusBar
+                momentum={trackMomentum(
+                  tasks.filter(t => t.completed).length,
+                  tasks.filter(t => t.due_date === selectedDate).length
+                )}
+                onActionClick={(action) => {
+                  console.log('Momentum action:', action)
+                  toast.info(`Akcja: ${action}`)
+                }}
+              />
+            )}
+
             {/* Add Break Button */}
             <Card className="p-4">
               <Button
@@ -1484,6 +1535,7 @@ function DayAssistantV2Content() {
                   onResumeTimer={resumeTimer}
                   onCompleteTimer={handleTimerComplete}
                   onSubtaskToggle={handleSubtaskToggle}
+                  riskAssessment={taskRisks.get(task.id)}
                 />
               ))}
             </CardContent>
@@ -2042,6 +2094,28 @@ function DayAssistantV2Content() {
         onReschedule={handleMorningReschedule}
         onDelete={handleMorningDelete}
       />
+      
+      {/* Burnout Warning Modal - NEW! */}
+      <BurnoutWarningModal
+        burnout={burnoutAssessment}
+        isOpen={showBurnoutModal}
+        onClose={() => setShowBurnoutModal(false)}
+        onAction={(action) => {
+          console.log('Burnout action:', action)
+          toast.info(`Akcja: ${action}`)
+        }}
+      />
+      
+      {/* Smart Overflow Alert - NEW! */}
+      <SmartAlertDialog
+        alert={overflowAlert}
+        isOpen={showOverflowAlert}
+        onClose={() => setShowOverflowAlert(false)}
+        onActionClick={(action, data) => {
+          console.log('Overflow action:', action, data)
+          toast.info(`Akcja: ${action}`)
+        }}
+      />
       </div>
     </>
   )
@@ -2084,7 +2158,8 @@ function TaskRow({
   onPauseTimer,
   onResumeTimer,
   onCompleteTimer,
-  onSubtaskToggle
+  onSubtaskToggle,
+  riskAssessment
 }: {
   task: TestDayTask
   queuePosition?: number
@@ -2104,6 +2179,7 @@ function TaskRow({
   onResumeTimer?: () => void
   onCompleteTimer?: () => void
   onSubtaskToggle?: (subtaskId: string, completed: boolean) => void
+  riskAssessment?: RiskAssessment
 }) {
   const shouldSuggestTen = focus <= 2 && task.estimate_min > 20
   
@@ -2204,6 +2280,7 @@ function TaskRow({
             )}
             {task.is_must && <span className="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-700">MUST</span>}
             <TaskBadges task={task} today={selectedDate} />
+            {riskAssessment && <RiskBadge risk={riskAssessment} />}
             {task.context_type && (
               <span className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600">
                 {task.context_type}

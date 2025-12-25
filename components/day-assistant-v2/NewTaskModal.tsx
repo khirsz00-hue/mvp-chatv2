@@ -5,6 +5,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import Button from '@/components/ui/Button'
 import { Lightning, Brain, Envelope, ChatCircle, Calendar, Tag } from '@phosphor-icons/react'
 import { TaskContext } from '@/lib/services/contextInferenceService'
+import { AISuggestionBadge } from './AISuggestionBadge'
+import { analyzeTaskPatterns, suggestEstimate, EstimateSuggestion, TaskPattern } from '@/lib/taskLearning'
+import { supabase } from '@/lib/supabaseClient'
 
 export interface NewTaskData {
   title: string
@@ -37,7 +40,10 @@ export function NewTaskModal({ isOpen, onClose, onSubmit, defaultDate }: NewTask
   const [tagsInput, setTagsInput] = useState('')
   const [isMust, setIsMust] = useState(false)
   const [isImportant, setIsImportant] = useState(false)
+  const [patterns, setPatterns] = useState<TaskPattern[]>([])
+  const [aiSuggestion, setAiSuggestion] = useState<EstimateSuggestion | null>(null)
 
+  // Load task patterns when modal opens
   useEffect(() => {
     if (isOpen) {
       // Reset form when opened
@@ -51,8 +57,35 @@ export function NewTaskModal({ isOpen, onClose, onSubmit, defaultDate }: NewTask
       setTagsInput('')
       setIsMust(false)
       setIsImportant(false)
+      setAiSuggestion(null)
+      
+      // Load AI patterns
+      loadPatterns()
     }
   }, [isOpen, defaultDate])
+  
+  // Update AI suggestion when estimate, context or cognitive load changes
+  useEffect(() => {
+    if (patterns.length > 0) {
+      const suggestion = suggestEstimate(
+        { context_type: contextType, cognitive_load: cognitiveLoad, estimate_min: estimateMin },
+        patterns
+      )
+      setAiSuggestion(suggestion)
+    }
+  }, [estimateMin, contextType, cognitiveLoad, patterns])
+  
+  const loadPatterns = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const taskPatterns = await analyzeTaskPatterns(user.id)
+        setPatterns(taskPatterns)
+      }
+    } catch (error) {
+      console.error('Failed to load task patterns:', error)
+    }
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -144,6 +177,12 @@ export function NewTaskModal({ isOpen, onClose, onSubmit, defaultDate }: NewTask
                 </button>
               ))}
             </div>
+            
+            {/* AI Suggestion Badge */}
+            <AISuggestionBadge 
+              suggestion={aiSuggestion}
+              onApply={(suggestedMinutes) => setEstimateMin(suggestedMinutes)}
+            />
           </div>
 
           {/* Cognitive Load Slider */}
