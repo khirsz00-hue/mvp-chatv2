@@ -68,16 +68,28 @@ interface ParseResponse {
   message?: string
 }
 
+// Error messages map for user-friendly error display
+const ERROR_MESSAGES: Record<string, string> = {
+  'network': 'Błąd połączenia. Sprawdź internet i spróbuj ponownie.',
+  'not-allowed': 'Brak dostępu do mikrofonu. Zezwól w ustawieniach przeglądarki.',
+  'no-speech': 'Nie wykryto mowy. Spróbuj mówić głośniej.',
+  'aborted': 'Nagrywanie przerwane.',
+  'audio-capture': 'Nie wykryto mikrofonu.',
+  'service-not-allowed': 'Usługa rozpoznawania mowy niedostępna.'
+}
+
 export function useVoiceRamble() {
   const [isRecording, setIsRecording] = useState(false)
   const [liveTranscription, setLiveTranscription] = useState('')
   const [parsedTasks, setParsedTasks] = useState<ParsedTask[]>([])
   const [lastAction, setLastAction] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [retryCount, setRetryCount] = useState(0)
 
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const fullTranscriptRef = useRef('')
   const isRecordingRef = useRef(false) // Use ref to avoid stale closure in onend
+  const retryCountRef = useRef(0) // Track retry count in ref for onend callback
 
   // Check browser compatibility
   const isSpeechRecognitionSupported = useMemo(() => {
@@ -186,11 +198,47 @@ export function useVoiceRamble() {
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error('❌ [Voice Ramble] Speech recognition error:', event.error)
+        
+        // Only show error toast for critical errors or repeated network errors
         if (event.error === 'no-speech') {
-          // Don't show error for no-speech, it's normal
+          // Don't show error for no-speech, it's normal during pauses
           return
         }
-        toast.error(`Błąd nagrywania: ${event.error}`)
+        
+        if (event.error === 'network') {
+          // Retry on network errors (max 3 attempts)
+          if (retryCountRef.current < 3) {
+            console.log(`🔄 [Voice Ramble] Retrying... (${retryCountRef.current + 1}/3)`)
+            retryCountRef.current += 1
+            setRetryCount(retryCountRef.current)
+            
+            // Wait 1 second before retry
+            setTimeout(() => {
+              if (isRecordingRef.current && recognitionRef.current) {
+                try {
+                  recognitionRef.current.start()
+                } catch (error) {
+                  console.error('❌ [Voice Ramble] Failed to restart after network error:', error)
+                }
+              }
+            }, 1000)
+            return
+          } else {
+            // Max retries exceeded - show error
+            toast.error(ERROR_MESSAGES[event.error])
+            setIsRecording(false)
+            isRecordingRef.current = false
+          }
+        } else if (['not-allowed', 'service-not-allowed', 'audio-capture'].includes(event.error)) {
+          // Critical errors - stop recording and show message
+          toast.error(ERROR_MESSAGES[event.error], { duration: 5000 })
+          setIsRecording(false)
+          isRecordingRef.current = false
+        } else {
+          // Other errors - show generic message
+          const message = ERROR_MESSAGES[event.error] || 'Wystąpił nieoczekiwany błąd'
+          toast.error(message)
+        }
       }
 
       recognition.onend = () => {
@@ -198,6 +246,9 @@ export function useVoiceRamble() {
         // Auto-restart if still recording (check ref to avoid stale closure)
         if (isRecordingRef.current && recognitionRef.current) {
           try {
+            // Reset retry count on successful restart
+            retryCountRef.current = 0
+            setRetryCount(0)
             recognition.start()
           } catch (error) {
             console.error('❌ [Voice Ramble] Failed to restart:', error)
@@ -209,6 +260,8 @@ export function useVoiceRamble() {
       recognitionRef.current = recognition
       setIsRecording(true)
       isRecordingRef.current = true
+      retryCountRef.current = 0 // Reset retry count on new recording
+      setRetryCount(0)
       fullTranscriptRef.current = ''
       setLiveTranscription('')
       setParsedTasks([])
