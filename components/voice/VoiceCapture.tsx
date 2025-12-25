@@ -4,7 +4,11 @@ import { useState } from 'react'
 import { Microphone } from '@phosphor-icons/react'
 import { VoiceRambleModal } from './VoiceRambleModal'
 
-export function VoiceCapture() {
+interface VoiceCaptureProps {
+  className?: string
+}
+
+export function VoiceCapture({ className }: VoiceCaptureProps) {
   const [isModalOpen, setIsModalOpen] = useState(false)
 
   const handleOpenModal = () => {
@@ -17,15 +21,13 @@ export function VoiceCapture() {
 
   return (
     <>
-      <div className="fixed bottom-6 right-6 z-50">
-        <button
-          onClick={handleOpenModal}
-          className="w-16 h-16 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 bg-gradient-to-r from-brand-purple to-brand-pink hover:scale-110 text-white"
-          title="Dyktuj zadania głosem"
-        >
-          <Microphone size={28} weight="fill" />
-        </button>
-      </div>
+      <button
+        onClick={handleOpenModal}
+        className={`w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 bg-gradient-to-r from-blue-600 to-indigo-600 hover:scale-110 text-white ${className || ''}`}
+        title="Dyktuj zadania głosem"
+      >
+        <Microphone size={28} weight="fill" />
+      </button>
 
       <VoiceRambleModal isOpen={isModalOpen} onClose={handleCloseModal} />
     </>

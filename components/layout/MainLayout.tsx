@@ -16,6 +16,7 @@ import { VoiceCapture } from '@/components/voice/VoiceCapture'
 import TrialBanner from '@/components/subscription/TrialBanner'
 import { FloatingAddButton } from '@/components/day-assistant-v2/FloatingAddButton'
 import { QuickAddModal } from '@/components/day-assistant-v2/QuickAddModal'
+import { NewTaskModal, NewTaskData } from '@/components/day-assistant-v2/NewTaskModal'
 import { TaskContext } from '@/lib/services/contextInferenceService'
 import { toast } from 'sonner'
 import { recalculateDailyTotal } from '@/lib/gamification'
@@ -138,12 +139,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
   
-  const handleQuickAdd = async (task: {
-    title: string
-    estimateMin: number
-    context: TaskContext
-    isMust: boolean
-  }) => {
+  const handleQuickAdd = async (taskData: NewTaskData) => {
     try {
       // Get fresh session token
       const { data: { session } } = await supabase.auth.getSession()
@@ -153,7 +149,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         return
       }
       
-      // ✅ VERIFIED API ENDPOINT
+      // ✅ VERIFIED API ENDPOINT - now supporting full task data
       const response = await fetch('/api/day-assistant-v2/task', {
         method: 'POST',
         headers: {
@@ -161,14 +157,16 @@ export default function MainLayout({ children }: MainLayoutProps) {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          title: task.title,
-          estimate_min: task.estimateMin,
-          cognitive_load: 2,  // Default
-          is_must: task.isMust,
-          is_important: task.isMust,
-          due_date: new Date().toISOString().split('T')[0],  // Today
-          context_type: task.context,
-          priority: 3  // Default
+          title: taskData.title,
+          description: taskData.description,
+          estimate_min: taskData.estimateMin,
+          cognitive_load: taskData.cognitiveLoad,
+          is_must: taskData.isMust,
+          is_important: taskData.isImportant,
+          due_date: taskData.dueDate,
+          context_type: taskData.contextType,
+          priority: taskData.priority,
+          tags: taskData.tags
         })
       })
       
@@ -323,16 +321,21 @@ export default function MainLayout({ children }: MainLayoutProps) {
             </div>
             
             {/* 🎮 GAMIFICATION: Voice Capture Button */}
-            <VoiceCapture />
+            {/* Floating Action Buttons - Stacked vertically */}
+            <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
+              {/* Add Task Button - Top */}
+              <FloatingAddButton onClick={() => setShowQuickAdd(true)} />
+              
+              {/* Voice Ramble Button - Bottom */}
+              <VoiceCapture />
+            </div>
             
-            {/* Global Quick Add Button */}
-            <FloatingAddButton onClick={() => setShowQuickAdd(true)} />
-            
-            {/* Quick Add Modal */}
-            <QuickAddModal
+            {/* Full Featured Task Modal (replaces simplified QuickAddModal) */}
+            <NewTaskModal
               isOpen={showQuickAdd}
               onClose={() => setShowQuickAdd(false)}
               onSubmit={handleQuickAdd}
+              defaultDate={new Date().toISOString().split('T')[0]}
             />
           </div>
         </SubscriptionWall>
@@ -366,16 +369,21 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </div>
           
           {/* 🎮 GAMIFICATION: Voice Capture Button */}
-          <VoiceCapture />
+          {/* Floating Action Buttons - Stacked vertically */}
+          <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
+            {/* Add Task Button - Top */}
+            <FloatingAddButton onClick={() => setShowQuickAdd(true)} />
+            
+            {/* Voice Ramble Button - Bottom */}
+            <VoiceCapture />
+          </div>
           
-          {/* Global Quick Add Button */}
-          <FloatingAddButton onClick={() => setShowQuickAdd(true)} />
-          
-          {/* Quick Add Modal */}
-          <QuickAddModal
+          {/* Full Featured Task Modal (replaces simplified QuickAddModal) */}
+          <NewTaskModal
             isOpen={showQuickAdd}
             onClose={() => setShowQuickAdd(false)}
             onSubmit={handleQuickAdd}
+            defaultDate={new Date().toISOString().split('T')[0]}
           />
         </div>
       )}
