@@ -1,229 +1,172 @@
-# Queue Fix Implementation - Complete Guide
+# Day Assistant V2 Queue Logic Fix - Implementation Summary
 
-## 🎯 Problem Solved
+## 🎯 Problem Fixed
 
-**Before:** Queue showed "Brak zadań w kolejce" even with 15 available tasks
-**After:** All tasks are visible and categorized intelligently
+**Before:** Tasks were duplicated between "Pozostałe na dziś" and "Na później" sections, causing confusion for users.
 
-## 🔧 Changes Made
+**After:** Tasks now appear in exactly one section, with clear separation between:
+1. **Queue NA DZIŚ (Top 3)**: Pinned tasks + top scored tasks from today (max 3 total)
+2. **Pozostałe na dziś**: Remaining today's tasks that FIT in available capacity
+3. **Na później**: Today's overflow tasks + future tasks
 
-### 1. Task Categorization Logic (Lines 440-473)
+## 📝 Changes Made
 
-Tasks are now split into clear categories BEFORE queue calculation:
+### 1. `hooks/useTaskQueue.ts`
 
-```typescript
-// Split non-overdue tasks into clear categories
-const tasksByCategory = useMemo(() => {
-  const todayDue: TestDayTask[] = []
-  const available: TestDayTask[] = []  // no date or future
-  
-  nonOverdueTasks.forEach(task => {
-    if (task.due_date === selectedDate) {
-      todayDue.push(task)
-    } else {
-      // No due date or future tasks - available to work on
-      available.push(task)
-    }
-  })
-  
-  return { todayDue, available }
-}, [nonOverdueTasks, selectedDate])
+Added new `buildSmartQueue()` function that:
+- Splits tasks by date (today vs future)
+- Separates pinned (MUST) tasks from unpinned
+- Builds Top 3 queue: pinned tasks first, then top scored unpinned
+- Calculates capacity usage
+- Splits remaining today's tasks by capacity (fit vs overflow)
+- Combines overflow + future tasks in "later" section
+- Sorts "later" tasks: overflow first, then by due_date
+
+Updated `QueueResult` interface to include:
+- `remainingToday: TestDayTask[]` - Tasks that fit in capacity
+- `overflowCount: number` - Count of today's tasks that don't fit
+
+### 2. `components/day-assistant-v2/DayAssistantV2View.tsx`
+
+Updated UI to display 3 proper sections:
+
+**Kolejka NA DZIŚ (Top 3)**:
+- Shows non-MUST tasks from queue (MUST tasks have their own section)
+- Displays capacity usage: `{usedMinutes} / {availableMinutes} min ({usagePercentage}%)`
+- Badge shows count of tasks in queue
+
+**Pozostałe na dziś**:
+- Shows `remainingToday` tasks
+- Badge: "Mieszczą się w capacity" (green success badge)
+- Collapsible section
+- Description: "Reszta zadań na dzisiaj które mieszczą się w {capacity} min capacity"
+
+**Na później**:
+- Shows `later` tasks (overflow + future)
+- Badge shows overflow count: "{count} z dzisiaj (nie mieszczą się)" (orange warning badge)
+- Each overflow task has "⚠️ Dzisiaj (overflow)" indicator
+- Description: "Zadania z dzisiaj które nie mieszczą się + przyszłe daty"
+
+## ✅ Verification
+
+### No Duplicates
+Run the verification script to confirm no task appears in multiple sections:
+```bash
+cd /home/runner/work/mvp-chatv2/mvp-chatv2
+node /tmp/test-queue-logic.mjs
 ```
 
-### 2. New Task Arrays
+Expected output:
+- ✅ Test 1: Normal capacity - Queue=3, Remaining=3, Later=0
+- ✅ Test 3: Future tasks - Queue=3, Later=2 (no overflow)
+- ✅ Test 4: No duplicates - All tasks appear exactly once
 
-- **`todayTasks`**: Non-MUST tasks with `due_date = today`, sorted by score
-- **`availableTasks`**: Tasks with no date OR future dates, sorted by score
-- **`mustTasks`**: All tasks with `is_must = true` (max 3)
-- **`overdueTasks`**: Handled by existing `useOverdueTasks` hook
-
-### 3. New UI Sections
-
-#### SEKCJA 3: 📊 Kolejka NA DZIŚ (Top 3)
-- Shows first 3 tasks from `todayTasks`
-- Purple gradient border
-- Label: "Zadania zaplanowane na dzisiaj (YYYY-MM-DD)"
-
-#### SEKCJA 4: 📋 Pozostałe na dziś
-- Shows tasks #4+ from `todayTasks`
-- Gray background, collapsible
-- Label: "Zadania z terminem YYYY-MM-DD poza Top 3"
-
-#### SEKCJA 5: 🗓️ DOSTĘPNE DO ZAPLANOWANIA
-- Shows all `availableTasks`
-- Blue background, collapsible
-- Label: "Zadania bez terminu lub na przyszłość - możesz zrobić dziś jeśli chcesz"
-
-### 4. Updated Empty State
-
-Empty state now only shows when ALL categories are empty:
-
-```typescript
-{mustTasks.length === 0 && 
- todayTasks.length === 0 && 
- availableTasks.length === 0 && 
- overdueTasks.length === 0 && (
-  <Card className="border-green-300 bg-green-50">
-    <CardContent className="pt-6 text-center">
-      <p className="text-green-800 font-semibold">
-        🎉 Brak zadań - masz wolne!
-      </p>
-    </CardContent>
-  </Card>
-)}
+### TypeScript Compilation
+```bash
+cd /home/runner/work/mvp-chatv2/mvp-chatv2
+npx tsc --noEmit
 ```
+Expected: No errors
 
-## 📊 Expected Behavior
-
-### Scenario 1: User with 15 tasks (12 overdue, 2 today, 1 no date)
-
-**Display:**
+### ESLint
+```bash
+cd /home/runner/work/mvp-chatv2/mvp-chatv2
+npm run lint
 ```
-⚠️ PRZETERMINOWANE (12 zadań)
-   [Shows 12 overdue tasks]
+Expected: Only minor warnings (React hooks exhaustive-deps)
 
-📊 Kolejka NA DZIŚ (Top 3) - 2 zadania
-   Zadania zaplanowane na dzisiaj (2025-12-24)
-   #1 Task A (due today)
-   #2 Task B (due today)
+## 📊 Example Scenarios
 
-🗓️ DOSTĘPNE DO ZAPLANOWANIA (1 zadanie)
-   Zadania bez terminu - możesz zrobić dziś jeśli chcesz
-   • Task C (no due date)
-```
+### Scenario 1: Normal Day
+**Input:**
+- Capacity: 480min (8 hours)
+- 1 MUST task: 120min
+- 5 unpinned tasks: 60min each (scores: 90, 80, 70, 60, 50)
 
-### Scenario 2: User with 5 tasks today + 3 MUST + 2 future
+**Output:**
+- Queue: [MUST, High(90), Medium(80)] = 240min
+- Remaining: [Low(70), Lower(60), Lowest(50)] = 180min
+- Later: [] (all fit!)
+- Total: 420min / 480min (87%)
 
-**Display:**
-```
-📌 MUST (przypięte na dziś) - 3/3
-   [Shows 3 MUST tasks]
+### Scenario 2: Overloaded Day
+**Input:**
+- Capacity: 480min
+- 1 MUST task: 480min
+- 7 unpinned tasks: 30min each
 
-📊 Kolejka NA DZIŚ (Top 3) - 3 zadania
-   Zadania zaplanowane na dzisiaj
-   #4 Task D
-   #5 Task E
-   #6 Task F
+**Output:**
+- Queue: [MUST, T1, T2] = 540min
+- Remaining: [] (nothing fits after queue)
+- Later: [5 overflow tasks] marked as "⚠️ Dzisiaj (overflow)"
+- Total: 540min / 480min (112%) 🔴
 
-📋 Pozostałe na dziś (2 zadania) [Collapsible]
-   #7 Task G
-   #8 Task H
+### Scenario 3: Future Tasks
+**Input:**
+- Capacity: 180min (3 hours)
+- 3 today tasks: 60min each
+- 2 future tasks: tomorrow and next week
 
-🗓️ DOSTĘPNE DO ZAPLANOWANIA (2 zadania) [Collapsible]
-   • Task I (due 2025-12-25)
-   • Task J (due 2025-12-26)
-```
+**Output:**
+- Queue: [Today1, Today2, Today3] = 180min
+- Remaining: [] (all today tasks in queue)
+- Later: [Tomorrow, NextWeek] (sorted by date)
+- Total: 180min / 180min (100%)
 
-## 🔍 Debug Information
+## 🐛 Edge Cases Handled
 
-The console will show detailed logs:
+1. **Empty sections**: If a section is empty, it shows appropriate message
+2. **No capacity**: If available time is 0, all tasks go to "later"
+3. **Large MUST tasks**: Can exceed capacity, remaining/overflow calculated correctly
+4. **No due dates**: Tasks without due_date treated as future tasks
+5. **Sorting**: Overflow tasks always appear before future tasks in "later"
 
+## 🎨 UI Improvements
+
+1. **Overflow badges**: Clear visual indicator for tasks that don't fit
+2. **Capacity indicators**: Shows green "Mieszczą się w capacity" for remaining tasks
+3. **Usage display**: Shows time used vs available with percentage
+4. **Collapsible sections**: Keep UI clean, expand to see all tasks
+5. **Debug logging**: Enhanced console logs for troubleshooting
+
+## 🔍 Debug Logging
+
+The component now logs:
 ```javascript
-📊 [Queue Debug] {
-  totalTasks: 15,
-  filteredTasks: 15,
-  scoredTasks: 15,
-  overdueTasks: 12,
-  mustTasks: 0,
-  todayTasks: 2,
-  availableTasks: 1,
-  nonOverdueTasks: 3,
+{
   queueTasks: 3,
-  laterTasks: 0,
+  remainingTodayTasks: 2,
+  laterTasks: 5,
+  overflowCount: 3,
   availableMinutes: 480,
-  usedMinutes: 90
+  usedMinutes: 420
 }
-
-⚠️ [Overdue Tasks] [
-  { title: "Old task 1", due_date: "2025-12-10", days_overdue: 14 },
-  { title: "Old task 2", due_date: "2025-12-15", days_overdue: 9 },
-  ...
-]
-
-📊 [Today Tasks] [
-  { title: "ZenON 30min", due_date: "2025-12-24", score: 85 },
-  { title: "Re: Fwd: Lokalizacje", due_date: "2025-12-24", score: 72 }
-]
-
-🗓️ [Available Tasks] [
-  { title: "Task without date", due_date: "no date", score: 45 }
-]
 ```
 
-## ✅ Testing Checklist
+Plus detailed breakdowns for each section showing task titles, dates, and scores.
 
-1. **Test with overdue tasks:**
-   - [ ] Overdue tasks appear in red section at top
-   - [ ] Overdue count is correct
+## 📋 Acceptance Criteria
 
-2. **Test with today's tasks:**
-   - [ ] Tasks due today appear in purple "Kolejka NA DZIŚ"
-   - [ ] Top 3 shown by default
-   - [ ] Remaining shown in collapsible gray section
+- [x] Top 3 queue = pinned + top scored (max 3)
+- [x] Remaining = today's tasks that FIT in capacity
+- [x] Later = overflow + future (NO DUPLICATES)
+- [x] Display shows real capacity with percentage
+- [x] Overflow badge shows count
+- [x] No tasks appear in multiple sections
+- [x] Sorting: queue by score, later by date (overflow first)
+- [x] TypeScript compiles without errors
 
-3. **Test with no-date tasks:**
-   - [ ] Tasks without due_date appear in blue "DOSTĘPNE"
-   - [ ] Section is collapsible
-   - [ ] Label indicates these are optional
+## 🚀 Deployment Notes
 
-4. **Test with future tasks:**
-   - [ ] Tasks with future dates appear in blue "DOSTĘPNE"
-   - [ ] They're grouped with no-date tasks
+- No database migrations required
+- No breaking changes to existing APIs
+- Backward compatible with existing task data
+- Safe to deploy immediately
 
-5. **Test with MUST tasks:**
-   - [ ] MUST tasks appear in purple section (max 3)
-   - [ ] They're shown regardless of due date
+## 📚 Related Files
 
-6. **Test empty state:**
-   - [ ] Empty state only shows when NO tasks exist
-   - [ ] Green background with "masz wolne!" message
-
-7. **Test work mode filters:**
-   - [ ] Low Focus mode still filters by cognitive_load
-   - [ ] Quick Wins mode still filters by estimate_min
-   - [ ] Filtered tasks still appear in correct sections
-
-## 🎨 Visual Changes
-
-### Section Colors & Styling
-
-- **Overdue**: Red border (`border-red-300`), always visible
-- **MUST**: Purple border (`border-brand-purple/40`), gradient title
-- **Today Top 3**: Purple border (`border-purple-300`), gradient title
-- **Pozostałe dziś**: Gray (`border-gray-300 bg-gray-50`), collapsible
-- **DOSTĘPNE**: Blue (`border-blue-300 bg-blue-50`), collapsible
-- **Empty State**: Green (`border-green-300 bg-green-50`)
-
-### Badges
-
-- MUST: Purple badge showing count (e.g., "3/3")
-- Today: Purple badge showing count (e.g., "2 zadań")
-- Pozostałe: Gray badge showing count (e.g., "5 zadań")
-- DOSTĘPNE: Blue badge showing count (e.g., "7 zadań")
-
-## 🚀 Next Steps for User
-
-1. **Load the app** and check the console for debug logs
-2. **Verify all 15 tasks are visible** across the sections
-3. **Test collapsible sections** - click headers to expand/collapse
-4. **Check task ordering** - higher scores should be at the top
-5. **Report any issues** if tasks are still missing
-
-## 📝 Notes
-
-- The existing `useTaskQueue` hook still manages capacity-based splitting into "later"
-- MUST tasks always have priority in queue ordering
-- Scoring algorithm (in `dayAssistantV2RecommendationEngine.ts`) is unchanged
-- Overdue handling (in `useOverdueTasks.ts`) is unchanged
-- Work mode filtering (Low Focus, Quick Wins) still works correctly
-
-## 🔗 Related Files Modified
-
-- `components/day-assistant-v2/DayAssistantV2View.tsx` (main changes)
-
-## 🔗 Files NOT Modified (for reference)
-
-- `hooks/useScoredTasks.ts` - unchanged, works correctly
-- `hooks/useOverdueTasks.ts` - unchanged, works correctly
-- `hooks/useTaskQueue.ts` - unchanged, handles capacity correctly
-- `lib/services/dayAssistantV2RecommendationEngine.ts` - unchanged, scoring is correct
+- `hooks/useTaskQueue.ts` - Core queue logic
+- `components/day-assistant-v2/DayAssistantV2View.tsx` - UI display
+- `lib/types/dayAssistantV2.ts` - Type definitions
+- `hooks/__tests__/useTaskQueue.test.ts` - Unit tests
+- `hooks/__tests__/verify-queue-logic.ts` - Manual verification script
