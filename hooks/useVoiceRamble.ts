@@ -195,7 +195,7 @@ export function useVoiceRamble() {
 
     retryCountRef.current++
     setRetryCount(retryCountRef.current)
-    const delay = Math.min(2000 * currentRetry, 10000)  // 0s, 2s, 4s (max 10s)
+    const delay = 2000 * currentRetry  // 0s, 2s, 4s
     
     console.log(`[Voice Ramble] Network error - retrying in ${delay}ms... (${currentRetry + 1}/${maxRetries})`)
     toast.info(`Ponawiam próbę (${currentRetry + 1}/${maxRetries})...`)
@@ -241,15 +241,8 @@ export function useVoiceRamble() {
       if (isRecordingRef.current && recognitionRef.current) {
         // Use setTimeout to avoid immediate restart issues
         setTimeout(() => {
-          if (isRecordingRef.current && recognitionRef.current && !isRecognitionActive) {
-            try {
-              recognitionRef.current.start()
-              console.log('[Voice Ramble] Auto-restarted after onend')
-            } catch (error: any) {
-              if (error.name !== 'InvalidStateError') {
-                console.error('[Voice Ramble] Failed to auto-restart:', error)
-              }
-            }
+          if (isRecordingRef.current) {
+            safeStartRecognition()
           }
         }, 100)
       }
@@ -308,7 +301,7 @@ export function useVoiceRamble() {
         toast.error(`Błąd rozpoznawania: ${event.error}`)
       }
     }
-  }, [debouncedParse, handleNetworkError, handleNoSpeech])
+  }, [debouncedParse, handleNetworkError, handleNoSpeech, safeStartRecognition])
 
   // Start recording
   const startRecording = useCallback(() => {
