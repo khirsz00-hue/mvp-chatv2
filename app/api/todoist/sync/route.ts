@@ -7,7 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createAuthenticatedSupabaseClient } from '@/lib/supabaseAuth'
 import { inferTaskContext, TaskContext } from '@/lib/services/contextInferenceService'
 
 export const dynamic = 'force-dynamic'
@@ -220,23 +220,25 @@ async function mapTodoistToDayAssistantTask(
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        global: {
-          headers: {
-            Authorization: request.headers.get('Authorization') || ''
-          }
-        }
-      }
-    )
+    console.log('🔍 [Todoist Sync API] Starting sync request')
+    
+    // Create authenticated Supabase client (uses cookies for session)
+    const supabase = await createAuthenticatedSupabaseClient()
 
     // Authenticate user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      console.error('❌ [Todoist Sync API] Authentication failed:', authError?.message || 'No user')
+      return NextResponse.json(
+        { 
+          error: 'Unauthorized',
+          details: authError?.message || 'No valid session found'
+        },
+        { status: 401 }
+      )
     }
+    
+    console.log('✅ [Todoist Sync API] User authenticated:', user.id)
 
     // Check cache - has sync happened recently?
     const { data: syncMeta } = await supabase
@@ -270,18 +272,25 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (profileError) {
-      console.error('[Sync] Error fetching Todoist token:', profileError)
+      console.error('❌ [Todoist Sync API] Error fetching Todoist token:', profileError)
     }
 
     const todoistToken = profile?.todoist_token
     if (!todoistToken) {
+      console.error('❌ [Todoist Sync API] No Todoist token found for user')
       return NextResponse.json(
-        { error: 'Todoist token not found - please connect your account' },
+        { 
+          error: 'Todoist not connected',
+          details: 'Please connect your Todoist account in settings'
+        },
         { status: 400 }
       )
     }
+    
+    console.log('✅ [Todoist Sync API] Todoist token found')
 
     // Fetch all tasks from Todoist API
+    console.log('🔍 [Todoist Sync API] Fetching tasks from Todoist API')
     let todoistResponse = await fetch('https://api.todoist.com/rest/v2/tasks', {
       headers: {
         Authorization: `Bearer ${todoistToken}`
@@ -291,22 +300,24 @@ export async function POST(request: NextRequest) {
 
     // Handle 401 Unauthorized - token might be expired or invalid
     if (todoistResponse.status === 401) {
-      console.error('[Sync] Todoist API 401 Unauthorized - token might be expired')
+      console.error('❌ [Todoist Sync API] Todoist API 401 Unauthorized - token expired')
       
-      // Try to refresh the token or clear it
-      // For now, we'll clear the token and ask user to reconnect
+      // Clear the invalid token
       const { error: clearError } = await supabase
         .from('user_profiles')
         .update({ todoist_token: null })
         .eq('id', user.id)
       
       if (clearError) {
-        console.error('[Sync] Error clearing invalid token:', clearError)
+        console.error('❌ [Todoist Sync API] Error clearing invalid token:', clearError)
+      } else {
+        console.log('✅ [Todoist Sync API] Cleared invalid Todoist token')
       }
       
       return NextResponse.json(
         { 
-          error: 'Todoist authorization expired - please reconnect your account',
+          error: 'Todoist token expired',
+          details: 'Please reconnect your Todoist account in settings',
           error_code: 'TODOIST_AUTH_EXPIRED',
           needs_reconnect: true
         },
@@ -315,7 +326,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!todoistResponse.ok) {
-      console.error(`[Sync] Todoist API error: ${todoistResponse.status}`)
+      console.error(`❌ [Todoist Sync API] Todoist API error: ${todoistResponse.status}`)
       return NextResponse.json(
         { 
           error: `Failed to fetch tasks from Todoist (${todoistResponse.status})`,
@@ -325,6 +336,8 @@ export async function POST(request: NextRequest) {
         { status: todoistResponse.status }
       )
     }
+    
+    console.log('✅ [Todoist Sync API] Successfully fetched tasks from Todoist')
 
     const todoistTasks: TodoistTask[] = await todoistResponse.json()
     
@@ -621,9 +634,12 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('[Sync] ❌ Error in sync:', error)
+    console.error('❌ [Todoist Sync API] Unexpected error:', error)
     return NextResponse.json(
-      { error: 'Internal server error during sync' },
+      { 
+        error: 'Internal server error during sync',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     )
   }
