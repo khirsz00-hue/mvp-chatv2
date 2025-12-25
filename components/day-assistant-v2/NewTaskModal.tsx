@@ -42,11 +42,18 @@ export function NewTaskModal({ isOpen, onClose, onSubmit, defaultDate }: NewTask
   const [isImportant, setIsImportant] = useState(false)
   const [patterns, setPatterns] = useState<TaskPattern[]>([])
   const [aiSuggestion, setAiSuggestion] = useState<EstimateSuggestion | null>(null)
+  const [patternsLoaded, setPatternsLoaded] = useState(false)
 
-  // Load task patterns when modal opens
+  // Load task patterns once when component mounts (not on every modal open)
+  useEffect(() => {
+    if (!patternsLoaded) {
+      loadPatterns()
+    }
+  }, [patternsLoaded])
+
+  // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
-      // Reset form when opened
       setTitle('')
       setDescription('')
       setEstimateMin(25)
@@ -58,9 +65,6 @@ export function NewTaskModal({ isOpen, onClose, onSubmit, defaultDate }: NewTask
       setIsMust(false)
       setIsImportant(false)
       setAiSuggestion(null)
-      
-      // Load AI patterns
-      loadPatterns()
     }
   }, [isOpen, defaultDate])
   
@@ -81,6 +85,7 @@ export function NewTaskModal({ isOpen, onClose, onSubmit, defaultDate }: NewTask
       if (user) {
         const taskPatterns = await analyzeTaskPatterns(user.id)
         setPatterns(taskPatterns)
+        setPatternsLoaded(true)
       }
     } catch (error) {
       console.error('Failed to load task patterns:', error)

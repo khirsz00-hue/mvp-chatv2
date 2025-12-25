@@ -117,12 +117,28 @@ export async function recordActualDuration(
   actualDurationMin: number
 ): Promise<void> {
   try {
+    // First, get current metadata
+    const { data: task, error: fetchError } = await supabase
+      .from('day_assistant_v2_tasks')
+      .select('metadata')
+      .eq('id', taskId)
+      .single()
+    
+    if (fetchError) {
+      console.error('❌ [TaskLearning] Failed to fetch task metadata:', fetchError)
+      return
+    }
+    
+    // Merge with existing metadata
+    const updatedMetadata = {
+      ...(task?.metadata || {}),
+      actual_duration_min: actualDurationMin
+    }
+    
     const { error } = await supabase
       .from('day_assistant_v2_tasks')
       .update({
-        metadata: {
-          actual_duration_min: actualDurationMin
-        }
+        metadata: updatedMetadata
       })
       .eq('id', taskId)
     

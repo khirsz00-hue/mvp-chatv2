@@ -36,18 +36,29 @@ async function getUserActivityLast7Days(userId: string): Promise<DayActivity[]> 
       dayjs().subtract(i, 'day').format('YYYY-MM-DD')
     )
     
+    // Fetch all tasks for last 7 days in a single query
+    const { data: allTasks } = await supabase
+      .from('day_assistant_v2_tasks')
+      .select('completed, estimate_min, metadata, due_date')
+      .eq('user_id', userId)
+      .in('due_date', last7Days)
+    
+    if (!allTasks) return []
+    
+    // Group tasks by date
+    const tasksByDate = new Map<string, typeof allTasks>()
+    allTasks.forEach(task => {
+      const date = task.due_date
+      if (!tasksByDate.has(date)) {
+        tasksByDate.set(date, [])
+      }
+      tasksByDate.get(date)!.push(task)
+    })
+    
     const activities: DayActivity[] = []
     
     for (const date of last7Days) {
-      // Get tasks for this day
-      const { data: tasks } = await supabase
-        .from('day_assistant_v2_tasks')
-        .select('completed, estimate_min, metadata')
-        .eq('user_id', userId)
-        .eq('due_date', date)
-      
-      if (!tasks) continue
-      
+      const tasks = tasksByDate.get(date) || []
       const completedTasks = tasks.filter(t => t.completed)
       const workedMinutes = completedTasks.reduce((sum, t) => {
         const actual = t.metadata?.actual_duration_min || t.estimate_min
