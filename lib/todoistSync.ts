@@ -12,6 +12,34 @@ let lastSyncTime = 0
 const SYNC_DEBOUNCE_MS = 30000 // 30 seconds - sensible interval for Todoist API to avoid rate limiting
 
 /**
+ * Safely parse JSON response, returning empty object on error
+ */
+async function safeParseJson(response: Response): Promise<any> {
+  try {
+    return await response.json()
+  } catch {
+    return {}
+  }
+}
+
+/**
+ * Show appropriate error toast based on error response
+ */
+function showErrorToast(errorData: any, statusCode: number) {
+  if (errorData.error === 'Todoist not connected') {
+    toast.error('Todoist nie jest połączony. Połącz w ustawieniach.')
+  } else if (errorData.error === 'Todoist token expired') {
+    toast.error('Token Todoist wygasł. Połącz ponownie w ustawieniach.')
+  } else if (statusCode === 401) {
+    toast.error('Sesja wygasła. Zaloguj się ponownie.')
+  } else if (statusCode >= 500) {
+    toast.error('Błąd serwera podczas synchronizacji')
+  } else {
+    toast.error('Błąd synchronizacji z Todoist')
+  }
+}
+
+/**
  * Coordinated sync that prevents concurrent/redundant syncs
  * Automatically handles token refresh on 401 errors
  * @param authToken - Bearer token for authentication (optional, will get fresh token if not provided)
@@ -96,15 +124,8 @@ async function performSyncWithRetry(authToken?: string): Promise<Response> {
         console.error('❌ [SyncCoordinator] Token refresh failed:', refreshError)
         
         // Parse error message to provide better feedback
-        const errorData = await response.json().catch(() => ({}))
-        
-        if (errorData.error === 'Todoist not connected') {
-          toast.error('Todoist nie jest połączony. Połącz w ustawieniach.')
-        } else if (errorData.error === 'Todoist token expired') {
-          toast.error('Token Todoist wygasł. Połącz ponownie w ustawieniach.')
-        } else {
-          toast.error('Sesja wygasła. Zaloguj się ponownie.')
-        }
+        const errorData = await safeParseJson(response)
+        showErrorToast(errorData, response.status)
         
         return response
       }
@@ -121,18 +142,9 @@ async function performSyncWithRetry(authToken?: string): Promise<Response> {
       })
       
       if (!retryResponse.ok) {
-        const errorData = await retryResponse.json().catch(() => ({}))
+        const errorData = await safeParseJson(retryResponse)
         console.error('❌ [SyncCoordinator] Retry failed:', retryResponse.status, errorData)
-        
-        // Show appropriate error message
-        if (errorData.error === 'Todoist not connected') {
-          toast.error('Todoist nie jest połączony. Połącz w ustawieniach.')
-        } else if (errorData.error === 'Todoist token expired') {
-          toast.error('Token Todoist wygasł. Połącz ponownie w ustawieniach.')
-        } else {
-          toast.error('Błąd synchronizacji z Todoist')
-        }
-        
+        showErrorToast(errorData, retryResponse.status)
         return retryResponse
       }
       
@@ -143,20 +155,9 @@ async function performSyncWithRetry(authToken?: string): Promise<Response> {
     
     // Handle other errors
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
+      const errorData = await safeParseJson(response)
       console.error('❌ [SyncCoordinator] Sync failed:', response.status, errorData)
-      
-      // Show appropriate error message
-      if (errorData.error === 'Todoist not connected') {
-        toast.error('Todoist nie jest połączony. Połącz w ustawieniach.')
-      } else if (errorData.error === 'Todoist token expired') {
-        toast.error('Token Todoist wygasł. Połącz ponownie w ustawieniach.')
-      } else if (response.status >= 500) {
-        toast.error('Błąd serwera podczas synchronizacji')
-      } else {
-        toast.error('Błąd synchronizacji z Todoist')
-      }
-      
+      showErrorToast(errorData, response.status)
       return response
     }
     
