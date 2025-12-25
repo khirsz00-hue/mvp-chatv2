@@ -68,6 +68,16 @@ interface ParseResponse {
   message?: string
 }
 
+// Error messages map for user-friendly error display
+const ERROR_MESSAGES: Record<string, string> = {
+  'network': 'Błąd połączenia. Sprawdź internet i spróbuj ponownie.',
+  'not-allowed': 'Brak dostępu do mikrofonu. Zezwól w ustawieniach przeglądarki.',
+  'no-speech': 'Nie wykryto mowy. Spróbuj mówić głośniej.',
+  'aborted': 'Nagrywanie przerwane.',
+  'audio-capture': 'Nie wykryto mikrofonu.',
+  'service-not-allowed': 'Usługa rozpoznawania mowy niedostępna.'
+}
+
 export function useVoiceRamble() {
   const [isRecording, setIsRecording] = useState(false)
   const [liveTranscription, setLiveTranscription] = useState('')
@@ -189,16 +199,6 @@ export function useVoiceRamble() {
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error('❌ [Voice Ramble] Speech recognition error:', event.error)
         
-        // Map errors to user-friendly messages
-        const errorMessages: Record<string, string> = {
-          'network': 'Błąd połączenia. Sprawdź internet i spróbuj ponownie.',
-          'not-allowed': 'Brak dostępu do mikrofonu. Zezwól w ustawieniach przeglądarki.',
-          'no-speech': 'Nie wykryto mowy. Spróbuj mówić głośniej.',
-          'aborted': 'Nagrywanie przerwane.',
-          'audio-capture': 'Nie wykryto mikrofonu.',
-          'service-not-allowed': 'Usługa rozpoznawania mowy niedostępna.'
-        }
-        
         // Only show error toast for critical errors or repeated network errors
         if (event.error === 'no-speech') {
           // Don't show error for no-speech, it's normal during pauses
@@ -225,18 +225,18 @@ export function useVoiceRamble() {
             return
           } else {
             // Max retries exceeded - show error
-            toast.error(errorMessages[event.error])
+            toast.error(ERROR_MESSAGES[event.error])
             setIsRecording(false)
             isRecordingRef.current = false
           }
         } else if (['not-allowed', 'service-not-allowed', 'audio-capture'].includes(event.error)) {
           // Critical errors - stop recording and show message
-          toast.error(errorMessages[event.error], { duration: 5000 })
+          toast.error(ERROR_MESSAGES[event.error], { duration: 5000 })
           setIsRecording(false)
           isRecordingRef.current = false
         } else {
           // Other errors - show generic message
-          const message = errorMessages[event.error] || 'Wystąpił nieoczekiwany błąd'
+          const message = ERROR_MESSAGES[event.error] || 'Wystąpił nieoczekiwany błąd'
           toast.error(message)
         }
       }

@@ -81,13 +81,21 @@ export function NewTaskModal({ isOpen, onClose, onSubmit, defaultDate }: NewTask
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent 
+        className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto"
+        aria-labelledby="new-task-modal-title"
+        aria-describedby="new-task-modal-description"
+      >
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle id="new-task-modal-title" className="flex items-center gap-2">
             <Lightning size={24} className="text-brand-purple" weight="fill" />
             Dodaj nowe zadanie
           </DialogTitle>
         </DialogHeader>
+        
+        <div id="new-task-modal-description" className="sr-only">
+          Formularz dodawania nowego zadania z wszystkimi opcjami konfiguracji
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Title Input */}
@@ -306,8 +314,8 @@ export function NewTaskModal({ isOpen, onClose, onSubmit, defaultDate }: NewTask
             </Button>
           </div>
 
-          <p className="text-xs text-center text-gray-500">
-            Naciśnij <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">Enter</kbd> aby dodać lub <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">Esc</kbd> aby anulować
+          <p className="text-xs text-center text-gray-500" role="note">
+            Naciśnij <kbd className="px-2 py-1 bg-gray-100 rounded text-xs" aria-label="klawisz Enter">Enter</kbd> aby dodać lub <kbd className="px-2 py-1 bg-gray-100 rounded text-xs" aria-label="klawisz Escape">Esc</kbd> aby anulować
           </p>
         </form>
       </DialogContent>
