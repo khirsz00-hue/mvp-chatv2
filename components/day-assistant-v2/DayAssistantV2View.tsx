@@ -124,8 +124,8 @@ function DayAssistantV2Content() {
   // NEW: Help me modal state
   const [helpMeTask, setHelpMeTask] = useState<TestDayTask | null>(null)
   
-  // NEW: Add task modal state
-  const [showAddTaskModal, setShowAddTaskModal] = useState(false)
+  // NEW: Create task modal state
+  const [showCreateTaskModal, setShowCreateTaskModal] = useState(false)
   
   // NEW: Add time block modal state
   const [showAddTimeBlockModal, setShowAddTimeBlockModal] = useState(false)
@@ -2039,7 +2039,7 @@ function DayAssistantV2Content() {
           </CardHeader>
           <CardContent>
             <Button 
-              onClick={() => setShowAddTaskModal(true)}
+              onClick={() => setShowCreateTaskModal(true)}
               className="w-full gap-2"
             >
               <Plus size={20} />
@@ -2284,40 +2284,51 @@ function DayAssistantV2Content() {
       
       {/* Create Task Modal */}
       <CreateTaskModal
-        open={showAddTaskModal}
-        onOpenChange={setShowAddTaskModal}
+        open={showCreateTaskModal}
+        onOpenChange={setShowCreateTaskModal}
         onCreateTask={async (taskData) => {
-          // Create task through API
-          const response = await authFetch('/api/day-assistant-v2/task', {
-            method: 'POST',
-            body: JSON.stringify({
-              title: taskData.content,
-              estimate_min: taskData.duration || 25,
-              cognitive_load: DEFAULT_COGNITIVE_LOAD_NEW_TASK,
-              is_must: false,
-              is_important: false,
-              due_date: taskData.due || selectedDate,
-              context_type: DEFAULT_CONTEXT_TYPE,
-              priority: taskData.priority || 3,
-              description: taskData.description || ''
+          try {
+            // Create task via API
+            const response = await authFetch('/api/day-assistant-v2/task', {
+              method: 'POST',
+              body: JSON.stringify({
+                title: taskData.content,
+                estimate_min: taskData.duration || 25,
+                cognitive_load: 2, // default
+                is_must: false,
+                is_important: false,
+                due_date: taskData.due || selectedDate,
+                context_type: 'deep_work', // default
+                priority: taskData.priority || 3,
+                description: taskData.description || '',
+                // If project_id is provided
+                ...(taskData.project_id && { project_id: taskData.project_id }),
+                // If labels are provided
+                ...(taskData.labels && { labels: taskData.labels })
+              })
             })
-          })
-          
-          if (!response.ok) {
-            const err = await response.json().catch(() => ({}))
-            showToast(err.message || 'Nie udało się dodać zadania', 'error')
-            throw new Error(err.message)
-          }
-          
-          const data = await response.json()
-          setTasks(prev => [...prev, data.task])
-          addDecisionLog(`Dodano zadanie "${data.task.title}"`)
-          showToast('✅ Zadanie dodane!', 'success')
-          
-          // 🎮 GAMIFICATION: Recalculate daily stats after adding task
-          const { data: { user } } = await supabase.auth.getUser()
-          if (user) {
-            await recalculateDailyTotal(user.id)
+            
+            if (!response.ok) {
+              const err = await response.json().catch(() => ({}))
+              showToast(err.message || 'Nie udało się dodać zadania', 'error')
+              throw new Error(err.message)
+            }
+            
+            const data = await response.json()
+            
+            // Add to local state
+            setTasks(prev => [...prev, data.task])
+            addDecisionLog(`Dodano zadanie "${data.task.title}"`)
+            showToast('✅ Zadanie dodane!', 'success')
+            
+            // 🎮 GAMIFICATION: Recalculate daily stats
+            const { data: { user } } = await supabase.auth.getUser()
+            if (user) {
+              await recalculateDailyTotal(user.id)
+            }
+          } catch (error) {
+            console.error('Error creating task:', error)
+            throw error
           }
         }}
       />
