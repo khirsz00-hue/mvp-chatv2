@@ -48,9 +48,6 @@ import { QueueReorderingOverlay } from './LoadingStates'
 import { CurrentActivityBox } from './CurrentActivityBox'
 import { BreakTimer } from './BreakTimer'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
-import { StreakDisplay } from '@/components/gamification/StreakDisplay'
-import { ProgressRing } from '@/components/gamification/ProgressRing'
-import { TimeStatsCompact } from '@/components/gamification/TimeStatsCompact'
 import { QuickAddModal } from './QuickAddModal'
 import { NewTaskModal, NewTaskData } from './NewTaskModal'
 import { updateStreakOnCompletion, updateDailyStats, triggerConfetti, triggerMilestoneToast, recalculateDailyTotal } from '@/lib/gamification'
@@ -66,6 +63,7 @@ import { calculateQueueWithOverflow, generateOverflowAlert, OverflowAlert } from
 import { generatePassiveInsights, PassiveInsight } from '@/lib/services/passiveInsightEngine'
 import { saveInsightFeedback } from '@/lib/services/insightFeedbackService'
 import { Sparkle } from '@phosphor-icons/react'
+import { TopStatusBar } from './TopStatusBar'
 
 // Create a query client outside the component to avoid recreation on every render
 const queryClient = new QueryClient({
@@ -702,6 +700,26 @@ function DayAssistantV2Content() {
       return getSmartEstimate(a) - getSmartEstimate(b)
     })[0]
   }, [tasks])
+
+  // Calculate today's task stats for TopStatusBar
+  const completedToday = useMemo(() => {
+    return tasks.filter(t => t.completed && t.due_date === selectedDate).length
+  }, [tasks, selectedDate])
+
+  const totalToday = useMemo(() => {
+    return tasks.filter(t => t.due_date === selectedDate).length
+  }, [tasks, selectedDate])
+
+  // Get first task in queue for TopStatusBar
+  const firstInQueue = useMemo(() => {
+    if (mustTasks.length > 0) {
+      return { title: mustTasks[0].title }
+    }
+    if (queue.length > 0) {
+      return { title: queue[0].title }
+    }
+    return undefined
+  }, [mustTasks, queue])
 
   const addDecisionLog = (message: string) => {
     setDecisionLog(prev => [
@@ -1555,9 +1573,26 @@ function DayAssistantV2Content() {
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(600px,2fr)_minmax(400px,1fr)] gap-6">
         {/* Main content area with improved spacing */}
         <div className="space-y-6 min-w-0">
+        {/* Top Status Bar - Full Width */}
+        <TopStatusBar
+          completedToday={completedToday}
+          totalToday={totalToday}
+          usedMinutes={usedMinutes}
+          availableMinutes={availableMinutes}
+          usagePercentage={usagePercentage}
+          workMode={workMode}
+          activeTimer={activeTimer ? {
+            taskId: activeTimer.taskId,
+            taskTitle: tasks.find(t => t.id === activeTimer.taskId)?.title || 'Zadanie',
+            elapsedSeconds: activeTimer.elapsedSeconds,
+            estimatedMinutes: activeTimer.estimatedMinutes
+          } : undefined}
+          firstInQueue={firstInQueue}
+        />
+        
         <Card>
           <CardHeader>
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex justify-between items-center">
               <CardTitle className="text-3xl text-brand-purple">Asystent Dnia v2</CardTitle>
               <button
                 onClick={() => setShowConfigModal(true)}
@@ -1566,19 +1601,6 @@ function DayAssistantV2Content() {
               >
                 <Gear size={24} className="text-gray-600" />
               </button>
-            </div>
-            
-            {/* 🎮 GAMIFICATION: Streak Display, Progress Ring, and Time Stats */}
-            <div className="flex flex-wrap items-center gap-4">
-              <StreakDisplay />
-              <ProgressRing />
-              {availableMinutes > 0 && (
-                <TimeStatsCompact 
-                  usedMinutes={usedMinutes}
-                  availableMinutes={availableMinutes}
-                  usagePercentage={usagePercentage}
-                />
-              )}
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
