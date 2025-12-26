@@ -6,7 +6,7 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Input from '@/components/ui/Input'
 import Textarea from '@/components/ui/Textarea'
-import { CalendarBlank, Clock, Tag, FolderOpen, Flag, Sparkle } from '@phosphor-icons/react'
+import { CalendarBlank, Clock, Tag, FolderOpen, Flag, Sparkle, Brain, PencilSimple, Lightning } from '@phosphor-icons/react'
 import { format, addDays } from 'date-fns'
 
 interface Project {
@@ -41,8 +41,16 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
     suggestedProject?: string
     suggestedDueDate?: string
     suggestedLabels?: string[]
+    actionPlan?: string[]
+    cognitiveLoad?: number
   } | null>(null)
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
+  const [generatingPlan, setGeneratingPlan] = useState(false)
+  const [planGenerated, setPlanGenerated] = useState(false)
+  const [showCorrectionModal, setShowCorrectionModal] = useState(false)
+  const [correctionText, setCorrectionText] = useState('')
+  const [aiUnderstanding, setAiUnderstanding] = useState('')
+  const [cognitiveLoad, setCognitiveLoad] = useState<1 | 2 | 3 | 4 | null>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   
   const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
@@ -80,6 +88,12 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
       setLabels('')
       setErrors({})
       setAiSuggestions(null)
+      setPlanGenerated(false)
+      setGeneratingPlan(false)
+      setShowCorrectionModal(false)
+      setCorrectionText('')
+      setAiUnderstanding('')
+      setCognitiveLoad(null)
     }
   }, [open])
   
@@ -185,6 +199,116 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
     }
   }
   
+  const handleGeneratePlan = async () => {
+    if (!title.trim()) return
+    
+    setGeneratingPlan(true)
+    
+    try {
+      const userId = token || 'anonymous'
+      
+      const response = await fetch('/api/ai/generate-action-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          title,
+          description,
+          understanding: aiUnderstanding || title,
+          userId,
+          userContext: {
+            projects: projects.map(p => ({ id: p.id, name: p.name }))
+          }
+        })
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        
+        // Update aiSuggestions with the action plan
+        setAiSuggestions(data)
+        
+        // Auto-apply all suggestions
+        if (data.priority) {
+          setPriority(data.priority as 1 | 2 | 3 | 4)
+        }
+        if (data.cognitiveLoad) {
+          setCognitiveLoad(data.cognitiveLoad as 1 | 2 | 3 | 4)
+        }
+        if (data.estimatedMinutes) {
+          setEstimatedMinutes(data.estimatedMinutes)
+        }
+        if (data.suggestedDueDate) {
+          setDueDate(data.suggestedDueDate)
+        }
+        if (data.suggestedProject) {
+          const suggestedName = data.suggestedProject.toLowerCase().trim()
+          const project = projects.find(p => 
+            p.name.toLowerCase().trim() === suggestedName ||
+            p.name.toLowerCase().includes(suggestedName) ||
+            suggestedName.includes(p.name.toLowerCase())
+          )
+          if (project) {
+            setProjectId(project.id)
+          }
+        }
+        if (data.suggestedLabels && data.suggestedLabels.length > 0) {
+          setLabels(data.suggestedLabels.join(', '))
+        }
+        if (data.description && !description.trim()) {
+          setDescription(data.description)
+        }
+        
+        setPlanGenerated(true)
+      }
+    } catch (err) {
+      console.error('Error generating plan:', err)
+      alert('Nie udało się wygenerować planu')
+    } finally {
+      setGeneratingPlan(false)
+    }
+  }
+  
+  const handleCorrection = () => {
+    setShowCorrectionModal(true)
+  }
+  
+  const handleCorrectionSubmit = async () => {
+    if (!correctionText.trim()) return
+    
+    setShowCorrectionModal(false)
+    setAiUnderstanding(correctionText)
+    
+    // Regenerate suggestions with correction
+    setLoadingSuggestions(true)
+    
+    try {
+      const userId = token || 'anonymous'
+      
+      const response = await fetch('/api/ai/suggest-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          title,
+          description: correctionText,
+          userId,
+          userContext: {
+            projects: projects.map(p => ({ id: p.id, name: p.name }))
+          }
+        })
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setAiSuggestions(data)
+      }
+    } catch (err) {
+      console.error('Error fetching AI suggestions:', err)
+    } finally {
+      setLoadingSuggestions(false)
+      setCorrectionText('')
+    }
+  }
+  
   const validate = () => {
     const newErrors:  { title?: string; dueDate?: string } = {}
     
@@ -216,8 +340,16 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
         token
       }
       
-      if (description.trim()) {
-        taskData.description = description.trim()
+      // Append action plan to description if exists
+      let finalDescription = description.trim()
+      if (aiSuggestions?.actionPlan && aiSuggestions.actionPlan.length > 0) {
+        const planText = '\n\n📋 Plan działania:\n' + 
+          aiSuggestions.actionPlan.map((step, i) => `${i + 1}. ${step}`).join('\n')
+        finalDescription = (finalDescription || '') + planText
+      }
+      
+      if (finalDescription) {
+        taskData.description = finalDescription
       }
       
       if (dueDate) {
@@ -232,8 +364,14 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
         taskData.project_id = projectId
       }
       
-      if (labels. trim()) {
-        taskData. labels = labels.split(',').map(l => l.trim()).filter(Boolean)
+      // Add cognitive load label if selected
+      const allLabels = labels. trim() ? labels.split(',').map(l => l.trim()).filter(Boolean) : []
+      if (cognitiveLoad) {
+        allLabels.push(`cognitive-${cognitiveLoad}`)
+      }
+      
+      if (allLabels.length > 0) {
+        taskData. labels = allLabels
       }
       
       // Custom metadata (może być używane lokalnie)
@@ -267,7 +405,62 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto relative">
+        {/* Correction Overlay */}
+        {showCorrectionModal && (
+          <div className="absolute inset-0 bg-white z-50 rounded-2xl p-6 flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-purple-700">
+                <PencilSimple size={24} weight="bold" />
+                Doprecyzuj zrozumienie
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="flex-1 space-y-4 py-4 overflow-y-auto">
+              {/* AI Understanding */}
+              <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                <p className="text-sm font-medium text-purple-800 mb-1">🤖 AI rozumie to tak:</p>
+                <p className="text-sm text-gray-700">{title}</p>
+              </div>
+              
+              {/* Correction Input */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  ✍️ Co AI powinno zrozumieć inaczej?
+                </label>
+                <Textarea
+                  value={correctionText}
+                  onChange={(e) => setCorrectionText(e.target.value)}
+                  placeholder="Np. To zadanie dotyczy szkolenia online, nie stacjonarnego. Będzie potrzebna prezentacja i nagranie wideo."
+                  rows={6}
+                  className="resize-none"
+                  autoFocus
+                />
+              </div>
+            </div>
+            
+            <DialogFooter className="mt-4">
+              <Button 
+                variant="ghost" 
+                onClick={() => {
+                  setShowCorrectionModal(false)
+                  setCorrectionText('')
+                }}
+              >
+                Anuluj
+              </Button>
+              <Button 
+                onClick={handleCorrectionSubmit}
+                disabled={!correctionText.trim()}
+                className="gap-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+              >
+                <Lightning size={16} weight="fill" />
+                Popraw i wygeneruj ponownie
+              </Button>
+            </DialogFooter>
+          </div>
+        )}
+        
         <DialogHeader>
           <DialogTitle className="text-2xl">Nowe Zadanie</DialogTitle>
         </DialogHeader>
@@ -298,69 +491,111 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
               </div>
             )}
             
-            {aiSuggestions && !loadingSuggestions && (
-              <div className="mt-3 p-3 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg">
-                <div className="flex items-start gap-2 mb-2">
-                  <Sparkle size={16} weight="fill" className="text-blue-600 mt-0.5" />
-                  <p className="text-sm text-blue-800 font-medium">AI Suggestions (kliknij, aby zastosować):</p>
+            {aiSuggestions && !loadingSuggestions && !planGenerated && (
+              <div className="mt-3 p-4 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start gap-2 mb-3">
+                  <Sparkle size={18} weight="fill" className="text-blue-600 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm text-blue-800 font-medium mb-1">🤖 AI rozumie to jako:</p>
+                    <p className="text-sm text-gray-700">{title}</p>
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {aiSuggestions.priority && (
-                    <Badge
-                      className="cursor-pointer hover:bg-blue-200 transition-colors gap-1"
-                      onClick={() => applySuggestion('priority')}
-                    >
-                      <Flag size={14} />
-                      P{aiSuggestions.priority}
-                    </Badge>
-                  )}
-                  {aiSuggestions.estimatedMinutes && (
-                    <Badge
-                      className="cursor-pointer hover:bg-blue-200 transition-colors gap-1"
-                      onClick={() => applySuggestion('estimatedMinutes')}
-                    >
-                      <Clock size={14} />
-                      {aiSuggestions.estimatedMinutes} min
-                    </Badge>
-                  )}
-                  {aiSuggestions.suggestedDueDate && (
-                    <Badge
-                      className="cursor-pointer hover:bg-blue-200 transition-colors gap-1"
-                      onClick={() => applySuggestion('dueDate')}
-                    >
-                      <CalendarBlank size={14} />
-                      📅 {aiSuggestions.suggestedDueDate}
-                    </Badge>
-                  )}
-                  {aiSuggestions.suggestedProject && (
-                    <Badge
-                      className="cursor-pointer hover:bg-blue-200 transition-colors gap-1"
-                      onClick={() => applySuggestion('project')}
-                    >
-                      <FolderOpen size={14} />
-                      📁 {aiSuggestions.suggestedProject}
-                    </Badge>
-                  )}
-                  {aiSuggestions.suggestedLabels && aiSuggestions.suggestedLabels.length > 0 && (
-                    <Badge
-                      className="cursor-pointer hover:bg-blue-200 transition-colors gap-1"
-                      onClick={() => applySuggestion('labels')}
-                      title={aiSuggestions.suggestedLabels.join(', ')}
-                    >
-                      <Tag size={14} />
-                      🏷️ {aiSuggestions.suggestedLabels.length} etykiet
-                    </Badge>
-                  )}
-                  {aiSuggestions.description && (
-                    <Badge
-                      className="cursor-pointer hover:bg-blue-200 transition-colors gap-1"
-                      onClick={() => applySuggestion('description')}
-                      title={aiSuggestions.description}
-                    >
-                      <Tag size={14} />
-                      📝 Opis
-                    </Badge>
-                  )}
+                
+                {/* Two main buttons */}
+                <div className="flex gap-2 mt-3">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={handleCorrection}
+                    disabled={loading || generatingPlan}
+                    className="flex-1 gap-2 border border-purple-300 hover:bg-purple-50"
+                  >
+                    <PencilSimple size={16} weight="bold" />
+                    ✨ Doprecyzuj
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleGeneratePlan}
+                    disabled={loading || generatingPlan}
+                    className="flex-1 gap-2 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+                  >
+                    {generatingPlan ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Generuję...
+                      </>
+                    ) : (
+                      <>
+                        <Lightning size={16} weight="fill" />
+                        ⚡ Wygeneruj plan
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+            
+            {/* Action Plan Display */}
+            {planGenerated && aiSuggestions?.actionPlan && (
+              <div className="mt-3 space-y-3">
+                {/* Applied Parameters Badge */}
+                <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                  <p className="text-xs text-gray-600 mb-2">💡 Parametry zostały automatycznie ustawione (możesz je zmienić)</p>
+                  <div className="flex flex-wrap gap-2">
+                    {aiSuggestions.priority && (
+                      <Badge className="bg-gray-200 text-gray-700">
+                        P{aiSuggestions.priority}
+                      </Badge>
+                    )}
+                    {aiSuggestions.cognitiveLoad && (
+                      <Badge className="bg-gray-200 text-gray-700">
+                        C{aiSuggestions.cognitiveLoad}
+                      </Badge>
+                    )}
+                    {aiSuggestions.estimatedMinutes && (
+                      <Badge className="bg-gray-200 text-gray-700">
+                        {aiSuggestions.estimatedMinutes} min
+                      </Badge>
+                    )}
+                    {aiSuggestions.suggestedDueDate && (
+                      <Badge className="bg-gray-200 text-gray-700">
+                        📅 {aiSuggestions.suggestedDueDate}
+                      </Badge>
+                    )}
+                    {aiSuggestions.suggestedProject && (
+                      <Badge className="bg-gray-200 text-gray-700">
+                        📁 {aiSuggestions.suggestedProject}
+                      </Badge>
+                    )}
+                    {aiSuggestions.suggestedLabels && aiSuggestions.suggestedLabels.length > 0 && (
+                      <Badge className="bg-gray-200 text-gray-700">
+                        🏷️ {aiSuggestions.suggestedLabels.length} etykiet
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Action Plan Box */}
+                <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-lg">📋</span>
+                    <h3 className="font-semibold text-green-800">Twój plan działania</h3>
+                  </div>
+                  <ul className="space-y-2">
+                    {aiSuggestions.actionPlan.map((step, index) => (
+                      <li key={index} className="flex items-start gap-3">
+                        <span className="flex-shrink-0 w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium">
+                          {index + 1}
+                        </span>
+                        <span className="text-sm text-gray-700 pt-0.5">{step}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-3 pt-3 border-t border-green-200">
+                    <p className="text-xs text-green-700">
+                      💡 Ten plan zostanie automatycznie dodany do opisu zadania
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
@@ -443,6 +678,71 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
               </div>
             </div>
             
+            {/* Cognitive Load */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium mb-2 flex items-center gap-2">
+                <Brain size={18} />
+                Obciążenie kognitywne
+              </label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCognitiveLoad(1)}
+                  className={`px-3 py-3 rounded-lg border-2 transition text-sm ${
+                    cognitiveLoad === 1
+                      ? 'border-green-500 bg-green-50 text-green-700'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                  disabled={loading}
+                >
+                  <div className="font-semibold mb-1">C1</div>
+                  <div className="text-xs">Proste</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCognitiveLoad(2)}
+                  className={`px-3 py-3 rounded-lg border-2 transition text-sm ${
+                    cognitiveLoad === 2
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                  disabled={loading}
+                >
+                  <div className="font-semibold mb-1">C2</div>
+                  <div className="text-xs">Umiarkowane</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCognitiveLoad(3)}
+                  className={`px-3 py-3 rounded-lg border-2 transition text-sm ${
+                    cognitiveLoad === 3
+                      ? 'border-orange-500 bg-orange-50 text-orange-700'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                  disabled={loading}
+                >
+                  <div className="font-semibold mb-1">C3</div>
+                  <div className="text-xs">Złożone</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCognitiveLoad(4)}
+                  className={`px-3 py-3 rounded-lg border-2 transition text-sm ${
+                    cognitiveLoad === 4
+                      ? 'border-red-500 bg-red-50 text-red-700'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                  disabled={loading}
+                >
+                  <div className="font-semibold mb-1">C4</div>
+                  <div className="text-xs">Bardzo złożone</div>
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          {/* Second grid for Project and Estimated Time */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Project */}
             <div>
               <label className="block text-sm font-medium mb-2 flex items-center gap-2">
