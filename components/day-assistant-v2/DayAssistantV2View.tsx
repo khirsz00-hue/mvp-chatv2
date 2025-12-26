@@ -423,6 +423,15 @@ function DayAssistantV2Content() {
           is_must: t.is_must,
           due_date: t.due_date
         })))
+        
+        // 📊 Debug logging for cognitive_load and estimate_min
+        console.log('📊 [Tasks Loaded] Cognitive load and estimate verification:')
+        data.tasks.slice(0, 10).forEach((t: TestDayTask, idx: number) => {
+          console.log(`  #${idx + 1}. "${t.title.substring(0, 40)}"`)
+          console.log(`      cognitive_load: ${t.cognitive_load} (type: ${typeof t.cognitive_load})`)
+          console.log(`      estimate_min: ${t.estimate_min} (type: ${typeof t.estimate_min})`)
+          console.log(`      score: ${(t as any).metadata?._score || (t as any)._score || 'N/A'}`)
+        })
       }
       
       setAssistant(data.assistant)
@@ -2321,12 +2330,23 @@ function TaskRow({
         total: (task as any).metadata._score || 0,
         factors: ((task as any).metadata._scoreReasoning as string[]).map((reason: string) => {
           // Parse reasoning string into structured format
-          // Example: "Priorytet P1: +20" → {name: "Priorytet P1", points: 20, positive: true}
-          const match = reason.match(/^(.*?):\s*([+-]?\d+(?:\.\d+)?)/)
-          if (!match) return { name: reason, points: 0, positive: false, detail: reason, explanation: '' }
+          // Support multiple formats:
+          // - "Priorytet P1: +20"
+          // - "⏱ Średnie (30min): -3"
+          // - "🚩 Priorytet P1: +8"
+          // - "Tie-breaker: +0.123"
+          // Pattern explanation: matches emoji/text followed by colon and number
+          const match = reason.match(/:\s*([+-]?\d+(?:\.\d+)?)/)
+          if (!match) {
+            console.warn('⚠️ [Tooltip] Failed to parse reasoning:', reason)
+            return { name: reason, points: 0, positive: false, detail: reason, explanation: '' }
+          }
           
-          const [, name, pointsStr] = match
+          const pointsStr = match[1]
           const points = parseFloat(pointsStr)
+          // Extract name as everything before the last colon (guaranteed to exist by regex match)
+          const colonIndex = reason.lastIndexOf(':')
+          const name = colonIndex !== -1 ? reason.substring(0, colonIndex) : reason
           
           // Add context/explanation based on factor type
           let explanation = ''
@@ -2544,6 +2564,26 @@ function TaskRow({
                             💬 {scoreBreakdown.summary}
                           </p>
                         </div>
+                      )}
+                      
+                      {/* Debug info in development */}
+                      {process.env.NODE_ENV === 'development' && (
+                        <details className="pt-2 mt-2 border-t border-gray-700">
+                          <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-300">
+                            🔧 Debug data
+                          </summary>
+                          <pre className="text-[10px] bg-gray-800 p-2 rounded mt-2 overflow-auto max-h-48 text-gray-300">
+                            {JSON.stringify({
+                              score: (task as any).metadata?._score,
+                              reasoning: (task as any).metadata?._scoreReasoning,
+                              cognitive_load: task.cognitive_load,
+                              estimate_min: task.estimate_min,
+                              due_date: task.due_date,
+                              priority: task.priority,
+                              is_must: task.is_must
+                            }, null, 2)}
+                          </pre>
+                        </details>
                       )}
                     </div>
                   </TooltipContent>
