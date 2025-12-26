@@ -64,6 +64,7 @@ import { generatePassiveInsights, PassiveInsight } from '@/lib/services/passiveI
 import { saveInsightFeedback } from '@/lib/services/insightFeedbackService'
 import { Sparkle } from '@phosphor-icons/react'
 import { TopStatusBar } from './TopStatusBar'
+import { RecommendationPanel } from './RecommendationPanel'
 
 // Create a query client outside the component to avoid recreation on every render
 const queryClient = new QueryClient({
@@ -2099,9 +2100,24 @@ function DayAssistantV2Content() {
       </div>
 
       <div className="space-y-6 min-w-0 flex-shrink-0">
-        {/* OLD RecommendationPanel removed - only PassiveInsights panel below */}
+        {/* Rekomendacje Panel - at the top */}
+        <Card className="border-blue-200 bg-blue-50 shadow-md">
+          <CardHeader>
+            <CardTitle className="text-base">🎯 Rekomendacje</CardTitle>
+            <p className="text-xs text-gray-600 mt-1">
+              Sugestie dotyczące organizacji zadań
+            </p>
+          </CardHeader>
+          <CardContent>
+            <RecommendationPanel
+              recommendations={filteredRecommendations}
+              onApply={handleApplyRecommendation}
+              loading={recLoading}
+            />
+          </CardContent>
+        </Card>
 
-        {/* NEW: Passive Insights Panel - ALWAYS SHOW */}
+        {/* AI Insights Panel - in the middle */}
         <Card className="border-purple-200 bg-purple-50 shadow-md">
           <CardHeader>
             <div className="flex items-center gap-2">
