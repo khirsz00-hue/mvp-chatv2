@@ -2439,7 +2439,7 @@ function TaskRow({
           // Parse reasoning string into structured format
           // Example: "Priorytet P1: +20" → {name: "Priorytet P1", points: 20, positive: true}
           const match = reason.match(/^(.*?):\s*([+-]?\d+(?:\.\d+)?)/)
-          if (!match) return { name: reason, points: 0, positive: false, detail: '', explanation: '' }
+          if (!match) return { name: reason, points: 0, positive: false, detail: reason, explanation: '' }
           
           const [, name, pointsStr] = match
           const points = parseFloat(pointsStr)
@@ -2447,18 +2447,57 @@ function TaskRow({
           // Add context/explanation based on factor type
           let explanation = ''
           let detail = reason
-          if (name.includes('Deadline') || name.includes('deadline')) {
-            explanation = 'Zadanie ma termin dzisiaj - warto zrobić wcześniej'
+          
+          if (name.includes('PRZETERMINOWANE')) {
+            explanation = 'Zadanie przekroczyło termin - należy je zrobić jak najszybciej!'
+          } else if (name.includes('Deadline dziś')) {
+            explanation = 'Termin mija dzisiaj - warto zrobić wcześniej'
+          } else if (name.includes('Deadline jutro')) {
+            explanation = 'Termin mija jutro - lepiej zacząć już dziś'
+          } else if (name.includes('Deadline')) {
+            explanation = 'Im bliżej deadline, tym wyższy priorytet'
+          } else if (name.includes('Brak deadline')) {
+            explanation = 'Zadanie bez konkretnego terminu'
           } else if (name.includes('Kontynuacja')) {
-            explanation = 'Kontynuujesz ten sam typ pracy - łatwiej się skupić'
-          } else if (name.includes('Przełączenie')) {
+            explanation = 'Kontynuujesz ten sam typ pracy - łatwiej się skupić i utrzymać flow'
+          } else if (name.includes('Przełączenie kontekstu')) {
             explanation = 'Zmiana typu pracy może wymagać więcej czasu na wejście w flow'
           } else if (name.includes('MUST') || name.includes('Przypięty')) {
-            explanation = 'Oznaczone jako obowiązkowe na dziś'
+            explanation = 'Oznaczone jako obowiązkowe na dziś - trzeba to zrobić'
+          } else if (name.includes('Ważny')) {
+            explanation = 'Wysokie znaczenie dla Twoich celów'
           } else if (name.includes('Priorytet')) {
-            explanation = 'Wysoki priorytet zwiększa pilność zadania'
-          } else if (name.includes('Przeterminowane')) {
-            explanation = 'Zadanie przekroczyło termin - należy je zrobić jak najszybciej'
+            explanation = 'Priorytet z Todoist - wyższy = ważniejsze zadanie'
+          } else if (name.includes('Znaczenie')) {
+            explanation = 'Podstawowe znaczenie zadania'
+          } else if (name.includes('Idealne dopasowanie energii')) {
+            explanation = 'Poziom trudności idealnie pasuje do Twojej obecnej energii i skupienia'
+          } else if (name.includes('Dobre dopasowanie energii')) {
+            explanation = 'Poziom trudności dobrze pasuje do Twojej obecnej energii'
+          } else if (name.includes('Za trudne dla obecnej energii')) {
+            explanation = 'To zadanie może być zbyt wymagające przy Twojej obecnej energii'
+          } else if (name.includes('Zbyt łatwe dla obecnej energii')) {
+            explanation = 'To zadanie może być zbyt proste - ryzyko nudy'
+          } else if (name.includes('Dopasowanie energii')) {
+            explanation = 'Dopasowanie trudności zadania do Twojej energii i skupienia'
+          } else if (name.includes('Bonus za krótkie zadanie')) {
+            explanation = 'Przy niskim focus krótkie zadania są łatwiejsze do ukończenia'
+          } else if (name.includes('Kara za długie zadanie')) {
+            explanation = 'Przy niskim focus długie zadania mogą być przytłaczające'
+          } else if (name.includes('Szybkie')) {
+            explanation = 'Krótkie zadanie - można szybko ukończyć i zdobyć momentum'
+          } else if (name.includes('Średnie')) {
+            explanation = 'Średniej długości zadanie'
+          } else if (name.includes('Długie')) {
+            explanation = 'Długie zadanie może być trudniejsze do rozpoczęcia'
+          } else if (name.includes('Bardzo długie')) {
+            explanation = 'Bardzo długie zadanie - rozważ podział na mniejsze części'
+          } else if (name.includes('Odkładane')) {
+            explanation = 'Zadanie było już odkładane - może warto je w końcu zrobić lub usunąć?'
+          } else if (name.includes('Kontekst')) {
+            explanation = 'Dopasowanie kontekstu pracy do kolejki zadań'
+          } else if (name.includes('Tie-breaker')) {
+            explanation = 'Drobna wartość zapewniająca unikalność kolejności'
           }
           
           return {
@@ -2475,7 +2514,14 @@ function TaskRow({
           ? '📌 Przypięte zadanie - musisz je zrobić dziś'
           : (task as any).due_date === selectedDate
           ? '⏰ Ma deadline dziś - warto zrobić wcześniej'
-          : `Pozycja #${queuePosition} w kolejce na podstawie pilności i ważności`
+          : `Pozycja #${queuePosition} w kolejce na podstawie pilności i ważności`,
+        explanation: (() => {
+          const score = (task as any).metadata._score || 0
+          if (score > 70) return 'Wysokie dopasowanie - świetny moment na to zadanie!'
+          if (score > 50) return 'Dobre dopasowanie - warto zrobić teraz.'
+          if (score > 30) return 'Średnie dopasowanie - możesz zrobić teraz lub później.'
+          return 'Niższe dopasowanie - może lepiej później lub przy innej energii.'
+        })()
       }
     : queuePosition 
     ? calculateScoreBreakdown(
@@ -2538,10 +2584,15 @@ function TaskRow({
                 </TooltipTrigger>
                 <TooltipContent side="right" className="max-w-md p-4 bg-gray-900 text-white border-purple-400">
                     <div className="space-y-3">
+                      {/* Header with total score */}
                       <div>
-                        <p className="font-bold text-lg">💡 Dlaczego #{queuePosition}?</p>
-                        <p className="text-sm text-gray-300 mt-1">
-                          Score: <span className="font-mono font-bold text-yellow-400">{scoreBreakdown.total.toFixed(1)}</span> / 100
+                        <p className="font-bold text-lg border-b border-gray-700 pb-2">🎯 Scoring Breakdown</p>
+                        <div className="flex justify-between items-baseline mt-2">
+                          <span className="text-sm text-gray-300">Total Score:</span>
+                          <span className="font-mono font-bold text-2xl text-yellow-400">{Math.round(scoreBreakdown.total)}</span>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">
+                          Pozycja #{queuePosition} w kolejce
                         </p>
                         {/* Show calculated sum for verification */}
                         {(() => {
@@ -2550,17 +2601,24 @@ function TaskRow({
                           if (diff > SCORING_DIFFERENCE_THRESHOLD) {
                             return (
                               <p className="text-xs text-orange-300 mt-1">
-                                ⚠️ Suma komponentów: {calculatedSum.toFixed(1)} (różnica: {diff.toFixed(1)})
+                                ⚠️ Suma składowych: {calculatedSum.toFixed(1)} (różnica: {diff.toFixed(1)})
+                              </p>
+                            )
+                          } else {
+                            return (
+                              <p className="text-xs text-green-400 mt-1">
+                                ✓ Suma składowych: {calculatedSum.toFixed(1)}
                               </p>
                             )
                           }
-                          return null
                         })()}
                       </div>
                       
+                      {/* Factors breakdown */}
                       <div className="space-y-2 text-sm">
+                        <p className="text-xs text-gray-400 font-semibold uppercase">Składowe punktacji:</p>
                         {scoreBreakdown.factors.map((factor, idx) => {
-                          const icon = factor.positive ? '✅' : '⚠️'
+                          const icon = factor.positive ? '✅' : factor.points < 0 ? '❌' : '⚪'
                           const colorClass = factor.positive 
                             ? 'text-green-400' 
                             : factor.points < 0 
@@ -2569,39 +2627,40 @@ function TaskRow({
                           
                           return (
                             <div key={idx} className="border-b border-gray-700 pb-2 last:border-0">
-                              <div className="flex justify-between items-start gap-3">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2">
-                                    <span>{icon}</span>
-                                    <span className="font-medium">{factor.name}</span>
-                                    <span className={`font-mono font-bold ${colorClass} ml-auto`}>
-                                      {factor.points > 0 ? '+' : ''}{factor.points}
-                                    </span>
-                                  </div>
-                                  <p className="text-xs text-gray-400 mt-1 ml-6">{factor.detail}</p>
-                                  {factor.explanation && (
-                                    <p className="text-xs text-gray-300 mt-1 ml-6 italic">
-                                      {factor.explanation}
-                                    </p>
-                                  )}
-                                </div>
+                              <div className="flex justify-between items-center gap-3">
+                                <span className="text-xs">{icon}</span>
+                                <span className="font-medium flex-1">{factor.name}</span>
+                                <span className={`font-mono font-bold ${colorClass}`}>
+                                  {factor.points > 0 ? '+' : ''}{Math.round(factor.points)}
+                                </span>
                               </div>
+                              {factor.explanation && (
+                                <p className="text-xs text-gray-300 mt-1 ml-5 italic">
+                                  💡 {factor.explanation}
+                                </p>
+                              )}
                             </div>
                           )
                         })}
                       </div>
                       
-                      {scoreBreakdown.summary && (
+                      {/* Explanation */}
+                      {(scoreBreakdown as any).explanation && (
                         <div className="pt-2 border-t border-gray-700">
-                          <p className="text-xs text-purple-300 font-medium">
-                            💬 {scoreBreakdown.summary}
+                          <p className="text-sm text-blue-300 font-medium">
+                            📊 {(scoreBreakdown as any).explanation}
                           </p>
                         </div>
                       )}
                       
-                      <div className="pt-2 text-xs text-gray-400 border-t border-gray-700">
-                        <p>Wyższy score = bardziej pilne/ważne dla dzisiejszej kolejki</p>
-                      </div>
+                      {/* Summary */}
+                      {scoreBreakdown.summary && (
+                        <div className="pt-2 border-t border-gray-700">
+                          <p className="text-sm text-purple-300 font-medium">
+                            💬 {scoreBreakdown.summary}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </TooltipContent>
                 </Tooltip>

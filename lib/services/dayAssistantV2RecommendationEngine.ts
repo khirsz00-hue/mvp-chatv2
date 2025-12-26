@@ -63,13 +63,12 @@ export function calculateTaskScore(
   // 1. Base score: priority + deadline + impact
   const priorityScore = calculatePriorityScore(task.priority)
   breakdown.base_score += priorityScore
-  if (task.priority >= 3) {
-    reasoning.push(`Priorytet P${task.priority}: +${priorityScore}`)
-  }
+  // ALWAYS show priority in breakdown
+  reasoning.push(`🚩 Priorytet P${task.priority}: +${priorityScore}`)
   
   const deadlineScore = calculateDeadlineProximity(task.due_date, context.todayDate)
   breakdown.base_score += deadlineScore
-  if (deadlineScore > 0 && task.due_date) {
+  if (task.due_date) {
     if (task.due_date < context.todayDate) {
       reasoning.push(`🔴 PRZETERMINOWANE: +${deadlineScore}`)
     } else if (task.due_date === context.todayDate) {
@@ -80,17 +79,25 @@ export function calculateTaskScore(
         reasoning.push(`⏰ Deadline jutro: +${deadlineScore}`)
       } else if (daysUntil <= 3) {
         reasoning.push(`📅 Deadline za ${daysUntil}d: +${deadlineScore}`)
+      } else {
+        // Show even if far in future
+        reasoning.push(`📅 Deadline za ${daysUntil}d: +${deadlineScore}`)
       }
     }
+  } else {
+    // Show when no deadline
+    reasoning.push(`📅 Brak deadline: +${deadlineScore}`)
   }
   
   const impactScore = calculateImpactScore(task)
   breakdown.base_score += impactScore
   if (task.is_must) {
     reasoning.push('📌 Przypięty (MUST): +' + (WEIGHTS.impact * 2))
-  }
-  if (task.is_important) {
+  } else if (task.is_important) {
     reasoning.push('⭐ Ważny: +' + WEIGHTS.impact)
+  } else {
+    // Show even if not must or important
+    reasoning.push('⭐ Znaczenie: +' + impactScore)
   }
   
   // 2. Energy/Focus fit bonus
@@ -120,12 +127,17 @@ export function calculateTaskScore(
     context.lightMinutesToday
   )
   breakdown.avoidance_penalty += postponePenalty
-  if (task.postpone_count > 2) {
-    reasoning.push(`Odkładane ${task.postpone_count}x: -${postponePenalty}`)
+  // ALWAYS show postpone penalty if there's any postpone count
+  if (task.postpone_count > 0) {
+    reasoning.push(`⏭️ Odkładane ${task.postpone_count}x: -${postponePenalty.toFixed(1)}`)
   }
   
   // 6. Tie-breaker for unique scores
   const tieBreaker = calculateTieBreaker(task)
+  // Show tie-breaker (rounded to be meaningful)
+  if (Math.abs(tieBreaker) > 0.01) {
+    reasoning.push(`🎲 Tie-breaker: +${tieBreaker.toFixed(2)}`)
+  }
   
   // 7. Final score
   breakdown.final_score = breakdown.base_score + breakdown.fit_bonus - breakdown.avoidance_penalty + tieBreaker
@@ -190,25 +202,34 @@ function calculateEnergyFocusFit(
   const fitDiff = Math.abs(avgState - cognitiveLoad)
   
   let fitScore = WEIGHTS.energy_focus_bonus * (1 - fitDiff / 5)
+  const baseFitScore = fitScore
   
+  // ALWAYS show energy/focus fit (not just for specific cases)
   if (fitDiff === 0) {
-    reasoning.push(`⚡ Idealne dopasowanie energii (${energy}/5): +${Math.round(fitScore)}`)
+    reasoning.push(`⚡ Idealne dopasowanie energii (${energy}/5, focus ${focus}/5): +${Math.round(fitScore)}`)
   } else if (fitDiff === 1) {
-    reasoning.push(`⚡ Dobre dopasowanie energii: +${Math.round(fitScore)}`)
+    reasoning.push(`⚡ Dobre dopasowanie energii (${energy}/5, focus ${focus}/5): +${Math.round(fitScore)}`)
   } else if (fitDiff >= 3) {
     if (cognitiveLoad > avgState) {
-      reasoning.push(`⚡ Za trudne dla obecnej energii (${energy}/5): ${Math.round(fitScore)}`)
+      reasoning.push(`⚡ Za trudne dla obecnej energii (${energy}/5, focus ${focus}/5): +${Math.round(fitScore)}`)
+    } else {
+      reasoning.push(`⚡ Zbyt łatwe dla obecnej energii (${energy}/5, focus ${focus}/5): +${Math.round(fitScore)}`)
     }
+  } else {
+    // Handle remaining cases (typically fitDiff === 2, but can be any value not caught above)
+    reasoning.push(`⚡ Dopasowanie energii (${energy}/5, focus ${focus}/5): +${Math.round(fitScore)}`)
   }
   
   // Bonus for short tasks when focus is low
   if (focus <= 2 && estimateMin <= 15) {
     fitScore += 10
+    reasoning.push(`⚡ Bonus za krótkie zadanie przy niskim focus: +10`)
   }
   
   // Penalty for long tasks when focus is low
   if (focus <= 2 && estimateMin > 45) {
     fitScore -= 15
+    reasoning.push(`⚡ Kara za długie zadanie przy niskim focus: -15`)
   }
   
   return Math.max(0, fitScore)
@@ -242,6 +263,7 @@ function calculateContextGroupingBonus(
   reasoning: string[]
 ): number {
   if (tasksAlreadyInQueue.length === 0) {
+    reasoning.push(`🎭 Kontekst (${task.context_type || 'brak'}): +0 (pierwsze zadanie)`)
     return 0  // First task - no context to group with
   }
   
@@ -270,6 +292,8 @@ function calculateContextGroupingBonus(
     return -3
   }
   
+  // No context or same as last task but not consecutive
+  reasoning.push(`🎭 Kontekst (${task.context_type || 'brak'}): +0`)
   return 0
 }
 
