@@ -53,11 +53,9 @@ import { NewTaskModal, NewTaskData } from './NewTaskModal'
 import { CreateTaskModal } from '@/components/assistant/CreateTaskModal'
 import { updateStreakOnCompletion, updateDailyStats, triggerConfetti, triggerMilestoneToast, recalculateDailyTotal } from '@/lib/gamification'
 import { useOverdueTasks } from '@/hooks/useOverdueTasks'
-import { MomentumStatusBar } from './MomentumStatusBar'
 import { RiskBadge } from './RiskBadge'
 import { BurnoutWarningModal } from './BurnoutWarningModal'
 import { SmartAlertDialog } from './SmartAlertDialog'
-import { trackMomentum } from '@/lib/momentumTracking'
 import { assessTasksRisk, RiskAssessment } from '@/lib/riskPrediction'
 import { assessBurnoutRisk, BurnoutAssessment } from '@/lib/burnoutPrevention'
 import { calculateQueueWithOverflow, generateOverflowAlert, OverflowAlert } from '@/lib/capacityManager'
@@ -1590,20 +1588,6 @@ function DayAssistantV2Content() {
               }}
               isUpdating={isReorderingQueue}
             />
-
-            {/* Momentum Status Bar - NEW! */}
-            {tasks.length > 0 && (
-              <MomentumStatusBar
-                momentum={trackMomentum(
-                  tasks.filter(t => t.completed).length,
-                  tasks.filter(t => t.due_date === selectedDate).length
-                )}
-                onActionClick={(action) => {
-                  console.log('Momentum action:', action)
-                  toast.info(`Akcja: ${action}`)
-                }}
-              />
-            )}
 
             {/* Add Break Button */}
             <Card className="p-4">
