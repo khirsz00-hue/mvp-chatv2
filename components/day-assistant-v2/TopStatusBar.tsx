@@ -51,7 +51,11 @@ export function TopStatusBar({
   firstInQueue
 }: TopStatusBarProps) {
   return (
-    <div className="sticky top-0 z-50 w-full bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-200 rounded-lg p-4 mb-6 shadow-md">
+    <div 
+      className="sticky top-0 z-50 w-full bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-200 rounded-lg p-4 mb-6 shadow-md"
+      role="complementary"
+      aria-label="Status pracy i metryki"
+    >
       <div className="flex flex-wrap items-center justify-between gap-4">
         {/* Left side: Metrics */}
         <div className="flex flex-wrap items-center gap-4">
@@ -91,7 +95,7 @@ export function TopStatusBar({
         </div>
         
         {/* Right side: Current status */}
-        <div className="flex-1 min-w-[200px]">
+        <div className="flex-1 min-w-[200px]" aria-live="polite" aria-atomic="true">
           {activeTimer ? (
             // When timer is active
             <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-100 to-pink-100 rounded-lg border border-purple-300">
