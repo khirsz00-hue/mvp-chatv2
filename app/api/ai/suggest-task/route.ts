@@ -97,11 +97,14 @@ Na podstawie tytułu i kontekstu zasugeruj:
 
 7. **Uzasadnienie** (krótkie wyjaśnienie dlaczego te sugestie - 1-2 zdania)
 
+8. **Zrozumienie AI** (1-2 zdania opisujące co AI rozumie przez to zadanie - podsumowanie zadania w kontekście)
+
 Zwróć odpowiedź jako JSON: 
 {
+  "understanding": "Jasne, zwięzłe 1-2 zdaniowe podsumowanie co AI rozumie przez to zadanie i czego dotyczy...",
   "priority": 2,
   "estimatedMinutes": 60,
-  "description": "Konkretny opis co zrobić.. .",
+  "description": "Konkretny opis co zrobić...",
   "suggestedProject": "Nazwa projektu" lub null,
   "suggestedDueDate": "2025-01-15",
   "suggestedLabels": ["etykieta1", "etykieta2"],
