@@ -547,17 +547,21 @@ function DayAssistantV2Content() {
   
   // Generate passive insights when queue changes (NEW!)
   useEffect(() => {
+    const todayOverflowTasks = later.filter(task => task.due_date === selectedDate)
+    const insightQueue = [...queue, ...remainingToday, ...todayOverflowTasks]
+    const plannedMinutes = insightQueue.reduce((sum, task) => sum + (task.estimate_min || 0), 0)
+
     console.log('🔍 [Insights Debug] ========== START ==========')
     console.log('🔍 [Insights Debug] Checking conditions:', {
-      queueLength: queue.length,
+      queueLength: insightQueue.length,
       dayPlanExists: !!dayPlan,
       tasksCount: tasks.length,
       availableMinutes,
-      usedMinutes,
+      plannedMinutes,
       dismissedCount: dismissedInsightIds.size
     })
     
-    if (queue.length === 0) {
+    if (insightQueue.length === 0) {
       console.log('⚠️ [Insights Debug] Skipping - queue is empty')
       return
     }
@@ -571,7 +575,7 @@ function DayAssistantV2Content() {
     
     // Log queue composition
     console.log('📊 [Insights Debug] Queue composition:')
-    queue.forEach((task, idx) => {
+    insightQueue.forEach((task, idx) => {
       console.log(`  #${idx + 1}:`, {
         id: task.id,
         title: task.title,
@@ -585,10 +589,10 @@ function DayAssistantV2Content() {
     
     // Generate insights
     try {
-      const newInsights = generatePassiveInsights(queue, tasks, {
+      const newInsights = generatePassiveInsights(insightQueue, tasks, {
         energy: dayPlan.energy,
         capacity: availableMinutes,
-        usedTime: usedMinutes
+        usedTime: plannedMinutes
       })
       
       console.log('💡 [Insights Debug] Generated insights:')
@@ -618,7 +622,7 @@ function DayAssistantV2Content() {
     }
     
     console.log('🔍 [Insights Debug] ========== END ==========')
-  }, [queue, tasks, dayPlan, availableMinutes, usedMinutes, dismissedInsightIds])
+  }, [queue, remainingToday, later, selectedDate, tasks, dayPlan, availableMinutes, dismissedInsightIds])
 
   // 🔍 DEBUG LOGGING for queue state
   useEffect(() => {
