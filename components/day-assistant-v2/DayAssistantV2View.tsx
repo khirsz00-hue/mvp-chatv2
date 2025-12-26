@@ -22,7 +22,7 @@ import {
   calculateScoreBreakdown
 } from '@/lib/services/dayAssistantV2RecommendationEngine'
 import { CONTEXT_LABELS, CONTEXT_COLORS, TaskContext } from '@/lib/services/contextInferenceService'
-import { Play, XCircle, MagicWand, Gear, Info, Coffee, CaretDown, CaretUp } from '@phosphor-icons/react'
+import { Play, XCircle, MagicWand, Gear, Info, Coffee, CaretDown, CaretUp, Plus } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import Badge from '@/components/ui/Badge'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -50,6 +50,7 @@ import { BreakTimer } from './BreakTimer'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { QuickAddModal } from './QuickAddModal'
 import { NewTaskModal, NewTaskData } from './NewTaskModal'
+import { CreateTaskModal } from '@/components/assistant/CreateTaskModal'
 import { updateStreakOnCompletion, updateDailyStats, triggerConfetti, triggerMilestoneToast, recalculateDailyTotal } from '@/lib/gamification'
 import { useOverdueTasks } from '@/hooks/useOverdueTasks'
 import { MomentumStatusBar } from './MomentumStatusBar'
@@ -108,11 +109,6 @@ function DayAssistantV2Content() {
   const [warningTask, setWarningTask] = useState<TestDayTask | null>(null)
   const [warningDetails, setWarningDetails] = useState<{ title: string; message: string; details: string[] } | null>(null)
   const [selectedTask, setSelectedTask] = useState<TestDayTask | null>(null)
-  const [newTaskTitle, setNewTaskTitle] = useState('')
-  const [newTaskEstimate, setNewTaskEstimate] = useState(25)
-  const [newTaskLoad, setNewTaskLoad] = useState(2)
-  const [newTaskMust, setNewTaskMust] = useState(false)
-  const [newTaskContext, setNewTaskContext] = useState<TaskContext>('deep_work')
   const [showConfigModal, setShowConfigModal] = useState(false)
   const [clarifyTask, setClarifyTask] = useState<TestDayTask | null>(null)
   const [showLaterQueue, setShowLaterQueue] = useState(false)
@@ -786,44 +782,6 @@ function DayAssistantV2Content() {
         setProposals(prev => [data.proposal, ...prev].slice(0, 3))
       }
       addDecisionLog(`Zmieniono ${field === 'energy' ? 'energię' : 'skupienie'} na ${value}`)
-    }
-  }
-
-  const handleCreateTask = async () => {
-    if (!newTaskTitle.trim()) {
-      showToast('Podaj tytuł zadania', 'warning')
-      return
-    }
-    const response = await authFetch('/api/day-assistant-v2/task', {
-      method: 'POST',
-      body: JSON.stringify({
-        title: newTaskTitle.trim(),
-        estimate_min: newTaskEstimate,
-        cognitive_load: newTaskLoad,
-        is_must: newTaskMust,
-        is_important: newTaskMust,
-        due_date: selectedDate,
-        context_type: newTaskContext,
-        priority: 3
-      })
-    })
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}))
-      showToast(err.message || 'Nie udało się dodać zadania', 'error')
-      return
-    }
-    const data = await response.json()
-    setTasks(prev => [...prev, data.task])
-    if (data.proposal) {
-      setProposals(prev => [data.proposal, ...prev].slice(0, 3))
-    }
-    setNewTaskTitle('')
-    addDecisionLog(`Dodano zadanie "${data.task.title}"`)
-    
-    // 🎮 GAMIFICATION: Recalculate daily stats after adding task
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      await recalculateDailyTotal(user.id)
     }
   }
 
@@ -2091,33 +2049,17 @@ function DayAssistantV2Content() {
           <CardContent>
             <Button 
               onClick={() => setShowAddTaskModal(true)}
-              className="w-full"
+              className="w-full gap-2"
             >
-              + Dodaj nowe zadanie
+              <Plus size={20} />
+              Dodaj zadanie na dziś
             </Button>
           </CardContent>
         </Card>
       </div>
 
       <div className="space-y-6 min-w-0 flex-shrink-0">
-        {/* Rekomendacje Panel - at the top */}
-        <Card className="border-blue-200 bg-blue-50 shadow-md">
-          <CardHeader>
-            <CardTitle className="text-base">🎯 Rekomendacje</CardTitle>
-            <p className="text-xs text-gray-600 mt-1">
-              Sugestie dotyczące organizacji zadań
-            </p>
-          </CardHeader>
-          <CardContent>
-            <RecommendationPanel
-              recommendations={filteredRecommendations}
-              onApply={handleApplyRecommendation}
-              loading={recLoading}
-            />
-          </CardContent>
-        </Card>
-
-        {/* AI Insights Panel - in the middle */}
+        {/* AI Insights Panel */}
         <Card className="border-purple-200 bg-purple-50 shadow-md">
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -2349,12 +2291,44 @@ function DayAssistantV2Content() {
         onSubmit={handleQuickAdd}
       />
       
-      {/* New Task Modal - Full Featured */}
-      <NewTaskModal
-        isOpen={showAddTaskModal}
-        onClose={() => setShowAddTaskModal(false)}
-        onSubmit={handleNewTaskSubmit}
-        defaultDate={selectedDate}
+      {/* Create Task Modal */}
+      <CreateTaskModal
+        open={showAddTaskModal}
+        onOpenChange={setShowAddTaskModal}
+        onCreateTask={async (taskData) => {
+          // Create task through API
+          const response = await authFetch('/api/day-assistant-v2/task', {
+            method: 'POST',
+            body: JSON.stringify({
+              title: taskData.content,
+              estimate_min: taskData.duration || 25,
+              cognitive_load: 2, // default
+              is_must: false,
+              is_important: false,
+              due_date: taskData.due || selectedDate,
+              context_type: 'deep_work', // default
+              priority: taskData.priority || 3,
+              description: taskData.description || ''
+            })
+          })
+          
+          if (!response.ok) {
+            const err = await response.json().catch(() => ({}))
+            showToast(err.message || 'Nie udało się dodać zadania', 'error')
+            throw new Error(err.message)
+          }
+          
+          const data = await response.json()
+          setTasks(prev => [...prev, data.task])
+          addDecisionLog(`Dodano zadanie "${data.task.title}"`)
+          showToast('✅ Zadanie dodane!', 'success')
+          
+          // 🎮 GAMIFICATION: Recalculate daily stats after adding task
+          const { data: { user } } = await supabase.auth.getUser()
+          if (user) {
+            await recalculateDailyTotal(user.id)
+          }
+        }}
       />
       
       {/* Morning Review Modal */}
@@ -2567,6 +2541,19 @@ function TaskRow({
                         <p className="text-sm text-gray-300 mt-1">
                           Score: <span className="font-mono font-bold text-yellow-400">{scoreBreakdown.total.toFixed(1)}</span> / 100
                         </p>
+                        {/* Show calculated sum for verification */}
+                        {(() => {
+                          const calculatedSum = scoreBreakdown.factors.reduce((sum, f) => sum + f.points, 0)
+                          const diff = Math.abs(calculatedSum - scoreBreakdown.total)
+                          if (diff > 0.1) {
+                            return (
+                              <p className="text-xs text-orange-300 mt-1">
+                                ⚠️ Suma komponentów: {calculatedSum.toFixed(1)} (różnica: {diff.toFixed(1)})
+                              </p>
+                            )
+                          }
+                          return null
+                        })()}
                       </div>
                       
                       <div className="space-y-2 text-sm">
@@ -2631,6 +2618,18 @@ function TaskRow({
             {task.is_must && <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-purple-700 text-white">MUST</span>}
             <TaskBadges task={task} today={selectedDate} />
             {riskAssessment && <RiskBadge risk={riskAssessment} />}
+            {/* Cognitive Load Badge */}
+            {task.cognitive_load && (
+              <Badge variant="outline" className="text-xs">
+                🧠 Load {task.cognitive_load}/5
+              </Badge>
+            )}
+            {/* Estimate Badge */}
+            {task.estimate_min && (
+              <Badge variant="outline" className="text-xs">
+                ⏱ {task.estimate_min} min
+              </Badge>
+            )}
             {task.context_type && (
               <span className={cn(
                 'px-2 py-0.5 text-xs font-medium rounded-full',
