@@ -116,7 +116,6 @@ function DayAssistantV2Content() {
   const [showRestOfQueue, setShowRestOfQueue] = useState(false)
   const [isReorderingQueue, setIsReorderingQueue] = useState(false)
   const [showRestOfToday, setShowRestOfToday] = useState(false)
-  const [showAvailable, setShowAvailable] = useState(false)
   
   // NEW: Work mode state (replaces energy/focus sliders)
   const [workMode, setWorkMode] = useState<WorkMode>('focus')
@@ -493,37 +492,7 @@ function DayAssistantV2Content() {
     return scoredTasks.filter(t => !t.due_date || t.due_date >= selectedDate)
   }, [scoredTasks, selectedDate])
 
-  // Split non-overdue tasks into clear categories
-  const tasksByCategory = useMemo(() => {
-    const todayDue: TestDayTask[] = []
-    const available: TestDayTask[] = []  // no date or future
-    
-    nonOverdueTasks.forEach(task => {
-      if (task.due_date === selectedDate) {
-        todayDue.push(task)
-      } else {
-        // No due date or future tasks - available to work on
-        available.push(task)
-      }
-    })
-    
-    return { todayDue, available }
-  }, [nonOverdueTasks, selectedDate])
-
-  // Today tasks (non-MUST) - sorted by score
-  const todayTasks = useMemo(() => {
-    return tasksByCategory.todayDue
-      .filter(t => !t.is_must)
-      .sort((a, b) => ((b as any)._score || 0) - ((a as any)._score || 0))
-  }, [tasksByCategory.todayDue])
-
-  // Available tasks (no date or future) - sorted by score
-  const availableTasks = useMemo(() => {
-    return tasksByCategory.available
-      .sort((a, b) => ((b as any)._score || 0) - ((a as any)._score || 0))
-  }, [tasksByCategory.available])
-
-  // MUST tasks - from ALL non-overdue tasks
+  // MUST tasks - from ALL non-overdue tasks (max 3)
   const mustTasks = useMemo(() => {
     return nonOverdueTasks.filter(t => t.is_must).slice(0, 3)
   }, [nonOverdueTasks])
@@ -534,6 +503,11 @@ function DayAssistantV2Content() {
     dayPlan,
     manualTimeBlock
   )
+
+  // Top 3 tasks - najlepiej scored na dzisiaj (nie-MUST) that fit in capacity
+  const top3Tasks = useMemo(() => {
+    return queue.filter(t => !t.is_must).slice(0, 3)
+  }, [queue])
 
   // Update task risks when tasks or queue changes
   useEffect(() => {
@@ -630,8 +604,7 @@ function DayAssistantV2Content() {
       scoredTasks: scoredTasks.length,
       overdueTasks: overdueTasks.length,
       mustTasks: mustTasks.length,
-      todayTasks: todayTasks.length,
-      availableTasks: availableTasks.length,
+      top3Tasks: top3Tasks.length,
       nonOverdueTasks: nonOverdueTasks.length,
       queueTasks: queue.length,
       remainingTodayTasks: remainingToday.length,
@@ -649,18 +622,10 @@ function DayAssistantV2Content() {
       })))
     }
     
-    if (todayTasks.length > 0) {
-      console.log('📊 [Today Tasks]', todayTasks.map(t => ({
+    if (top3Tasks.length > 0) {
+      console.log('🎯 [Top 3 Tasks]', top3Tasks.map(t => ({
         title: t.title,
         due_date: t.due_date,
-        score: (t as any)._score || 'N/A'
-      })))
-    }
-    
-    if (availableTasks.length > 0) {
-      console.log('🗓️ [Available Tasks]', availableTasks.map(t => ({
-        title: t.title,
-        due_date: t.due_date || 'no date',
         score: (t as any)._score || 'N/A'
       })))
     }
@@ -681,7 +646,7 @@ function DayAssistantV2Content() {
         score: (t as any)._score || 'N/A'
       })))
     }
-  }, [tasks.length, filteredTasks.length, scoredTasks.length, overdueTasks, mustTasks.length, todayTasks.length, availableTasks.length, nonOverdueTasks.length, queue.length, remainingToday.length, later, overflowCount, availableMinutes, usedMinutes])
+  }, [tasks.length, filteredTasks.length, scoredTasks.length, overdueTasks, mustTasks.length, top3Tasks.length, nonOverdueTasks.length, queue.length, remainingToday.length, later, overflowCount, availableMinutes, usedMinutes])
 
   // matchedTasks kept for backward compatibility with existing queue logic
   const matchedTasks = queue.filter(t => !t.is_must && !t.completed)
@@ -1685,23 +1650,35 @@ function DayAssistantV2Content() {
           </Card>
         )}
 
-        {/* SEKCJA 3: Kolejka NA DZIŚ (Top 3) */}
-        {queue.filter(t => !t.is_must).length > 0 && (
-          <Card className="shadow-md border-purple-300">
-            {isReorderingQueue && <QueueReorderingOverlay />}
-            <CardHeader>
-              <CardTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent flex items-center gap-2">
-                📊 Kolejka NA DZIŚ (Top 3)
-                <Badge className="bg-purple-100 text-purple-800">
-                  {queue.filter(t => !t.is_must).length} zadań
-                </Badge>
-              </CardTitle>
-              <p className="text-sm text-gray-600 mt-1">
-                📌 Przypięte + 🎯 Top scored na dziś • {usedMinutes} / {availableMinutes} min ({usagePercentage}%)
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {queue.filter(t => !t.is_must).map((task, index) => (
+        {/* 🎯 Top 3 - ZAWSZE WIDOCZNA */}
+        <Card className="shadow-md border-blue-500 bg-gradient-to-br from-blue-50 to-purple-50">
+          {isReorderingQueue && <QueueReorderingOverlay />}
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold flex items-center gap-2">
+              <span className="text-3xl">🎯</span>
+              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                Top 3
+              </span>
+              <Badge className="bg-blue-600 text-white font-semibold px-3 py-1">
+                {top3Tasks.length} zadań
+              </Badge>
+            </CardTitle>
+            <p className="text-sm text-gray-700 mt-1 font-medium">
+              Top scored na dziś • {usedMinutes} / {availableMinutes} min ({usagePercentage}%)
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {top3Tasks.length === 0 ? (
+              <div className="p-6 text-center bg-white rounded-lg border-2 border-dashed border-gray-300">
+                <p className="text-gray-600 font-medium">
+                  🎉 Brak zadań w kolejce
+                </p>
+                <p className="text-sm text-gray-500 mt-2">
+                  Dodaj zadania lub przypnij je jako MUST
+                </p>
+              </div>
+            ) : (
+              top3Tasks.map((task, index) => (
                 <TaskRow
                   key={task.id}
                   task={task}
@@ -1722,24 +1699,27 @@ function DayAssistantV2Content() {
                   onCompleteTimer={handleTimerComplete}
                   onSubtaskToggle={handleSubtaskToggle}
                 />
-              ))}
-            </CardContent>
-          </Card>
-        )}
+              ))
+            )}
+          </CardContent>
+        </Card>
 
-        {/* SEKCJA 4: Pozostałe NA DZIŚ (collapsible) - Tasks that FIT in capacity */}
+        {/* 📋 Pozostałe na dziś (collapsible) - Tasks that FIT in capacity */}
         {remainingToday.length > 0 && (
-          <Card className="border-gray-300 bg-gray-50">
+          <Card className="border-green-400 bg-gradient-to-br from-green-50 to-blue-50 shadow-sm">
             {isReorderingQueue && <QueueReorderingOverlay />}
             <CardHeader 
-              className="cursor-pointer hover:bg-gray-100 transition-colors"
+              className="cursor-pointer hover:bg-green-100/50 transition-colors rounded-t-lg"
               onClick={() => setShowRestOfToday(!showRestOfToday)}
             >
               <div className="flex items-center justify-between">
-                <CardTitle className="text-lg text-gray-700 flex items-center gap-2">
-                  📋 Pozostałe na dziś
-                  <Badge variant="secondary">{remainingToday.length} zadań</Badge>
-                  <Badge variant="success" className="bg-green-100 text-green-700">
+                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                  <span className="text-2xl">📋</span>
+                  <span className="text-gray-800">Pozostałe na dziś</span>
+                  <Badge className="bg-green-600 text-white font-semibold px-3 py-1">
+                    {remainingToday.length} zadań
+                  </Badge>
+                  <Badge className="bg-green-100 text-green-700 font-semibold px-3 py-1 border border-green-300">
                     Mieszczą się w capacity
                   </Badge>
                 </CardTitle>
@@ -1748,12 +1728,12 @@ function DayAssistantV2Content() {
                   showRestOfToday && "rotate-180"
                 )} size={24} />
               </div>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-700 mt-1 font-medium">
                 Reszta zadań na dzisiaj które mieszczą się w {availableMinutes} min capacity
               </p>
             </CardHeader>
             {showRestOfToday && (
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-2 pt-4">
                 {remainingToday.map((task, index) => (
                   <TaskRow
                     key={task.id}
@@ -1782,116 +1762,11 @@ function DayAssistantV2Content() {
           </Card>
         )}
 
-        {/* SEKCJA 5: DOSTĘPNE (no date or future) */}
-        {availableTasks.length > 0 && (
-          <Card className="border-blue-300 bg-blue-50">
-            <CardHeader 
-              className="cursor-pointer hover:bg-blue-100 transition-colors"
-              onClick={() => setShowAvailable(!showAvailable)}
-            >
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg text-blue-800 flex items-center gap-2">
-                  🗓️ DOSTĘPNE DO ZAPLANOWANIA
-                  <Badge className="bg-blue-600 text-white">{availableTasks.length} zadań</Badge>
-                </CardTitle>
-                <CaretDown className={cn(
-                  "transition-transform text-blue-600",
-                  showAvailable && "rotate-180"
-                )} size={24} />
-              </div>
-              <p className="text-xs text-blue-700 mt-1">
-                Zadania bez terminu lub na przyszłość - możesz zrobić dziś jeśli chcesz
-              </p>
-            </CardHeader>
-            {showAvailable && (
-              <CardContent className="space-y-2">
-                {availableTasks.map((task, index) => (
-                  <TaskRow
-                    key={task.id}
-                    task={task}
-                    queuePosition={mustTasks.length + todayTasks.length + index + 1}
-                    onNotToday={() => handleNotToday(task)}
-                    onStart={() => handleStartTask(task)}
-                    onUnmark={() => openUnmarkWarning(task)}
-                    onDecompose={() => handleDecompose(task)}
-                    onComplete={() => handleComplete(task)}
-                    onPin={() => handlePin(task)}
-                    onDelete={() => handleDelete(task)}
-                    onClick={() => setSelectedTask(task)}
-                    focus={dayPlan?.focus || 3}
-                    selectedDate={selectedDate}
-                    activeTimer={activeTimer?.taskId === task.id ? activeTimer : undefined}
-                    onPauseTimer={pauseTimer}
-                    onResumeTimer={resumeTimer}
-                    onCompleteTimer={handleTimerComplete}
-                    onSubtaskToggle={handleSubtaskToggle}
-                  />
-                ))}
-              </CardContent>
-            )}
-          </Card>
-        )}
-
-        {/* Rest of Queue (expandable) - Old matchedTasks section kept for compatibility */}
-        {matchedTasks.length > 3 && todayTasks.length === 0 && (
-          <Card className="relative border-gray-300 bg-gray-50 shadow-sm">
-            {isReorderingQueue && <QueueReorderingOverlay />}
-            <CardHeader 
-              className="cursor-pointer hover:bg-gray-100 transition-colors"
-              onClick={() => setShowRestOfQueue(!showRestOfQueue)}
-            >
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg text-gray-700 flex items-center gap-2">
-                  📋 Pozostałe w kolejce dzisiaj
-                  <Badge variant="secondary" className="bg-gray-200 text-gray-700 font-semibold px-3 py-1">
-                    {matchedTasks.length - 3} zadań
-                  </Badge>
-                </CardTitle>
-                <CaretDown className={cn(
-                  "transition-transform text-gray-600",
-                  showRestOfQueue && "rotate-180"
-                )} size={24} />
-              </div>
-            </CardHeader>
-            {showRestOfQueue && (
-              <CardContent className="space-y-3">
-                <p className="text-sm text-gray-600">
-                  Te zadania są w kolejce na dziś, ale poza Top 3.
-                </p>
-                <div className="space-y-2 pt-2 border-t border-gray-200">
-                  {matchedTasks.slice(3).map((task, index) => (
-                    <TaskRow
-                      key={task.id}
-                      task={task}
-                      queuePosition={mustTasks.length + 3 + index + 1}
-                      onNotToday={() => handleNotToday(task)}
-                      onStart={() => handleStartTask(task)}
-                      onUnmark={() => openUnmarkWarning(task)}
-                      onDecompose={() => handleDecompose(task)}
-                      onComplete={() => handleComplete(task)}
-                      onPin={() => handlePin(task)}
-                      onDelete={() => handleDelete(task)}
-                      onClick={() => setSelectedTask(task)}
-                      focus={dayPlan?.focus || 3}
-                      selectedDate={selectedDate}
-                      activeTimer={activeTimer?.taskId === task.id ? activeTimer : undefined}
-                      onPauseTimer={pauseTimer}
-                      onResumeTimer={resumeTimer}
-                      onCompleteTimer={handleTimerComplete}
-                      onSubtaskToggle={handleSubtaskToggle}
-                      isCollapsed={true}
-                    />
-                  ))}
-                </div>
-              </CardContent>
-            )}
-          </Card>
-        )}
-
         {/* Empty state - ONLY if truly no tasks */}
         {mustTasks.length === 0 && 
-         todayTasks.length === 0 && 
-         availableTasks.length === 0 && 
+         top3Tasks.length === 0 && 
+         remainingToday.length === 0 && 
+         later.length === 0 && 
          overdueTasks.length === 0 && (
           <Card className="border-green-300 bg-green-50">
             <CardContent className="pt-6 text-center">
@@ -1904,8 +1779,9 @@ function DayAssistantV2Content() {
 
         {/* Low Focus fallback - when there are tasks but none match the work mode */}
         {mustTasks.length === 0 && 
-         todayTasks.length === 0 && 
-         availableTasks.length === 0 && 
+         top3Tasks.length === 0 && 
+         remainingToday.length === 0 && 
+         later.length === 0 &&
          overdueTasks.length === 0 &&
          tasks.length > 0 && (
           <Card className="border-orange-300 bg-orange-50">
@@ -1958,54 +1834,61 @@ function DayAssistantV2Content() {
           </Card>
         )}
 
-        {/* 📋 LATER QUEUE */}
-        <Card className="border-2 border-blue-500 bg-blue-50 shadow-sm">
+        {/* 📅 Na później (collapsible) - Overflow + Future */}
+        <Card className="border-orange-400 bg-gradient-to-br from-orange-50 to-yellow-50 shadow-sm">
           <CardHeader 
-            className="cursor-pointer hover:bg-blue-100 transition-colors"
+            className="cursor-pointer hover:bg-orange-100/50 transition-colors rounded-t-lg"
             onClick={() => setShowLaterQueue(!showLaterQueue)}
           >
             <div className="flex items-center justify-between">
-              <CardTitle className="text-lg text-blue-800 flex items-center gap-2">
-                📋 Na później
-                <Badge variant="secondary" className="bg-blue-600 text-white font-semibold px-3 py-1">
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <span className="text-2xl">📅</span>
+                <span className="text-gray-800">Na później</span>
+                <Badge className="bg-orange-600 text-white font-semibold px-3 py-1">
                   {later.length} zadań
                 </Badge>
                 {overflowCount > 0 && (
-                  <Badge variant="warning" className="bg-orange-100 text-orange-700 font-semibold px-3 py-1">
-                    {overflowCount} z dzisiaj (nie mieszczą się)
+                  <Badge className="bg-red-100 text-red-700 font-semibold px-3 py-1 border border-red-300">
+                    ⚠️ {overflowCount} z dzisiaj (nie mieszczą się)
                   </Badge>
                 )}
               </CardTitle>
               <CaretDown className={cn(
-                "transition-transform text-blue-600",
+                "transition-transform text-gray-600",
                 showLaterQueue && "rotate-180"
               )} size={24} />
             </div>
+            <p className="text-xs text-gray-700 mt-1 font-medium">
+              Zadania z dzisiaj które nie mieszczą się w capacity + przyszłe daty + bez daty
+            </p>
           </CardHeader>
           {showLaterQueue && (
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-3 pt-4">
               {later.length === 0 ? (
-                <div className="p-4 text-center">
-                  <p className="text-sm text-blue-700">
-                    Wszystkie zadania mieszczą się w dostępnym czasie pracy
+                <div className="p-4 text-center bg-white rounded-lg border-2 border-dashed border-gray-300">
+                  <p className="text-sm text-gray-700 font-medium">
+                    ✅ Wszystkie zadania mieszczą się w dostępnym czasie pracy
                   </p>
                 </div>
               ) : (
                 <>
-                  <p className="text-sm text-blue-700">
-                    Zadania z dzisiaj które nie mieszczą się + przyszłe daty
+                  <p className="text-sm text-gray-700 font-medium bg-white p-2 rounded border border-orange-200">
+                    💡 Opcjonalne zadania - możesz je zrobić jeśli skończysz wcześniej
                   </p>
                   
-                  <div className="border-t pt-3 mt-2 border-blue-200">
+                  <div className="border-t pt-3 mt-2 border-orange-200 space-y-2">
                     {later.map((task, index) => {
                       const isOverflowToday = task.due_date === selectedDate
                       return (
-                        <div key={task.id} className="mb-2">
+                        <div key={task.id} className="space-y-1">
                           {isOverflowToday && (
-                            <div className="flex items-center gap-2 mb-1">
-                              <Badge variant="warning" className="bg-orange-100 text-orange-700 text-xs">
+                            <div className="flex items-center gap-2">
+                              <Badge className="bg-red-100 text-red-700 text-xs font-semibold px-2 py-1 border border-red-300">
                                 ⚠️ Dzisiaj (overflow)
                               </Badge>
+                              <span className="text-xs text-gray-600">
+                                To zadanie jest na dziś, ale nie mieści się w capacity
+                              </span>
                             </div>
                           )}
                           <TaskRow
@@ -2022,6 +1905,7 @@ function DayAssistantV2Content() {
                             focus={dayPlan?.focus || 3}
                             selectedDate={selectedDate}
                             onSubtaskToggle={handleSubtaskToggle}
+                            isCollapsed={true}
                           />
                         </div>
                       )
