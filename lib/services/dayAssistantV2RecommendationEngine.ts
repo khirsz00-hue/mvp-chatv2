@@ -947,19 +947,7 @@ export function calculateScoreBreakdown(
     explanation: contextExplanation
   })
   
-  // 7. Freshness bonus (new tasks created today)
-  if (task.created_at) {
-    const createdDate = task.created_at.split('T')[0]
-    if (createdDate === todayDate) {
-      factors.push({
-        name: 'Świeżość',
-        points: 10,
-        positive: true,
-        detail: '🆕 Utworzone dziś',
-        explanation: 'Nowe zadanie - świeże w pamięci, łatwiej się zabrać'
-      })
-    }
-  }
+  // 7. Freshness bonus removed - promotes procrastination for ADHD users
   
   const total = factors.reduce((sum, f) => sum + f.points, 0)
   

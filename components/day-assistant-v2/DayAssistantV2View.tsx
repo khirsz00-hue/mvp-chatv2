@@ -35,7 +35,7 @@ import { getSmartEstimate, getFormattedEstimate } from '@/lib/utils/estimateHelp
 import { TaskBadges } from './TaskBadges'
 import { TaskContextMenu } from './TaskContextMenu'
 import { TaskDetailsModal } from './TaskDetailsModal'
-import { RecommendationPanel } from './RecommendationPanel'
+
 import { WorkModeSelector, WorkMode } from './WorkModeSelector'
 import { HelpMeModal } from './HelpMeModal'
 import { WorkHoursConfigModal } from './WorkHoursConfigModal'
@@ -52,6 +52,7 @@ import { StreakDisplay } from '@/components/gamification/StreakDisplay'
 import { ProgressRing } from '@/components/gamification/ProgressRing'
 import { TimeStatsCompact } from '@/components/gamification/TimeStatsCompact'
 import { QuickAddModal } from './QuickAddModal'
+import { NewTaskModal, NewTaskData } from './NewTaskModal'
 import { updateStreakOnCompletion, updateDailyStats, triggerConfetti, triggerMilestoneToast, recalculateDailyTotal } from '@/lib/gamification'
 import { useOverdueTasks } from '@/hooks/useOverdueTasks'
 import { MomentumStatusBar } from './MomentumStatusBar'
@@ -126,6 +127,9 @@ function DayAssistantV2Content() {
   
   // NEW: Help me modal state
   const [helpMeTask, setHelpMeTask] = useState<TestDayTask | null>(null)
+  
+  // NEW: Add task modal state
+  const [showAddTaskModal, setShowAddTaskModal] = useState(false)
   
   // NEW: Add time block modal state
   const [showAddTimeBlockModal, setShowAddTimeBlockModal] = useState(false)
@@ -832,6 +836,45 @@ function DayAssistantV2Content() {
 
     const data = await response.json()
     setTasks(prev => [...prev, data.task])
+    showToast('✅ Zadanie dodane!', 'success')
+    addDecisionLog(`Dodano zadanie "${data.task.title}"`)
+    
+    // 🎮 GAMIFICATION: Recalculate daily stats after adding task
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      await recalculateDailyTotal(user.id)
+    }
+  }
+
+  // Handler for NewTaskModal submission
+  const handleNewTaskSubmit = async (taskData: NewTaskData) => {
+    const response = await authFetch('/api/day-assistant-v2/task', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: taskData.title,
+        description: taskData.description,
+        estimate_min: taskData.estimateMin,
+        cognitive_load: taskData.cognitiveLoad,
+        is_must: taskData.isMust,
+        is_important: taskData.isImportant,
+        due_date: taskData.dueDate,
+        context_type: taskData.contextType,
+        priority: taskData.priority,
+        tags: taskData.tags
+      })
+    })
+    
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      showToast(err.message || 'Nie udało się dodać zadania', 'error')
+      return
+    }
+    
+    const data = await response.json()
+    setTasks(prev => [...prev, data.task])
+    if (data.proposal) {
+      setProposals(prev => [data.proposal, ...prev].slice(0, 3))
+    }
     showToast('✅ Zadanie dodane!', 'success')
     addDecisionLog(`Dodano zadanie "${data.task.title}"`)
     
@@ -2022,77 +2065,19 @@ function DayAssistantV2Content() {
           <CardHeader>
             <CardTitle>Dodaj zadanie</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <input
-                className="w-full rounded-lg border px-3 py-2"
-                placeholder="Tytuł zadania"
-                value={newTaskTitle}
-                onChange={e => setNewTaskTitle(e.target.value)}
-              />
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Estymat</span>
-                <input
-                  type="number"
-                  min={5}
-                  className="w-20 rounded-lg border px-2 py-2"
-                  value={newTaskEstimate}
-                  onChange={e => setNewTaskEstimate(Number(e.target.value))}
-                />
-                <span className="text-sm text-muted-foreground">min</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Cognitive load</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={5}
-                  className="w-16 rounded-lg border px-2 py-2"
-                  value={newTaskLoad}
-                  onChange={e => setNewTaskLoad(Number(e.target.value))}
-                />
-              </div>
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={newTaskMust} onChange={e => setNewTaskMust(e.target.checked)} />
-                  MUST (pinned)
-                </label>
-                <select
-                  className="rounded-lg border px-3 py-2 text-sm"
-                  value={newTaskContext}
-                  onChange={e => setNewTaskContext(e.target.value as TaskContext)}
-                >
-                  {(Object.keys(CONTEXT_LABELS) as TaskContext[]).map(ctx => (
-                    <option key={ctx} value={ctx}>
-                      {CONTEXT_LABELS[ctx]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <Button onClick={handleCreateTask} className="w-full">Dodaj na dziś</Button>
+          <CardContent>
+            <Button 
+              onClick={() => setShowAddTaskModal(true)}
+              className="w-full"
+            >
+              + Dodaj nowe zadanie
+            </Button>
           </CardContent>
         </Card>
       </div>
 
       <div className="space-y-6 min-w-0 flex-shrink-0">
-        <Card className="shadow-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <span>💡</span>
-              <span className="bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
-                Rekomendacje
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <RecommendationPanel
-              recommendations={filteredRecommendations}
-              onApply={handleApplyRecommendation}
-              loading={recLoading}
-            />
-          </CardContent>
-        </Card>
+        {/* OLD RecommendationPanel removed - only PassiveInsights panel below */}
 
         {/* NEW: Passive Insights Panel - ALWAYS SHOW */}
         <Card className="border-purple-200 bg-purple-50 shadow-md">
@@ -2326,6 +2311,14 @@ function DayAssistantV2Content() {
         onSubmit={handleQuickAdd}
       />
       
+      {/* New Task Modal - Full Featured */}
+      <NewTaskModal
+        isOpen={showAddTaskModal}
+        onClose={() => setShowAddTaskModal(false)}
+        onSubmit={handleNewTaskSubmit}
+        defaultDate={selectedDate}
+      />
+      
       {/* Morning Review Modal */}
       <MorningReviewModal
         overdueTasks={overdueTasks}
@@ -2424,13 +2417,60 @@ function TaskRow({
 }) {
   const shouldSuggestTen = focus <= 2 && task.estimate_min > 20
   
-  // Calculate score breakdown for tooltip
-  const scoreBreakdown = queuePosition ? calculateScoreBreakdown(
-    task,
-    { energy: focus, focus, context: null },
-    selectedDate,
-    queuePosition  // Pass queue position for summary generation
-  ) : null
+  // Calculate score breakdown for tooltip - use NEW scoring from metadata
+  const scoreBreakdown = queuePosition && (task as any).metadata?._scoreReasoning 
+    ? {
+        total: (task as any).metadata._score || 0,
+        factors: ((task as any).metadata._scoreReasoning as string[]).map((reason: string) => {
+          // Parse reasoning string into structured format
+          // Example: "Priorytet P1: +20" → {name: "Priorytet P1", points: 20, positive: true}
+          const match = reason.match(/^(.*?):\s*([+-]?\d+(?:\.\d+)?)/)
+          if (!match) return { name: reason, points: 0, positive: false, detail: '', explanation: '' }
+          
+          const [, name, pointsStr] = match
+          const points = parseFloat(pointsStr)
+          
+          // Add context/explanation based on factor type
+          let explanation = ''
+          let detail = reason
+          if (name.includes('Deadline') || name.includes('deadline')) {
+            explanation = 'Zadanie ma termin dzisiaj - warto zrobić wcześniej'
+          } else if (name.includes('Kontynuacja')) {
+            explanation = 'Kontynuujesz ten sam typ pracy - łatwiej się skupić'
+          } else if (name.includes('Przełączenie')) {
+            explanation = 'Zmiana typu pracy może wymagać więcej czasu na wejście w flow'
+          } else if (name.includes('MUST') || name.includes('Przypięty')) {
+            explanation = 'Oznaczone jako obowiązkowe na dziś'
+          } else if (name.includes('Priorytet')) {
+            explanation = 'Wysoki priorytet zwiększa pilność zadania'
+          } else if (name.includes('Przeterminowane')) {
+            explanation = 'Zadanie przekroczyło termin - należy je zrobić jak najszybciej'
+          }
+          
+          return {
+            name,
+            points,
+            positive: points > 0,
+            detail,
+            explanation
+          }
+        }),
+        summary: queuePosition === 1 
+          ? '🏆 To zadanie jest najważniejsze dziś - zacznij od niego!'
+          : (task as any).is_must
+          ? '📌 Przypięte zadanie - musisz je zrobić dziś'
+          : (task as any).due_date === selectedDate
+          ? '⏰ Ma deadline dziś - warto zrobić wcześniej'
+          : `Pozycja #${queuePosition} w kolejce na podstawie pilności i ważności`
+      }
+    : queuePosition 
+    ? calculateScoreBreakdown(
+        task,
+        { energy: focus, focus, context: null },
+        selectedDate,
+        queuePosition  // Fallback to old system if no _scoreReasoning
+      )
+    : null
   
   // Visual distinction based on queue position
   const cardSizeClass = queuePosition === 1 
@@ -2550,12 +2590,21 @@ function TaskRow({
                 #{queuePosition}
               </span>
             )}
-            {task.is_must && <span className="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-700">MUST</span>}
+            {task.is_must && <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-purple-700 text-white">MUST</span>}
             <TaskBadges task={task} today={selectedDate} />
             {riskAssessment && <RiskBadge risk={riskAssessment} />}
             {task.context_type && (
-              <span className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600">
-                {task.context_type}
+              <span className={cn(
+                'px-2 py-0.5 text-xs font-medium rounded-full',
+                task.context_type === 'deep_work' && 'bg-purple-200 text-purple-900',
+                task.context_type === 'admin' && 'bg-blue-200 text-blue-900',
+                task.context_type === 'communication' && 'bg-green-200 text-green-900',
+                task.context_type === 'creative' && 'bg-pink-200 text-pink-900',
+                task.context_type === 'maintenance' && 'bg-gray-300 text-gray-900',
+                // Default fallback
+                !['deep_work', 'admin', 'communication', 'creative', 'maintenance'].includes(task.context_type) && 'bg-gray-300 text-gray-900'
+              )}>
+                {CONTEXT_LABELS[task.context_type as keyof typeof CONTEXT_LABELS] || task.context_type}
               </span>
             )}
             <p className={cn(

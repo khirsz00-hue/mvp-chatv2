@@ -50,7 +50,7 @@ export function TaskBadges({ task, today }: TaskBadgesProps) {
   // Due today
   if (task.due_date === todayDate) {
     return (
-      <Badge variant="default" className="text-xs bg-blue-500 text-white border-blue-600">
+      <Badge variant="default" className="text-xs font-semibold bg-green-700 text-white border-green-800">
         📅 Dziś
       </Badge>
     )
