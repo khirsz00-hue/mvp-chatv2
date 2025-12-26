@@ -397,8 +397,8 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
     setLoading(true)
     
     try {
-      const taskData:  any = {
-        content: title. trim(),
+      const taskData: any = {
+        content: title.trim(),
         token
       }
       
@@ -426,7 +426,7 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
       }
       
       if (allLabels.length > 0) {
-        taskData. labels = allLabels
+        taskData.labels = allLabels
       }
       
       // Custom metadata (może być używane lokalnie)
@@ -446,7 +446,7 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
             const planText = '📋 Plan działania:\n' + 
               aiSuggestions.actionPlan.map((step, i) => `${i + 1}. ${step}`).join('\n')
             
-            await fetch('/api/todoist/comments', {
+            const commentResponse = await fetch('/api/todoist/comments', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -455,6 +455,12 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
                 content: planText
               })
             })
+            
+            if (!commentResponse.ok) {
+              console.error('⚠️ Failed to add action plan as comment:', await commentResponse.text())
+            } else {
+              console.log('✅ Action plan added as comment successfully')
+            }
           }
         } catch (commentErr) {
           console.error('⚠️ Failed to add action plan as comment:', commentErr)
