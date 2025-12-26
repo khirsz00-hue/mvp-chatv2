@@ -2335,7 +2335,8 @@ function TaskRow({
           // - "⏱ Średnie (30min): -3"
           // - "🚩 Priorytet P1: +8"
           // - "Tie-breaker: +0.123"
-          const match = reason.match(/^.*?:\s*([+-]?\d+(?:\.\d+)?)/)
+          // Pattern explanation: matches emoji/text followed by colon and number
+          const match = reason.match(/:\s*([+-]?\d+(?:\.\d+)?)/)
           if (!match) {
             console.warn('⚠️ [Tooltip] Failed to parse reasoning:', reason)
             return { name: reason, points: 0, positive: false, detail: reason, explanation: '' }
@@ -2343,7 +2344,9 @@ function TaskRow({
           
           const pointsStr = match[1]
           const points = parseFloat(pointsStr)
-          const name = reason.substring(0, reason.lastIndexOf(':'))
+          // Extract name as everything before the last colon (guaranteed to exist by regex match)
+          const colonIndex = reason.lastIndexOf(':')
+          const name = colonIndex !== -1 ? reason.substring(0, colonIndex) : reason
           
           // Add context/explanation based on factor type
           let explanation = ''
