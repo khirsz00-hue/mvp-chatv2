@@ -2622,15 +2622,17 @@ function TaskRow({
             <TaskBadges task={task} today={selectedDate} />
             {riskAssessment && <RiskBadge risk={riskAssessment} />}
             {/* Cognitive Load Badge */}
-            {task.cognitive_load && (
-              <Badge variant="outline" className="text-xs">
-                🧠 Load {task.cognitive_load}/5
+            {task.cognitive_load != null && (
+              <Badge variant="outline" className="text-xs flex items-center gap-1">
+                <span>🧠</span>
+                <span>Load {task.cognitive_load}/5</span>
               </Badge>
             )}
             {/* Estimate Badge */}
-            {task.estimate_min && (
-              <Badge variant="outline" className="text-xs">
-                ⏱ {task.estimate_min} min
+            {task.estimate_min != null && (
+              <Badge variant="outline" className="text-xs flex items-center gap-1">
+                <span>⏱</span>
+                <span>{task.estimate_min} min</span>
               </Badge>
             )}
             {task.context_type && (
