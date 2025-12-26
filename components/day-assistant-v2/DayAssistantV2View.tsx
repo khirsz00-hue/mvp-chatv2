@@ -2478,7 +2478,7 @@ function TaskRow({
           } else if (name.includes('Bardzo długie')) {
             explanation = 'Bardzo długie zadanie - rozważ podział na mniejsze części'
           } else if (name.includes('Odkładane')) {
-            explanation = 'Zadanie było już откładane - może warto je w końcu zrobić lub usunąć?'
+            explanation = 'Zadanie było już odkładane - może warto je w końcu zrobić lub usunąć?'
           } else if (name.includes('Kontekst')) {
             explanation = 'Dopasowanie kontekstu pracy do kolejki zadań'
           } else if (name.includes('Tie-breaker')) {

@@ -216,7 +216,7 @@ function calculateEnergyFocusFit(
       reasoning.push(`⚡ Zbyt łatwe dla obecnej energii (${energy}/5, focus ${focus}/5): +${Math.round(fitScore)}`)
     }
   } else {
-    // Middle range (fitDiff === 2)
+    // Handle remaining cases (typically fitDiff === 2, but can be any value not caught above)
     reasoning.push(`⚡ Dopasowanie energii (${energy}/5, focus ${focus}/5): +${Math.round(fitScore)}`)
   }
   
