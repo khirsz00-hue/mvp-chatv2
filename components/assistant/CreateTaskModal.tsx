@@ -6,7 +6,7 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Input from '@/components/ui/Input'
 import Textarea from '@/components/ui/Textarea'
-import { CalendarBlank, Clock, Tag, FolderOpen, Flag, Sparkle, Brain, PencilSimple, Lightning } from '@phosphor-icons/react'
+import { CalendarBlank, Clock, Tag, FolderOpen, Flag, Sparkle, Brain, PencilSimple, Lightning, CheckCircle } from '@phosphor-icons/react'
 import { format, addDays } from 'date-fns'
 
 interface Project {
@@ -15,10 +15,16 @@ interface Project {
   color?:  string
 }
 
+interface Label {
+  id: string
+  name: string
+  color?: string
+}
+
 interface CreateTaskModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onCreateTask: (taskData: any) => Promise<void>
+  onCreateTask: (taskData: any) => Promise<any>
 }
 
 export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTaskModalProps) {
@@ -28,13 +34,15 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
   const [priority, setPriority] = useState<1 | 2 | 3 | 4>(4)
   const [projectId, setProjectId] = useState<string>('')
   const [estimatedMinutes, setEstimatedMinutes] = useState<number>(0)
-  const [labels, setLabels] = useState<string>('')
+  const [labels, setLabels] = useState<string[]>([])
+  const [availableLabels, setAvailableLabels] = useState<Label[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<{ title?: string; dueDate?: string }>({})
   
   // AI Suggestions state
   const [aiSuggestions, setAiSuggestions] = useState<{
+    understanding?: string
     priority?: number
     estimatedMinutes?: number
     description?: string
@@ -55,7 +63,7 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
   
   const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
   
-  // Fetch projects on mount
+  // Fetch projects and labels on mount
   useEffect(() => {
     if (! open || !token) return
     
@@ -73,7 +81,22 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
       }
     }
     
+    const fetchLabels = async () => {
+      try {
+        const res = await fetch(`/api/todoist/labels?token=${token}`)
+        if (res.ok) {
+          const data = await res.json()
+          setAvailableLabels(data.labels || [])
+        } else {
+          console.error('Failed to fetch labels:', res.status, await res.text())
+        }
+      } catch (err) {
+        console.error('Error fetching labels:', err)
+      }
+    }
+    
     fetchProjects()
+    fetchLabels()
   }, [open, token])
   
   // Reset form when modal opens
@@ -85,7 +108,7 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
       setPriority(4)
       setProjectId('')
       setEstimatedMinutes(0)
-      setLabels('')
+      setLabels([])
       setErrors({})
       setAiSuggestions(null)
       setPlanGenerated(false)
@@ -193,10 +216,48 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
         break
       case 'labels':
         if (aiSuggestions.suggestedLabels && aiSuggestions.suggestedLabels.length > 0) {
-          setLabels(aiSuggestions.suggestedLabels.join(', '))
+          setLabels(aiSuggestions.suggestedLabels)
         }
         break
     }
+  }
+  
+  const handleApplyParameters = () => {
+    if (!aiSuggestions) return
+    
+    // Apply all suggestions without generating plan
+    if (aiSuggestions.priority) {
+      setPriority(aiSuggestions.priority as 1 | 2 | 3 | 4)
+    }
+    if (aiSuggestions.cognitiveLoad) {
+      setCognitiveLoad(aiSuggestions.cognitiveLoad as 1 | 2 | 3 | 4)
+    }
+    if (aiSuggestions.estimatedMinutes) {
+      setEstimatedMinutes(aiSuggestions.estimatedMinutes)
+    }
+    if (aiSuggestions.suggestedDueDate) {
+      setDueDate(aiSuggestions.suggestedDueDate)
+    }
+    if (aiSuggestions.suggestedProject) {
+      const suggestedName = aiSuggestions.suggestedProject.toLowerCase().trim()
+      const project = projects.find(p => 
+        p.name.toLowerCase().trim() === suggestedName ||
+        p.name.toLowerCase().includes(suggestedName) ||
+        suggestedName.includes(p.name.toLowerCase())
+      )
+      if (project) {
+        setProjectId(project.id)
+      }
+    }
+    if (aiSuggestions.suggestedLabels && aiSuggestions.suggestedLabels.length > 0) {
+      setLabels(aiSuggestions.suggestedLabels)
+    }
+    if (aiSuggestions.description && !description.trim()) {
+      setDescription(aiSuggestions.description)
+    }
+    
+    // Hide AI suggestions after applying
+    setPlanGenerated(false)
   }
   
   const handleGeneratePlan = async () => {
@@ -252,7 +313,7 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
           }
         }
         if (data.suggestedLabels && data.suggestedLabels.length > 0) {
-          setLabels(data.suggestedLabels.join(', '))
+          setLabels(data.suggestedLabels)
         }
         if (data.description && !description.trim()) {
           setDescription(data.description)
@@ -336,21 +397,14 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
     setLoading(true)
     
     try {
-      const taskData:  any = {
-        content: title. trim(),
+      const taskData: any = {
+        content: title.trim(),
         token
       }
       
-      // Append action plan to description if exists
-      let finalDescription = description.trim()
-      if (aiSuggestions?.actionPlan && aiSuggestions.actionPlan.length > 0) {
-        const planText = '\n\n📋 Plan działania:\n' + 
-          aiSuggestions.actionPlan.map((step, i) => `${i + 1}. ${step}`).join('\n')
-        finalDescription = (finalDescription || '') + planText
-      }
-      
-      if (finalDescription) {
-        taskData.description = finalDescription
+      // Add description WITHOUT action plan
+      if (description.trim()) {
+        taskData.description = description.trim()
       }
       
       if (dueDate) {
@@ -366,13 +420,13 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
       }
       
       // Add cognitive load label if selected
-      const allLabels = labels. trim() ? labels.split(',').map(l => l.trim()).filter(Boolean) : []
+      const allLabels = [...labels]
       if (cognitiveLoad) {
         allLabels.push(`cognitive-${cognitiveLoad}`)
       }
       
       if (allLabels.length > 0) {
-        taskData. labels = allLabels
+        taskData.labels = allLabels
       }
       
       // Custom metadata (może być używane lokalnie)
@@ -380,7 +434,40 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
         taskData.duration = estimatedMinutes
       }
       
-      await onCreateTask(taskData)
+      const result = await onCreateTask(taskData)
+      
+      // Add action plan as comment if exists
+      if (aiSuggestions?.actionPlan && aiSuggestions.actionPlan.length > 0) {
+        try {
+          // Extract task ID from result - it might be in different places depending on the API
+          const createdTaskId = result?.id || result?.task?.id
+          
+          if (createdTaskId) {
+            const planText = '📋 Plan działania:\n' + 
+              aiSuggestions.actionPlan.map((step, i) => `${i + 1}. ${step}`).join('\n')
+            
+            const commentResponse = await fetch('/api/todoist/comments', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                token,
+                task_id: createdTaskId,
+                content: planText
+              })
+            })
+            
+            if (!commentResponse.ok) {
+              console.error('⚠️ Failed to add action plan as comment:', await commentResponse.text())
+            } else {
+              console.log('✅ Action plan added as comment successfully')
+            }
+          }
+        } catch (commentErr) {
+          console.error('⚠️ Failed to add action plan as comment:', commentErr)
+          // Don't fail the whole operation if comment fails
+        }
+      }
+      
       onOpenChange(false)
     } catch (err) {
       console.error('Error creating task:', err)
@@ -498,12 +585,22 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
                   <Sparkle size={18} weight="fill" className="text-blue-600 mt-0.5" />
                   <div className="flex-1">
                     <p className="text-sm text-blue-800 font-medium mb-1">🤖 AI rozumie to jako:</p>
-                    <p className="text-sm text-gray-700">{title}</p>
+                    <p className="text-sm text-gray-700">{aiSuggestions.understanding || title}</p>
                   </div>
                 </div>
                 
-                {/* Two main buttons */}
+                {/* Three main buttons */}
                 <div className="flex gap-2 mt-3">
+                  <Button
+                    type="button"
+                    onClick={handleApplyParameters}
+                    disabled={loading}
+                    className="flex-1 gap-2 border border-blue-300 hover:bg-blue-50"
+                    variant="ghost"
+                  >
+                    <CheckCircle size={16} />
+                    Uzupełnij parametry
+                  </Button>
                   <Button
                     type="button"
                     variant="ghost"
@@ -512,7 +609,7 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
                     className="flex-1 gap-2 border border-purple-300 hover:bg-purple-50"
                   >
                     <PencilSimple size={16} weight="bold" />
-                    ✨ Doprecyzuj
+                    Doprecyzuj
                   </Button>
                   <Button
                     type="button"
@@ -594,7 +691,7 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
                   </ul>
                   <div className="mt-3 pt-3 border-t border-green-200">
                     <p className="text-xs text-green-700">
-                      💡 Ten plan zostanie automatycznie dodany do opisu zadania
+                      💡 Ten plan zostanie automatycznie dodany jako komentarz do zadania
                     </p>
                   </div>
                 </div>
@@ -785,14 +882,59 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
           <div>
             <label className="block text-sm font-medium mb-2 flex items-center gap-2">
               <Tag size={18} />
-              Etykiety (oddzielone przecinkami)
+              Etykiety
             </label>
-            <Input
-              value={labels}
-              onChange={(e) => setLabels(e.target.value)}
-              placeholder="praca, pilne, spotkanie"
-              disabled={loading}
-            />
+            
+            {/* Selected Labels */}
+            {labels.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-2">
+                {labels.map((label, idx) => (
+                  <Badge 
+                    key={idx} 
+                    className="bg-blue-100 text-blue-700 cursor-pointer hover:bg-red-100 hover:text-red-700"
+                    onClick={() => setLabels(labels.filter((_, i) => i !== idx))}
+                  >
+                    {label} ×
+                  </Badge>
+                ))}
+              </div>
+            )}
+            
+            {/* Available Labels */}
+            {availableLabels.length > 0 ? (
+              <div className="space-y-2">
+                <select
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-purple"
+                  value=""
+                  onChange={(e) => {
+                    const selectedLabel = e.target.value
+                    if (selectedLabel && !labels.includes(selectedLabel)) {
+                      setLabels([...labels, selectedLabel])
+                    }
+                  }}
+                  disabled={loading}
+                >
+                  <option value="">Wybierz etykietę z Todoist...</option>
+                  {availableLabels
+                    .filter(label => !labels.includes(label.name))
+                    .map(label => (
+                      <option key={label.id} value={label.name}>
+                        {label.name}
+                      </option>
+                    ))}
+                </select>
+                <p className="text-xs text-gray-500">
+                  Kliknij na wybraną etykietę aby ją usunąć
+                </p>
+              </div>
+            ) : (
+              <Input
+                value={labels.join(', ')}
+                onChange={(e) => setLabels(e.target.value.split(',').map(l => l.trim()).filter(Boolean))}
+                placeholder="Wpisz etykiety oddzielone przecinkami"
+                disabled={loading}
+              />
+            )}
           </div>
         </form>
         

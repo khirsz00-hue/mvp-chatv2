@@ -618,9 +618,11 @@ export function TasksAssistant() {
       // Refresh tasks to get updated list
       setTimeout(() => fetchTasks(filter), 500)
       
+      return newTask
     } catch (err: any) {
       console.error('❌ Error creating task:', err)
       showToast('Nie udało się utworzyć zadania: ' + (err?.message || ''), 'error')
+      throw err
     }
   }
   
