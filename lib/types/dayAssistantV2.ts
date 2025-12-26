@@ -250,6 +250,7 @@ export interface ScoreFactor {
   points: number
   positive: boolean
   detail: string
+  explanation?: string  // NEW: Human-readable context for why this factor matters
 }
 
 // Detailed Score Breakdown (for tooltip display)
@@ -257,6 +258,7 @@ export interface DetailedScoreBreakdown {
   total: number
   factors: ScoreFactor[]
   explanation: string
+  summary?: string  // NEW: Overall explanation of why this task has its current position
 }
 
 // Recommendation Action (for new recommendation system)

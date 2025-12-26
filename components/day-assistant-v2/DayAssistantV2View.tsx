@@ -2094,22 +2094,57 @@ function DayAssistantV2Content() {
           </CardContent>
         </Card>
 
-        {/* NEW: Passive Insights Panel */}
-        {insights.length > 0 && (
-          <Card className="border-purple-200 bg-purple-50 shadow-md">
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Sparkle className="text-purple-600" size={20} />
-                <CardTitle className="text-base">
-                  💡 AI zauważyło wzorce
-                </CardTitle>
+        {/* NEW: Passive Insights Panel - ALWAYS SHOW */}
+        <Card className="border-purple-200 bg-purple-50 shadow-md">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Sparkle className="text-purple-600" size={20} />
+              <CardTitle className="text-base">
+                💡 AI zauważyło wzorce
+              </CardTitle>
+            </div>
+            <p className="text-xs text-gray-600 mt-1">
+              Sugestie oparte na analizie kolejki (nie zmieniają kolejności)
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {insights.length === 0 ? (
+              /* Fallback UI when no insights */
+              <div className="p-6 text-center">
+                <p className="text-gray-600 font-medium">
+                  🔍 Analizuję Twoją kolejkę...
+                </p>
+                <p className="text-xs text-gray-500 mt-2">
+                  Insighty pojawią się gdy AI wykryje wzorce w Twoich zadaniach
+                </p>
+                
+                {/* Debug info in dev mode */}
+                {process.env.NODE_ENV === 'development' && (
+                  <details className="mt-4 text-left">
+                    <summary className="text-xs text-blue-600 cursor-pointer hover:underline">
+                      🔧 Debug info
+                    </summary>
+                    <pre className="text-xs bg-gray-800 text-gray-100 p-2 rounded mt-2 overflow-auto max-h-48">
+{JSON.stringify({
+  queueLength: queue.length,
+  dayPlanExists: !!dayPlan,
+  energy: dayPlan?.energy,
+  dismissedCount: dismissedInsightIds.size,
+  tasksWithContext: tasks.filter(t => t.context_type).length,
+  queueSample: queue.slice(0, 3).map(t => ({
+    id: t.id.substring(0, 8),
+    title: t.title.substring(0, 30),
+    context: t.context_type,
+    estimate: t.estimate_min
+  }))
+}, null, 2)}
+                    </pre>
+                  </details>
+                )}
               </div>
-              <p className="text-xs text-gray-600 mt-1">
-                Sugestie oparte na analizie kolejki (nie zmieniają kolejności)
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {insights.map(insight => (
+            ) : (
+              /* Show insights */
+              insights.map(insight => (
                 <div
                   key={insight.id}
                   className="p-4 bg-white rounded-lg border border-purple-200 shadow-sm"
@@ -2148,10 +2183,10 @@ function DayAssistantV2Content() {
                     </Button>
                   </div>
                 </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
+              ))
+            )}
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
@@ -2393,7 +2428,8 @@ function TaskRow({
   const scoreBreakdown = queuePosition ? calculateScoreBreakdown(
     task,
     { energy: focus, focus, context: null },
-    selectedDate
+    selectedDate,
+    queuePosition  // Pass queue position for summary generation
   ) : null
   
   // Visual distinction based on queue position
@@ -2446,29 +2482,59 @@ function TaskRow({
                     <Info size={14} className="text-gray-400" />
                   </div>
                 </TooltipTrigger>
-                <TooltipContent side="right" className="max-w-sm">
-                    <div className="space-y-2">
-                      <p className="font-semibold">💡 Dlaczego #{queuePosition} w kolejce?</p>
-                      <p className="text-sm">Score: {scoreBreakdown.total}/100</p>
-                      
-                      <div className="space-y-1 text-xs">
-                        {scoreBreakdown.factors.map((factor, idx) => (
-                          <div key={idx} className="flex justify-between gap-2">
-                            <span>
-                              {factor.positive ? '✅' : '⚠️'} {factor.name}:
-                            </span>
-                            <span className={factor.positive ? 'text-green-400' : 'text-orange-400'}>
-                              {factor.points > 0 ? '+' : ''}{factor.points}
-                            </span>
-                          </div>
-                        ))}
+                <TooltipContent side="right" className="max-w-md p-4 bg-gray-900 text-white border-purple-400">
+                    <div className="space-y-3">
+                      <div>
+                        <p className="font-bold text-lg">💡 Dlaczego #{queuePosition}?</p>
+                        <p className="text-sm text-gray-300 mt-1">
+                          Score: <span className="font-mono font-bold text-yellow-400">{scoreBreakdown.total.toFixed(1)}</span> / 100
+                        </p>
                       </div>
                       
-                      {scoreBreakdown.explanation && (
-                        <p className="text-xs text-gray-300 mt-2">
-                          {scoreBreakdown.explanation}
-                        </p>
+                      <div className="space-y-2 text-sm">
+                        {scoreBreakdown.factors.map((factor, idx) => {
+                          const icon = factor.positive ? '✅' : '⚠️'
+                          const colorClass = factor.positive 
+                            ? 'text-green-400' 
+                            : factor.points < 0 
+                            ? 'text-red-400' 
+                            : 'text-gray-400'
+                          
+                          return (
+                            <div key={idx} className="border-b border-gray-700 pb-2 last:border-0">
+                              <div className="flex justify-between items-start gap-3">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span>{icon}</span>
+                                    <span className="font-medium">{factor.name}</span>
+                                    <span className={`font-mono font-bold ${colorClass} ml-auto`}>
+                                      {factor.points > 0 ? '+' : ''}{factor.points}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-gray-400 mt-1 ml-6">{factor.detail}</p>
+                                  {factor.explanation && (
+                                    <p className="text-xs text-gray-300 mt-1 ml-6 italic">
+                                      {factor.explanation}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      
+                      {scoreBreakdown.summary && (
+                        <div className="pt-2 border-t border-gray-700">
+                          <p className="text-xs text-purple-300 font-medium">
+                            💬 {scoreBreakdown.summary}
+                          </p>
+                        </div>
                       )}
+                      
+                      <div className="pt-2 text-xs text-gray-400 border-t border-gray-700">
+                        <p>Wyższy score = bardziej pilne/ważne dla dzisiejszej kolejki</p>
+                      </div>
                     </div>
                   </TooltipContent>
                 </Tooltip>
@@ -2493,12 +2559,12 @@ function TaskRow({
               </span>
             )}
             <p className={cn(
-              'font-semibold',
+              'font-semibold text-gray-900',  // Changed from default to ensure dark text on light background
               queuePosition === 1 && 'text-lg',
               isCollapsed && 'text-sm'
             )}>{task.title}</p>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-xs text-gray-700 mt-1">  {/* Changed from text-muted-foreground for better contrast */}
             Estymat: {getFormattedEstimate(task)} • Load {task.cognitive_load} • Przeniesienia: {task.postpone_count || 0}
           </p>
           

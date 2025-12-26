@@ -82,20 +82,31 @@ export function RecommendationPanel({ recommendations, onApply, loading }: Recom
     )
   }
 
-  // Filter out already applied recommendations
-  const activeRecommendations = recommendations.filter(rec => !appliedIds.has(rec.id))
+  // Filter out already applied recommendations AND action-based recommendations
+  // Keep only passive/informational recommendations
+  const ACTION_TYPES = ['REORDER_QUEUE', 'MOVE_TASK', 'UNPIN_TASK', 'DECOMPOSE_TASK', 'CHANGE_MUST']
+  const passiveRecommendations = recommendations.filter(rec => 
+    !appliedIds.has(rec.id) && 
+    !ACTION_TYPES.includes(rec.action?.op || '')
+  )
 
-  if (activeRecommendations.length === 0) {
+  if (passiveRecommendations.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">
-        Brak aktywnych rekomendacji. Zmiany energii/skupienia lub nowe zadania wywołają rekomendacje.
-      </p>
+      <div className="p-4 text-center text-gray-500 text-sm">
+        <p className="font-medium">Brak aktywnych rekomendacji</p>
+        <p className="text-xs mt-1">
+          Stare rekomendacje z przyciskami [Zastosuj] zostały zastąpione pastywnymi insightami poniżej.
+        </p>
+        <p className="text-xs mt-1">
+          Zmiany energii/skupienia lub nowe zadania mogą wywołać nowe sugestie.
+        </p>
+      </div>
     )
   }
 
   return (
     <div className="space-y-3">
-      {activeRecommendations.map(rec => {
+      {passiveRecommendations.map(rec => {
         const isApplying = applyingId === rec.id
         const isApplied = appliedIds.has(rec.id)
         
