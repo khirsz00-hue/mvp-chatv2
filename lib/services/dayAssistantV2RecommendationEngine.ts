@@ -785,64 +785,97 @@ function calculateAvailableMinutesForAI(dayPlan: DayPlan): number {
 export function calculateScoreBreakdown(
   task: TestDayTask,
   context: { energy: number; focus: number; context: string | null },
-  todayDate: string
+  todayDate: string,
+  queuePosition?: number
 ): DetailedScoreBreakdown {
   const factors: ScoreFactor[] = []
   
   // 1. Energy match
   const energyDiff = Math.abs(task.cognitive_load - context.energy)
   const energyScore = Math.max(0, 30 - (energyDiff * 10))
+  let energyExplanation = ''
+  if (energyDiff === 0) {
+    energyExplanation = 'Idealne dopasowanie do Twojej energii!'
+  } else if (energyDiff === 1) {
+    energyExplanation = 'Bardzo dobre dopasowanie energii'
+  } else if (energyDiff >= 3) {
+    energyExplanation = task.cognitive_load > context.energy 
+      ? 'Może być trudne przy Twojej obecnej energii'
+      : 'Może być zbyt proste, łatwo się znudzić'
+  }
+  
   factors.push({
     name: 'Dopasowanie energii',
     points: energyScore,
     positive: energyScore > 15,
-    detail: `Load ${task.cognitive_load} vs Twoja energia: ${context.energy}`
+    detail: `Load ${task.cognitive_load} vs Twoja energia: ${context.energy}`,
+    explanation: energyExplanation
   })
   
   // 2. Priority
   let priorityScore = 0
   let priorityDetail = ''
+  let priorityExplanation = ''
   if (task.is_must) {
     priorityScore = 30
-    priorityDetail = 'MUST task'
+    priorityDetail = '📌 MUST - Przypięte'
+    priorityExplanation = 'Oznaczone jako obowiązkowe na dziś'
   } else if (task.is_important) {
     priorityScore = 25
-    priorityDetail = 'Important'
+    priorityDetail = '⭐ Ważny'
+    priorityExplanation = 'Wysokie znaczenie dla Twoich celów'
   } else if (task.priority >= 3) {
     priorityScore = 15
-    priorityDetail = `Priority ${task.priority}`
+    priorityDetail = `Priorytet P${task.priority}`
+    priorityExplanation = task.priority === 4 ? 'Najwyższy priorytet w Todoist' : 'Wysoki priorytet'
   } else {
     priorityScore = task.priority * 5
-    priorityDetail = 'Normal priority'
+    priorityDetail = task.priority === 1 ? 'Brak priorytetu' : `Priorytet P${task.priority}`
+    priorityExplanation = 'Normalny priorytet'
   }
   
   factors.push({
     name: 'Priorytet',
     points: priorityScore,
     positive: priorityScore > 10,
-    detail: priorityDetail
+    detail: priorityDetail,
+    explanation: priorityExplanation
   })
   
   // 3. Deadline urgency
   let deadlineScore = 0
   let deadlineDetail = 'Brak deadline'
+  let deadlineExplanation = ''
   
   if (task.due_date) {
+    // Try to get time from metadata if available
+    const dueTime = (task.metadata as any)?.due_time || '23:59'
+    
     if (task.due_date < todayDate) {
       const daysOverdue = Math.floor((new Date(todayDate).getTime() - new Date(task.due_date).getTime()) / MILLISECONDS_PER_DAY)
       deadlineScore = 25 // Overdue = high urgency
-      deadlineDetail = `Przeterminowane (${daysOverdue} ${daysOverdue === 1 ? 'dzień' : 'dni'})`
+      deadlineDetail = `🔴 Przeterminowane ${daysOverdue}d`
+      deadlineExplanation = 'Już minął termin - powinno być zrobione!'
     } else if (task.due_date === todayDate) {
       deadlineScore = 20 // Due today
-      deadlineDetail = 'Due dziś'
+      deadlineDetail = `⏰ Deadline dziś o ${dueTime}`
+      const now = new Date()
+      const [hours, minutes] = dueTime.split(':').map(Number)
+      const deadline = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes)
+      const hoursLeft = Math.max(0, Math.round((deadline.getTime() - now.getTime()) / (1000 * 60 * 60)))
+      deadlineExplanation = hoursLeft <= 3 
+        ? `Zostało ${hoursLeft}h - bardzo pilne!`
+        : `Zostało ${hoursLeft}h - zrób dziś`
     } else {
       const daysUntil = Math.floor((new Date(task.due_date).getTime() - new Date(todayDate).getTime()) / MILLISECONDS_PER_DAY)
       if (daysUntil === 1) {
         deadlineScore = 15
-        deadlineDetail = 'Due jutro'
+        deadlineDetail = '📅 Deadline jutro'
+        deadlineExplanation = 'Jutro już koniec - lepiej zrobić dziś'
       } else {
         deadlineScore = 10
-        deadlineDetail = `Due za ${daysUntil} dni`
+        deadlineDetail = `📅 Deadline za ${daysUntil}d`
+        deadlineExplanation = 'Masz jeszcze czas, ale warto zacząć'
       }
     }
   }
@@ -851,47 +884,108 @@ export function calculateScoreBreakdown(
     name: 'Deadline',
     points: deadlineScore,
     positive: deadlineScore > 15,
-    detail: deadlineDetail
+    detail: deadlineDetail,
+    explanation: deadlineExplanation
   })
   
-  // 4. Postpone penalty
-  if (task.postpone_count > 0) {
-    const postponePenalty = -Math.min(task.postpone_count * 5, 20)
+  // 4. Estimate penalty
+  if (task.estimate_min > 60) {
+    const estimatePenalty = -Math.min(Math.floor((task.estimate_min - 60) / 30) * 3, 10)
     factors.push({
-      name: 'Postpone penalty',
-      points: postponePenalty,
+      name: 'Czas trwania',
+      points: estimatePenalty,
       positive: false,
-      detail: `Przełożone ${task.postpone_count}x`
+      detail: `Długie zadanie (${task.estimate_min}min)`,
+      explanation: 'Dłuższe zadania mają niższy priorytet (można je podzielić na mniejsze)'
+    })
+  } else if (task.estimate_min <= 15) {
+    factors.push({
+      name: 'Czas trwania',
+      points: 5,
+      positive: true,
+      detail: `Szybkie zadanie (${task.estimate_min}min)`,
+      explanation: 'Szybkie zwycięstwo - łatwe momentum!'
     })
   }
   
-  // 5. Context match
+  // 5. Postpone penalty
+  if (task.postpone_count > 0) {
+    const postponePenalty = -Math.min(task.postpone_count * 5, 20)
+    factors.push({
+      name: 'Historia odkładania',
+      points: postponePenalty,
+      positive: false,
+      detail: `Przełożone ${task.postpone_count}x`,
+      explanation: task.postpone_count >= 3 
+        ? 'Często odkładane - może warto je w końcu zrobić lub usunąć?'
+        : 'Odkładane - nie pozwól aby rosło dalej'
+    })
+  }
+  
+  // 6. Context match
   let contextScore = 0
   let contextDetail = ''
+  let contextExplanation = ''
   if (context.context && task.context_type === context.context) {
     contextScore = 22
-    contextDetail = `Pasuje do filtru: ${task.context_type}`
+    contextDetail = `✅ Pasuje do filtru: ${task.context_type}`
+    contextExplanation = 'Idealny kontekst do tego co teraz robisz'
   } else if (!context.context) {
     contextScore = 10 // Neutral if no filter
     contextDetail = `Kontekst: ${task.context_type || 'brak'}`
   } else {
     contextScore = 5
-    contextDetail = `Nie pasuje do filtru (${task.context_type} vs ${context.context})`
+    contextDetail = `🔄 Zmiana kontekstu (${context.context} → ${task.context_type})`
+    contextExplanation = 'Przełączenie między różnymi typami pracy może zająć więcej czasu'
   }
   
   factors.push({
-    name: 'Context match',
+    name: 'Kontekst',
     points: contextScore,
     positive: contextScore > 15,
-    detail: contextDetail
+    detail: contextDetail,
+    explanation: contextExplanation
   })
   
+  // 7. Freshness bonus (new tasks created today)
+  if (task.created_at) {
+    const createdDate = task.created_at.split('T')[0]
+    if (createdDate === todayDate) {
+      factors.push({
+        name: 'Świeżość',
+        points: 10,
+        positive: true,
+        detail: '🆕 Utworzone dziś',
+        explanation: 'Nowe zadanie - świeże w pamięci, łatwiej się zabrać'
+      })
+    }
+  }
+  
   const total = factors.reduce((sum, f) => sum + f.points, 0)
+  
+  // Generate summary based on position and factors
+  let summary = ''
+  if (queuePosition === 1) {
+    summary = '🏆 To zadanie jest najważniejsze dziś - zacznij od niego!'
+    const topFactor = factors.reduce((max, f) => f.points > max.points ? f : max, factors[0])
+    if (topFactor) {
+      summary += ` Główny powód: ${topFactor.detail}`
+    }
+  } else if (task.is_must) {
+    summary = '📌 Przypięte zadanie - musisz je zrobić dziś'
+  } else if (task.due_date === todayDate) {
+    summary = '⏰ Ma deadline dziś - warto zrobić wcześniej'
+  } else if (total > 60) {
+    summary = '✨ Wysokie dopasowanie - dobre zadanie na teraz'
+  } else if (total < 40) {
+    summary = '💤 Słabe dopasowanie - może lepiej później lub gdy zmieni się kontekst'
+  }
   
   return {
     total: Math.max(0, Math.min(100, total)),
     factors,
-    explanation: generateExplanation(factors, total)
+    explanation: generateExplanation(factors, total),
+    summary
   }
 }
 
