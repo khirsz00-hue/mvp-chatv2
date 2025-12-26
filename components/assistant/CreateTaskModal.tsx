@@ -277,6 +277,7 @@ export function CreateTaskModal({ open, onOpenChange, onCreateTask }: CreateTask
     
     setShowCorrectionModal(false)
     setAiUnderstanding(correctionText)
+    setPlanGenerated(false) // Reset plan when correcting
     
     // Regenerate suggestions with correction
     setLoadingSuggestions(true)
