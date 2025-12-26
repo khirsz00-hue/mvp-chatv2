@@ -87,7 +87,7 @@ export function RecommendationPanel({ recommendations, onApply, loading }: Recom
   const ACTION_TYPES = ['REORDER_QUEUE', 'MOVE_TASK', 'UNPIN_TASK', 'DECOMPOSE_TASK', 'CHANGE_MUST']
   const passiveRecommendations = recommendations.filter(rec => 
     !appliedIds.has(rec.id) && 
-    !ACTION_TYPES.includes(rec.action?.op || '')
+    !rec.actions?.some(action => ACTION_TYPES.includes(action.op))
   )
 
   if (passiveRecommendations.length === 0) {

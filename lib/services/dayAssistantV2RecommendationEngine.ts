@@ -912,7 +912,7 @@ export function calculateScoreBreakdown(
   if (task.postpone_count > 0) {
     const postponePenalty = -Math.min(task.postpone_count * 5, 20)
     factors.push({
-      name: 'Historia откładan',
+      name: 'Historia odkładania',
       points: postponePenalty,
       positive: false,
       detail: `Przełożone ${task.postpone_count}x`,
