@@ -91,6 +91,9 @@ type UndoToast = {
 const todayIso = () => new Date().toISOString().split('T')[0]
 const MAX_COGNITIVE_LOAD = 5
 const DEFAULT_COGNITIVE_LOAD = 3
+const DEFAULT_COGNITIVE_LOAD_NEW_TASK = 2
+const DEFAULT_CONTEXT_TYPE: TaskContext = 'deep_work'
+const SCORING_DIFFERENCE_THRESHOLD = 0.1
 const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000 // 24 hours
 
 // Inner content component (will be wrapped with QueryClientProvider)
@@ -2302,11 +2305,11 @@ function DayAssistantV2Content() {
             body: JSON.stringify({
               title: taskData.content,
               estimate_min: taskData.duration || 25,
-              cognitive_load: 2, // default
+              cognitive_load: DEFAULT_COGNITIVE_LOAD_NEW_TASK,
               is_must: false,
               is_important: false,
               due_date: taskData.due || selectedDate,
-              context_type: 'deep_work', // default
+              context_type: DEFAULT_CONTEXT_TYPE,
               priority: taskData.priority || 3,
               description: taskData.description || ''
             })
@@ -2545,7 +2548,7 @@ function TaskRow({
                         {(() => {
                           const calculatedSum = scoreBreakdown.factors.reduce((sum, f) => sum + f.points, 0)
                           const diff = Math.abs(calculatedSum - scoreBreakdown.total)
-                          if (diff > 0.1) {
+                          if (diff > SCORING_DIFFERENCE_THRESHOLD) {
                             return (
                               <p className="text-xs text-orange-300 mt-1">
                                 ⚠️ Suma komponentów: {calculatedSum.toFixed(1)} (różnica: {diff.toFixed(1)})
