@@ -46,11 +46,20 @@ export function generatePassiveInsights(
   }
 ): PassiveInsight[] {
   
+  console.log('🔮 [Insight Engine] ========== GENERATE START ==========')
+  console.log('🔮 [Insight Engine] Input:', {
+    queueLength: queue.length,
+    allTasksLength: allTasks.length,
+    context
+  })
+  
   const insights: PassiveInsight[] = []
   
   // Insight 1: Context Pattern Detection
+  console.log('🔮 [Insight Engine] Checking CONTEXT_PATTERN...')
   const contextPattern = detectContextPattern(queue)
   if (contextPattern) {
+    console.log('  ✅ Found context pattern:', contextPattern)
     insights.push({
       id: `context-pattern-${Date.now()}`,
       type: 'CONTEXT_PATTERN',
@@ -65,11 +74,15 @@ export function generatePassiveInsights(
         estimated_time_saved: contextPattern.timeSaved
       }
     })
+  } else {
+    console.log('  ❌ No context pattern found')
   }
   
   // Insight 2: Energy Match Observation
+  console.log('🔮 [Insight Engine] Checking ENERGY_OBSERVATION...')
   const energyObs = observeEnergyMatch(queue, context.energy)
   if (energyObs) {
+    console.log('  ✅ Found energy observation:', energyObs.title)
     insights.push({
       id: `energy-obs-${Date.now()}`,
       type: 'ENERGY_OBSERVATION',
@@ -79,11 +92,15 @@ export function generatePassiveInsights(
       message: energyObs.message,
       highlightTaskIds: energyObs.taskIds
     })
+  } else {
+    console.log('  ❌ No energy observation')
   }
   
   // Insight 3: Deadline Warning
+  console.log('🔮 [Insight Engine] Checking DEADLINE_WARNING...')
   const deadlineWarning = checkDeadlineWarnings(queue)
   if (deadlineWarning) {
+    console.log('  ✅ Found deadline warning:', deadlineWarning.title)
     insights.push({
       id: `deadline-${Date.now()}`,
       type: 'DEADLINE_WARNING',
@@ -93,11 +110,15 @@ export function generatePassiveInsights(
       message: deadlineWarning.message,
       highlightTaskIds: [deadlineWarning.taskId]
     })
+  } else {
+    console.log('  ❌ No deadline warnings')
   }
   
   // Insight 4: Quick Wins Opportunity
+  console.log('🔮 [Insight Engine] Checking QUICK_WINS...')
   const quickWins = detectQuickWins(queue)
   if (quickWins) {
+    console.log('  ✅ Found quick wins:', quickWins.count, 'tasks')
     insights.push({
       id: `quick-wins-${Date.now()}`,
       type: 'QUICK_WINS',
@@ -110,11 +131,15 @@ export function generatePassiveInsights(
         total_time: quickWins.totalTime
       }
     })
+  } else {
+    console.log('  ❌ No quick wins detected')
   }
   
   // Insight 5: Long Task Alert
+  console.log('🔮 [Insight Engine] Checking LONG_TASK_ALERT...')
   const longTask = detectLongTask(queue)
   if (longTask) {
+    console.log('  ✅ Found long task:', longTask.title)
     insights.push({
       id: `long-task-${Date.now()}`,
       type: 'LONG_TASK_ALERT',
@@ -124,10 +149,14 @@ export function generatePassiveInsights(
       message: `Zadanie "${longTask.title}" (${longTask.estimate}min) jest na pozycji #${longTask.position}. Zarezerwuj odpowiedni blok czasu.`,
       highlightTaskIds: [longTask.taskId]
     })
+  } else {
+    console.log('  ❌ No long tasks')
   }
   
   // Insight 6: Overload Warning
+  console.log('🔮 [Insight Engine] Checking OVERLOAD_WARNING...')
   if (context.usedTime > context.capacity) {
+    console.log('  ✅ Overload detected:', context.usedTime, '>', context.capacity)
     const overflow = context.usedTime - context.capacity
     insights.push({
       id: `overload-${Date.now()}`,
@@ -142,11 +171,15 @@ export function generatePassiveInsights(
         overflow
       }
     })
+  } else {
+    console.log('  ❌ No overload')
   }
   
   // Insight 7: Flow State Opportunity
+  console.log('🔮 [Insight Engine] Checking FLOW_STATE_OPPORTUNITY...')
   const flowOpp = detectFlowStateOpportunity(queue)
   if (flowOpp) {
+    console.log('  ✅ Found flow state opportunity')
     insights.push({
       id: `flow-state-${Date.now()}`,
       type: 'FLOW_STATE_OPPORTUNITY',
@@ -156,7 +189,12 @@ export function generatePassiveInsights(
       message: flowOpp.message,
       highlightTaskIds: flowOpp.taskIds
     })
+  } else {
+    console.log('  ❌ No flow state opportunities')
   }
+  
+  console.log('🔮 [Insight Engine] ========== GENERATE END ==========')
+  console.log('🔮 [Insight Engine] Total insights generated:', insights.length)
   
   return insights
 }

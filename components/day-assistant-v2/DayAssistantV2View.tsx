@@ -545,18 +545,77 @@ function DayAssistantV2Content() {
   
   // Generate passive insights when queue changes (NEW!)
   useEffect(() => {
-    if (queue.length === 0 || !dayPlan) return
-    
-    const newInsights = generatePassiveInsights(queue, tasks, {
-      energy: dayPlan.energy,
-      capacity: availableMinutes,
-      usedTime: usedMinutes
+    console.log('🔍 [Insights Debug] ========== START ==========')
+    console.log('🔍 [Insights Debug] Checking conditions:', {
+      queueLength: queue.length,
+      dayPlanExists: !!dayPlan,
+      tasksCount: tasks.length,
+      availableMinutes,
+      usedMinutes,
+      dismissedCount: dismissedInsightIds.size
     })
     
-    // Filter out dismissed insights
-    setInsights(newInsights.filter(i => !dismissedInsightIds.has(i.id)))
+    if (queue.length === 0) {
+      console.log('⚠️ [Insights Debug] Skipping - queue is empty')
+      return
+    }
     
-    console.log('💡 [Passive Insights] Generated:', newInsights.length)
+    if (!dayPlan) {
+      console.log('⚠️ [Insights Debug] Skipping - no dayPlan')
+      return
+    }
+    
+    console.log('✅ [Insights Debug] Conditions met - generating insights...')
+    
+    // Log queue composition
+    console.log('📊 [Insights Debug] Queue composition:')
+    queue.forEach((task, idx) => {
+      console.log(`  #${idx + 1}:`, {
+        id: task.id,
+        title: task.title,
+        context_type: task.context_type,
+        cognitive_load: task.cognitive_load,
+        estimate_min: task.estimate_min,
+        score: (task as any).metadata?._score || (task as any)._score,
+        hasReasoning: !!((task as any).metadata?._scoreReasoning || (task as any)._scoreReasoning)
+      })
+    })
+    
+    // Generate insights
+    try {
+      const newInsights = generatePassiveInsights(queue, tasks, {
+        energy: dayPlan.energy,
+        capacity: availableMinutes,
+        usedTime: usedMinutes
+      })
+      
+      console.log('💡 [Insights Debug] Generated insights:')
+      newInsights.forEach((insight, idx) => {
+        console.log(`  ${idx + 1}. [${insight.type}] ${insight.title}`)
+        console.log(`     Priority: ${insight.priority}`)
+        console.log(`     Message: ${insight.message}`)
+        console.log(`     Highlighted tasks: ${insight.highlightTaskIds?.length || 0}`)
+      })
+      
+      console.log('💡 [Insights Debug] Total generated:', newInsights.length)
+      
+      // Filter dismissed
+      const filteredInsights = newInsights.filter(i => !dismissedInsightIds.has(i.id))
+      console.log('✅ [Insights Debug] After filtering dismissed:', filteredInsights.length)
+      
+      if (filteredInsights.length < newInsights.length) {
+        console.log('🚫 [Insights Debug] Filtered out:', 
+          newInsights.filter(i => dismissedInsightIds.has(i.id)).map(i => i.type)
+        )
+      }
+      
+      setInsights(filteredInsights)
+      console.log('✅ [Insights Debug] State updated with', filteredInsights.length, 'insights')
+    } catch (error) {
+      console.error('❌ [Insights Debug] Error generating insights:', error)
+    }
+    
+    console.log('🔍 [Insights Debug] ========== END ==========')
   }, [queue, tasks, dayPlan, availableMinutes, usedMinutes, dismissedInsightIds])
 
   // 🔍 DEBUG LOGGING for queue state
