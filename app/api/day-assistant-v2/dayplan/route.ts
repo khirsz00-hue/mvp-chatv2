@@ -94,6 +94,18 @@ export async function GET(request: NextRequest) {
     // Log tasks count
     console.log('[dayplan API] Tasks retrieved:', tasks.length)
     
+    // 📊 Debug logging for cognitive_load and estimate_min
+    if (tasks.length > 0) {
+      console.log('📊 [dayplan API] Cognitive load verification (first 5 tasks):')
+      tasks.slice(0, 5).forEach((t, idx) => {
+        console.log(`  #${idx + 1}. "${t.title.substring(0, 40)}"`)
+        console.log(`      cognitive_load: ${t.cognitive_load} (type: ${typeof t.cognitive_load})`)
+        console.log(`      estimate_min: ${t.estimate_min} (type: ${typeof t.estimate_min})`)
+        console.log(`      due_date: ${t.due_date}`)
+        console.log(`      priority: ${t.priority}`)
+      })
+    }
+    
     // Get active proposals
     const proposals = await getActiveProposals(user.id, assistant.id, date)
     

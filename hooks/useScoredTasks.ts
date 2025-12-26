@@ -24,6 +24,16 @@ export function useScoredTasks(
       selectedDate
     })
     
+    // 📊 Verify cognitive_load before scoring
+    if (rawTasks.length > 0) {
+      console.log('📊 [Scoring Debug] Cognitive load BEFORE scoring:')
+      rawTasks.slice(0, 5).forEach((task, idx) => {
+        console.log(`  #${idx + 1}. "${task.title.substring(0, 40)}"`)
+        console.log(`      cognitive_load: ${task.cognitive_load}`)
+        console.log(`      estimate_min: ${task.estimate_min}`)
+      })
+    }
+    
     if (!dayPlan) {
       console.log('⚠️ [Scoring Debug] No dayPlan - returning unsorted tasks')
       console.log('🎯 [Scoring Debug] ========== END ==========')
@@ -34,6 +44,16 @@ export function useScoredTasks(
     
     // Apply scoring algorithm from recommendation engine
     const scored = scoreAndSortTasks(rawTasks, dayPlan, selectedDate)
+    
+    // 📊 Verify cognitive_load after scoring
+    if (scored.length > 0) {
+      console.log('📊 [Scoring Debug] Cognitive load AFTER scoring:')
+      scored.slice(0, 5).forEach((task, idx) => {
+        console.log(`  #${idx + 1}. "${task.title.substring(0, 40)}"`)
+        console.log(`      cognitive_load: ${task.cognitive_load}`)
+        console.log(`      estimate_min: ${task.estimate_min}`)
+      })
+    }
     
     // Log first 10 tasks with scores
     console.log('📊 [Scoring Debug] Top scored tasks:')
