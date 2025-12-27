@@ -707,7 +707,7 @@ export function scoreAndSortTasks(
   const workMode = dayPlan.metadata?.work_mode as WorkMode | undefined
   const energyFocus = workMode 
     ? mapWorkModeToEnergyFocus(workMode)
-    : { energy: dayPlan.energy, focus: dayPlan.focus }
+    : { energy: dayPlan.energy ?? 3, focus: dayPlan.focus ?? 3 } // Default to 3 if undefined
   
   // Create adjusted dayPlan with mapped energy/focus
   const adjustedDayPlan: DayPlan = {
@@ -1017,7 +1017,7 @@ export function calculateScoreBreakdown(
   factors.push({
     name: '🧠 Cognitive Load',
     points: cognitiveLoadScore,
-    positive: true,
+    positive: false, // Neutral - cognitive load is informational, not inherently positive
     detail: `Złożoność zadania: ${task.cognitive_load}/5`,
     explanation: getCognitiveLoadExplanation(task.cognitive_load)
   })
