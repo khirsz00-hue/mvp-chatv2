@@ -439,6 +439,16 @@ function DayAssistantV2Content() {
       setTasks(data.tasks || [])
       setProposals(data.proposals || [])
       
+      // 🔍 Debug: Verify cognitive_load immediately after setting state
+      console.log('🔍 [State Set] Cognitive load verification (first 5 tasks):')
+      if (data.tasks && data.tasks.length > 0) {
+        data.tasks.slice(0, 5).forEach((t: TestDayTask, idx: number) => {
+          console.log(`  #${idx + 1}. "${t.title.substring(0, 40)}"`)
+          console.log(`      cognitive_load: ${t.cognitive_load}`)
+          console.log(`      estimate_min: ${t.estimate_min}`)
+        })
+      }
+      
       console.log('[DayAssistantV2] State updated successfully')
     } catch (error) {
       console.error('[DayAssistantV2] ❌ Exception in loadDayPlan:', error)
@@ -485,6 +495,15 @@ function DayAssistantV2Content() {
       filtered = filtered.filter(t => t.cognitive_load <= 2)
     } else if (workMode === 'quick_wins') {
       filtered = filtered.filter(t => t.estimate_min <= 20)
+    }
+    
+    // 🔍 Debug: Verify cognitive_load after filtering
+    if (filtered.length > 0 && process.env.NODE_ENV === 'development') {
+      console.log('🔍 [Filtered Tasks] Cognitive load after filtering (first 3):')
+      filtered.slice(0, 3).forEach((t, idx) => {
+        console.log(`  #${idx + 1}. "${t.title.substring(0, 40)}"`)
+        console.log(`      cognitive_load: ${t.cognitive_load}`)
+      })
     }
     
     return filtered
@@ -2608,6 +2627,8 @@ function TaskRow({
               <Badge variant="outline" className="text-xs flex items-center gap-1">
                 <span>🧠</span>
                 <span>Load {task.cognitive_load}/5</span>
+                {/* 🔍 Debug: Log cognitive_load at render time */}
+                {process.env.NODE_ENV === 'development' && console.log(`🔍 [Render] Task "${task.title.substring(0, 30)}" cognitive_load: ${task.cognitive_load}`)}
               </Badge>
             )}
             {/* Estimate Badge */}
