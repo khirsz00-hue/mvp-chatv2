@@ -482,6 +482,18 @@ function DayAssistantV2Content() {
     }
   }, [sessionToken])
   
+  // Debug: Log cognitive_load values after tasks are loaded
+  useEffect(() => {
+    if (tasks.length > 0 && process.env.NODE_ENV === 'development') {
+      console.log('🔍 [DayAssistantV2View] Tasks after loading:')
+      tasks.slice(0, 3).forEach((t) => {
+        console.log(`  - "${t.title.substring(0, 40)}"`)
+        console.log(`    cognitive_load: ${t.cognitive_load}`)
+        console.log(`    estimate_min: ${t.estimate_min}`)
+      })
+    }
+  }, [tasks])
+  
   const filteredTasks = useMemo(() => {
     // Don't filter by due_date here - allow overdue tasks to pass through
     // The overdue filtering will be done later by useOverdueTasks hook
@@ -2627,8 +2639,6 @@ function TaskRow({
               <Badge variant="outline" className="text-xs flex items-center gap-1">
                 <span>🧠</span>
                 <span>Load {task.cognitive_load}/5</span>
-                {/* 🔍 Debug: Log cognitive_load at render time */}
-                {process.env.NODE_ENV === 'development' && console.log(`🔍 [Render] Task "${task.title.substring(0, 30)}" cognitive_load: ${task.cognitive_load}`)}
               </Badge>
             )}
             {/* Estimate Badge */}
