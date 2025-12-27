@@ -34,7 +34,8 @@ const WEIGHTS = {
   dependencies: 5,
   energy_focus_bonus: 20,
   avoidance_penalty: 25,
-  postpone_base: 5
+  postpone_base: 5,
+  cognitive_load: 2 // Weight per cognitive load level (1-5)
 }
 
 // Constants
@@ -1013,7 +1014,7 @@ export function calculateScoreBreakdown(
   })
   
   // 7. Cognitive Load (NEW!)
-  const cognitiveLoadScore = task.cognitive_load * 2 // Weight: 2 points per cognitive load level
+  const cognitiveLoadScore = task.cognitive_load * WEIGHTS.cognitive_load
   factors.push({
     name: '🧠 Cognitive Load',
     points: cognitiveLoadScore,
