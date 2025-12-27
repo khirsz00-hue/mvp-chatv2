@@ -14,7 +14,8 @@ import {
   AssistantConfig,
   DEFAULT_SETTINGS,
   DetailedScoreBreakdown,
-  ScoreFactor
+  ScoreFactor,
+  WorkMode
 } from '@/lib/types/dayAssistantV2'
 import { createProposal, getTasks } from './dayAssistantV2Service'
 import { 
@@ -33,11 +34,49 @@ const WEIGHTS = {
   dependencies: 5,
   energy_focus_bonus: 20,
   avoidance_penalty: 25,
-  postpone_base: 5
+  postpone_base: 5,
+  cognitive_load: 2 // Weight per cognitive load level (1-5)
 }
 
 // Constants
 const MILLISECONDS_PER_DAY = 1000 * 60 * 60 * 24
+const DEFAULT_ENERGY = 3
+const DEFAULT_FOCUS = 3
+const DEFAULT_COGNITIVE_LOAD = 3
+
+/**
+ * Get cognitive load explanation in Polish
+ */
+function getCognitiveLoadExplanation(load: number): string {
+  if (load === 1) return 'Bardzo proste zadanie - szybkie do wykonania'
+  if (load === 2) return 'Proste zadanie - niewielki wysiłek mentalny'
+  if (load === 3) return 'Średnia złożoność - wymaga skupienia'
+  if (load === 4) return 'Złożone zadanie - wymaga wysokiej koncentracji'
+  if (load === 5) return 'Bardzo złożone - pełne zaangażowanie mentalne'
+  return 'Nieznana złożoność'
+}
+
+/**
+ * Map WorkMode to energy/focus values
+ */
+function mapWorkModeToEnergyFocus(workMode: WorkMode): { energy: number, focus: number } {
+  switch (workMode) {
+    case 'low_focus':
+      return { energy: 2, focus: 2 } // Niska energia - łatwe zadania
+    case 'quick_wins':
+      return { energy: 4, focus: 4 } // Wysoka energia - szybkie zwycięstwa
+    case 'focus':
+    default:
+      return { energy: 3, focus: 3 } // Normalna praca
+  }
+}
+
+/**
+ * Type guard to validate WorkMode
+ */
+function isValidWorkMode(value: unknown): value is WorkMode {
+  return typeof value === 'string' && ['low_focus', 'focus', 'quick_wins'].includes(value)
+}
 
 /**
  * Calculate task score based on multiple factors with enhanced context grouping
@@ -675,6 +714,20 @@ export function scoreAndSortTasks(
   dayPlan: DayPlan,
   todayDate: string
 ): TestDayTask[] {
+  // Map WorkMode to energy/focus if available and valid
+  const workModeValue = dayPlan.metadata?.work_mode
+  const workMode = isValidWorkMode(workModeValue) ? workModeValue : undefined
+  const energyFocus = workMode 
+    ? mapWorkModeToEnergyFocus(workMode)
+    : { energy: dayPlan.energy ?? DEFAULT_ENERGY, focus: dayPlan.focus ?? DEFAULT_FOCUS }
+  
+  // Create adjusted dayPlan with mapped energy/focus
+  const adjustedDayPlan: DayPlan = {
+    ...dayPlan,
+    energy: energyFocus.energy,
+    focus: energyFocus.focus
+  }
+  
   // Separate into date categories first
   const today = todayDate
   const overdueTasks = tasks.filter(t => t.due_date && t.due_date < today)
@@ -687,7 +740,7 @@ export function scoreAndSortTasks(
     const scored: Array<{ task: TestDayTask; score: any }> = []
     
     for (const task of taskList) {
-      const scoreResult = calculateTaskScore(task, dayPlan, {
+      const scoreResult = calculateTaskScore(task, adjustedDayPlan, {
         todayDate,
         totalTasksToday: tasks.length,
         lightMinutesToday: 0,
@@ -971,7 +1024,18 @@ export function calculateScoreBreakdown(
     explanation: contextExplanation
   })
   
-  // 7. Freshness bonus removed - promotes procrastination for ADHD users
+  // 7. Cognitive Load (NEW!)
+  const cognitiveLoad = task.cognitive_load ?? DEFAULT_COGNITIVE_LOAD
+  const cognitiveLoadScore = cognitiveLoad * WEIGHTS.cognitive_load
+  factors.push({
+    name: '🧠 Cognitive Load',
+    points: cognitiveLoadScore,
+    positive: false, // Neutral - cognitive load is informational, not inherently positive
+    detail: `Złożoność zadania: ${cognitiveLoad}/5`,
+    explanation: getCognitiveLoadExplanation(cognitiveLoad)
+  })
+  
+  // 8. Freshness bonus removed - promotes procrastination for ADHD users
   
   const total = factors.reduce((sum, f) => sum + f.points, 0)
   

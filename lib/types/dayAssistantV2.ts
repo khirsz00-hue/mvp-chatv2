@@ -18,6 +18,9 @@ export type ContextType =
   | 'komunikacja'     // Maps to 'communication'
   | 'prywatne'        // Maps to 'personal'
 
+// Work Mode - filtering and sorting modes
+export type WorkMode = 'low_focus' | 'focus' | 'quick_wins'
+
 // Energy/Focus Preset
 export interface EnergyFocusPreset {
   name: string
