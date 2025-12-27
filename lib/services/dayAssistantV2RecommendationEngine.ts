@@ -72,6 +72,13 @@ function mapWorkModeToEnergyFocus(workMode: WorkMode): { energy: number, focus: 
 }
 
 /**
+ * Type guard to validate WorkMode
+ */
+function isValidWorkMode(value: unknown): value is WorkMode {
+  return typeof value === 'string' && ['low_focus', 'focus', 'quick_wins'].includes(value)
+}
+
+/**
  * Calculate task score based on multiple factors with enhanced context grouping
  */
 export function calculateTaskScore(
@@ -707,8 +714,9 @@ export function scoreAndSortTasks(
   dayPlan: DayPlan,
   todayDate: string
 ): TestDayTask[] {
-  // Map WorkMode to energy/focus if available
-  const workMode = dayPlan.metadata?.work_mode as WorkMode | undefined
+  // Map WorkMode to energy/focus if available and valid
+  const workModeValue = dayPlan.metadata?.work_mode
+  const workMode = isValidWorkMode(workModeValue) ? workModeValue : undefined
   const energyFocus = workMode 
     ? mapWorkModeToEnergyFocus(workMode)
     : { energy: dayPlan.energy ?? DEFAULT_ENERGY, focus: dayPlan.focus ?? DEFAULT_FOCUS }
