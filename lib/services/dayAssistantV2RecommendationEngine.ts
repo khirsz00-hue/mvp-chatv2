@@ -40,6 +40,9 @@ const WEIGHTS = {
 
 // Constants
 const MILLISECONDS_PER_DAY = 1000 * 60 * 60 * 24
+const DEFAULT_ENERGY = 3
+const DEFAULT_FOCUS = 3
+const DEFAULT_COGNITIVE_LOAD = 3
 
 /**
  * Get cognitive load explanation in Polish
@@ -708,7 +711,7 @@ export function scoreAndSortTasks(
   const workMode = dayPlan.metadata?.work_mode as WorkMode | undefined
   const energyFocus = workMode 
     ? mapWorkModeToEnergyFocus(workMode)
-    : { energy: dayPlan.energy ?? 3, focus: dayPlan.focus ?? 3 } // Default to 3 if undefined
+    : { energy: dayPlan.energy ?? DEFAULT_ENERGY, focus: dayPlan.focus ?? DEFAULT_FOCUS }
   
   // Create adjusted dayPlan with mapped energy/focus
   const adjustedDayPlan: DayPlan = {
@@ -1014,13 +1017,14 @@ export function calculateScoreBreakdown(
   })
   
   // 7. Cognitive Load (NEW!)
-  const cognitiveLoadScore = task.cognitive_load * WEIGHTS.cognitive_load
+  const cognitiveLoad = task.cognitive_load ?? DEFAULT_COGNITIVE_LOAD
+  const cognitiveLoadScore = cognitiveLoad * WEIGHTS.cognitive_load
   factors.push({
     name: '🧠 Cognitive Load',
     points: cognitiveLoadScore,
     positive: false, // Neutral - cognitive load is informational, not inherently positive
-    detail: `Złożoność zadania: ${task.cognitive_load}/5`,
-    explanation: getCognitiveLoadExplanation(task.cognitive_load)
+    detail: `Złożoność zadania: ${cognitiveLoad}/5`,
+    explanation: getCognitiveLoadExplanation(cognitiveLoad)
   })
   
   // 8. Freshness bonus removed - promotes procrastination for ADHD users
