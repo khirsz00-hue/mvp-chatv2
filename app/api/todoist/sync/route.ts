@@ -143,6 +143,7 @@ function parseCognitiveLoadFromLabels(labels?: string[]): number | null {
  * @param task Todoist task payload
  * @param userId Supabase user id
  * @param assistantId Assistant configuration id
+ * @param projects Map of project_id to project name
  * @param existingContext Previously stored context_type (preserved when provided)
  * @param existingCognitiveLoad Previously stored cognitive_load (1-5) to keep user edits when no label is present
  */
@@ -150,6 +151,7 @@ async function mapTodoistToDayAssistantTask(
   task: TodoistTask,
   userId: string,
   assistantId: string,
+  projects: Map<string, string>,
   existingContext?: string | null,
   existingCognitiveLoad?: number
 ): Promise<Partial<DayAssistantV2Task> | null> {
@@ -166,13 +168,19 @@ async function mapTodoistToDayAssistantTask(
 
   // Determine context_type with AI inference (if not preserving existing)
   let contextType: string
+  let aiInferredContext = false
   
   if (existingContext) {
     // Preserve existing context to avoid changing user's manual categorization
     contextType = existingContext
   } else {
-    // Check labels for backward compatibility first
-    if (task.labels) {
+    // Priority 1: Use project name if available
+    if (task.project_id && projects.has(task.project_id)) {
+      contextType = projects.get(task.project_id)!
+      console.log(`[Sync] Using project name "${contextType}" for "${task.content}"`)
+    }
+    // Priority 2: Check labels for backward compatibility
+    else if (task.labels) {
       if (task.labels.includes('admin')) contextType = 'admin'
       else if (task.labels.includes('komunikacja')) contextType = 'communication'
       else if (task.labels.includes('prywatne')) contextType = 'personal'
@@ -182,6 +190,7 @@ async function mapTodoistToDayAssistantTask(
         try {
           const inference = await inferTaskContext(task.content, task.description)
           contextType = inference.context
+          aiInferredContext = true
           console.log(`[Sync] AI inferred context "${contextType}" for "${task.content}"`)
         } catch (error) {
           console.error('[Sync] Error inferring context:', error)
@@ -193,6 +202,7 @@ async function mapTodoistToDayAssistantTask(
       try {
         const inference = await inferTaskContext(task.content, task.description)
         contextType = inference.context
+        aiInferredContext = true
         console.log(`[Sync] AI inferred context "${contextType}" for "${task.content}"`)
       } catch (error) {
         console.error('[Sync] Error inferring context:', error)
@@ -242,7 +252,9 @@ async function mapTodoistToDayAssistantTask(
     position: 0,
     postpone_count: 0,
     auto_moved: false,
-    metadata: {},
+    metadata: {
+      ai_inferred_context: aiInferredContext
+    },
     completed: false
   }
 }
@@ -370,6 +382,29 @@ export async function POST(request: NextRequest) {
 
     const todoistTasks: TodoistTask[] = await todoistResponse.json()
     
+    // Fetch projects from Todoist for context mapping
+    console.log('🔍 [Todoist Sync API] Fetching projects from Todoist API')
+    let projectsMap = new Map<string, string>()
+    try {
+      const projectsResponse = await fetch('https://api.todoist.com/rest/v2/projects', {
+        headers: {
+          Authorization: `Bearer ${todoistToken}`
+        },
+        cache: 'no-store'
+      })
+      
+      if (projectsResponse.ok) {
+        const projects = await projectsResponse.json()
+        projectsMap = new Map(projects.map((p: any) => [p.id, p.name]))
+        console.log(`✅ [Todoist Sync API] Fetched ${projectsMap.size} projects`)
+      } else {
+        console.warn(`⚠️ [Todoist Sync API] Failed to fetch projects: ${projectsResponse.status}`)
+      }
+    } catch (error) {
+      console.error('❌ [Todoist Sync API] Error fetching projects:', error)
+      // Continue without projects - will fall back to AI inference
+    }
+    
     // Calculate today's date for overdue detection
     const todayISO = new Date().toISOString().split('T')[0]
 
@@ -480,7 +515,7 @@ export async function POST(request: NextRequest) {
       try {
         const existingContext = task.id ? existingContexts.get(task.id) : undefined
         const existingCognitive = task.id ? existingCognitiveLoads.get(task.id) : undefined
-        return await mapTodoistToDayAssistantTask(task, user.id, assistantId, existingContext, existingCognitive)
+        return await mapTodoistToDayAssistantTask(task, user.id, assistantId, projectsMap, existingContext, existingCognitive)
       } catch (error) {
         console.error('[Sync] Error mapping task:', task.id, error)
         return null
