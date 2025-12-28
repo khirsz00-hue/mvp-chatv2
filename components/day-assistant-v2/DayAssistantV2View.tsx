@@ -1107,6 +1107,15 @@ function DayAssistantV2Content() {
   }
 
   // NEW: Work hours handlers
+  const revertWorkHours = () => {
+    const prevStart = dayPlan?.metadata?.work_hours_start || '09:00'
+    const prevEnd = dayPlan?.metadata?.work_hours_end || '17:00'
+    const prevCapacity = dayPlan?.metadata?.capacity_minutes || 480
+    setWorkHoursStart(prevStart)
+    setWorkHoursEnd(prevEnd)
+    setCapacityMinutes(prevCapacity)
+  }
+
   const handleWorkHoursChange = async (start: string, end: string) => {
     // Calculate new capacity
     const startTime = new Date(`2000-01-01T${start}`)
@@ -1145,24 +1154,12 @@ function DayAssistantV2Content() {
         console.log('[DayAssistantV2] Work hours saved successfully')
         addDecisionLog(`Zaktualizowano godziny pracy: ${start} - ${end}`)
       } else {
-        // Revert on error
-        const prevStart = dayPlan?.metadata?.work_hours_start || '09:00'
-        const prevEnd = dayPlan?.metadata?.work_hours_end || '17:00'
-        const prevCapacity = dayPlan?.metadata?.capacity_minutes || 480
-        setWorkHoursStart(prevStart)
-        setWorkHoursEnd(prevEnd)
-        setCapacityMinutes(prevCapacity)
+        revertWorkHours()
         showToast('Nie udało się zapisać godzin pracy', 'error')
       }
     } catch (error) {
       console.error('[DayAssistantV2] Failed to save work hours:', error)
-      // Revert on error
-      const prevStart = dayPlan?.metadata?.work_hours_start || '09:00'
-      const prevEnd = dayPlan?.metadata?.work_hours_end || '17:00'
-      const prevCapacity = dayPlan?.metadata?.capacity_minutes || 480
-      setWorkHoursStart(prevStart)
-      setWorkHoursEnd(prevEnd)
-      setCapacityMinutes(prevCapacity)
+      revertWorkHours()
       showToast('Nie udało się zapisać godzin pracy', 'error')
     }
   }

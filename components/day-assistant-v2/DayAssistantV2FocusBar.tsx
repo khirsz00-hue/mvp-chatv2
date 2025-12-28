@@ -13,7 +13,7 @@ import { Pause, Check, X, Play } from '@phosphor-icons/react'
 interface FocusBarProps {
   task: TestDayTask | null
   elapsedSeconds: number
-  isPaused?: boolean
+  isPaused: boolean
   onPause: () => void
   onResume: () => void
   onComplete: () => void
@@ -23,7 +23,7 @@ interface FocusBarProps {
 export function DayAssistantV2FocusBar({ 
   task, 
   elapsedSeconds, 
-  isPaused = false,
+  isPaused,
   onPause, 
   onResume,
   onComplete, 
