@@ -254,7 +254,7 @@ export async function PUT(request: NextRequest) {
     }
     
     // Update metadata
-    const updates: any = {}
+    const updates: Partial<{ metadata: Record<string, any> }> = {}
     if (metadata) {
       updates.metadata = { ...dayPlan.metadata, ...metadata }
     }

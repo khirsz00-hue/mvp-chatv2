@@ -1114,7 +1114,16 @@ function DayAssistantV2Content() {
     // Calculate new capacity
     const startTime = new Date(`2000-01-01T${start}`)
     const endTime = new Date(`2000-01-01T${end}`)
-    const newCapacity = Math.floor((endTime.getTime() - startTime.getTime()) / 1000 / 60)
+    const timeDiff = endTime.getTime() - startTime.getTime()
+    
+    // Handle negative values (end before start)
+    if (timeDiff < 0) {
+      console.warn('[DayAssistantV2] End time is before start time')
+      showToast('Godzina zakończenia musi być po godzinie rozpoczęcia', 'error')
+      return
+    }
+    
+    const newCapacity = Math.floor(timeDiff / 1000 / 60)
     setCapacityMinutes(newCapacity)
     
     // Save to database
