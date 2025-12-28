@@ -1793,20 +1793,6 @@ function DayAssistantV2Content() {
                   key={task.id}
                   task={task}
                   queuePosition={mustTasks.length + index + 1}
-                  onNotToday={() => handleNotToday(task)}
-                  onStart={() => handleStartTask(task)}
-                  onUnmark={() => openUnmarkWarning(task)}
-                  onDecompose={() => handleDecompose(task)}
-                  onComplete={() => handleComplete(task)}
-                  onPin={() => handlePin(task)}
-                  onDelete={() => handleDelete(task)}
-                  focus={dayPlan?.focus || 3}
-                  selectedDate={selectedDate}
-                  activeTimer={activeTimer?.taskId === task.id ? activeTimer : undefined}
-                  onPauseTimer={pauseTimer}
-                  onResumeTimer={resumeTimer}
-                  onCompleteTimer={handleTimerComplete}
-                  onSubtaskToggle={handleSubtaskToggle}
                   onStartTimer={handleStartTimer}
                   onComplete={handleCompleteById}
                   onHelp={handleHelpById}
@@ -1858,21 +1844,6 @@ function DayAssistantV2Content() {
                     key={task.id}
                     task={task}
                     queuePosition={queue.length + index + 1}
-                    onNotToday={() => handleNotToday(task)}
-                    onStart={() => handleStartTask(task)}
-                    onUnmark={() => openUnmarkWarning(task)}
-                    onDecompose={() => handleDecompose(task)}
-                    onComplete={() => handleComplete(task)}
-                    onPin={() => handlePin(task)}
-                    onDelete={() => handleDelete(task)}
-                    focus={dayPlan?.focus || 3}
-                    selectedDate={selectedDate}
-                    activeTimer={activeTimer?.taskId === task.id ? activeTimer : undefined}
-                    onPauseTimer={pauseTimer}
-                    onResumeTimer={resumeTimer}
-                    onCompleteTimer={handleTimerComplete}
-                    onSubtaskToggle={handleSubtaskToggle}
-                    isCollapsed={true}
                     onStartTimer={handleStartTimer}
                     onComplete={handleCompleteById}
                     onHelp={handleHelpById}
@@ -1932,17 +1903,6 @@ function DayAssistantV2Content() {
                   <DayAssistantV2TaskCard
                     key={easiestTask.id}
                     task={easiestTask}
-                    onNotToday={() => handleNotToday(easiestTask)}
-                    onStart={() => handleStartTask(easiestTask)}
-                    onUnmark={() => openUnmarkWarning(easiestTask)}
-                    onDecompose={() => handleDecompose(easiestTask)}
-                    onComplete={() => handleComplete(easiestTask)}
-                    onPin={() => handlePin(easiestTask)}
-                    onDelete={() => handleDelete(easiestTask)}
-                    focus={dayPlan?.focus || 3}
-                    selectedDate={selectedDate}
-                    onSubtaskToggle={handleSubtaskToggle}
-                    // No queuePosition - this task is shown outside normal queue
                     onStartTimer={handleStartTimer}
                     onComplete={handleCompleteById}
                     onHelp={handleHelpById}
@@ -2030,17 +1990,6 @@ function DayAssistantV2Content() {
                             key={task.id}
                             task={task}
                             queuePosition={queue.length + remainingToday.length + index + 1}
-                            onNotToday={() => handleNotToday(task)}
-                            onStart={() => handleStartTask(task)}
-                            onUnmark={() => openUnmarkWarning(task)}
-                            onDecompose={() => handleDecompose(task)}
-                            onComplete={() => handleComplete(task)}
-                            onPin={() => handlePin(task)}
-                            onDelete={() => handleDelete(task)}
-                            focus={dayPlan?.focus || 3}
-                            selectedDate={selectedDate}
-                            onSubtaskToggle={handleSubtaskToggle}
-                            isCollapsed={true}
                             onStartTimer={handleStartTimer}
                             onComplete={handleCompleteById}
                             onHelp={handleHelpById}
