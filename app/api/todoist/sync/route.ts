@@ -124,8 +124,7 @@ function parseCognitiveLoadFromLabels(labels?: string[]): number | null {
   for (const label of labels) {
     const normalized = label.trim().toLowerCase()
     if (/^c[1-3]$/.test(normalized)) {
-      const level = Number(normalized[1])
-      if (level >= 1 && level <= 3) return level
+      return Number(normalized[1])
     }
   }
   return null
