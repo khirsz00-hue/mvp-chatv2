@@ -35,7 +35,7 @@ const WEIGHTS = {
   energy_focus_bonus: 20,
   avoidance_penalty: 25,
   postpone_base: 5,
-  cognitive_load: 6 // Weight per cognitive load level (1-5) - emphasize mental effort
+  cognitive_load: 6 // Weight per cognitive load level (1-5) - emphasize mental effort after reports of load being ignored
 }
 
 // Constants

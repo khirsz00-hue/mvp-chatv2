@@ -125,6 +125,7 @@ function parseCognitiveLoadFromLabels(labels?: string[]): number | null {
   if (!labels || labels.length === 0) return null
   for (const label of labels) {
     const normalized = label.trim().toLowerCase()
+    // Todoist labels currently use a three-level scale (C1-C3). Higher loads come from in-app task creation.
     if (/^c[1-3]$/.test(normalized)) {
       return Number(normalized[1])
     }
