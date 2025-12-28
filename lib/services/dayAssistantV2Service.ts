@@ -575,7 +575,7 @@ export async function createTask(
       is_must: task.is_must || false,
       is_important: task.is_important || false,
       estimate_min: task.estimate_min || 30,
-      cognitive_load: task.cognitive_load || 3,
+      cognitive_load: task.cognitive_load ?? 2,
       tags: task.tags || [],
       context_type: task.context_type,
       due_date: task.due_date,

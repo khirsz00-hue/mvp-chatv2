@@ -35,14 +35,14 @@ const WEIGHTS = {
   energy_focus_bonus: 20,
   avoidance_penalty: 25,
   postpone_base: 5,
-  cognitive_load: 2 // Weight per cognitive load level (1-5)
+  cognitive_load: 6 // Weight per cognitive load level (1-5) - emphasize mental effort
 }
 
 // Constants
 const MILLISECONDS_PER_DAY = 1000 * 60 * 60 * 24
 const DEFAULT_ENERGY = 3
 const DEFAULT_FOCUS = 3
-const DEFAULT_COGNITIVE_LOAD = 3
+const DEFAULT_COGNITIVE_LOAD = 2
 
 /**
  * Get cognitive load explanation in Polish

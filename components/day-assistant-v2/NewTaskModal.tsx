@@ -33,7 +33,7 @@ export function NewTaskModal({ isOpen, onClose, onSubmit, defaultDate }: NewTask
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [estimateMin, setEstimateMin] = useState(25)
-  const [cognitiveLoad, setCognitiveLoad] = useState(3)
+  const [cognitiveLoad, setCognitiveLoad] = useState(2)
   const [contextType, setContextType] = useState<TaskContext>('deep_work')
   const [priority, setPriority] = useState(3)
   const [dueDate, setDueDate] = useState(defaultDate || new Date().toISOString().split('T')[0])

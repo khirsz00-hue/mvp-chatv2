@@ -116,13 +116,30 @@ function parseEstimateFromTodoist(task: TodoistTask): number {
 }
 
 /**
+ * Derive cognitive load from Todoist labels (C1, C2, C3)
+ * Returns null if no cognitive label is present
+ */
+function parseCognitiveLoadFromLabels(labels?: string[]): number | null {
+  if (!labels || labels.length === 0) return null
+  const cognitiveLabel = labels.find(label => /^c[1-3]$/i.test(label.trim()))
+  if (!cognitiveLabel) return null
+  
+  const level = parseInt(cognitiveLabel.replace(/[^0-9]/g, ''), 10)
+  if (!Number.isNaN(level) && level >= 1 && level <= 3) {
+    return level
+  }
+  return null
+}
+
+/**
  * Map Todoist task to DayAssistantV2Task format with AI-powered context inference
  */
 async function mapTodoistToDayAssistantTask(
   task: TodoistTask,
   userId: string,
   assistantId: string,
-  existingContext?: string | null
+  existingContext?: string | null,
+  existingCognitiveLoad?: number
 ): Promise<Partial<DayAssistantV2Task> | null> {
   // Validate required fields
   if (!task.id) {
@@ -183,12 +200,12 @@ async function mapTodoistToDayAssistantTask(
   // Determine is_important: priority >= 3
   const isImportant = priority >= 3
 
-  // Calculate cognitive_load: Math.min(5 - priority + 1, 5)
-  // Priority in Todoist: 1 (lowest) to 4 (highest/P1)
-  // Cognitive load: 1 (light) to 5 (heavy)
-  // Formula inverts priority scale: P1 (4) → load 2, P2 (3) → load 3, P3 (2) → load 4, P4 (1) → load 5
-  // Math.min ensures cognitive load never exceeds 5
-  const cognitiveLoad = Math.min(5 - priority + 1, 5)
+  // Derive cognitive load from labels (C1, C2, C3). Default to C2 if missing.
+  const cognitiveFromLabel = parseCognitiveLoadFromLabels(task.labels)
+  const cognitiveLoad = Math.min(
+    Math.max(cognitiveFromLabel ?? existingCognitiveLoad ?? 2, 1),
+    5
+  )
 
   // Parse estimate_min from task
   const estimateMin = parseEstimateFromTodoist(task)
@@ -419,10 +436,10 @@ export async function POST(request: NextRequest) {
 
     const assistantId = assistant.id
 
-    // Fetch existing tasks to preserve custom estimate_min AND context_type values
+    // Fetch existing tasks to preserve custom estimate_min, context_type AND cognitive_load values
     const { data: existingTasksData } = await supabase
       .from('day_assistant_v2_tasks')
-      .select('todoist_id, estimate_min, context_type')
+      .select('todoist_id, estimate_min, context_type, cognitive_load')
       .eq('user_id', user.id)
       .eq('assistant_id', assistantId)
       .not('todoist_id', 'is', null)
@@ -430,12 +447,16 @@ export async function POST(request: NextRequest) {
     // Create maps for quick lookup
     const existingEstimates = new Map<string, number>()
     const existingContexts = new Map<string, string>()
+    const existingCognitiveLoads = new Map<string, number>()
     if (existingTasksData) {
       existingTasksData.forEach(task => {
         if (task.todoist_id) {
           existingEstimates.set(task.todoist_id, task.estimate_min)
           if (task.context_type) {
             existingContexts.set(task.todoist_id, task.context_type)
+          }
+          if (typeof task.cognitive_load === 'number') {
+            existingCognitiveLoads.set(task.todoist_id, task.cognitive_load)
           }
         }
       })
@@ -446,7 +467,8 @@ export async function POST(request: NextRequest) {
     const mappedTasksPromises = activeTasks.map(async (task) => {
       try {
         const existingContext = task.id ? existingContexts.get(task.id) : undefined
-        return await mapTodoistToDayAssistantTask(task, user.id, assistantId, existingContext)
+        const existingCognitive = task.id ? existingCognitiveLoads.get(task.id) : undefined
+        return await mapTodoistToDayAssistantTask(task, user.id, assistantId, existingContext, existingCognitive)
       } catch (error) {
         console.error('[Sync] Error mapping task:', task.id, error)
         return null
