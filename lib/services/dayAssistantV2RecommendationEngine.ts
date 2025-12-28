@@ -368,6 +368,169 @@ function calculateTieBreaker(task: TestDayTask): number {
 }
 
 /**
+ * SCORING ALGORITHM V3 - Complete overhaul with new weights
+ * Part of Day Assistant V2 Complete Overhaul
+ */
+export function calculateTaskScoreV3(
+  task: TestDayTask,
+  context: {
+    todayDate: string
+    workMode: WorkMode
+    contextFilter: string | null
+  }
+): TaskScore & { reasoning: string[] } {
+  let score = 0
+  const reasoning: string[] = []
+  
+  // 1. MUST task - highest priority (+50)
+  if (task.is_must) {
+    score += 50
+    reasoning.push('📌 MUST przypięte: +50')
+  }
+  
+  // 2. Priority scoring
+  const priorityPoints = {
+    4: 30, // P1
+    3: 20, // P2
+    2: 10, // P3
+    1: 5   // P4
+  }
+  const priorityScore = priorityPoints[task.priority as keyof typeof priorityPoints] || 5
+  score += priorityScore
+  const priorityLabel = task.priority === 4 ? 'P1' : task.priority === 3 ? 'P2' : task.priority === 2 ? 'P3' : 'P4'
+  reasoning.push(`🚩 Priorytet ${priorityLabel}: +${priorityScore}`)
+  
+  // 3. Deadline scoring
+  if (task.due_date) {
+    const today = new Date(context.todayDate)
+    const due = new Date(task.due_date)
+    const diffMs = due.getTime() - today.getTime()
+    const daysUntil = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+    
+    if (daysUntil < 0) {
+      score += 40
+      reasoning.push('🔴 PRZETERMINOWANE: +40')
+    } else if (daysUntil === 0) {
+      const timeMatch = task.due_date.match(/T(\d{2}):(\d{2})/)
+      if (timeMatch) {
+        score += 30
+        reasoning.push(`⏰ Deadline dziś o ${timeMatch[1]}:${timeMatch[2]}: +30`)
+      } else {
+        score += 30
+        reasoning.push('⏰ Deadline dziś: +30')
+      }
+    } else if (daysUntil === 1) {
+      score += 20
+      reasoning.push('📅 Deadline jutro: +20')
+    } else if (daysUntil >= 2 && daysUntil <= 7) {
+      score += 10
+      reasoning.push(`📅 Deadline za ${daysUntil}d: +10`)
+    }
+  }
+  
+  // 4. Cognitive load matching with work mode
+  if (context.workMode === 'low_focus' && task.cognitive_load < 3) {
+    score += 15
+    reasoning.push(`🧠 Cognitive Load ${task.cognitive_load}/5 (dopasowanie Low Focus): +15`)
+  } else if (context.workMode === 'hyperfocus' && task.cognitive_load > 3) {
+    score += 15
+    reasoning.push(`🧠 Cognitive Load ${task.cognitive_load}/5 (dopasowanie HyperFocus): +15`)
+  } else {
+    reasoning.push(`🧠 Cognitive Load ${task.cognitive_load}/5: +0`)
+  }
+  
+  // 5. Context matching
+  if (context.contextFilter && task.context_type === context.contextFilter) {
+    score += 10
+    reasoning.push(`📁 Kontekst ${task.context_type} (filtr aktywny): +10`)
+  } else if (task.context_type) {
+    reasoning.push(`📁 Kontekst ${task.context_type}: +0`)
+  }
+  
+  // 6. Short task bonus (Standard mode)
+  if (context.workMode === 'standard' && task.estimate_min <= 40) {
+    score += 5
+    reasoning.push(`⏱ Krótkie zadanie (${task.estimate_min}min): +5`)
+  } else {
+    reasoning.push(`⏱ Czas ${task.estimate_min}min: +0`)
+  }
+  
+  // 7. Long task penalty
+  if (task.estimate_min > 90) {
+    score -= 10
+    reasoning.push(`⏱ Bardzo długie zadanie (${task.estimate_min}min): -10`)
+  }
+  
+  // 8. Postpone penalty
+  if (task.postpone_count > 0) {
+    const penalty = task.postpone_count * 5
+    score -= penalty
+    reasoning.push(`⏭️ Odkładane ${task.postpone_count}x: -${penalty}`)
+  }
+  
+  const breakdown: ScoreBreakdown = {
+    base_score: score,
+    fit_bonus: 0,
+    avoidance_penalty: 0,
+    final_score: score
+  }
+  
+  return {
+    task_id: task.id,
+    score,
+    breakdown,
+    reasoning
+  }
+}
+
+/**
+ * Score and sort tasks using V3 algorithm with work mode filtering
+ */
+export function scoreAndSortTasksV3(
+  tasks: TestDayTask[],
+  dayPlan: DayPlan,
+  todayDate: string,
+  contextFilter: string | null
+): TestDayTask[] {
+  const workMode = (dayPlan.metadata?.work_mode as WorkMode) || 'standard'
+  
+  // Filter by work mode FIRST
+  let filteredTasks = tasks
+  if (workMode === 'low_focus') {
+    filteredTasks = tasks.filter(t => t.cognitive_load < 3)
+  } else if (workMode === 'hyperfocus') {
+    filteredTasks = tasks.filter(t => t.cognitive_load > 3)
+  }
+  
+  // Score tasks
+  const scored = filteredTasks.map(task => {
+    const scoreResult = calculateTaskScoreV3(task, {
+      todayDate,
+      workMode,
+      contextFilter
+    })
+    
+    return {
+      ...task,
+      metadata: {
+        ...task.metadata,
+        _score: scoreResult.score,
+        _scoreReasoning: scoreResult.reasoning
+      }
+    }
+  })
+  
+  // Sort by score (highest first), then MUST tasks on top
+  scored.sort((a, b) => {
+    if (a.is_must && !b.is_must) return -1
+    if (!a.is_must && b.is_must) return 1
+    return (b.metadata._score || 0) - (a.metadata._score || 0)
+  })
+  
+  return scored
+}
+
+/**
  * Generate recommendation when user adds a task with "today" flag
  */
 export async function generateTaskAddedRecommendation(
