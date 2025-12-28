@@ -139,13 +139,14 @@ export function MorningReviewModal({
     if (!rescheduleDate) return
 
     if (isBulkReschedule) {
-      // Bulk reschedule
+      // Bulk reschedule - batch state update
       const tasksToReschedule = remainingTasks.filter(t => selectedTasks.has(t.id))
+      const newProcessedTasks = new Set(processedTasks)
       tasksToReschedule.forEach(task => {
-        const newProcessedTasks = new Set(processedTasks).add(task.id)
-        setProcessedTasks(newProcessedTasks)
+        newProcessedTasks.add(task.id)
         onReschedule(task, rescheduleDate)
       })
+      setProcessedTasks(newProcessedTasks)
       setSelectedTasks(new Set())
     } else if (rescheduleTaskId) {
       // Single task reschedule
@@ -199,17 +200,18 @@ export function MorningReviewModal({
 
   const handleBulkComplete = () => {
     const tasksToComplete = remainingTasks.filter(t => selectedTasks.has(t.id))
+    
+    // Batch state update - update processed tasks once
+    const newProcessedTasks = new Set(processedTasks)
     tasksToComplete.forEach(task => {
-      const newProcessedTasks = new Set(processedTasks).add(task.id)
-      setProcessedTasks(newProcessedTasks)
+      newProcessedTasks.add(task.id)
       onComplete(task)
     })
+    setProcessedTasks(newProcessedTasks)
     setSelectedTasks(new Set())
 
     // Check if all tasks are processed after bulk complete
-    const newProcessedSet = new Set(processedTasks)
-    tasksToComplete.forEach(t => newProcessedSet.add(t.id))
-    const remainingAfterBulk = overdueTasks.filter(t => !newProcessedSet.has(t.id))
+    const remainingAfterBulk = overdueTasks.filter(t => !newProcessedTasks.has(t.id))
     if (remainingAfterBulk.length === 0) {
       markReviewedToday(selectedDate)
       setIsOpen(false)
@@ -218,17 +220,18 @@ export function MorningReviewModal({
 
   const handleBulkDelete = () => {
     const tasksToDelete = remainingTasks.filter(t => selectedTasks.has(t.id))
+    
+    // Batch state update - update processed tasks once
+    const newProcessedTasks = new Set(processedTasks)
     tasksToDelete.forEach(task => {
-      const newProcessedTasks = new Set(processedTasks).add(task.id)
-      setProcessedTasks(newProcessedTasks)
+      newProcessedTasks.add(task.id)
       onDelete(task)
     })
+    setProcessedTasks(newProcessedTasks)
     setSelectedTasks(new Set())
 
     // Check if all tasks are processed after bulk delete
-    const newProcessedSet = new Set(processedTasks)
-    tasksToDelete.forEach(t => newProcessedSet.add(t.id))
-    const remainingAfterBulk = overdueTasks.filter(t => !newProcessedSet.has(t.id))
+    const remainingAfterBulk = overdueTasks.filter(t => !newProcessedTasks.has(t.id))
     if (remainingAfterBulk.length === 0) {
       markReviewedToday(selectedDate)
       setIsOpen(false)
@@ -276,9 +279,8 @@ export function MorningReviewModal({
                 <input
                   type="checkbox"
                   checked={selectedTasks.size === remainingTasks.length && remainingTasks.length > 0}
-                  onChange={handleToggleAll}
-                  className="cursor-pointer"
-                  onClick={(e) => e.stopPropagation()}
+                  readOnly
+                  className="cursor-pointer pointer-events-none"
                 />
                 <span>{selectedTasks.size === remainingTasks.length ? 'Odznacz wszystkie' : 'Zaznacz wszystkie'}</span>
               </Button>
