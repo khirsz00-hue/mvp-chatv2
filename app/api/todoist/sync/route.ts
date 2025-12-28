@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedSupabaseClient } from '@/lib/supabaseAuth'
 import { inferTaskContext, TaskContext } from '@/lib/services/contextInferenceService'
+import { clampCognitiveLoad } from '@/lib/utils/cognitiveLoad'
 
 export const dynamic = 'force-dynamic'
 
@@ -115,8 +116,6 @@ function parseEstimateFromTodoist(task: TodoistTask): number {
   return 30 // Default
 }
 
-const clampCognitiveLoad = (value: number): number => Math.min(Math.max(value, 1), 5)
-
 /**
  * Derive cognitive load from Todoist labels (C1, C2, C3)
  * Returns null if no cognitive label is present
@@ -125,7 +124,7 @@ function parseCognitiveLoadFromLabels(labels?: string[]): number | null {
   if (!labels || labels.length === 0) return null
   for (const label of labels) {
     const normalized = label.trim().toLowerCase()
-    // Todoist labels currently use a three-level scale (C1-C3). Higher loads come from in-app task creation.
+    // Todoist labels intentionally use a three-level scale (C1-C3). The UI covers heavier loads (4-5), so we only map these three here.
     if (/^c[1-3]$/.test(normalized)) {
       return Number(normalized[1])
     }
