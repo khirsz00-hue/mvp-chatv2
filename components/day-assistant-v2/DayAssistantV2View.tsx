@@ -1901,7 +1901,7 @@ function DayAssistantV2Content() {
                   <DayAssistantV2TaskCard
                     key={easiestTask.id}
                     task={easiestTask}
-                    queuePosition={0} // Easiest task doesn't have position
+                    // No queuePosition - this task is shown outside normal queue
                     onStartTimer={handleStartTimer}
                     onComplete={handleCompleteById}
                     onHelp={handleHelpById}

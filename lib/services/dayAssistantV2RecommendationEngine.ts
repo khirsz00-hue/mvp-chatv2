@@ -43,6 +43,8 @@ const MILLISECONDS_PER_DAY = 1000 * 60 * 60 * 24
 const DEFAULT_ENERGY = 3
 const DEFAULT_FOCUS = 3
 const DEFAULT_COGNITIVE_LOAD = 2
+const LOW_FOCUS_MAX_COGNITIVE_LOAD = 2  // Low focus mode shows tasks with cognitive load ≤ 2
+const HYPERFOCUS_MIN_COGNITIVE_LOAD = 4  // Hyperfocus mode shows tasks with cognitive load ≥ 4
 
 /**
  * Get cognitive load explanation in Polish
@@ -429,11 +431,11 @@ export function calculateTaskScoreV3(
   }
   
   // 4. Cognitive load matching with work mode
-  const cogLoad = task.cognitive_load || 3
-  if (context.workMode === 'low_focus' && cogLoad <= 2) {
+  const cogLoad = task.cognitive_load || DEFAULT_COGNITIVE_LOAD
+  if (context.workMode === 'low_focus' && cogLoad <= LOW_FOCUS_MAX_COGNITIVE_LOAD) {
     score += 15
     reasoning.push(`🧠 Cognitive Load ${cogLoad}/5 (dopasowanie Low Focus): +15`)
-  } else if (context.workMode === 'hyperfocus' && cogLoad >= 4) {
+  } else if (context.workMode === 'hyperfocus' && cogLoad >= HYPERFOCUS_MIN_COGNITIVE_LOAD) {
     score += 15
     reasoning.push(`🧠 Cognitive Load ${cogLoad}/5 (dopasowanie HyperFocus): +15`)
   } else {
@@ -499,11 +501,11 @@ export function scoreAndSortTasksV3(
   let filteredTasks = tasks.filter(t => !t.completed)  // Always filter out completed tasks
   
   if (workMode === 'low_focus') {
-    // Low focus mode: cognitive load 1-2 (easy tasks)
-    filteredTasks = filteredTasks.filter(t => (t.cognitive_load || 3) <= 2)
+    // Low focus mode: easy tasks only
+    filteredTasks = filteredTasks.filter(t => (t.cognitive_load || DEFAULT_COGNITIVE_LOAD) <= LOW_FOCUS_MAX_COGNITIVE_LOAD)
   } else if (workMode === 'hyperfocus') {
-    // Hyperfocus mode: cognitive load 4-5 (hard tasks)
-    filteredTasks = filteredTasks.filter(t => (t.cognitive_load || 3) >= 4)
+    // Hyperfocus mode: hard tasks only
+    filteredTasks = filteredTasks.filter(t => (t.cognitive_load || DEFAULT_COGNITIVE_LOAD) >= HYPERFOCUS_MIN_COGNITIVE_LOAD)
   }
   // Standard mode: no filtering by cognitive load
   
