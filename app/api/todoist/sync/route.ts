@@ -121,12 +121,12 @@ function parseEstimateFromTodoist(task: TodoistTask): number {
  */
 function parseCognitiveLoadFromLabels(labels?: string[]): number | null {
   if (!labels || labels.length === 0) return null
-  const cognitiveLabel = labels.find(label => /^c[1-3]$/i.test(label.trim()))
-  if (!cognitiveLabel) return null
-  
-  const level = parseInt(cognitiveLabel.replace(/[^0-9]/g, ''), 10)
-  if (!Number.isNaN(level) && level >= 1 && level <= 3) {
-    return level
+  for (const label of labels) {
+    const normalized = label.trim().toLowerCase()
+    if (/^c[1-3]$/.test(normalized)) {
+      const level = Number(normalized[1])
+      if (level >= 1 && level <= 3) return level
+    }
   }
   return null
 }
