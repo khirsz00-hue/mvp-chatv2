@@ -20,7 +20,6 @@ import {
   PostponeAlertBanner
 } from './DayAssistantV2TaskBadges'
 import { DayAssistantV2TaskMenu } from './DayAssistantV2TaskMenu'
-import { DayAssistantV2TaskTooltip } from './DayAssistantV2TaskTooltip'
 
 interface DayAssistantV2TaskCardProps {
   task: TestDayTask
@@ -118,11 +117,6 @@ export function DayAssistantV2TaskCard({
 
         {/* Postpone alert */}
         <PostponeAlertBanner postponeCount={task.postpone_count} />
-
-        {/* Score tooltip */}
-        <div className="mt-3 pt-3 border-t border-gray-100">
-          <DayAssistantV2TaskTooltip task={task} queuePosition={queuePosition} />
-        </div>
       </CardContent>
     </Card>
   )

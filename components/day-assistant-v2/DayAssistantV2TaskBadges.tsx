@@ -4,7 +4,6 @@
  */
 
 import Badge from '@/components/ui/Badge'
-import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
 // Position Badge - Shows queue position (#1, #2, etc.)
@@ -26,6 +25,11 @@ export function MustBadge() {
 }
 
 // Priority Badge - P1 (red), P2 (orange), P3 (blue), P4 (gray)
+// Todoist priority scale:
+// priority=4 → P1 (highest)
+// priority=3 → P2
+// priority=2 → P3
+// priority=1 → P4 (lowest)
 export function PriorityBadge({ priority }: { priority: 1 | 2 | 3 | 4 }) {
   const variants = {
     4: { className: 'bg-red-100 text-red-800 border-red-300', label: 'P1' },
@@ -109,15 +113,6 @@ export function DeadlineBadge({ dueDate, todayDate }: { dueDate: string | null, 
 
 // Cognitive Load Badge - Shows brain icon with load level (1-5)
 export function CognitiveLoadBadge({ load }: { load: number }) {
-  const getLoadDescription = (load: number): string => {
-    if (load === 1) return 'Bardzo proste zadanie - szybkie do wykonania'
-    if (load === 2) return 'Proste zadanie - niewielki wysiłek mentalny'
-    if (load === 3) return 'Średnia złożoność - wymaga skupienia'
-    if (load === 4) return 'Złożone zadanie - wymaga wysokiej koncentracji'
-    if (load === 5) return 'Bardzo złożone - pełne zaangażowanie mentalne'
-    return 'Nieznana złożoność'
-  }
-  
   const getLoadColor = (load: number): string => {
     if (load <= 2) return 'bg-green-100 text-green-800 border-green-300'
     if (load === 3) return 'bg-yellow-100 text-yellow-800 border-yellow-300'
@@ -125,20 +120,9 @@ export function CognitiveLoadBadge({ load }: { load: number }) {
   }
   
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <div>
-          <Badge className={getLoadColor(load)}>
-            🧠 {load}/5
-          </Badge>
-        </div>
-      </TooltipTrigger>
-      <TooltipContent>
-        <div className="text-xs">
-          {getLoadDescription(load)}
-        </div>
-      </TooltipContent>
-    </Tooltip>
+    <Badge className={getLoadColor(load)}>
+      🧠 {load}/5
+    </Badge>
   )
 }
 
@@ -168,22 +152,9 @@ export function ContextBadge({ context, aiInferred }: { context: string, aiInfer
   if (!context) return null
   
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <div>
-          <Badge className="bg-indigo-100 text-indigo-800 border-indigo-300">
-            📁 {context} {aiInferred && '✨'}
-          </Badge>
-        </div>
-      </TooltipTrigger>
-      {aiInferred && (
-        <TooltipContent>
-          <div className="text-xs">
-            Kontekst ustalony przez AI
-          </div>
-        </TooltipContent>
-      )}
-    </Tooltip>
+    <Badge className="bg-indigo-100 text-indigo-800 border-indigo-300">
+      📁 {context} {aiInferred && '✨'}
+    </Badge>
   )
 }
 

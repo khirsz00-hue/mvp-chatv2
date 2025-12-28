@@ -103,7 +103,9 @@ export function calculateTaskScore(
   const priorityScore = calculatePriorityScore(task.priority)
   breakdown.base_score += priorityScore
   // ALWAYS show priority in breakdown
-  reasoning.push(`🚩 Priorytet P${task.priority}: +${priorityScore}`)
+  // Todoist: priority=4 is P1 (highest), priority=1 is P4 (lowest)
+  const priorityLabel = task.priority === 4 ? 'P1' : task.priority === 3 ? 'P2' : task.priority === 2 ? 'P3' : 'P4'
+  reasoning.push(`🚩 Priorytet ${priorityLabel}: +${priorityScore}`)
   
   const deadlineScore = calculateDeadlineProximity(task.due_date, context.todayDate)
   breakdown.base_score += deadlineScore
