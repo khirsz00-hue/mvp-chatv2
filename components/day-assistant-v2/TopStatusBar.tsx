@@ -37,7 +37,8 @@ export interface TopStatusBarProps {
 const WORK_MODE_LABELS = {
   low_focus: '🔴 Low Focus',
   standard: '🟡 Standard',
-  hyperfocus: '⚡ HyperFocus'
+  hyperfocus: '⚡ HyperFocus',
+  quick_wins: '⏱️ Quick Wins'
 }
 
 export function TopStatusBar({

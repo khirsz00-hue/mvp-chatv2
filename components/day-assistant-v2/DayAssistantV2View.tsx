@@ -507,6 +507,8 @@ function DayAssistantV2Content() {
       filtered = filtered.filter(t => t.cognitive_load <= 2)
     } else if (workMode === 'hyperfocus') {
       filtered = filtered.filter(t => t.cognitive_load >= 4)
+    } else if (workMode === 'quick_wins') {
+      filtered = filtered.filter(t => t.estimate_min < 20)
     }
     
     // 🔍 Debug: Verify cognitive_load after filtering
@@ -1710,7 +1712,6 @@ function DayAssistantV2Content() {
                   onComplete={() => handleComplete(task)}
                   onPin={() => handlePin(task)}
                   onDelete={() => handleDelete(task)}
-                  onClick={() => setSelectedTask(task)}
                   focus={dayPlan?.focus || 3}
                   selectedDate={selectedDate}
                   activeTimer={activeTimer?.taskId === task.id ? activeTimer : undefined}
@@ -1765,7 +1766,6 @@ function DayAssistantV2Content() {
                   onComplete={() => handleComplete(task)}
                   onPin={() => handlePin(task)}
                   onDelete={() => handleDelete(task)}
-                  onClick={() => setSelectedTask(task)}
                   focus={dayPlan?.focus || 3}
                   selectedDate={selectedDate}
                   activeTimer={activeTimer?.taskId === task.id ? activeTimer : undefined}
@@ -1821,7 +1821,6 @@ function DayAssistantV2Content() {
                     onComplete={() => handleComplete(task)}
                     onPin={() => handlePin(task)}
                     onDelete={() => handleDelete(task)}
-                    onClick={() => setSelectedTask(task)}
                     focus={dayPlan?.focus || 3}
                     selectedDate={selectedDate}
                     activeTimer={activeTimer?.taskId === task.id ? activeTimer : undefined}
@@ -1886,7 +1885,6 @@ function DayAssistantV2Content() {
                     onComplete={() => handleComplete(easiestTask)}
                     onPin={() => handlePin(easiestTask)}
                     onDelete={() => handleDelete(easiestTask)}
-                    onClick={() => setSelectedTask(easiestTask)}
                     focus={dayPlan?.focus || 3}
                     selectedDate={selectedDate}
                     onSubtaskToggle={handleSubtaskToggle}
@@ -1976,7 +1974,6 @@ function DayAssistantV2Content() {
                             onComplete={() => handleComplete(task)}
                             onPin={() => handlePin(task)}
                             onDelete={() => handleDelete(task)}
-                            onClick={() => setSelectedTask(task)}
                             focus={dayPlan?.focus || 3}
                             selectedDate={selectedDate}
                             onSubtaskToggle={handleSubtaskToggle}
