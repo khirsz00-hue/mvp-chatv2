@@ -11,6 +11,8 @@ import { createAuthenticatedSupabaseClient } from '@/lib/supabaseAuth'
 import { inferTaskContext, TaskContext } from '@/lib/services/contextInferenceService'
 import { clampCognitiveLoad } from '@/lib/utils/cognitiveLoad'
 
+const COGNITIVE_LABEL_PATTERN = /^c([1-3])$/
+
 export const dynamic = 'force-dynamic'
 
 const SYNC_INTERVAL_MS = 10000 // 10 seconds cache
@@ -125,8 +127,9 @@ function parseCognitiveLoadFromLabels(labels?: string[]): number | null {
   for (const label of labels) {
     const normalized = label.trim().toLowerCase()
     // Todoist labels intentionally use a three-level scale (C1-C3). The UI covers heavier loads (4-5), so we only map these three here.
-    if (/^c[1-3]$/.test(normalized)) {
-      return Number(normalized[1])
+    const match = normalized.match(COGNITIVE_LABEL_PATTERN)
+    if (match) {
+      return Number(match[1])
     }
   }
   return null
@@ -201,7 +204,7 @@ async function mapTodoistToDayAssistantTask(
   // Determine is_important: priority >= 3
   const isImportant = priority >= 3
 
-  // Derive cognitive load from labels (C1, C2, C3). Default to C2 if missing, then clamp to 1-5 scale used internally.
+  // Derive cognitive load from labels (C1, C2, C3). Default to cognitive load 2 if missing, then clamp to 1-5 scale used internally.
   const cognitiveFromLabel = parseCognitiveLoadFromLabels(task.labels)
   const cognitiveLoad = clampCognitiveLoad(cognitiveFromLabel ?? existingCognitiveLoad ?? 2)
 
