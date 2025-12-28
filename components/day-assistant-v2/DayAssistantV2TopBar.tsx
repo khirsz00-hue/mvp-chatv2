@@ -46,17 +46,6 @@ export function DayAssistantV2TopBar({
     return `${weekday.charAt(0).toUpperCase() + weekday.slice(1)}, ${day} ${month}`
   }
 
-  const calculateCapacity = (start: string, end: string) => {
-    if (!start || !end) return 0
-    try {
-      const startTime = new Date(`2000-01-01T${start}`)
-      const endTime = new Date(`2000-01-01T${end}`)
-      return Math.floor((endTime.getTime() - startTime.getTime()) / 1000 / 60)
-    } catch (e) {
-      return 0
-    }
-  }
-
   const capacityHours = Math.floor(capacityMinutes / 60)
   const progressPercent = capacityMinutes > 0 
     ? Math.round((completedMinutes / capacityMinutes) * 100) 

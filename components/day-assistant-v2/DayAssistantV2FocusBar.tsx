@@ -72,7 +72,7 @@ export function DayAssistantV2FocusBar({
               ⏱ {formatTime(elapsedSeconds)}
             </div>
             
-            {!isPaused && onResume && (
+            {!isPaused ? (
               <Button
                 size="sm"
                 onClick={onPause}
@@ -81,9 +81,7 @@ export function DayAssistantV2FocusBar({
                 <Pause size={16} weight="fill" />
                 <span className="hidden sm:inline ml-1">Pauza</span>
               </Button>
-            )}
-
-            {isPaused && onResume && (
+            ) : onResume && (
               <Button
                 size="sm"
                 onClick={onResume}
