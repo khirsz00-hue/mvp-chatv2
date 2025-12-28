@@ -53,10 +53,36 @@ export async function GET(req: Request) {
       throw new Error(JSON.stringify(data))
     }
 
-    // Save token to database
+    // Fetch Todoist user info to get user_id
+    console.log('[Todoist Callback] 🔍 Fetching Todoist user info')
+    const userInfoRes = await fetch('https://api.todoist.com/rest/v2/users/me', {
+      headers: {
+        Authorization: `Bearer ${data.access_token}`
+      }
+    })
+
+    if (!userInfoRes.ok) {
+      console.error('[Todoist Callback] ❌ Failed to fetch Todoist user info:', userInfoRes.status)
+      throw new Error(`Failed to fetch Todoist user info: ${userInfoRes.status}`)
+    }
+
+    const todoistUser = await userInfoRes.json()
+    const todoistUserId = todoistUser.id?.toString()
+
+    if (!todoistUserId) {
+      console.error('[Todoist Callback] ❌ No user ID in Todoist response')
+      throw new Error('No user ID in Todoist response')
+    }
+
+    console.log('[Todoist Callback] ✅ Todoist user ID:', todoistUserId)
+
+    // Save token and user_id to database
     const { error: updateError } = await supabase
       .from('user_profiles')
-      .update({ todoist_token: data.access_token })
+      .update({ 
+        todoist_token: data.access_token,
+        todoist_user_id: todoistUserId
+      })
       .eq('id', user.id)
 
     if (updateError) {
@@ -64,7 +90,7 @@ export async function GET(req: Request) {
       throw updateError
     }
 
-    console.log('[Todoist Callback] ✓ Token saved to database for user:', user.id)
+    console.log('[Todoist Callback] ✓ Token and user ID saved to database for user:', user.id)
 
     // Redirect with success indicator
     return NextResponse.redirect(`${baseUrl}/?todoist_connected=true`)
