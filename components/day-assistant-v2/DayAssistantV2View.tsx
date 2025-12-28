@@ -35,6 +35,7 @@ import { getSmartEstimate, getFormattedEstimate } from '@/lib/utils/estimateHelp
 import { TaskBadges } from './TaskBadges'
 import { TaskContextMenu } from './TaskContextMenu'
 import { TaskDetailsModal } from './TaskDetailsModal'
+import { DayAssistantV2TaskCard } from './DayAssistantV2TaskCard'
 
 import { WorkModeSelector, WorkMode } from './WorkModeSelector'
 import { HelpMeModal } from './HelpMeModal'
@@ -1031,6 +1032,39 @@ function DayAssistantV2Content() {
     addDecisionLog(`Rozpoczęto timer dla "${task.title}"`)
   }
 
+  const handleStartTimer = (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId)
+    if (task) {
+      handleStartTask(task)
+    }
+  }
+
+  // Wrapper handlers for DayAssistantV2TaskCard (take taskId strings)
+  const handleCompleteById = async (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId)
+    if (task) await handleComplete(task)
+  }
+
+  const handlePinById = async (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId)
+    if (task) await handlePin(task)
+  }
+
+  const handlePostponeById = async (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId)
+    if (task) await handleNotToday(task)
+  }
+
+  const handleDeleteById = async (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId)
+    if (task) await handleDelete(task)
+  }
+
+  const handleHelpById = (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId)
+    if (task) setHelpMeTask(task)
+  }
+
   const handleTimerComplete = async () => {
     if (!activeTimer) return
     
@@ -1704,26 +1738,20 @@ function DayAssistantV2Content() {
             </CardHeader>
             <CardContent className="space-y-3">
               {mustTasks.map((task, index) => (
-                <TaskRow
+                <DayAssistantV2TaskCard
                   key={task.id}
                   task={task}
                   queuePosition={index + 1}
-                  onNotToday={() => handleNotToday(task)}
-                  onStart={() => handleStartTask(task)}
-                  onUnmark={() => openUnmarkWarning(task)}
-                  onDecompose={() => handleDecompose(task)}
-                  onComplete={() => handleComplete(task)}
-                  onPin={() => handlePin(task)}
-                  onDelete={() => handleDelete(task)}
-                  onClick={() => setSelectedTask(task)}
-                  focus={dayPlan?.focus || 3}
-                  selectedDate={selectedDate}
-                  activeTimer={activeTimer?.taskId === task.id ? activeTimer : undefined}
-                  onPauseTimer={pauseTimer}
-                  onResumeTimer={resumeTimer}
-                  onCompleteTimer={handleTimerComplete}
-                  onSubtaskToggle={handleSubtaskToggle}
-                  riskAssessment={taskRisks.get(task.id)}
+                  onStartTimer={handleStartTimer}
+                  onComplete={handleCompleteById}
+                  onHelp={handleHelpById}
+                  onPin={handlePinById}
+                  onPostpone={handlePostponeById}
+                  onDelete={handleDeleteById}
+                  onOpenDetails={(id) => {
+                    const task = mustTasks.find(t => t.id === id)
+                    if (task) setSelectedTask(task)
+                  }}
                 />
               ))}
             </CardContent>
@@ -1759,25 +1787,20 @@ function DayAssistantV2Content() {
               </div>
             ) : (
               top3Tasks.map((task, index) => (
-                <TaskRow
+                <DayAssistantV2TaskCard
                   key={task.id}
                   task={task}
                   queuePosition={mustTasks.length + index + 1}
-                  onNotToday={() => handleNotToday(task)}
-                  onStart={() => handleStartTask(task)}
-                  onUnmark={() => openUnmarkWarning(task)}
-                  onDecompose={() => handleDecompose(task)}
-                  onComplete={() => handleComplete(task)}
-                  onPin={() => handlePin(task)}
-                  onDelete={() => handleDelete(task)}
-                  onClick={() => setSelectedTask(task)}
-                  focus={dayPlan?.focus || 3}
-                  selectedDate={selectedDate}
-                  activeTimer={activeTimer?.taskId === task.id ? activeTimer : undefined}
-                  onPauseTimer={pauseTimer}
-                  onResumeTimer={resumeTimer}
-                  onCompleteTimer={handleTimerComplete}
-                  onSubtaskToggle={handleSubtaskToggle}
+                  onStartTimer={handleStartTimer}
+                  onComplete={handleCompleteById}
+                  onHelp={handleHelpById}
+                  onPin={handlePinById}
+                  onPostpone={handlePostponeById}
+                  onDelete={handleDeleteById}
+                  onOpenDetails={(id) => {
+                    const task = top3Tasks.find(t => t.id === id)
+                    if (task) setSelectedTask(task)
+                  }}
                 />
               ))
             )}
@@ -1815,26 +1838,20 @@ function DayAssistantV2Content() {
             {showRestOfToday && (
               <CardContent className="space-y-2 pt-4">
                 {remainingToday.map((task, index) => (
-                  <TaskRow
+                  <DayAssistantV2TaskCard
                     key={task.id}
                     task={task}
                     queuePosition={queue.length + index + 1}
-                    onNotToday={() => handleNotToday(task)}
-                    onStart={() => handleStartTask(task)}
-                    onUnmark={() => openUnmarkWarning(task)}
-                    onDecompose={() => handleDecompose(task)}
-                    onComplete={() => handleComplete(task)}
-                    onPin={() => handlePin(task)}
-                    onDelete={() => handleDelete(task)}
-                    onClick={() => setSelectedTask(task)}
-                    focus={dayPlan?.focus || 3}
-                    selectedDate={selectedDate}
-                    activeTimer={activeTimer?.taskId === task.id ? activeTimer : undefined}
-                    onPauseTimer={pauseTimer}
-                    onResumeTimer={resumeTimer}
-                    onCompleteTimer={handleTimerComplete}
-                    onSubtaskToggle={handleSubtaskToggle}
-                    isCollapsed={true}
+                    onStartTimer={handleStartTimer}
+                    onComplete={handleCompleteById}
+                    onHelp={handleHelpById}
+                    onPin={handlePinById}
+                    onPostpone={handlePostponeById}
+                    onDelete={handleDeleteById}
+                    onOpenDetails={(id) => {
+                      const task = remainingToday.find(t => t.id === id)
+                      if (task) setSelectedTask(task)
+                    }}
                   />
                 ))}
               </CardContent>
@@ -1881,20 +1898,17 @@ function DayAssistantV2Content() {
                   <p className="text-xs font-semibold text-orange-800">
                     <span aria-label="żarówka">💡</span> Najłatwiejsze zadanie:
                   </p>
-                  <TaskRow
+                  <DayAssistantV2TaskCard
                     key={easiestTask.id}
                     task={easiestTask}
-                    onNotToday={() => handleNotToday(easiestTask)}
-                    onStart={() => handleStartTask(easiestTask)}
-                    onUnmark={() => openUnmarkWarning(easiestTask)}
-                    onDecompose={() => handleDecompose(easiestTask)}
-                    onComplete={() => handleComplete(easiestTask)}
-                    onPin={() => handlePin(easiestTask)}
-                    onDelete={() => handleDelete(easiestTask)}
-                    onClick={() => setSelectedTask(easiestTask)}
-                    focus={dayPlan?.focus || 3}
-                    selectedDate={selectedDate}
-                    onSubtaskToggle={handleSubtaskToggle}
+                    queuePosition={0} // Easiest task doesn't have position
+                    onStartTimer={handleStartTimer}
+                    onComplete={handleCompleteById}
+                    onHelp={handleHelpById}
+                    onPin={handlePinById}
+                    onPostpone={handlePostponeById}
+                    onDelete={handleDeleteById}
+                    onOpenDetails={(id) => setSelectedTask(easiestTask)}
                   />
                   <div className="text-center mt-3">
                     <Button
@@ -1971,21 +1985,20 @@ function DayAssistantV2Content() {
                               </span>
                             </div>
                           )}
-                          <TaskRow
+                          <DayAssistantV2TaskCard
+                            key={task.id}
                             task={task}
                             queuePosition={queue.length + remainingToday.length + index + 1}
-                            onNotToday={() => handleNotToday(task)}
-                            onStart={() => handleStartTask(task)}
-                            onUnmark={() => openUnmarkWarning(task)}
-                            onDecompose={() => handleDecompose(task)}
-                            onComplete={() => handleComplete(task)}
-                            onPin={() => handlePin(task)}
-                            onDelete={() => handleDelete(task)}
-                            onClick={() => setSelectedTask(task)}
-                            focus={dayPlan?.focus || 3}
-                            selectedDate={selectedDate}
-                            onSubtaskToggle={handleSubtaskToggle}
-                            isCollapsed={true}
+                            onStartTimer={handleStartTimer}
+                            onComplete={handleCompleteById}
+                            onHelp={handleHelpById}
+                            onPin={handlePinById}
+                            onPostpone={handlePostponeById}
+                            onDelete={handleDeleteById}
+                            onOpenDetails={(id) => {
+                              const foundTask = later.find(t => t.id === id)
+                              if (foundTask) setSelectedTask(foundTask)
+                            }}
                           />
                         </div>
                       )
