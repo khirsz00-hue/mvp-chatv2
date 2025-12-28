@@ -741,7 +741,11 @@ function DayAssistantV2Content() {
   }, [tasks, selectedDate])
 
   const addedToday = useMemo(() => {
-    return tasks.filter(t => t.created_at && t.created_at.startsWith(selectedDate)).length
+    return tasks.filter(t => {
+      if (!t.created_at) return false
+      const createdDate = t.created_at.split('T')[0]
+      return createdDate === selectedDate
+    }).length
   }, [tasks, selectedDate])
 
   const pendingToday = Math.max(totalToday - completedToday, 0)
