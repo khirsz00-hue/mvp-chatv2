@@ -1267,10 +1267,45 @@ function DayAssistantV2Content() {
     toast.success('📅 Zadanie przeniesione na jutro')
   }
 
-  const handleMorningReschedule = async (task: TestDayTask) => {
-    // For now, same as postpone - could open date picker in future
-    await handleNotToday(task, 'Przełożono z porannego przeglądu')
-    toast.success('📅 Zadanie przełożone')
+  const handleMorningReschedule = async (task: TestDayTask, date?: string) => {
+    if (date) {
+      // Reschedule to specific date
+      setTasks(prev => prev.map(t => 
+        t.id === task.id ? { ...t, due_date: date } : t
+      ))
+      
+      addDecisionLog(`Przełożono "${task.title}" na ${date}`)
+      toast.success(`📅 Zadanie przełożone na ${date}`)
+      
+      try {
+        const response = await authFetch('/api/day-assistant-v2/task', {
+          method: 'PUT',
+          body: JSON.stringify({ 
+            task_id: task.id, 
+            due_date: date 
+          })
+        })
+        
+        if (!response.ok) {
+          // Rollback on error
+          setTasks(prev => prev.map(t => 
+            t.id === task.id ? { ...t, due_date: task.due_date } : t
+          ))
+          toast.error('Nie udało się zaktualizować zadania')
+        }
+      } catch (error) {
+        console.error('Update task due date error:', error)
+        // Rollback on error
+        setTasks(prev => prev.map(t => 
+          t.id === task.id ? { ...t, due_date: task.due_date } : t
+        ))
+        toast.error('Błąd przy aktualizacji zadania')
+      }
+    } else {
+      // Default behavior - postpone to tomorrow
+      await handleNotToday(task, 'Przełożono z porannego przeglądu')
+      toast.success('📅 Zadanie przełożone')
+    }
   }
 
   const handleMorningDelete = async (task: TestDayTask) => {
@@ -2265,6 +2300,7 @@ function DayAssistantV2Content() {
         onMoveToTomorrow={handleMorningMoveToTomorrow}
         onReschedule={handleMorningReschedule}
         onDelete={handleMorningDelete}
+        onComplete={handleCompleteOverdue}
       />
       
       {/* Burnout Warning Modal - NEW! */}
