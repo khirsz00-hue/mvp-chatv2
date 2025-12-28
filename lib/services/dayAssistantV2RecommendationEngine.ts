@@ -63,9 +63,9 @@ function mapWorkModeToEnergyFocus(workMode: WorkMode): { energy: number, focus: 
   switch (workMode) {
     case 'low_focus':
       return { energy: 2, focus: 2 } // Niska energia - łatwe zadania
-    case 'quick_wins':
-      return { energy: 4, focus: 4 } // Wysoka energia - szybkie zwycięstwa
-    case 'focus':
+    case 'hyperfocus':
+      return { energy: 4, focus: 4 } // Wysoka energia - trudne zadania
+    case 'standard':
     default:
       return { energy: 3, focus: 3 } // Normalna praca
   }
@@ -75,7 +75,7 @@ function mapWorkModeToEnergyFocus(workMode: WorkMode): { energy: number, focus: 
  * Type guard to validate WorkMode
  */
 function isValidWorkMode(value: unknown): value is WorkMode {
-  return typeof value === 'string' && ['low_focus', 'focus', 'quick_wins'].includes(value)
+  return typeof value === 'string' && ['low_focus', 'standard', 'hyperfocus'].includes(value)
 }
 
 /**

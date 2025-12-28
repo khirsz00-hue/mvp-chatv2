@@ -118,7 +118,7 @@ function DayAssistantV2Content() {
   const [showRestOfToday, setShowRestOfToday] = useState(false)
   
   // NEW: Work mode state (replaces energy/focus sliders)
-  const [workMode, setWorkMode] = useState<WorkMode>('focus')
+  const [workMode, setWorkMode] = useState<WorkMode>('standard')
   
   // NEW: Help me modal state
   const [helpMeTask, setHelpMeTask] = useState<TestDayTask | null>(null)
@@ -505,8 +505,8 @@ function DayAssistantV2Content() {
     // Apply work mode filtering
     if (workMode === 'low_focus') {
       filtered = filtered.filter(t => t.cognitive_load <= 2)
-    } else if (workMode === 'quick_wins') {
-      filtered = filtered.filter(t => t.estimate_min <= 20)
+    } else if (workMode === 'hyperfocus') {
+      filtered = filtered.filter(t => t.cognitive_load >= 4)
     }
     
     // 🔍 Debug: Verify cognitive_load after filtering
@@ -686,7 +686,7 @@ function DayAssistantV2Content() {
         score: (t as any)._score || 'N/A'
       })))
     }
-  }, [tasks.length, filteredTasks.length, scoredTasks.length, overdueTasks, mustTasks.length, top3Tasks.length, nonOverdueTasks.length, queue.length, remainingToday.length, later, overflowCount, availableMinutes, usedMinutes])
+  }, [tasks.length, filteredTasks.length, scoredTasks.length, overdueTasks, mustTasks.length, top3Tasks, nonOverdueTasks.length, queue.length, remainingToday, later, overflowCount, availableMinutes, usedMinutes])
 
   // matchedTasks kept for backward compatibility with existing queue logic
   const matchedTasks = queue.filter(t => !t.is_must && !t.completed)
