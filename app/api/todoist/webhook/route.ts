@@ -72,7 +72,7 @@ async function handleTaskUpsert(taskData: any, todoistUserId: string) {
     // Find user by Todoist user ID (assuming it's stored in user_profiles)
     const { data: profiles, error: profileError } = await supabase
       .from('user_profiles')
-      .select('id, todoist_user_id')
+      .select('id')
       .eq('todoist_user_id', todoistUserId)
     
     if (profileError) {

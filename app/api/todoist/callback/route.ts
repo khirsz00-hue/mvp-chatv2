@@ -67,13 +67,14 @@ export async function GET(req: Request) {
     }
 
     const todoistUser = await userInfoRes.json()
-    const todoistUserId = todoistUser.id?.toString()
-
-    if (!todoistUserId) {
+    
+    // Extract and validate user ID
+    if (!todoistUser.id) {
       console.error('[Todoist Callback] ❌ No user ID in Todoist response')
       throw new Error('No user ID in Todoist response')
     }
-
+    
+    const todoistUserId = todoistUser.id.toString()
     console.log('[Todoist Callback] ✅ Todoist user ID:', todoistUserId)
 
     // Save token and user_id to database
