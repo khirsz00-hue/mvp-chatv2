@@ -2,6 +2,7 @@
  * API Route: /api/day-assistant-v2/dayplan
  * GET: Fetch day plan with timeline and proposals
  * POST: Update day plan (energy/focus sliders)
+ * PUT: Update day plan metadata (work hours, capacity)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -14,6 +15,13 @@ import {
   getActiveProposals
 } from '@/lib/services/dayAssistantV2Service'
 import { generateSliderChangeRecommendation } from '@/lib/services/dayAssistantV2RecommendationEngine'
+
+interface DayPlanMetadata {
+  work_hours_start?: string
+  work_hours_end?: string
+  capacity_minutes?: number
+  [key: string]: any
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -235,7 +243,7 @@ export async function PUT(request: NextRequest) {
     }
     
     const body = await request.json()
-    const { date, metadata } = body
+    const { date, metadata } = body as { date: string; metadata?: DayPlanMetadata }
     
     if (!date) {
       return NextResponse.json({ error: 'Date is required' }, { status: 400 })
@@ -254,7 +262,7 @@ export async function PUT(request: NextRequest) {
     }
     
     // Update metadata
-    const updates: Partial<{ metadata: Record<string, any> }> = {}
+    const updates: Partial<{ metadata: DayPlanMetadata }> = {}
     if (metadata) {
       updates.metadata = { ...dayPlan.metadata, ...metadata }
     }

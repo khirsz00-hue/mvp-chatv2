@@ -15,7 +15,7 @@ interface FocusBarProps {
   elapsedSeconds: number
   isPaused?: boolean
   onPause: () => void
-  onResume?: () => void
+  onResume: () => void
   onComplete: () => void
   onStop: () => void
 }
@@ -82,16 +82,14 @@ export function DayAssistantV2FocusBar({
                 <span className="hidden sm:inline ml-1">Pauza</span>
               </Button>
             ) : (
-              onResume && (
-                <Button
-                  size="sm"
-                  onClick={onResume}
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                >
-                  <Play size={16} weight="fill" />
-                  <span className="hidden sm:inline ml-1">Wznów</span>
-                </Button>
-              )
+              <Button
+                size="sm"
+                onClick={onResume}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <Play size={16} weight="fill" />
+                <span className="hidden sm:inline ml-1">Wznów</span>
+              </Button>
             )}
             
             <Button
