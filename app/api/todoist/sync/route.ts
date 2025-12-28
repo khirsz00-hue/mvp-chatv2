@@ -11,6 +11,7 @@ import { createAuthenticatedSupabaseClient } from '@/lib/supabaseAuth'
 import { inferTaskContext, TaskContext } from '@/lib/services/contextInferenceService'
 import { clampCognitiveLoad } from '@/lib/utils/cognitiveLoad'
 
+// Matches Todoist cognitive labels like C1, c2, c3
 const COGNITIVE_LABEL_PATTERN = /^c([1-3])$/
 
 export const dynamic = 'force-dynamic'
@@ -127,7 +128,8 @@ function parseCognitiveLoadFromLabels(labels?: string[]): number | null {
   for (const label of labels) {
     const normalized = label.trim().toLowerCase()
     // Todoist labels intentionally use a three-level scale (C1-C3).
-    // The UI covers higher loads (4-5), so we only map these three here and ignore any C4/C5 labels.
+    // The UI covers higher loads (4-5), so we only map these three here and ignore any C4/C5 labels
+    // to keep Todoist inputs aligned with the more compact Todoist labeling scheme.
     const match = normalized.match(COGNITIVE_LABEL_PATTERN)
     if (match) {
       return Number(match[1])
@@ -138,6 +140,11 @@ function parseCognitiveLoadFromLabels(labels?: string[]): number | null {
 
 /**
  * Map Todoist task to DayAssistantV2Task format with AI-powered context inference
+ * @param task Todoist task payload
+ * @param userId Supabase user id
+ * @param assistantId Assistant configuration id
+ * @param existingContext Previously stored context_type (preserved when provided)
+ * @param existingCognitiveLoad Previously stored cognitive_load (1-5) to keep user edits when no label is present
  */
 async function mapTodoistToDayAssistantTask(
   task: TodoistTask,

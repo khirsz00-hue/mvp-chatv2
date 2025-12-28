@@ -4,4 +4,7 @@
  * @param value Raw cognitive load value (may be outside range)
  * @returns Number between 1 and 5 inclusive
  */
-export const clampCognitiveLoad = (value: number): number => Math.min(Math.max(value, 1), 5)
+export const clampCognitiveLoad = (value: number): number => {
+  const safeValue = Number.isFinite(value) ? value : 2
+  return Math.min(Math.max(safeValue, 1), 5)
+}
