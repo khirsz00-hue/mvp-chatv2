@@ -126,7 +126,8 @@ function parseCognitiveLoadFromLabels(labels?: string[]): number | null {
   if (!labels || labels.length === 0) return null
   for (const label of labels) {
     const normalized = label.trim().toLowerCase()
-    // Todoist labels intentionally use a three-level scale (C1-C3). The UI covers heavier loads (4-5), so we only map these three here.
+    // Todoist labels intentionally use a three-level scale (C1-C3).
+    // The UI covers higher loads (4-5), so we only map these three here.
     const match = normalized.match(COGNITIVE_LABEL_PATTERN)
     if (match) {
       return Number(match[1])
@@ -204,7 +205,8 @@ async function mapTodoistToDayAssistantTask(
   // Determine is_important: priority >= 3
   const isImportant = priority >= 3
 
-  // Derive cognitive load from labels (C1, C2, C3). Default to cognitive load 2 if missing, then clamp to 1-5 scale used internally.
+  // Derive cognitive load from labels (C1, C2, C3).
+  // Default to cognitive load 2 if missing, then clamp to the 1-5 scale used internally.
   const cognitiveFromLabel = parseCognitiveLoadFromLabels(task.labels)
   const cognitiveLoad = clampCognitiveLoad(cognitiveFromLabel ?? existingCognitiveLoad ?? 2)
 
