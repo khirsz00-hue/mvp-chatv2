@@ -10,7 +10,7 @@ import { TestDayTask } from '@/lib/types/dayAssistantV2'
 
 interface DayAssistantV2TaskTooltipProps {
   task: TestDayTask
-  queuePosition: number
+  queuePosition?: number  // Optional - not all tasks have a queue position
 }
 
 export function DayAssistantV2TaskTooltip({ task, queuePosition }: DayAssistantV2TaskTooltipProps) {
@@ -32,7 +32,9 @@ export function DayAssistantV2TaskTooltip({ task, queuePosition }: DayAssistantV
         <div className="space-y-3 text-xs">
           {/* Score breakdown header */}
           <div>
-            <div className="font-bold text-sm mb-1">🎯 Dlaczego pozycja #{queuePosition}?</div>
+            <div className="font-bold text-sm mb-1">
+              {queuePosition ? `🎯 Dlaczego pozycja #${queuePosition}?` : '🎯 Scoring Breakdown'}
+            </div>
             <div className="text-gray-300">📊 Całkowity score: {Math.round(score)}/100</div>
           </div>
 

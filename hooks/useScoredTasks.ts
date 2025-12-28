@@ -5,28 +5,30 @@
 
 import { useMemo } from 'react'
 import { TestDayTask, DayPlan } from '@/lib/types/dayAssistantV2'
-import { scoreAndSortTasks } from '@/lib/services/dayAssistantV2RecommendationEngine'
+import { scoreAndSortTasksV3 } from '@/lib/services/dayAssistantV2RecommendationEngine'
 
 export function useScoredTasks(
   rawTasks: TestDayTask[],
   dayPlan: DayPlan | null,
-  selectedDate: string
+  selectedDate: string,
+  contextFilter: string | null = null
 ): TestDayTask[] {
   return useMemo(() => {
-    console.log('🎯 [Scoring Debug] ========== START ==========')
-    console.log('🎯 [Scoring Debug] Input:', {
+    console.log('🎯 [Scoring Debug V3] ========== START ==========')
+    console.log('🎯 [Scoring Debug V3] Input:', {
       tasksCount: rawTasks.length,
       dayPlan: dayPlan ? {
         energy: dayPlan.energy,
         focus: dayPlan.focus,
         workMode: dayPlan.metadata?.work_mode
       } : null,
-      selectedDate
+      selectedDate,
+      contextFilter
     })
     
     // 📊 Verify cognitive_load before scoring
     if (rawTasks.length > 0) {
-      console.log('📊 [Scoring Debug] Cognitive load BEFORE scoring:')
+      console.log('📊 [Scoring Debug V3] Cognitive load BEFORE scoring:')
       rawTasks.slice(0, 5).forEach((task, idx) => {
         console.log(`  #${idx + 1}. "${task.title.substring(0, 40)}"`)
         console.log(`      cognitive_load: ${task.cognitive_load}`)
@@ -35,19 +37,19 @@ export function useScoredTasks(
     }
     
     if (!dayPlan) {
-      console.log('⚠️ [Scoring Debug] No dayPlan - returning unsorted tasks')
-      console.log('🎯 [Scoring Debug] ========== END ==========')
+      console.log('⚠️ [Scoring Debug V3] No dayPlan - returning unsorted tasks')
+      console.log('🎯 [Scoring Debug V3] ========== END ==========')
       return rawTasks
     }
     
-    console.log('✅ [Scoring Debug] Calculating scores for', rawTasks.length, 'tasks')
+    console.log('✅ [Scoring Debug V3] Using Scoring V3 algorithm for', rawTasks.length, 'tasks')
     
-    // Apply scoring algorithm from recommendation engine
-    const scored = scoreAndSortTasks(rawTasks, dayPlan, selectedDate)
+    // Apply V3 scoring algorithm from recommendation engine
+    const scored = scoreAndSortTasksV3(rawTasks, dayPlan, selectedDate, contextFilter)
     
     // 📊 Verify cognitive_load after scoring
     if (scored.length > 0) {
-      console.log('📊 [Scoring Debug] Cognitive load AFTER scoring:')
+      console.log('📊 [Scoring Debug V3] Cognitive load AFTER scoring:')
       scored.slice(0, 5).forEach((task, idx) => {
         console.log(`  #${idx + 1}. "${task.title.substring(0, 40)}"`)
         console.log(`      cognitive_load: ${task.cognitive_load}`)
@@ -56,7 +58,7 @@ export function useScoredTasks(
     }
     
     // Log first 10 tasks with scores
-    console.log('📊 [Scoring Debug] Top scored tasks:')
+    console.log('📊 [Scoring Debug V3] Top scored tasks:')
     scored.slice(0, 10).forEach((task, idx) => {
       const score = task.metadata?._score
       const reasoning = task.metadata?._scoreReasoning || []
@@ -75,7 +77,7 @@ export function useScoredTasks(
     const uniqueScores = new Set(scores)
     
     if (uniqueScores.size < scores.length && scores.length > 0) {
-      console.warn('⚠️ [Scoring Debug] DUPLICATE SCORES DETECTED!')
+      console.warn('⚠️ [Scoring Debug V3] DUPLICATE SCORES DETECTED!')
       console.warn('  Unique scores:', uniqueScores.size, '/', scores.length)
       console.warn('  Score distribution:', Array.from(uniqueScores).sort((a, b) => b - a).slice(0, 10))
       
@@ -100,11 +102,11 @@ export function useScoredTasks(
         }
       })
     } else if (scores.length > 0) {
-      console.log('✅ [Scoring Debug] All scores are unique!')
+      console.log('✅ [Scoring Debug V3] All scores are unique!')
     }
     
-    console.log('🎯 [Scoring Debug] ========== END ==========')
+    console.log('🎯 [Scoring Debug V3] ========== END ==========')
     
     return scored
-  }, [rawTasks, dayPlan, selectedDate])
+  }, [rawTasks, dayPlan, selectedDate, contextFilter])
 }
