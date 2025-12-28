@@ -5,7 +5,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 
-export type WorkMode = 'low_focus' | 'focus' | 'quick_wins'
+export type WorkMode = 'low_focus' | 'standard' | 'hyperfocus'
 
 interface Props {
   value: WorkMode
@@ -22,16 +22,16 @@ export function WorkModeSelector({ value, onChange, isUpdating }: Props) {
       description: 'Pokazuj tylko łatwe zadania (cognitive load ≤ 2). Idealne gdy jesteś zmęczony.'
     },
     {
-      id: 'focus' as WorkMode,
+      id: 'standard' as WorkMode,
       emoji: '🟡',
-      label: 'Focus',
+      label: 'Standard',
       description: 'Normalne sortowanie według priorytetu i dopasowania. Standardowy tryb pracy.'
     },
     {
-      id: 'quick_wins' as WorkMode,
+      id: 'hyperfocus' as WorkMode,
       emoji: '⚡',
-      label: 'Quick Wins',
-      description: 'Tylko szybkie zadania (≤ 20 min). Zbieraj małe zwycięstwa!'
+      label: 'HyperFocus',
+      description: 'Tylko trudne zadania (cognitive load ≥ 4). Wykorzystaj wysoki focus!'
     }
   ]
 
