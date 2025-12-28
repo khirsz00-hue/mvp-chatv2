@@ -103,8 +103,8 @@ export function DayAssistantV2TopBar({
           </div>
 
           {/* Progress */}
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <ChartBar size={18} className="text-purple-600" />
+          <div className="flex items-center gap-2 text-sm text-gray-600" aria-label="Postęp dnia pracy">
+            <ChartBar size={18} className="text-purple-600" aria-hidden="true" />
             <span>
               Progress: <strong className="text-gray-900">{completedMinutes}/{capacityMinutes} min</strong> 
               <span className="text-gray-500 ml-1">({progressPercent}%)</span>

@@ -1122,9 +1122,9 @@ function DayAssistantV2Content() {
     const endTime = new Date(`2000-01-01T${end}`)
     const timeDiff = endTime.getTime() - startTime.getTime()
     
-    // Handle negative values (end before start)
-    if (timeDiff < 0) {
-      console.warn('[DayAssistantV2] End time is before start time')
+    // Handle invalid time ranges
+    if (timeDiff <= 0) {
+      console.warn('[DayAssistantV2] Invalid work hours: end time must be after start time')
       showToast('Godzina zakończenia musi być po godzinie rozpoczęcia', 'error')
       return
     }

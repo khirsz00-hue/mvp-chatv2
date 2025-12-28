@@ -45,15 +45,15 @@ export function DayAssistantV2FocusBar({
           
           {/* Left: Task info */}
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="relative">
+            <div className="relative" role="status" aria-label={isPaused ? 'Timer wstrzymany' : 'Timer aktywny'}>
               {!isPaused && (
                 <>
-                  <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-                  <div className="absolute inset-0 w-3 h-3 bg-red-500 rounded-full animate-ping" />
+                  <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" aria-hidden="true" />
+                  <div className="absolute inset-0 w-3 h-3 bg-red-500 rounded-full animate-ping" aria-hidden="true" />
                 </>
               )}
               {isPaused && (
-                <div className="w-3 h-3 bg-yellow-500 rounded-full" />
+                <div className="w-3 h-3 bg-yellow-500 rounded-full" aria-hidden="true" />
               )}
             </div>
             <div className="flex-1 min-w-0">
