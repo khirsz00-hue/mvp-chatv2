@@ -429,14 +429,15 @@ export function calculateTaskScoreV3(
   }
   
   // 4. Cognitive load matching with work mode
-  if (context.workMode === 'low_focus' && task.cognitive_load < 3) {
+  const cogLoad = task.cognitive_load || 3
+  if (context.workMode === 'low_focus' && cogLoad <= 2) {
     score += 15
-    reasoning.push(`🧠 Cognitive Load ${task.cognitive_load}/5 (dopasowanie Low Focus): +15`)
-  } else if (context.workMode === 'hyperfocus' && task.cognitive_load > 3) {
+    reasoning.push(`🧠 Cognitive Load ${cogLoad}/5 (dopasowanie Low Focus): +15`)
+  } else if (context.workMode === 'hyperfocus' && cogLoad >= 4) {
     score += 15
-    reasoning.push(`🧠 Cognitive Load ${task.cognitive_load}/5 (dopasowanie HyperFocus): +15`)
+    reasoning.push(`🧠 Cognitive Load ${cogLoad}/5 (dopasowanie HyperFocus): +15`)
   } else {
-    reasoning.push(`🧠 Cognitive Load ${task.cognitive_load}/5: +0`)
+    reasoning.push(`🧠 Cognitive Load ${cogLoad}/5: +0`)
   }
   
   // 5. Context matching
@@ -495,12 +496,16 @@ export function scoreAndSortTasksV3(
   const workMode = (dayPlan.metadata?.work_mode as WorkMode) || 'standard'
   
   // Filter by work mode FIRST
-  let filteredTasks = tasks
+  let filteredTasks = tasks.filter(t => !t.completed)  // Always filter out completed tasks
+  
   if (workMode === 'low_focus') {
-    filteredTasks = tasks.filter(t => t.cognitive_load < 3)
+    // Low focus mode: cognitive load 1-2 (easy tasks)
+    filteredTasks = filteredTasks.filter(t => (t.cognitive_load || 3) <= 2)
   } else if (workMode === 'hyperfocus') {
-    filteredTasks = tasks.filter(t => t.cognitive_load > 3)
+    // Hyperfocus mode: cognitive load 4-5 (hard tasks)
+    filteredTasks = filteredTasks.filter(t => (t.cognitive_load || 3) >= 4)
   }
+  // Standard mode: no filtering by cognitive load
   
   // Score tasks
   const scored = filteredTasks.map(task => {

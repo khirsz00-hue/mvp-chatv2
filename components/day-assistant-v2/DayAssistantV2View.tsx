@@ -521,8 +521,13 @@ function DayAssistantV2Content() {
     return filtered
   }, [tasks, contextFilter, workMode])
 
-  // Apply intelligent scoring to filtered tasks
-  const scoredTasks = useScoredTasks(filteredTasks, dayPlan, selectedDate)
+  // Apply intelligent scoring to filtered tasks with V3 algorithm
+  const scoredTasks = useScoredTasks(
+    filteredTasks, 
+    dayPlan, 
+    selectedDate,
+    contextFilter === 'all' ? null : contextFilter
+  )
 
   // Use overdue tasks hook for better management
   const { overdueTasks } = useOverdueTasks(scoredTasks, selectedDate)
