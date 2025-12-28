@@ -122,6 +122,7 @@ CREATE TABLE IF NOT EXISTS sync_metadata (
   last_synced_at TIMESTAMPTZ NOT NULL,
   task_count INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id, sync_type)
 );
 
@@ -286,6 +287,11 @@ CREATE TRIGGER update_v2_tasks_updated_at
 
 CREATE TRIGGER update_v2_plan_updated_at
   BEFORE UPDATE ON day_assistant_v2_plan
+  FOR EACH ROW
+  EXECUTE FUNCTION update_day_assistant_v2_updated_at();
+
+CREATE TRIGGER update_sync_metadata_updated_at
+  BEFORE UPDATE ON sync_metadata
   FOR EACH ROW
   EXECUTE FUNCTION update_day_assistant_v2_updated_at();
 
