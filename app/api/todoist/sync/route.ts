@@ -115,6 +115,8 @@ function parseEstimateFromTodoist(task: TodoistTask): number {
   return 30 // Default
 }
 
+const clampCognitiveLoad = (value: number): number => Math.min(Math.max(value, 1), 5)
+
 /**
  * Derive cognitive load from Todoist labels (C1, C2, C3)
  * Returns null if no cognitive label is present
@@ -199,12 +201,9 @@ async function mapTodoistToDayAssistantTask(
   // Determine is_important: priority >= 3
   const isImportant = priority >= 3
 
-  // Derive cognitive load from labels (C1, C2, C3). Default to C2 if missing.
+  // Derive cognitive load from labels (C1, C2, C3). Default to C2 if missing, then clamp to 1-5 scale used internally.
   const cognitiveFromLabel = parseCognitiveLoadFromLabels(task.labels)
-  const cognitiveLoad = Math.min(
-    Math.max(cognitiveFromLabel ?? existingCognitiveLoad ?? 2, 1),
-    5
-  )
+  const cognitiveLoad = clampCognitiveLoad(cognitiveFromLabel ?? existingCognitiveLoad ?? 2)
 
   // Parse estimate_min from task
   const estimateMin = parseEstimateFromTodoist(task)
