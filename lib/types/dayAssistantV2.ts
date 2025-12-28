@@ -19,7 +19,7 @@ export type ContextType =
   | 'prywatne'        // Maps to 'personal'
 
 // Work Mode - filtering and sorting modes
-export type WorkMode = 'low_focus' | 'standard' | 'hyperfocus'
+export type WorkMode = 'low_focus' | 'standard' | 'hyperfocus' | 'quick_wins'
 
 // Energy/Focus Preset
 export interface EnergyFocusPreset {

@@ -5,7 +5,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 
-export type WorkMode = 'low_focus' | 'standard' | 'hyperfocus'
+export type WorkMode = 'low_focus' | 'standard' | 'hyperfocus' | 'quick_wins'
 
 interface Props {
   value: WorkMode
@@ -26,6 +26,12 @@ export function WorkModeSelector({ value, onChange, isUpdating }: Props) {
       emoji: '🟡',
       label: 'Standard',
       description: 'Normalne sortowanie według priorytetu i dopasowania. Standardowy tryb pracy.'
+    },
+    {
+      id: 'quick_wins' as WorkMode,
+      emoji: '⏱️',
+      label: 'Quick Wins',
+      description: 'Błyskawiczne zadania z est. czasem < 20 min — złap szybkie wygrane.'
     },
     {
       id: 'hyperfocus' as WorkMode,
