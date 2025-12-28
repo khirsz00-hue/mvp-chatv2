@@ -65,6 +65,8 @@ import { saveInsightFeedback } from '@/lib/services/insightFeedbackService'
 import { Sparkle } from '@phosphor-icons/react'
 import { TopStatusBar } from './TopStatusBar'
 import { RecommendationPanel } from './RecommendationPanel'
+import { DayAssistantV2FocusBar } from './DayAssistantV2FocusBar'
+import { DayAssistantV2TopBar } from './DayAssistantV2TopBar'
 
 // Create a query client outside the component to avoid recreation on every render
 const queryClient = new QueryClient({
@@ -138,6 +140,11 @@ function DayAssistantV2Content() {
   
   // NEW: Quick add modal state
   const [showQuickAdd, setShowQuickAdd] = useState(false)
+  
+  // NEW: Work hours state (for inline editing)
+  const [workHoursStart, setWorkHoursStart] = useState<string>('09:00')
+  const [workHoursEnd, setWorkHoursEnd] = useState<string>('17:00')
+  const [capacityMinutes, setCapacityMinutes] = useState<number>(480)
   
   // NEW: AI Features state
   const [burnoutAssessment, setBurnoutAssessment] = useState<BurnoutAssessment | null>(null)
@@ -439,6 +446,19 @@ function DayAssistantV2Content() {
       setDayPlan(data.dayPlan)
       setTasks(data.tasks || [])
       setProposals(data.proposals || [])
+      
+      // Load work hours from dayPlan metadata
+      if (data.dayPlan?.metadata) {
+        if (data.dayPlan.metadata.work_hours_start) {
+          setWorkHoursStart(data.dayPlan.metadata.work_hours_start)
+        }
+        if (data.dayPlan.metadata.work_hours_end) {
+          setWorkHoursEnd(data.dayPlan.metadata.work_hours_end)
+        }
+        if (data.dayPlan.metadata.capacity_minutes) {
+          setCapacityMinutes(data.dayPlan.metadata.capacity_minutes)
+        }
+      }
       
       // 🔍 Debug: Verify cognitive_load immediately after setting state
       console.log('🔍 [State Set] Cognitive load verification (first 5 tasks):')
@@ -1086,6 +1106,48 @@ function DayAssistantV2Content() {
     addDecisionLog(`Zatrzymano timer dla "${task?.title || 'zadania'}"`)
   }
 
+  // NEW: Work hours handlers
+  const handleWorkHoursChange = async (start: string, end: string) => {
+    setWorkHoursStart(start)
+    setWorkHoursEnd(end)
+    
+    // Calculate new capacity
+    const startTime = new Date(`2000-01-01T${start}`)
+    const endTime = new Date(`2000-01-01T${end}`)
+    const newCapacity = Math.floor((endTime.getTime() - startTime.getTime()) / 1000 / 60)
+    setCapacityMinutes(newCapacity)
+    
+    // Save to database
+    try {
+      const response = await authFetch('/api/day-assistant-v2/dayplan', {
+        method: 'PUT',
+        body: JSON.stringify({
+          date: selectedDate,
+          metadata: {
+            work_hours_start: start,
+            work_hours_end: end,
+            capacity_minutes: newCapacity
+          }
+        })
+      })
+      
+      if (response.ok) {
+        console.log('[DayAssistantV2] Work hours saved successfully')
+        addDecisionLog(`Zaktualizowano godziny pracy: ${start} - ${end}`)
+      }
+    } catch (error) {
+      console.error('[DayAssistantV2] Failed to save work hours:', error)
+      showToast('Nie udało się zapisać godzin pracy', 'error')
+    }
+  }
+
+  const handleWorkModeChange = (mode: WorkMode) => {
+    setWorkMode(mode)
+    setIsReorderingQueue(true)
+    setTimeout(() => setIsReorderingQueue(false), 300)
+    addDecisionLog(`Zmieniono tryb pracy na ${mode}`)
+  }
+
   const handleCompleteOverdue = async (task: TestDayTask) => {
     // Stop timer if this task is active
     if (activeTimer && activeTimer.taskId === task.id) {
@@ -1615,26 +1677,35 @@ function DayAssistantV2Content() {
   return (
     <>
       <Toaster position="top-right" />
+      
+      {/* ADHD Focus Bar - Only when timer is active */}
+      {activeTimer && (
+        <DayAssistantV2FocusBar
+          task={tasks.find(t => t.id === activeTimer.taskId) || null}
+          elapsedSeconds={activeTimer.elapsedSeconds}
+          isPaused={activeTimer.isPaused}
+          onPause={pauseTimer}
+          onResume={resumeTimer}
+          onComplete={handleTimerComplete}
+          onStop={handleTimerStop}
+        />
+      )}
+      
+      {/* New Top Bar - Always visible */}
+      <DayAssistantV2TopBar
+        selectedDate={selectedDate}
+        workHoursStart={workHoursStart}
+        workHoursEnd={workHoursEnd}
+        capacityMinutes={capacityMinutes}
+        workMode={workMode}
+        completedMinutes={usedMinutes}
+        onWorkHoursChange={handleWorkHoursChange}
+        onWorkModeChange={handleWorkModeChange}
+      />
+      
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(600px,2fr)_minmax(400px,1fr)] gap-6">
         {/* Main content area with improved spacing */}
         <div className="space-y-6 min-w-0">
-        {/* Top Status Bar - Full Width */}
-        <TopStatusBar
-          completedToday={completedToday}
-          totalToday={totalToday}
-          usedMinutes={usedMinutes}
-          availableMinutes={availableMinutes}
-          usagePercentage={usagePercentage}
-          workMode={workMode}
-          activeTimer={activeTimer ? {
-            taskId: activeTimer.taskId,
-            taskTitle: tasks.find(t => t.id === activeTimer.taskId)?.title || 'Zadanie',
-            elapsedSeconds: activeTimer.elapsedSeconds,
-            estimatedMinutes: activeTimer.estimatedMinutes
-          } : undefined}
-          firstInQueue={firstInQueue}
-        />
-        
         <Card>
           <CardHeader>
             <div className="flex justify-between items-center">
@@ -1665,12 +1736,7 @@ function DayAssistantV2Content() {
             {/* Work Mode Selector */}
             <WorkModeSelector
               value={workMode}
-              onChange={(mode) => {
-                setWorkMode(mode)
-                setIsReorderingQueue(true)
-                setTimeout(() => setIsReorderingQueue(false), 300)
-                addDecisionLog(`Zmieniono tryb pracy na ${mode}`)
-              }}
+              onChange={handleWorkModeChange}
               isUpdating={isReorderingQueue}
             />
 
