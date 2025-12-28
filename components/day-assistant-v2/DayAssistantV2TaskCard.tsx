@@ -24,7 +24,7 @@ import { DayAssistantV2TaskTooltip } from './DayAssistantV2TaskTooltip'
 
 interface DayAssistantV2TaskCardProps {
   task: TestDayTask
-  queuePosition: number
+  queuePosition?: number  // Optional - only shown for tasks in queue
   onStartTimer: (taskId: string) => void
   onComplete: (taskId: string) => void
   onHelp: (taskId: string) => void
@@ -58,7 +58,9 @@ export function DayAssistantV2TaskCard({
       <CardContent className="p-4">
         {/* Header row with all badges */}
         <div className="flex flex-wrap items-center gap-2 mb-3">
-          <PositionBadge position={queuePosition} />
+          {queuePosition !== undefined && queuePosition > 0 && (
+            <PositionBadge position={queuePosition} />
+          )}
           
           {task.is_must && <MustBadge />}
           
