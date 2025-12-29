@@ -52,7 +52,7 @@ export function DayAssistantV2TopBar({
     : 0
 
   return (
-    <div className="sticky top-0 z-50 bg-white border-b shadow-md w-full">
+    <div className="sticky top-0 z-50 w-full bg-white border-b shadow-md">
       <div className="max-w-7xl mx-auto px-6 py-4">
         
         {/* Line 1: Date */}
