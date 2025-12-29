@@ -119,6 +119,9 @@ function DayAssistantV2Content() {
   const [showRestOfQueue, setShowRestOfQueue] = useState(false)
   const [isReorderingQueue, setIsReorderingQueue] = useState(false)
   const [showRestOfToday, setShowRestOfToday] = useState(false)
+  const [showInsightsPanel, setShowInsightsPanel] = useState(false)
+  const [showDecisionLog, setShowDecisionLog] = useState(false)
+  const [showProgressPanel, setShowProgressPanel] = useState(false)
   
   // NEW: Work mode state (replaces energy/focus sliders)
   const [workMode, setWorkMode] = useState<WorkMode>('standard')
@@ -744,6 +747,28 @@ function DayAssistantV2Content() {
   const totalToday = useMemo(() => {
     return tasks.filter(t => t.due_date === selectedDate).length
   }, [tasks, selectedDate])
+
+  const movedFromToday = useMemo(() => {
+    return tasks.filter(
+      t => t.moved_from_date === selectedDate && t.due_date && t.due_date !== selectedDate
+    ).length
+  }, [tasks, selectedDate])
+
+  const movedToToday = useMemo(() => {
+    return tasks.filter(
+      t => t.due_date === selectedDate && t.moved_from_date && t.moved_from_date !== selectedDate
+    ).length
+  }, [tasks, selectedDate])
+
+  const addedToday = useMemo(() => {
+    return tasks.filter(t => {
+      if (!t.created_at) return false
+      const createdDate = t.created_at.split('T')[0]
+      return createdDate === selectedDate
+    }).length
+  }, [tasks, selectedDate])
+
+  const pendingToday = Math.max(totalToday - completedToday, 0)
 
   // Get first task in queue for TopStatusBar
   const firstInQueue = useMemo(() => {
@@ -2119,35 +2144,48 @@ function DayAssistantV2Content() {
       <div className="space-y-6 min-w-0 flex-shrink-0">
         {/* AI Insights Panel */}
         <Card className="border-purple-200 bg-purple-50 shadow-md">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Sparkle className="text-purple-600" size={20} />
-              <CardTitle className="text-base">
-                💡 AI zauważyło wzorce
-              </CardTitle>
+          <CardHeader
+            className="cursor-pointer hover:bg-purple-100/50 transition-colors rounded-t-lg"
+            onClick={() => setShowInsightsPanel(!showInsightsPanel)}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkle className="text-purple-600" size={20} />
+                <CardTitle className="text-base">
+                  💡 AI zauważyło wzorce
+                </CardTitle>
+              </div>
+              <CaretDown
+                className={cn(
+                  'transition-transform text-purple-600',
+                  showInsightsPanel && 'rotate-180'
+                )}
+                size={20}
+              />
             </div>
             <p className="text-xs text-gray-600 mt-1">
               Sugestie oparte na analizie kolejki (nie zmieniają kolejności)
             </p>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {insights.length === 0 ? (
-              /* Fallback UI when no insights */
-              <div className="p-6 text-center">
-                <p className="text-gray-600 font-medium">
-                  🔍 Analizuję Twoją kolejkę...
-                </p>
-                <p className="text-xs text-gray-500 mt-2">
-                  Insighty pojawią się gdy AI wykryje wzorce w Twoich zadaniach
-                </p>
-                
-                {/* Debug info in dev mode */}
-                {process.env.NODE_ENV === 'development' && (
-                  <details className="mt-4 text-left">
-                    <summary className="text-xs text-blue-600 cursor-pointer hover:underline">
-                      🔧 Debug info
-                    </summary>
-                    <pre className="text-xs bg-gray-800 text-gray-100 p-2 rounded mt-2 overflow-auto max-h-48">
+          {showInsightsPanel && (
+            <CardContent className="space-y-3">
+              {insights.length === 0 ? (
+                /* Fallback UI when no insights */
+                <div className="p-6 text-center">
+                  <p className="text-gray-600 font-medium">
+                    🔍 Analizuję Twoją kolejkę...
+                  </p>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Insighty pojawią się gdy AI wykryje wzorce w Twoich zadaniach
+                  </p>
+                  
+                  {/* Debug info in dev mode */}
+                  {process.env.NODE_ENV === 'development' && (
+                    <details className="mt-4 text-left">
+                      <summary className="text-xs text-blue-600 cursor-pointer hover:underline">
+                        🔧 Debug info
+                      </summary>
+                      <pre className="text-xs bg-gray-800 text-gray-100 p-2 rounded mt-2 overflow-auto max-h-48">
 {JSON.stringify({
   queueLength: queue.length,
   dayPlanExists: !!dayPlan,
@@ -2161,69 +2199,132 @@ function DayAssistantV2Content() {
     estimate: t.estimate_min
   }))
 }, null, 2)}
-                    </pre>
-                  </details>
-                )}
-              </div>
-            ) : (
-              /* Show insights */
-              insights.map(insight => (
-                <div
-                  key={insight.id}
-                  className="p-4 bg-white rounded-lg border border-purple-200 shadow-sm"
-                >
-                  <div className="flex items-start gap-3">
-                    <span className="text-2xl">{insight.icon}</span>
-                    <div className="flex-1">
-                      <h4 className="font-medium text-purple-900">{insight.title}</h4>
-                      <p className="text-sm text-gray-700 mt-1">{insight.message}</p>
+                      </pre>
+                    </details>
+                  )}
+                </div>
+              ) : (
+                /* Show insights */
+                insights.map(insight => (
+                  <div
+                    key={insight.id}
+                    className="p-4 bg-white rounded-lg border border-purple-200 shadow-sm"
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl">{insight.icon}</span>
+                      <div className="flex-1">
+                        <h4 className="font-medium text-purple-900">{insight.title}</h4>
+                        <p className="text-sm text-gray-700 mt-1">{insight.message}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-2 mt-3">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleInsightFeedback(insight, 'helpful')}
+                        className="text-green-700 border-green-300 hover:bg-green-50"
+                      >
+                        👍 Przydatne
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleInsightFeedback(insight, 'not_helpful')}
+                        className="text-red-700 border-red-300 hover:bg-red-50"
+                      >
+                        👎 Nieprzydatne
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleInsightFeedback(insight, 'neutral')}
+                      >
+                        🤷 Nie wiem
+                      </Button>
                     </div>
                   </div>
-                  
-                  <div className="flex gap-2 mt-3">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleInsightFeedback(insight, 'helpful')}
-                      className="text-green-700 border-green-300 hover:bg-green-50"
-                    >
-                      👍 Przydatne
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleInsightFeedback(insight, 'not_helpful')}
-                      className="text-red-700 border-red-300 hover:bg-red-50"
-                    >
-                      👎 Nieprzydatne
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleInsightFeedback(insight, 'neutral')}
-                    >
-                      🤷 Nie wiem
-                    </Button>
-                  </div>
-                </div>
-              ))
-            )}
-          </CardContent>
+                ))
+              )}
+            </CardContent>
+          )}
+        </Card>
+
+        <Card className="border-blue-200 bg-blue-50 shadow-sm">
+          <CardHeader
+            className="cursor-pointer hover:bg-blue-100/50 transition-colors rounded-t-lg"
+            onClick={() => setShowProgressPanel(!showProgressPanel)}
+          >
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">📈 Dzisiejsze postępy</CardTitle>
+              <CaretDown
+                className={cn(
+                  'transition-transform text-blue-600',
+                  showProgressPanel && 'rotate-180'
+                )}
+                size={20}
+              />
+            </div>
+            <p className="text-xs text-gray-600 mt-1">
+              Szybki podgląd: co ukończono, co przeniesiono i ile zadań dodano
+            </p>
+          </CardHeader>
+          {showProgressPanel && (
+            <CardContent className="space-y-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span>✅ Ukończone dziś</span>
+                <span className="font-semibold">{completedToday}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>📌 W trakcie na dziś</span>
+                <span className="font-semibold">{pendingToday}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>🗓️ Przeniesione z dziś</span>
+                <span className="font-semibold">{movedFromToday}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>📅 Przyszło na dziś</span>
+                <span className="font-semibold">{movedToToday}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>➕ Dodane dzisiaj</span>
+                <span className="font-semibold">{addedToday}</span>
+              </div>
+            </CardContent>
+          )}
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>DecisionLog</CardTitle>
+          <CardHeader
+            className="cursor-pointer hover:bg-gray-50 transition-colors rounded-t-lg"
+            onClick={() => setShowDecisionLog(!showDecisionLog)}
+          >
+            <div className="flex items-center justify-between">
+              <CardTitle>DecisionLog</CardTitle>
+              <CaretDown
+                className={cn(
+                  'transition-transform text-gray-600',
+                  showDecisionLog && 'rotate-180'
+                )}
+                size={20}
+              />
+            </div>
+            <p className="text-xs text-gray-600 mt-1">
+              Historia najważniejszych decyzji i działań
+            </p>
           </CardHeader>
-          <CardContent className="max-h-[500px] overflow-y-auto space-y-2">
-            {decisionLog.length === 0 && <p className="text-sm text-muted-foreground">Brak decyzji — wszystkie akcje użytkownika są dozwolone, system stosuje soft-warnings i undo.</p>}
-            {decisionLog.map(entry => (
-              <div key={entry.id} className="flex items-center justify-between text-sm border rounded-lg px-3 py-2">
-                <span>{entry.message}</span>
-                <span className="text-muted-foreground">{entry.timestamp}</span>
-              </div>
-            ))}
-          </CardContent>
+          {showDecisionLog && (
+            <CardContent className="max-h-[500px] overflow-y-auto space-y-2">
+              {decisionLog.length === 0 && <p className="text-sm text-muted-foreground">Brak decyzji — wszystkie akcje użytkownika są dozwolone, system stosuje soft-warnings i undo.</p>}
+              {decisionLog.map(entry => (
+                <div key={entry.id} className="flex items-center justify-between text-sm border rounded-lg px-3 py-2">
+                  <span>{entry.message}</span>
+                  <span className="text-muted-foreground">{entry.timestamp}</span>
+                </div>
+              ))}
+            </CardContent>
+          )}
         </Card>
       </div>
 
