@@ -2,6 +2,7 @@
  * API Route: /api/day-assistant-v2/dayplan
  * GET: Fetch day plan with timeline and proposals
  * POST: Update day plan (energy/focus sliders)
+ * PUT: Update day plan metadata (work hours, capacity)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -14,6 +15,13 @@ import {
   getActiveProposals
 } from '@/lib/services/dayAssistantV2Service'
 import { generateSliderChangeRecommendation } from '@/lib/services/dayAssistantV2RecommendationEngine'
+
+interface DayPlanMetadata {
+  work_hours_start?: string
+  work_hours_end?: string
+  capacity_minutes?: number
+  [key: string]: any
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -208,6 +216,68 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('Error in POST /api/day-assistant-v2/dayplan:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        global: {
+          headers: {
+            Authorization: request.headers.get('Authorization') || ''
+          }
+        }
+      }
+    )
+    
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    
+    const body = await request.json()
+    const { date, metadata } = body as { date: string; metadata?: DayPlanMetadata }
+    
+    if (!date) {
+      return NextResponse.json({ error: 'Date is required' }, { status: 400 })
+    }
+    
+    // Get assistant
+    const assistant = await getOrCreateDayAssistantV2(user.id)
+    if (!assistant) {
+      return NextResponse.json({ error: 'Failed to get assistant' }, { status: 500 })
+    }
+    
+    // Get or create day plan
+    const dayPlan = await getOrCreateDayPlan(user.id, assistant.id, date)
+    if (!dayPlan) {
+      return NextResponse.json({ error: 'Failed to get day plan' }, { status: 500 })
+    }
+    
+    // Update metadata
+    const updates: Partial<{ metadata: DayPlanMetadata }> = {}
+    if (metadata) {
+      updates.metadata = { ...dayPlan.metadata, ...metadata }
+    }
+    
+    const updatedPlan = await updateDayPlan(user.id, assistant.id, date, updates)
+    if (!updatedPlan) {
+      return NextResponse.json({ error: 'Failed to update day plan' }, { status: 500 })
+    }
+    
+    return NextResponse.json({
+      dayPlan: updatedPlan,
+      message: 'Day plan metadata updated successfully'
+    })
+  } catch (error) {
+    console.error('Error in PUT /api/day-assistant-v2/dayplan:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
