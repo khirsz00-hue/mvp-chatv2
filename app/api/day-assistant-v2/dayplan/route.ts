@@ -91,13 +91,50 @@ export async function GET(request: NextRequest) {
       focus: dayPlan.focus
     })
     
-    // Get tasks for the date
+    // Get tasks for the date (active only for queue rendering)
     const tasks = await getTasks(user.id, assistant.id, { 
       date, 
       includeCompleted: false,
       includeSubtasks: true,
       includeAllDates
     })
+    
+    // Get full task list for stats (including completed)
+    const allTasks = await getTasks(user.id, assistant.id, {
+      date,
+      includeCompleted: true,
+      includeSubtasks: false,
+      includeAllDates
+    })
+    
+    const tasksDueToday = allTasks.filter(t => t.due_date === date)
+    const completedDueToday = tasksDueToday.filter(t => t.completed).length
+    const totalToday = tasksDueToday.length
+    const completedToday = allTasks.filter(t => {
+      const completedDate = t.completed_at ? t.completed_at.split('T')[0] : null
+      if (completedDate) return completedDate === date
+      return t.completed && t.due_date === date
+    }).length
+    const movedFromToday = allTasks.filter(
+      t => t.moved_from_date === date && t.due_date && t.due_date !== date
+    ).length
+    const movedToToday = allTasks.filter(
+      t => t.due_date === date && t.moved_from_date && t.moved_from_date !== date
+    ).length
+    const addedToday = allTasks.filter(t => {
+      if (!t.created_at) return false
+      const createdDate = t.created_at.split('T')[0]
+      return createdDate === date
+    }).length
+    
+    const taskStats = {
+      completedToday,
+      totalToday,
+      pendingToday: Math.max(totalToday - completedDueToday, 0),
+      movedFromToday,
+      movedToToday,
+      addedToday
+    }
     
     // Log tasks count
     console.log('[dayplan API] Tasks retrieved:', tasks.length)
@@ -135,7 +172,8 @@ export async function GET(request: NextRequest) {
       dayPlan,
       tasks,
       proposals,
-      assistant
+      assistant,
+      taskStats
     })
   } catch (error) {
     console.error('[dayplan API] Error in GET /api/day-assistant-v2/dayplan:', error)
