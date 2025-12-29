@@ -17,7 +17,23 @@ export async function POST(req: Request) {
     const body = await req.json()
     const { event_name, event_data, user_id: todoistUserId } = body
     
-    console.log('🔔 Webhook Todoist:', event_name, event_data?.id)
+    console.log('🔔 [Webhook] Todoist event received:', {
+      event: event_name,
+      task_id: event_data?.id,
+      todoist_user_id: todoistUserId,
+      task_content: event_data?.content
+    })
+    
+    // Validate required fields
+    if (!todoistUserId) {
+      console.error('❌ [Webhook] Missing user_id in webhook payload')
+      return NextResponse.json({ ok: false, error: 'Missing user_id' }, { status: 400 })
+    }
+    
+    if (!event_data?.id) {
+      console.error('❌ [Webhook] Missing event_data.id in webhook payload')
+      return NextResponse.json({ ok: false, error: 'Missing event data' }, { status: 400 })
+    }
     
     // Update last event timestamp
     lastEventTime = Date.now()
@@ -35,12 +51,13 @@ export async function POST(req: Request) {
         break
         
       default:
-        console.log('Unhandled event type:', event_name)
+        console.log('⚠️ [Webhook] Unhandled event type:', event_name)
     }
     
+    console.log('✅ [Webhook] Event processed successfully')
     return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error('❌ Webhook error:', error)
+    console.error('❌ [Webhook] Error processing webhook:', error)
     return NextResponse.json({ ok: false, error: 'Internal error' }, { status: 500 })
   }
 }
@@ -50,23 +67,34 @@ export async function POST(req: Request) {
  */
 async function handleTaskUpsert(taskData: any, todoistUserId: string) {
   try {
+    console.log(`🔍 [Webhook] Looking up user for Todoist user ID: ${todoistUserId}`)
+    
     // Find user by Todoist user ID (assuming it's stored in user_profiles)
     const { data: profiles, error: profileError } = await supabase
       .from('user_profiles')
       .select('id')
       .eq('todoist_user_id', todoistUserId)
     
-    if (profileError || !profiles || profiles.length === 0) {
-      console.warn('No user found for Todoist user ID:', todoistUserId)
+    if (profileError) {
+      console.error('❌ [Webhook] Error querying user_profiles:', profileError)
       return
     }
     
+    if (!profiles || profiles.length === 0) {
+      console.warn(`⚠️ [Webhook] No user found for Todoist user ID: ${todoistUserId}`)
+      console.log('🔍 [Webhook] This might mean the user needs to reconnect their Todoist account')
+      return
+    }
+    
+    console.log(`✅ [Webhook] Found ${profiles.length} user(s) for Todoist ID ${todoistUserId}`)
+    
     // Sync task for each user (in case multiple users have the same Todoist account)
     for (const profile of profiles) {
+      console.log(`📝 [Webhook] Syncing task "${taskData.content}" for user ${profile.id}`)
       await syncSingleTaskFromWebhook(profile.id, taskData)
     }
   } catch (error) {
-    console.error('Error handling task upsert:', error)
+    console.error('❌ [Webhook] Error handling task upsert:', error)
   }
 }
 
@@ -75,6 +103,13 @@ async function handleTaskUpsert(taskData: any, todoistUserId: string) {
  */
 async function syncSingleTaskFromWebhook(userId: string, taskData: any) {
   try {
+    console.log(`📝 [Webhook] Syncing task for user ${userId}:`, {
+      task_id: taskData.id,
+      content: taskData.content,
+      priority: taskData.priority,
+      completed: taskData.is_completed
+    })
+    
     // Map priority
     const priority = mapTodoistPriority(taskData)
     
@@ -108,20 +143,30 @@ async function syncSingleTaskFromWebhook(userId: string, taskData: any) {
     
     if (existing) {
       // Update
-      await supabase
+      const { error: updateError } = await supabase
         .from('day_assistant_tasks')
         .update(taskPayload)
         .eq('id', existing.id)
+        
+      if (updateError) {
+        console.error('❌ [Webhook] Error updating task:', updateError)
+      } else {
+        console.log('✅ [Webhook] Updated task from webhook:', taskData.id)
+      }
     } else {
       // Insert
-      await supabase
+      const { error: insertError } = await supabase
         .from('day_assistant_tasks')
         .insert(taskPayload)
+        
+      if (insertError) {
+        console.error('❌ [Webhook] Error inserting task:', insertError)
+      } else {
+        console.log('✅ [Webhook] Inserted task from webhook:', taskData.id)
+      }
     }
-    
-    console.log('✅ Synced task from webhook:', taskData.id)
   } catch (error) {
-    console.error('Error syncing task from webhook:', error)
+    console.error('❌ [Webhook] Error syncing task from webhook:', error)
   }
 }
 
@@ -130,18 +175,29 @@ async function syncSingleTaskFromWebhook(userId: string, taskData: any) {
  */
 async function handleTaskRemoval(taskData: any, todoistUserId: string) {
   try {
+    console.log(`🔍 [Webhook] Looking up user for task removal, Todoist user ID: ${todoistUserId}`)
+    
     // Find user
     const { data: profiles, error: profileError } = await supabase
       .from('user_profiles')
       .select('id')
       .eq('todoist_user_id', todoistUserId)
     
-    if (profileError || !profiles || profiles.length === 0) {
+    if (profileError) {
+      console.error('❌ [Webhook] Error querying user_profiles for removal:', profileError)
       return
     }
     
+    if (!profiles || profiles.length === 0) {
+      console.warn(`⚠️ [Webhook] No user found for Todoist user ID: ${todoistUserId} (removal)`)
+      return
+    }
+    
+    console.log(`✅ [Webhook] Found ${profiles.length} user(s) for task removal`)
+    
     // Remove task for each user
     for (const profile of profiles) {
+      console.log(`🗑️ [Webhook] Removing task ${taskData.id} for user ${profile.id}`)
       await supabase
         .from('day_assistant_tasks')
         .delete()
@@ -149,9 +205,9 @@ async function handleTaskRemoval(taskData: any, todoistUserId: string) {
         .eq('todoist_task_id', taskData.id)
     }
     
-    console.log('✅ Removed task from webhook:', taskData.id)
+    console.log('✅ [Webhook] Removed task from webhook:', taskData.id)
   } catch (error) {
-    console.error('Error removing task from webhook:', error)
+    console.error('❌ [Webhook] Error removing task from webhook:', error)
   }
 }
 
