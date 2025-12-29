@@ -39,7 +39,7 @@ export function DayAssistantV2FocusBar({
   }
 
   return (
-    <div className="sticky top-0 z-[100] bg-black text-white shadow-2xl">
+    <div className="sticky top-0 z-[100] w-full bg-black text-white shadow-2xl">
       <div className="max-w-7xl mx-auto px-6 py-4">
         <div className="flex items-center justify-between gap-4">
           
