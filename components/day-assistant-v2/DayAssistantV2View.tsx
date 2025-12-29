@@ -89,6 +89,15 @@ type UndoToast = {
   expiresAt: string
 }
 
+type TaskStats = {
+  completedToday: number
+  pendingToday: number
+  movedFromToday: number
+  movedToToday: number
+  addedToday: number
+  totalToday: number
+}
+
 const todayIso = () => new Date().toISOString().split('T')[0]
 const MAX_COGNITIVE_LOAD = 5
 const DEFAULT_COGNITIVE_LOAD = 3
@@ -105,6 +114,7 @@ function DayAssistantV2Content() {
   const [assistant, setAssistant] = useState<any>(null)
   const [dayPlan, setDayPlan] = useState<DayPlan | null>(null)
   const [tasks, setTasks] = useState<TestDayTask[]>([])
+  const [taskStats, setTaskStats] = useState<TaskStats | null>(null)
   const [proposals, setProposals] = useState<Proposal[]>([])
   const [selectedDate] = useState<string>(todayIso())
   const [contextFilter, setContextFilter] = useState<ContextType | 'all'>('all')
@@ -448,6 +458,7 @@ function DayAssistantV2Content() {
       setAssistant(data.assistant)
       setDayPlan(data.dayPlan)
       setTasks(data.tasks || [])
+      setTaskStats(data.taskStats || null)
       setProposals(data.proposals || [])
       
       // Load work hours from dayPlan metadata
@@ -741,11 +752,19 @@ function DayAssistantV2Content() {
 
   // Calculate today's task stats for TopStatusBar
   const completedToday = useMemo(() => {
-    return tasks.filter(t => t.completed && t.due_date === selectedDate).length
+    return tasks.filter(t => {
+      const completedDate = t.completed_at ? t.completed_at.split('T')[0] : null
+      if (completedDate) return completedDate === selectedDate
+      return t.completed && t.due_date === selectedDate
+    }).length
   }, [tasks, selectedDate])
 
   const totalToday = useMemo(() => {
     return tasks.filter(t => t.due_date === selectedDate).length
+  }, [tasks, selectedDate])
+  
+  const completedDueToday = useMemo(() => {
+    return tasks.filter(t => t.completed && t.due_date === selectedDate).length
   }, [tasks, selectedDate])
 
   const movedFromToday = useMemo(() => {
@@ -768,7 +787,13 @@ function DayAssistantV2Content() {
     }).length
   }, [tasks, selectedDate])
 
-  const pendingToday = Math.max(totalToday - completedToday, 0)
+  const pendingToday = Math.max(totalToday - completedDueToday, 0)
+  
+  const completedTodayDisplay = taskStats?.completedToday ?? completedToday
+  const pendingTodayDisplay = taskStats?.pendingToday ?? pendingToday
+  const movedFromTodayDisplay = taskStats?.movedFromToday ?? movedFromToday
+  const movedToTodayDisplay = taskStats?.movedToToday ?? movedToToday
+  const addedTodayDisplay = taskStats?.addedToday ?? addedToday
 
   // Get first task in queue for TopStatusBar
   const firstInQueue = useMemo(() => {
@@ -790,6 +815,51 @@ function DayAssistantV2Content() {
       },
       ...prev
     ].slice(0, 12))
+  }
+  
+  const applyCompletionToStats = (task: TestDayTask) => {
+    setTaskStats(prev => {
+      const dueToday = task.due_date === selectedDate
+      if (!prev) {
+        return {
+          completedToday: completedToday + 1,
+          pendingToday: dueToday ? Math.max(pendingToday - 1, 0) : pendingToday,
+          movedFromToday,
+          movedToToday,
+          addedToday,
+          totalToday
+        }
+      }
+      return {
+        ...prev,
+        completedToday: prev.completedToday + 1,
+        pendingToday: dueToday ? Math.max(prev.pendingToday - 1, 0) : prev.pendingToday
+      }
+    })
+  }
+  
+  const applyAdditionToStats = (task: TestDayTask) => {
+    setTaskStats(prev => {
+      const createdToday = task.created_at?.split('T')[0] === selectedDate
+      const dueToday = task.due_date === selectedDate
+      if (!createdToday && !dueToday) return prev
+      if (!prev) {
+        return {
+          completedToday,
+          pendingToday: pendingToday + (dueToday ? 1 : 0),
+          movedFromToday,
+          movedToToday,
+          addedToday: addedToday + (createdToday ? 1 : 0),
+          totalToday: totalToday + (dueToday ? 1 : 0)
+        }
+      }
+      return {
+        ...prev,
+        addedToday: prev.addedToday + (createdToday ? 1 : 0),
+        totalToday: prev.totalToday + (dueToday ? 1 : 0),
+        pendingToday: prev.pendingToday + (dueToday ? 1 : 0)
+      }
+    })
   }
 
   const handleAddTimeBlock = (minutes: number) => {
@@ -876,6 +946,7 @@ function DayAssistantV2Content() {
 
     const data = await response.json()
     setTasks(prev => [...prev, data.task])
+    applyAdditionToStats(data.task)
     showToast('✅ Zadanie dodane!', 'success')
     addDecisionLog(`Dodano zadanie "${data.task.title}"`)
     
@@ -912,6 +983,7 @@ function DayAssistantV2Content() {
     
     const data = await response.json()
     setTasks(prev => [...prev, data.task])
+    applyAdditionToStats(data.task)
     if (data.proposal) {
       setProposals(prev => [data.proposal, ...prev].slice(0, 3))
     }
@@ -972,6 +1044,7 @@ function DayAssistantV2Content() {
           setTasks(data.tasks || [])
           setProposals(data.proposals || [])
           setDayPlan(data.dayPlan || null)
+          setTaskStats(data.taskStats || null)
         }
       }
     } else {
@@ -1025,17 +1098,18 @@ function DayAssistantV2Content() {
       })
       
       // If recommendation affected tasks, refresh task list without full reload
-      if (response && sessionToken) {
-        const tasksResponse = await authFetch(`/api/day-assistant-v2/dayplan?date=${selectedDate}`)
-        if (tasksResponse.ok) {
-          const data = await tasksResponse.json()
-          setTasks(data.tasks || [])
-          setProposals(data.proposals || [])
+        if (response && sessionToken) {
+          const tasksResponse = await authFetch(`/api/day-assistant-v2/dayplan?date=${selectedDate}`)
+          if (tasksResponse.ok) {
+            const data = await tasksResponse.json()
+            setTasks(data.tasks || [])
+            setProposals(data.proposals || [])
+            setTaskStats(data.taskStats || null)
+          }
         }
+      } catch (error) {
+        console.error('Proposal response error:', error)
       }
-    } catch (error) {
-      console.error('Proposal response error:', error)
-    }
   }
 
   const handleComplete = async (task: TestDayTask) => {
@@ -1050,6 +1124,7 @@ function DayAssistantV2Content() {
     
     try {
       await completeTaskMutation.mutateAsync(task.id)
+      applyCompletionToStats(task)
       
       // 🎮 GAMIFICATION: Update streak and stats
       const { data: { user } } = await supabase.auth.getUser()
@@ -1232,6 +1307,7 @@ function DayAssistantV2Content() {
       
       // 2. Update local DB
       await completeTaskMutation.mutateAsync(task.id)
+      applyCompletionToStats(task)
       
       // 🎮 GAMIFICATION: Update streak and stats
       if (user) {
@@ -1659,6 +1735,7 @@ function DayAssistantV2Content() {
             const data = await tasksResponse.json()
             setTasks(data.tasks || [])
             setProposals(data.proposals || [])
+            setTaskStats(data.taskStats || null)
           } else {
             console.warn('⚠️ [Apply Recommendation] Failed to refresh tasks after applying recommendation')
             toast.warning('Rekomendacja zastosowana, ale nie udało się odświeżyć listy zadań. Odśwież stronę.')
@@ -2273,23 +2350,23 @@ function DayAssistantV2Content() {
             <CardContent className="space-y-3 text-sm">
               <div className="flex items-center justify-between">
                 <span>✅ Ukończone dziś</span>
-                <span className="font-semibold">{completedToday}</span>
+                <span className="font-semibold">{completedTodayDisplay}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span>📌 W trakcie na dziś</span>
-                <span className="font-semibold">{pendingToday}</span>
+                <span className="font-semibold">{pendingTodayDisplay}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span>🗓️ Przeniesione z dziś</span>
-                <span className="font-semibold">{movedFromToday}</span>
+                <span className="font-semibold">{movedFromTodayDisplay}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span>📅 Przyszło na dziś</span>
-                <span className="font-semibold">{movedToToday}</span>
+                <span className="font-semibold">{movedToTodayDisplay}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span>➕ Dodane dzisiaj</span>
-                <span className="font-semibold">{addedToday}</span>
+                <span className="font-semibold">{addedTodayDisplay}</span>
               </div>
             </CardContent>
           )}
@@ -2406,6 +2483,7 @@ function DayAssistantV2Content() {
               if (tasksResponse.ok) {
                 const data = await tasksResponse.json()
                 setTasks(data.tasks || [])
+                setTaskStats(data.taskStats || null)
               }
             }
           }}
@@ -2429,6 +2507,7 @@ function DayAssistantV2Content() {
               if (tasksResponse.ok) {
                 const data = await tasksResponse.json()
                 setTasks(data.tasks || [])
+                setTaskStats(data.taskStats || null)
               }
             }
           }}
@@ -2486,6 +2565,7 @@ function DayAssistantV2Content() {
             
             // Add to local state
             setTasks(prev => [...prev, data.task])
+            applyAdditionToStats(data.task)
             addDecisionLog(`Dodano zadanie "${data.task.title}"`)
             showToast('✅ Zadanie dodane!', 'success')
             
