@@ -315,7 +315,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 isAdmin={isAdmin}
                 isMobileMenuOpen={isMobileMenuOpen}
               />
-              <main className="flex-1 p-6 overflow-x-hidden">
+              <main className="flex-1 p-6">
                 {children || renderAssistant()}
               </main>
             </div>
@@ -363,7 +363,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               isAdmin={isAdmin}
               isMobileMenuOpen={isMobileMenuOpen}
             />
-            <main className="flex-1 p-6 overflow-x-hidden">
+            <main className="flex-1 p-6">
               {children || renderAssistant()}
             </main>
           </div>
