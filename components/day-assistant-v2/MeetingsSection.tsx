@@ -104,6 +104,20 @@ function MeetingCard({ meeting }: { meeting: Meeting }) {
   const isUpcoming = minutesUntil > 0 && minutesUntil <= 60
   const isPast = minutesUntil < -meeting.duration_minutes
 
+  // Improved meeting platform detection
+  const getMeetingPlatform = (link?: string): string => {
+    if (!link) return 'Link do spotkania'
+    try {
+      const url = new URL(link)
+      if (url.hostname.includes('meet.google.com')) return 'Google Meet'
+      if (url.hostname.includes('zoom.us')) return 'Zoom'
+      if (url.hostname.includes('teams.microsoft.com')) return 'Microsoft Teams'
+      return 'Link do spotkania'
+    } catch {
+      return 'Link do spotkania'
+    }
+  }
+
   return (
     <div className={`
       p-3 rounded-lg border-l-4 transition-colors
@@ -144,9 +158,7 @@ function MeetingCard({ meeting }: { meeting: Meeting }) {
                 rel="noopener noreferrer"
                 className="text-xs text-blue-600 hover:underline flex items-center gap-1"
               >
-                📍 {meeting.meeting_link.includes('meet.google') ? 'Google Meet' : 
-                     meeting.meeting_link.includes('zoom') ? 'Zoom' : 
-                     'Link do spotkania'}
+                📍 {getMeetingPlatform(meeting.meeting_link)}
               </a>
             </div>
           )}

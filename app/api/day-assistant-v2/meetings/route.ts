@@ -130,10 +130,13 @@ export async function GET(req: NextRequest) {
         end_time: endTime.toISOString(),
         duration_minutes: durationMinutes,
         location: event.location || null,
+        // Prefer hangoutLink (Google Meet) if available, otherwise use htmlLink
+        // hangoutLink is specifically for video meetings, htmlLink is the general event URL
         meeting_link: event.hangoutLink || event.htmlLink || null,
         metadata: {
           description: event.description,
-          attendees: event.attendees?.length || 0
+          attendees: event.attendees?.length || 0,
+          hasVideoCall: !!event.hangoutLink
         }
       }
 

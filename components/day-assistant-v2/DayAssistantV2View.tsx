@@ -652,9 +652,10 @@ function DayAssistantV2Content() {
   }, [nonOverdueTasks])
 
   // Calculate meeting time with buffers (15 min before + 15 min after each meeting)
+  const MEETING_BUFFER_MINUTES = 30 // 15 min before + 15 min after
   const meetingMinutes = useMemo(() => {
     return meetings.reduce((sum, m) => {
-      return sum + m.duration_minutes + 30 // meeting duration + 30 min buffer (15 before + 15 after)
+      return sum + m.duration_minutes + MEETING_BUFFER_MINUTES
     }, 0)
   }, [meetings])
 

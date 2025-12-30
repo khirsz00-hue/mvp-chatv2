@@ -94,7 +94,7 @@ export function DayAssistantV2TopBar({
               • {capacityHours}h
               {meetingMinutes && meetingMinutes > 0 && (
                 <span className="text-xs text-gray-500 ml-2">
-                  ({originalHours}h work - {meetingHours}h spotkania + bufory)
+                  ({originalHours}h praca - {meetingHours}h spotkania + bufory)
                 </span>
               )}
             </span>
