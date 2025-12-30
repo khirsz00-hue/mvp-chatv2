@@ -109,11 +109,14 @@ function MeetingCard({ meeting }: { meeting: Meeting }) {
     if (!link) return 'Link do spotkania'
     try {
       const url = new URL(link)
-      if (url.hostname.includes('meet.google.com')) return 'Google Meet'
-      if (url.hostname.includes('zoom.us')) return 'Zoom'
-      if (url.hostname.includes('teams.microsoft.com')) return 'Microsoft Teams'
+      const hostname = url.hostname.toLowerCase()
+      // Check exact hostname or subdomain patterns
+      if (hostname === 'meet.google.com' || hostname.endsWith('.meet.google.com')) return 'Google Meet'
+      if (hostname === 'zoom.us' || hostname.endsWith('.zoom.us')) return 'Zoom'
+      if (hostname === 'teams.microsoft.com' || hostname.endsWith('.teams.microsoft.com')) return 'Microsoft Teams'
       return 'Link do spotkania'
     } catch {
+      // Invalid URL - return generic label
       return 'Link do spotkania'
     }
   }
