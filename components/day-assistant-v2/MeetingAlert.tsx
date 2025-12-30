@@ -1,7 +1,7 @@
 'use client'
 
 import Button from '@/components/ui/Button'
-import { X } from 'lucide-react'
+import { X } from '@phosphor-icons/react'
 import { format } from 'date-fns'
 
 interface Meeting {
@@ -55,8 +55,9 @@ export function MeetingAlert({ meeting, minutesUntil, onDismiss }: MeetingAlertP
           )}
           <Button 
             variant="ghost" 
-            size="icon"
+            size="sm"
             onClick={onDismiss}
+            className="min-w-0 px-2"
           >
             <X size={16} />
           </Button>
