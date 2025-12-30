@@ -18,6 +18,8 @@ export interface DayAssistantV2TopBarProps {
   completedMinutes: number
   onWorkHoursChange: (start: string, end: string) => void
   onWorkModeChange: (mode: WorkMode) => void
+  meetingMinutes?: number
+  originalCapacityMinutes?: number
 }
 
 const WORK_MODE_OPTIONS = {
@@ -35,7 +37,9 @@ export function DayAssistantV2TopBar({
   workMode,
   completedMinutes,
   onWorkHoursChange,
-  onWorkModeChange
+  onWorkModeChange,
+  meetingMinutes,
+  originalCapacityMinutes
 }: DayAssistantV2TopBarProps) {
   
   const formatDate = (dateStr: string) => {
@@ -47,6 +51,9 @@ export function DayAssistantV2TopBar({
   }
 
   const capacityHours = Math.floor(capacityMinutes / 60)
+  const originalHours = originalCapacityMinutes ? Math.floor(originalCapacityMinutes / 60) : capacityHours
+  const meetingHours = meetingMinutes ? (meetingMinutes / 60).toFixed(1) : null
+  
   const progressPercent = capacityMinutes > 0 
     ? Math.round((completedMinutes / capacityMinutes) * 100) 
     : 0
@@ -83,7 +90,14 @@ export function DayAssistantV2TopBar({
               }}
               className="border border-gray-300 rounded-md px-2 py-1 text-sm font-medium hover:border-purple-500 focus:border-purple-600 focus:ring-2 focus:ring-purple-200 outline-none transition-colors"
             />
-            <span className="text-gray-600 text-sm">• {capacityHours}h</span>
+            <span className="text-gray-600 text-sm">
+              • {capacityHours}h
+              {meetingMinutes && meetingMinutes > 0 && (
+                <span className="text-xs text-gray-500 ml-2">
+                  ({originalHours}h work - {meetingHours}h spotkania + bufory)
+                </span>
+              )}
+            </span>
           </div>
 
           {/* Work Mode Dropdown */}

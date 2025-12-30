@@ -67,6 +67,8 @@ import { TopStatusBar } from './TopStatusBar'
 import { RecommendationPanel } from './RecommendationPanel'
 import { DayAssistantV2FocusBar } from './DayAssistantV2FocusBar'
 import { DayAssistantV2TopBar } from './DayAssistantV2TopBar'
+import { MeetingsSection } from './MeetingsSection'
+import { MeetingAlert } from './MeetingAlert'
 
 // Create a query client outside the component to avoid recreation on every render
 const queryClient = new QueryClient({
@@ -188,6 +190,10 @@ function DayAssistantV2Content() {
   // NEW: Passive Insights State
   const [insights, setInsights] = useState<PassiveInsight[]>([])
   const [dismissedInsightIds, setDismissedInsightIds] = useState<Set<string>>(new Set())
+  
+  // NEW: Meetings State
+  const [meetings, setMeetings] = useState<any[]>([])
+  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set())
   
   // Persist applied recommendation IDs to localStorage
   useEffect(() => {
@@ -499,6 +505,47 @@ function DayAssistantV2Content() {
     }
   }
 
+  const loadMeetings = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      const response = await fetch(
+        `/api/day-assistant-v2/meetings?date=${selectedDate}`,
+        { headers: { Authorization: `Bearer ${session.access_token}` } }
+      )
+
+      if (response.ok) {
+        const data = await response.json()
+        setMeetings(data.meetings || [])
+        console.log('🔍 [DayAssistant] Loaded meetings:', data.meetings?.length || 0)
+      }
+    } catch (error) {
+      console.error('❌ [DayAssistant] Error loading meetings:', error)
+    }
+  }
+
+  const forceRefreshMeetings = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      const response = await fetch(
+        `/api/day-assistant-v2/meetings?date=${selectedDate}&force=true`,
+        { headers: { Authorization: `Bearer ${session.access_token}` } }
+      )
+
+      if (response.ok) {
+        const data = await response.json()
+        setMeetings(data.meetings || [])
+        showToast('Spotkania odświeżone', 'success')
+      }
+    } catch (error) {
+      console.error('❌ [DayAssistant] Error refreshing meetings:', error)
+      showToast('Błąd podczas odświeżania spotkań', 'error')
+    }
+  }
+
   // Load burnout assessment when component mounts
   useEffect(() => {
     if (sessionToken) {
@@ -528,6 +575,31 @@ function DayAssistantV2Content() {
       })
     }
   }, [tasks])
+  
+  // Auto-refresh meetings every 5 minutes
+  useEffect(() => {
+    loadMeetings()
+
+    const interval = setInterval(() => {
+      console.log('🔍 [DayAssistant] Auto-refreshing meetings')
+      loadMeetings()
+    }, 5 * 60 * 1000) // 5 minutes
+
+    return () => clearInterval(interval)
+  }, [selectedDate]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Refresh meetings when tab becomes visible
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('🔍 [DayAssistant] Tab visible - refreshing meetings')
+        loadMeetings()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [selectedDate]) // eslint-disable-line react-hooks/exhaustive-deps
   
   const filteredTasks = useMemo(() => {
     // Don't filter by due_date here - allow overdue tasks to pass through
@@ -579,12 +651,49 @@ function DayAssistantV2Content() {
     return nonOverdueTasks.filter(t => t.is_must).slice(0, 3)
   }, [nonOverdueTasks])
 
-  // Use queue hook to calculate queue (with manual time block)
+  // Calculate meeting time with buffers (15 min before + 15 min after each meeting)
+  const meetingMinutes = useMemo(() => {
+    return meetings.reduce((sum, m) => {
+      return sum + m.duration_minutes + 30 // meeting duration + 30 min buffer (15 before + 15 after)
+    }, 0)
+  }, [meetings])
+
+  // Adjust manual time block to subtract meeting time
+  const adjustedTimeBlock = manualTimeBlock - meetingMinutes
+
+  // Use queue hook to calculate queue (with manual time block adjusted for meetings)
   const { queue, remainingToday, later, availableMinutes, usedMinutes, usagePercentage, overflowCount } = useTaskQueue(
     nonOverdueTasks,
     dayPlan,
-    manualTimeBlock
+    adjustedTimeBlock
   )
+
+  // Calculate adjusted capacity for display
+  const adjustedCapacity = Math.max(0, capacityMinutes - meetingMinutes)
+
+  // Find upcoming meeting for alert
+  const upcomingMeeting = useMemo(() => {
+    const now = new Date()
+    return meetings
+      .filter(m => new Date(m.start_time) > now)
+      .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+      [0]
+  }, [meetings])
+
+  const minutesUntilMeeting = useMemo(() => {
+    if (!upcomingMeeting) return null
+    const now = new Date()
+    const startTime = new Date(upcomingMeeting.start_time)
+    const diff = Math.floor((startTime.getTime() - now.getTime()) / 1000 / 60)
+    return diff
+  }, [upcomingMeeting])
+
+  const showMeetingAlert = 
+    upcomingMeeting && 
+    minutesUntilMeeting !== null && 
+    minutesUntilMeeting > 0 &&
+    minutesUntilMeeting <= 15 &&
+    !dismissedAlerts.has(upcomingMeeting.id)
 
   // Top 3 tasks - najlepiej scored na dzisiaj (nie-MUST) that fit in capacity
   const top3Tasks = useMemo(() => {
@@ -1821,11 +1930,13 @@ function DayAssistantV2Content() {
         selectedDate={selectedDate}
         workHoursStart={workHoursStart}
         workHoursEnd={workHoursEnd}
-        capacityMinutes={capacityMinutes}
+        capacityMinutes={adjustedCapacity}
         workMode={workMode}
         completedMinutes={usedMinutes}
         onWorkHoursChange={handleWorkHoursChange}
         onWorkModeChange={handleWorkModeChange}
+        meetingMinutes={meetingMinutes}
+        originalCapacityMinutes={capacityMinutes}
       />
       
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(600px,2fr)_minmax(400px,1fr)] gap-6">
@@ -1883,6 +1994,23 @@ function DayAssistantV2Content() {
             )}
           </CardContent>
         </Card>
+
+        {/* Meeting Alert */}
+        {showMeetingAlert && upcomingMeeting && (
+          <MeetingAlert
+            meeting={upcomingMeeting}
+            minutesUntil={minutesUntilMeeting!}
+            onDismiss={() => {
+              setDismissedAlerts(prev => new Set(prev).add(upcomingMeeting.id))
+            }}
+          />
+        )}
+
+        {/* Meetings Section */}
+        <MeetingsSection 
+          meetings={meetings}
+          onRefresh={forceRefreshMeetings}
+        />
 
         {/* Overdue Tasks Section - ALWAYS VISIBLE */}
         <OverdueTasksSection
