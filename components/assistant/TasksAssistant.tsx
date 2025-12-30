@@ -123,7 +123,7 @@ export function TasksAssistant() {
   // Change to 'all' to include tasks without due dates by default
   const [filter, setFilter] = useState<FilterType>('today')
   const [sortBy, setSortBy] = useState<SortType>('date')
-  const [groupBy, setGroupBy] = useState<GroupByType>('none')
+  const [groupBy, setGroupBy] = useState<GroupByType>('day')
   const [selectedProject, setSelectedProject] = useState<string>('all')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
@@ -813,13 +813,14 @@ export function TasksAssistant() {
   }
 
   const renderTaskCards = (list: Task[]) => (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {list.map(task => (
         <TaskCard 
           key={task.id}
           task={task}
           onComplete={handleComplete}
           onDelete={handleDelete}
+          onMove={handleMove}
           onDetails={(t) => {
             setSelectedTask(t)
             setShowDetailsModal(true)

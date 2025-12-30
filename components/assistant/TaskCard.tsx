@@ -36,6 +36,7 @@ interface TaskCardProps {
   onComplete: (id: string) => Promise<void>
   onDelete:  (id: string) => Promise<void>
   onDetails: (task: Task) => void
+  onMove?: (id: string, newDate: string) => Promise<void>
   showCheckbox?: boolean
   selectable?: boolean
   selected?: boolean
@@ -63,6 +64,7 @@ export function TaskCard({
   const [aiUnderstanding, setAiUnderstanding] = useState<string>('')
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const mobileMenuRef = useRef<HTMLDivElement>(null)
+  const datePickerRef = useRef<HTMLInputElement>(null)
   
   const { startTimer, stopTimer, getActiveTimer } = useTaskTimer()
   const { showToast } = useToast()
@@ -194,6 +196,24 @@ export function TaskCard({
   }
   
   const dueStr = typeof task.due === 'string' ? task.due : task.due?.date
+  const dueInputValue = dueStr ? dueStr.split('T')[0] : ''
+
+  const openDatePicker = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const input = datePickerRef.current
+    if (!input) return
+    // Prefer native picker when available
+    if (typeof input.showPicker === 'function') {
+      input.showPicker()
+    } else {
+      input.click()
+    }
+  }
+
+  const handleDueDateChange = (value: string) => {
+    if (!value || !onMove) return
+    onMove(task.id, value)
+  }
   
   // Calculate subtasks progress
   const subtasksTotal = task.subtasks?.length || 0
@@ -203,7 +223,7 @@ export function TaskCard({
   return (
     <Card 
       className={cn(
-        'p-2.5 md:p-4 border-l-4 transition-all hover:shadow-lg group cursor-pointer',
+        'p-2 md:p-3 border-l-4 transition-all hover:shadow-md group cursor-pointer',
         priorityColors[task.priority] || priorityColors[4],
         loading && 'opacity-50 pointer-events-none',
         deleting && 'opacity-0 scale-95',
@@ -211,7 +231,7 @@ export function TaskCard({
       )}
       onClick={() => onDetails(task)}
     >
-      <div className="flex items-start gap-2.5">
+      <div className="flex items-start gap-2">
         {/* Selection checkbox - shown when bulk selection is active */}
         {selectable && onToggleSelection && (
           <input
@@ -248,19 +268,19 @@ export function TaskCard({
         
         {/* Content */}
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-sm sm:text-base md:text-lg break-words group-hover:text-brand-purple transition-colors">
+          <h3 className="font-medium text-sm sm:text-base break-words group-hover:text-brand-purple transition-colors">
             {task.content}
           </h3>
           
           {task.description && (
-            <p className="text-xs md:text-sm text-gray-600 line-clamp-2 mt-1 break-words">
+            <p className="text-xs text-gray-600 line-clamp-2 mt-1 break-words">
               {task.description}
             </p>
           )}
           
           {/* Subtasks progress */}
           {subtasksTotal > 0 && (
-            <div className="mt-3">
+            <div className="mt-2">
               <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
                 <CheckSquare size={14} />
                 <span>{subtasksCompleted} / {subtasksTotal} ukończone</span>
@@ -275,7 +295,7 @@ export function TaskCard({
           )}
           
           {/* Footer badges */}
-          <div className="flex gap-1.5 md:gap-2 mt-2 md:mt-3 flex-wrap items-center">
+          <div className="flex gap-1.5 md:gap-2 mt-1.5 md:mt-2 flex-wrap items-center">
             {hasActiveTimer && (
               <Badge className="gap-1 text-xs bg-red-500 text-white animate-pulse">
                 <div className="w-2 h-2 rounded-full bg-white" />
@@ -284,11 +304,21 @@ export function TaskCard({
             )}
             
             {dueStr && (
-              <Badge variant="outline" className="gap-1 text-xs">
-                <CalendarBlank size={12} className="md:hidden" />
-                <CalendarBlank size={14} className="hidden md:inline" />
-                {format(parseISO(dueStr), 'dd MMM', { locale: pl })}
-              </Badge>
+              <>
+                <input
+                  ref={datePickerRef}
+                  type="date"
+                  value={dueInputValue}
+                  onChange={(e) => handleDueDateChange(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="sr-only"
+                />
+                <Badge variant="outline" className="gap-1 text-xs cursor-pointer" onClick={openDatePicker}>
+                  <CalendarBlank size={12} className="md:hidden" />
+                  <CalendarBlank size={14} className="hidden md:inline" />
+                  {format(parseISO(dueStr), 'dd MMM', { locale: pl })}
+                </Badge>
+              </>
             )}
             
             {task.priority && task.priority < 4 && (
