@@ -50,6 +50,7 @@ export function TaskCard({
   onComplete, 
   onDelete, 
   onDetails,
+  onMove,
   showCheckbox = true,
   selectable = false,
   selected = false,
@@ -211,8 +212,11 @@ export function TaskCard({
   }
 
   const handleDueDateChange = (value: string) => {
-    if (!value || !onMove) return
-    onMove(task.id, value)
+    if (!value) return
+    
+    if (onMove) {
+      onMove(task.id, value)
+    }
   }
   
   // Calculate subtasks progress
