@@ -87,9 +87,6 @@ function DayCard({ day }: { day: WeekDaySummary }) {
                         <span className="text-[10px]">{getPriorityLabel(task.priority)}</span>
                       )}
                       <span className="text-[10px]">⏱️ {formatDuration(task.estimatedDuration)}</span>
-                      {task.completed && (
-                        <span className="text-[10px] text-green-300">✓ Ukończone</span>
-                      )}
                     </div>
                   </div>
                 ))

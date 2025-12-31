@@ -6,7 +6,6 @@ export interface WeekTaskDetail {
   dueDate: string | null
   estimatedDuration: number
   priority?: string | null
-  completed: boolean
 }
 
 export interface WeekEventDetail {

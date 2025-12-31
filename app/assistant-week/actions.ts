@@ -16,7 +16,6 @@ type WeekTask = {
   estimated_duration?: number | null
   priority?: string | null
   metadata?: Record<string, any> | null
-  completed?: boolean
 }
 
 type WeekEvent = {
@@ -84,7 +83,6 @@ function buildDaySummaries(tasks: WeekTask[], events: WeekEvent[], weekStartDate
       dueDate: t.due_date,
       estimatedDuration: minutesForTask(t),
       priority: t.priority,
-      completed: t.completed || false,
     }))
     
     const eventDetails: WeekEventDetail[] = dayEvents.map(e => ({
@@ -365,7 +363,7 @@ async function fetchWeekState(userId: string, weekStartDate: Date, supabase: Awa
 
   const { data: tasks = [] } = await supabase
     .from('day_assistant_tasks')
-    .select('id, title, due_date, estimated_duration, priority, metadata, completed')
+    .select('id, title, due_date, estimated_duration, priority, metadata')
     .eq('user_id', userId)
     .eq('completed', false)
     .gte('due_date', weekStartIso)
