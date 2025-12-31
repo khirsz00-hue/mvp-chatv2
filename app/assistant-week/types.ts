@@ -1,5 +1,23 @@
 export type WeekDayStatus = 'ok' | 'overloaded' | 'empty'
 
+export interface WeekTaskDetail {
+  id: string
+  title: string
+  dueDate: string | null
+  estimatedDuration: number
+  priority?: string | null
+}
+
+export interface WeekEventDetail {
+  id: string
+  title: string
+  date: string
+  startTime?: string | null
+  endTime?: string | null
+  durationMinutes: number
+  type: string
+}
+
 export interface WeekDaySummary {
   date: string
   label: string
@@ -9,6 +27,8 @@ export interface WeekDaySummary {
   eventsCount: number
   totalMinutes: number
   warnings: string[]
+  tasks: WeekTaskDetail[]
+  events: WeekEventDetail[]
 }
 
 export interface WeekRecommendation {
