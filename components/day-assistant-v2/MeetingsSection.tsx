@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Button from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { format, differenceInMinutes } from 'date-fns'
@@ -93,16 +93,38 @@ export function MeetingsSection({ meetings, onRefresh }: MeetingsSectionProps) {
   )
 }
 
+// Helper function to format countdown
+function formatCountdown(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`
+  const hours = Math.floor(minutes / 60)
+  const mins = minutes % 60
+  return mins > 0 ? `${hours}h ${mins}min` : `${hours}h`
+}
+
 function MeetingCard({ meeting }: { meeting: Meeting }) {
   const startTime = format(new Date(meeting.start_time), 'HH:mm')
   const endTime = format(new Date(meeting.end_time), 'HH:mm')
-  const minutesUntil = differenceInMinutes(
-    new Date(meeting.start_time),
-    new Date()
-  )
   
-  const isUpcoming = minutesUntil > 0 && minutesUntil <= 60
-  const isPast = minutesUntil < -meeting.duration_minutes
+  // Live countdown state
+  const [minutesUntil, setMinutesUntil] = useState<number | null>(null)
+  
+  // Update countdown every minute
+  useEffect(() => {
+    const updateCountdown = () => {
+      const now = new Date()
+      const start = new Date(meeting.start_time)
+      const diff = Math.floor((start.getTime() - now.getTime()) / 1000 / 60)
+      setMinutesUntil(diff)
+    }
+    
+    updateCountdown() // Initial calculation
+    const interval = setInterval(updateCountdown, 60000) // Update every minute
+    
+    return () => clearInterval(interval)
+  }, [meeting.start_time])
+  
+  const isUpcoming = minutesUntil !== null && minutesUntil > 0 && minutesUntil <= 60
+  const isPast = minutesUntil !== null && minutesUntil < -meeting.duration_minutes
 
   // Improved meeting platform detection
   const getMeetingPlatform = (link?: string): string => {
@@ -132,9 +154,9 @@ function MeetingCard({ meeting }: { meeting: Meeting }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-sm">{meeting.title}</span>
-            {isUpcoming && (
-              <span className="text-xs bg-orange-200 text-orange-800 px-2 py-0.5 rounded whitespace-nowrap">
-                Za {minutesUntil} min
+            {minutesUntil !== null && minutesUntil > 0 && (
+              <span className="text-sm text-orange-600 font-semibold">
+                Za {formatCountdown(minutesUntil)}
               </span>
             )}
             {isPast && (

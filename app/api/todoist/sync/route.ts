@@ -216,8 +216,9 @@ async function mapTodoistToDayAssistantTask(
   // Todoist priorities: 1 (lowest) to 4 (highest/P1)
   const priority = Number(task.priority) || 1
 
-  // Determine is_must: labels include 'must' OR priority === 4 (P1 in Todoist)
-  const isMust = task.labels?.includes('must') || priority === 4
+  // Determine is_must: Only user can pin via UI (manual action)
+  // Priority P1 should NOT auto-pin as MUST
+  const isMust = false
 
   // Determine is_important: priority >= 3
   const isImportant = priority >= 3
