@@ -69,6 +69,7 @@ import { DayAssistantV2FocusBar } from './DayAssistantV2FocusBar'
 import { DayAssistantV2TopBar } from './DayAssistantV2TopBar'
 import { MeetingsSection } from './MeetingsSection'
 import { MeetingAlert } from './MeetingAlert'
+import { AfterWorkHoursCard } from './AfterWorkHoursCard'
 
 // Create a query client outside the component to avoid recreation on every render
 const queryClient = new QueryClient({
@@ -131,6 +132,7 @@ function DayAssistantV2Content() {
   const [showRestOfQueue, setShowRestOfQueue] = useState(false)
   const [isReorderingQueue, setIsReorderingQueue] = useState(false)
   const [showRestOfToday, setShowRestOfToday] = useState(false)
+  const [showOverflowToday, setShowOverflowToday] = useState(false)
   const [showInsightsPanel, setShowInsightsPanel] = useState(false)
   const [showDecisionLog, setShowDecisionLog] = useState(false)
   const [showProgressPanel, setShowProgressPanel] = useState(false)
@@ -713,6 +715,50 @@ function DayAssistantV2Content() {
     return nonMustQueue.slice(0, 3)
   }, [queue, remainingToday])
 
+  // Calculate if we're after work hours
+  const isAfterWorkHours = useMemo(() => {
+    if (!workHoursEnd) return false
+    
+    const now = new Date()
+    const [hours, minutes] = workHoursEnd.split(':').map(Number)
+    const workEnd = new Date()
+    workEnd.setHours(hours, minutes, 0, 0)
+    
+    return now > workEnd
+  }, [workHoursEnd])
+
+  // Split "later" into two separate sections
+  const overflowToday = useMemo(() => {
+    return later.filter(t => t.due_date === selectedDate)
+  }, [later, selectedDate])
+
+  const laterTasks = useMemo(() => {
+    return later.filter(t => t.due_date !== selectedDate)
+  }, [later, selectedDate])
+
+  // Suggested tasks for manual time block (after work hours)
+  const suggestedTasksForExtraTime = useMemo(() => {
+    if (!isAfterWorkHours || manualTimeBlock === 0) return []
+    
+    // Get tasks that fit in the manual time block
+    const availableTasks = [...queue, ...remainingToday, ...overflowToday]
+      .filter(t => !t.completed && t.estimate_min <= manualTimeBlock)
+      .sort((a, b) => ((b as any)._score || 0) - ((a as any)._score || 0))
+    
+    // Calculate which tasks fit
+    let usedTime = 0
+    const fitting: TestDayTask[] = []
+    
+    for (const task of availableTasks) {
+      if (usedTime + task.estimate_min <= manualTimeBlock) {
+        fitting.push(task)
+        usedTime += task.estimate_min
+      }
+    }
+    
+    return fitting
+  }, [isAfterWorkHours, manualTimeBlock, queue, remainingToday, overflowToday])
+
   // Update task risks when tasks or queue changes
   useEffect(() => {
     if (tasks.length > 0 && queue.length > 0) {
@@ -985,8 +1031,12 @@ function DayAssistantV2Content() {
   }
 
   const handleAddTimeBlock = (minutes: number) => {
-    setManualTimeBlock(prev => prev + minutes)
-    addDecisionLog(`Dodano blok czasu: ${minutes} min`)
+    setManualTimeBlock(minutes)
+    if (minutes > 0) {
+      addDecisionLog(`Dodano blok czasu: ${minutes} min po godzinach pracy`)
+    } else {
+      addDecisionLog(`Zresetowano dodatkowy czas`)
+    }
     setIsReorderingQueue(true)
     setTimeout(() => setIsReorderingQueue(false), 300)
   }
@@ -2055,42 +2105,55 @@ function DayAssistantV2Content() {
           </Card>
         )}
 
-        {/* MUST Tasks Section */}
-        {mustTasks.length > 0 && (
-          <Card className="border-brand-purple/40 relative shadow-md">
-            {isReorderingQueue && <QueueReorderingOverlay />}
-            <CardHeader>
-              <CardTitle className="text-xl font-bold flex items-center gap-2">
-                <span>📌</span>
-                <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                  MUST (najpilniejsze)
-                </span>
-                <Badge variant="purple" className="bg-purple-100 text-purple-800 font-semibold px-3 py-1">
-                  {mustTasks.length}/3
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {mustTasks.map((task, index) => (
-                <DayAssistantV2TaskCard
-                  key={task.id}
-                  task={task}
-                  queuePosition={index + 1}
-                  onStartTimer={handleStartTimer}
-                  onComplete={handleCompleteById}
-                  onHelp={handleHelpById}
-                  onPin={handlePinById}
-                  onPostpone={handlePostponeById}
-                  onDelete={handleDeleteById}
-                  onOpenDetails={(id) => {
-                    const task = mustTasks.find(t => t.id === id)
-                    if (task) setSelectedTask(task)
-                  }}
-                />
-              ))}
-            </CardContent>
-          </Card>
+        {/* After work hours state */}
+        {isAfterWorkHours && (
+          <AfterWorkHoursCard
+            workHoursEnd={workHoursEnd}
+            onAddTimeBlock={handleAddTimeBlock}
+            suggestedTasks={suggestedTasksForExtraTime}
+            manualTimeBlock={manualTimeBlock}
+          />
         )}
+
+        {/* Show normal queue only if NOT after work hours OR user added time block */}
+        {(!isAfterWorkHours || manualTimeBlock > 0) && (
+          <>
+            {/* MUST Tasks Section */}
+            {mustTasks.length > 0 && (
+              <Card className="border-brand-purple/40 relative shadow-md">
+                {isReorderingQueue && <QueueReorderingOverlay />}
+                <CardHeader>
+                  <CardTitle className="text-xl font-bold flex items-center gap-2">
+                    <span>📌</span>
+                    <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                      MUST (najpilniejsze)
+                    </span>
+                    <Badge variant="purple" className="bg-purple-100 text-purple-800 font-semibold px-3 py-1">
+                      {mustTasks.length}/3
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {mustTasks.map((task, index) => (
+                    <DayAssistantV2TaskCard
+                      key={task.id}
+                      task={task}
+                      queuePosition={index + 1}
+                      onStartTimer={handleStartTimer}
+                      onComplete={handleCompleteById}
+                      onHelp={handleHelpById}
+                      onPin={handlePinById}
+                      onPostpone={handlePostponeById}
+                      onDelete={handleDeleteById}
+                      onOpenDetails={(id) => {
+                        const task = mustTasks.find(t => t.id === id)
+                        if (task) setSelectedTask(task)
+                      }}
+                    />
+                  ))}
+                </CardContent>
+              </Card>
+            )}
 
         {/* 🎯 Top 3 - ZAWSZE WIDOCZNA */}
         <Card className="shadow-md border-blue-500 bg-gradient-to-br from-blue-50 to-purple-50">
@@ -2192,6 +2255,8 @@ function DayAssistantV2Content() {
             )}
           </Card>
         )}
+          </>
+        )}
 
         {/* Empty state - ONLY if truly no tasks */}
         {mustTasks.length === 0 && 
@@ -2261,87 +2326,101 @@ function DayAssistantV2Content() {
           </Card>
         )}
 
-        {/* 📅 Na później (collapsible) - Overflow + Future */}
-        <Card className="border-orange-400 bg-gradient-to-br from-orange-50 to-yellow-50 shadow-sm">
-          <CardHeader 
-            className="cursor-pointer hover:bg-orange-100/50 transition-colors rounded-t-lg"
-            onClick={() => setShowLaterQueue(!showLaterQueue)}
-          >
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg font-bold flex items-center gap-2">
-                <span className="text-2xl">📅</span>
-                <span className="text-gray-800">Na później</span>
-                <Badge className="bg-orange-600 text-white font-semibold px-3 py-1">
-                  {later.length} zadań
-                </Badge>
-                {overflowCount > 0 && (
-                  <Badge className="bg-red-100 text-red-700 font-semibold px-3 py-1 border border-red-300">
-                    ⚠️ {overflowCount} z dzisiaj (nie mieszczą się)
+        {/* NEW: Overflow today - DON'T FIT in capacity */}
+        {overflowToday.length > 0 && (
+          <Card className="border-red-400 bg-gradient-to-br from-red-50 to-orange-50 shadow-sm">
+            <CardHeader 
+              className="cursor-pointer hover:bg-red-100/50 transition-colors rounded-t-lg"
+              onClick={() => setShowOverflowToday(!showOverflowToday)}
+            >
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                  <span className="text-2xl">⚠️</span>
+                  <span className="text-gray-800">Nie mieszczą się w capacity</span>
+                  <Badge className="bg-red-600 text-white font-semibold px-3 py-1">
+                    {overflowToday.length} zadań
                   </Badge>
-                )}
-              </CardTitle>
-              <CaretDown className={cn(
-                "transition-transform text-gray-600",
-                showLaterQueue && "rotate-180"
-              )} size={24} />
-            </div>
-            <p className="text-xs text-gray-700 mt-1 font-medium">
-              Zadania z dzisiaj które nie mieszczą się w capacity + przyszłe daty + bez daty
-            </p>
-          </CardHeader>
-          {showLaterQueue && (
-            <CardContent className="space-y-3 pt-4">
-              {later.length === 0 ? (
-                <div className="p-4 text-center bg-white rounded-lg border-2 border-dashed border-gray-300">
-                  <p className="text-sm text-gray-700 font-medium">
-                    ✅ Wszystkie zadania mieszczą się w dostępnym czasie pracy
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <p className="text-sm text-gray-700 font-medium bg-white p-2 rounded border border-orange-200">
-                    💡 Opcjonalne zadania - możesz je zrobić jeśli skończysz wcześniej
-                  </p>
-                  
-                  <div className="border-t pt-3 mt-2 border-orange-200 space-y-2">
-                    {later.map((task, index) => {
-                      const isOverflowToday = task.due_date === selectedDate
-                      return (
-                        <div key={task.id} className="space-y-1">
-                          {isOverflowToday && (
-                            <div className="flex items-center gap-2">
-                              <Badge className="bg-red-100 text-red-700 text-xs font-semibold px-2 py-1 border border-red-300">
-                                ⚠️ Dzisiaj (overflow)
-                              </Badge>
-                              <span className="text-xs text-gray-600">
-                                To zadanie jest na dziś, ale nie mieści się w capacity
-                              </span>
-                            </div>
-                          )}
-                          <DayAssistantV2TaskCard
-                            key={task.id}
-                            task={task}
-                            queuePosition={queue.length + remainingToday.length + index + 1}
-                            onStartTimer={handleStartTimer}
-                            onComplete={handleCompleteById}
-                            onHelp={handleHelpById}
-                            onPin={handlePinById}
-                            onPostpone={handlePostponeById}
-                            onDelete={handleDeleteById}
-                            onOpenDetails={(id) => {
-                              const foundTask = later.find(t => t.id === id)
-                              if (foundTask) setSelectedTask(foundTask)
-                            }}
-                          />
-                        </div>
-                      )
-                    })}
-                  </div>
-                </>
-              )}
-            </CardContent>
-          )}
-        </Card>
+                </CardTitle>
+                <CaretDown className={cn(
+                  "transition-transform text-gray-600",
+                  showOverflowToday && "rotate-180"
+                )} size={24} />
+              </div>
+              <p className="text-xs text-red-700 mt-1 font-medium">
+                Zadania na dziś, które nie zmieszczą się w dostępnym czasie pracy
+              </p>
+            </CardHeader>
+            {showOverflowToday && (
+              <CardContent className="space-y-2 pt-4">
+                {overflowToday.map((task, index) => (
+                  <DayAssistantV2TaskCard
+                    key={task.id}
+                    task={task}
+                    queuePosition={queue.length + remainingToday.length + index + 1}
+                    onStartTimer={handleStartTimer}
+                    onComplete={handleCompleteById}
+                    onHelp={handleHelpById}
+                    onPin={handlePinById}
+                    onPostpone={handlePostponeById}
+                    onDelete={handleDeleteById}
+                    onOpenDetails={(id) => {
+                      const task = overflowToday.find(t => t.id === id)
+                      if (task) setSelectedTask(task)
+                    }}
+                  />
+                ))}
+              </CardContent>
+            )}
+          </Card>
+        )}
+
+        {/* Later - future dates + no date */}
+        {laterTasks.length > 0 && (
+          <Card className="border-orange-400 bg-gradient-to-br from-orange-50 to-yellow-50 shadow-sm">
+            <CardHeader 
+              className="cursor-pointer hover:bg-orange-100/50 transition-colors rounded-t-lg"
+              onClick={() => setShowLaterQueue(!showLaterQueue)}
+            >
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                  <span className="text-2xl">📅</span>
+                  <span className="text-gray-800">Na później</span>
+                  <Badge className="bg-orange-600 text-white font-semibold px-3 py-1">
+                    {laterTasks.length} zadań
+                  </Badge>
+                </CardTitle>
+                <CaretDown className={cn(
+                  "transition-transform text-gray-600",
+                  showLaterQueue && "rotate-180"
+                )} size={24} />
+              </div>
+              <p className="text-xs text-gray-700 mt-1 font-medium">
+                Zadania z przyszłych dat lub bez określonej daty
+              </p>
+            </CardHeader>
+            {showLaterQueue && (
+              <CardContent className="space-y-2 pt-4">
+                {laterTasks.map((task, index) => (
+                  <DayAssistantV2TaskCard
+                    key={task.id}
+                    task={task}
+                    queuePosition={queue.length + remainingToday.length + overflowToday.length + index + 1}
+                    onStartTimer={handleStartTimer}
+                    onComplete={handleCompleteById}
+                    onHelp={handleHelpById}
+                    onPin={handlePinById}
+                    onPostpone={handlePostponeById}
+                    onDelete={handleDeleteById}
+                    onOpenDetails={(id) => {
+                      const task = laterTasks.find(t => t.id === id)
+                      if (task) setSelectedTask(task)
+                    }}
+                  />
+                ))}
+              </CardContent>
+            )}
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
