@@ -697,9 +697,21 @@ function DayAssistantV2Content() {
     !dismissedAlerts.has(upcomingMeeting.id)
 
   // Top 3 tasks - najlepiej scored na dzisiaj (nie-MUST) that fit in capacity
+  // If we have less than 3, fill from remainingToday
   const top3Tasks = useMemo(() => {
-    return queue.filter(t => !t.is_must).slice(0, 3)
-  }, [queue])
+    // Get non-MUST tasks from queue
+    const nonMustQueue = queue.filter(t => !t.is_must)
+    
+    // If we have less than 3, fill from remainingToday
+    if (nonMustQueue.length < 3) {
+      const additional = remainingToday
+        .filter(t => !t.is_must)
+        .slice(0, 3 - nonMustQueue.length)
+      return [...nonMustQueue, ...additional]
+    }
+    
+    return nonMustQueue.slice(0, 3)
+  }, [queue, remainingToday])
 
   // Update task risks when tasks or queue changes
   useEffect(() => {
