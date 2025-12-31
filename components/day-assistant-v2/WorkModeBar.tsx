@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Lightning, Clock, Gear } from '@phosphor-icons/react'
-import { WorkMode } from './WorkModeSelector'
+import { WorkMode, MODE_ICONS, MODE_LABELS } from './WorkModeSelector'
 import { WorkModeModal } from './WorkModeModal'
 
 interface WorkModeBarProps {
@@ -11,22 +11,6 @@ interface WorkModeBarProps {
   workHoursEnd: string
   energy: number
   onWorkModeChange: (mode: WorkMode) => void
-}
-
-const MODE_ICONS: Record<WorkMode, string> = {
-  standard: '🎯',
-  low_focus: '🧘',
-  quick_wins: '⚡',
-  hyperfocus: '🔥',
-  crisis: '🚨'
-}
-
-const MODE_LABELS: Record<WorkMode, string> = {
-  standard: 'Standard',
-  low_focus: 'Low Focus',
-  quick_wins: 'Quick Wins',
-  hyperfocus: 'HyperFocus',
-  crisis: 'Crisis Mode'
 }
 
 export function WorkModeBar({

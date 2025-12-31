@@ -17,27 +17,33 @@ export function WorkModeSelector({ value, onChange, isUpdating }: Props) {
   const modes = [
     {
       id: 'low_focus' as WorkMode,
-      emoji: '🔴',
+      emoji: '🧘',
       label: 'Low Focus',
       description: 'Pokazuj tylko łatwe zadania (cognitive load ≤ 2). Idealne gdy jesteś zmęczony.'
     },
     {
       id: 'standard' as WorkMode,
-      emoji: '🟡',
+      emoji: '🎯',
       label: 'Standard',
       description: 'Normalne sortowanie według priorytetu i dopasowania. Standardowy tryb pracy.'
     },
     {
       id: 'quick_wins' as WorkMode,
-      emoji: '⏱️',
+      emoji: '⚡',
       label: 'Quick Wins',
       description: 'Błyskawiczne zadania z est. czasem < 20 min — złap szybkie wygrane.'
     },
     {
       id: 'hyperfocus' as WorkMode,
-      emoji: '⚡',
+      emoji: '🔥',
       label: 'HyperFocus',
       description: 'Tylko trudne zadania (cognitive load ≥ 4). Wykorzystaj wysoki focus!'
+    },
+    {
+      id: 'crisis' as WorkMode,
+      emoji: '🚨',
+      label: 'Crisis Mode',
+      description: 'Tylko MUST i deadline dziś. Ekstremalny fokus na najpilniejszych zadaniach.'
     }
   ]
 
