@@ -769,8 +769,7 @@ function DayAssistantV2Content() {
   
   // Generate passive insights when queue changes (NEW!)
   useEffect(() => {
-    const todayOverflowTasks = later.filter(task => task.due_date === selectedDate)
-    const insightQueue = [...queue, ...remainingToday, ...todayOverflowTasks]
+    const insightQueue = [...queue, ...remainingToday, ...overflowToday]
     const plannedMinutes = insightQueue.reduce((sum, task) => sum + (task.estimate_min || 0), 0)
 
     console.log('🔍 [Insights Debug] ========== START ==========')
@@ -844,7 +843,7 @@ function DayAssistantV2Content() {
     }
     
     console.log('🔍 [Insights Debug] ========== END ==========')
-  }, [queue, remainingToday, later, selectedDate, tasks, dayPlan, availableMinutes, dismissedInsightIds])
+  }, [queue, remainingToday, overflowToday, selectedDate, tasks, dayPlan, availableMinutes, dismissedInsightIds])
 
   // 🔍 DEBUG LOGGING for queue state
   useEffect(() => {
@@ -2262,7 +2261,8 @@ function DayAssistantV2Content() {
         {mustTasks.length === 0 && 
          top3Tasks.length === 0 && 
          remainingToday.length === 0 && 
-         later.length === 0 && 
+         overflowToday.length === 0 &&
+         laterTasks.length === 0 && 
          overdueTasks.length === 0 && (
           <Card className="border-green-300 bg-green-50">
             <CardContent className="pt-6 text-center">
@@ -2277,7 +2277,8 @@ function DayAssistantV2Content() {
         {mustTasks.length === 0 && 
          top3Tasks.length === 0 && 
          remainingToday.length === 0 && 
-         later.length === 0 &&
+         overflowToday.length === 0 &&
+         laterTasks.length === 0 &&
          overdueTasks.length === 0 &&
          tasks.length > 0 && (
           <Card className="border-orange-300 bg-orange-50">
