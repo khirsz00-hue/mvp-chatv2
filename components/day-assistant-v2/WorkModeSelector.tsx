@@ -5,7 +5,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 
-export type WorkMode = 'low_focus' | 'standard' | 'hyperfocus' | 'quick_wins'
+export type WorkMode = 'low_focus' | 'standard' | 'hyperfocus' | 'quick_wins' | 'crisis'
 
 interface Props {
   value: WorkMode
@@ -100,4 +100,21 @@ export function WorkModeSelector({ value, onChange, isUpdating }: Props) {
       )}
     </Card>
   )
+}
+
+// Export icons and labels for use in other components
+export const MODE_ICONS: Record<WorkMode, string> = {
+  standard: '🎯',
+  low_focus: '🧘',
+  quick_wins: '⚡',
+  hyperfocus: '🔥',
+  crisis: '🚨'
+}
+
+export const MODE_LABELS: Record<WorkMode, string> = {
+  standard: 'Standard',
+  low_focus: 'Low Focus',
+  quick_wins: 'Quick Wins',
+  hyperfocus: 'HyperFocus',
+  crisis: 'Crisis Mode'
 }

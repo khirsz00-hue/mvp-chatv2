@@ -37,7 +37,8 @@ import { TaskContextMenu } from './TaskContextMenu'
 import { TaskDetailsModal } from './TaskDetailsModal'
 import { DayAssistantV2TaskCard } from './DayAssistantV2TaskCard'
 
-import { WorkModeSelector, WorkMode } from './WorkModeSelector'
+import { WorkModeSelector, WorkMode, MODE_ICONS, MODE_LABELS } from './WorkModeSelector'
+import { WorkModeBar } from './WorkModeBar'
 import { HelpMeModal } from './HelpMeModal'
 import { WorkHoursConfigModal } from './WorkHoursConfigModal'
 import { AddTimeBlockModal } from './AddTimeBlockModal'
@@ -1938,6 +1939,15 @@ function DayAssistantV2Content() {
         />
       )}
       
+      {/* NEW: Global State Bar (sticky, 1 linia) */}
+      <WorkModeBar
+        workMode={workMode}
+        workHoursStart={workHoursStart}
+        workHoursEnd={workHoursEnd}
+        energy={dayPlan?.energy || 3}
+        onWorkModeChange={handleWorkModeChange}
+      />
+      
       {/* New Top Bar - Always visible */}
       <DayAssistantV2TopBar
         selectedDate={selectedDate}
@@ -1980,13 +1990,6 @@ function DayAssistantV2Content() {
               onResume={resumeTimer}
               onComplete={handleTimerComplete}
               onStop={handleTimerStop}
-            />
-
-            {/* Work Mode Selector */}
-            <WorkModeSelector
-              value={workMode}
-              onChange={handleWorkModeChange}
-              isUpdating={isReorderingQueue}
             />
 
             {/* Add Break Button */}
@@ -2060,6 +2063,11 @@ function DayAssistantV2Content() {
           <Card className="border-brand-purple/40 relative shadow-md">
             {isReorderingQueue && <QueueReorderingOverlay />}
             <CardHeader>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-purple-600 font-medium">
+                  Kolejka • {MODE_LABELS[workMode]} aktywny {MODE_ICONS[workMode]}
+                </span>
+              </div>
               <CardTitle className="text-xl font-bold flex items-center gap-2">
                 <span>📌</span>
                 <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
@@ -2096,6 +2104,11 @@ function DayAssistantV2Content() {
         <Card className="shadow-md border-blue-500 bg-gradient-to-br from-blue-50 to-purple-50">
           {isReorderingQueue && <QueueReorderingOverlay />}
           <CardHeader>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-blue-600 font-medium">
+                Kolejka • {MODE_LABELS[workMode]} aktywny {MODE_ICONS[workMode]}
+              </span>
+            </div>
             <CardTitle className="text-2xl font-bold flex items-center gap-2">
               <span className="text-3xl">🎯</span>
               <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
