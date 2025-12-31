@@ -67,7 +67,6 @@ import { Sparkle } from '@phosphor-icons/react'
 import { TopStatusBar } from './TopStatusBar'
 import { RecommendationPanel } from './RecommendationPanel'
 import { DayAssistantV2FocusBar } from './DayAssistantV2FocusBar'
-import { DayAssistantV2TopBar } from './DayAssistantV2TopBar'
 import { MeetingsSection } from './MeetingsSection'
 import { MeetingAlert } from './MeetingAlert'
 import { AfterWorkHoursCard } from './AfterWorkHoursCard'
@@ -2007,20 +2006,6 @@ function DayAssistantV2Content() {
         onWorkModeChange={handleWorkModeChange}
       />
       
-      {/* New Top Bar - Always visible */}
-      <DayAssistantV2TopBar
-        selectedDate={selectedDate}
-        workHoursStart={workHoursStart}
-        workHoursEnd={workHoursEnd}
-        capacityMinutes={adjustedCapacity}
-        workMode={workMode}
-        completedMinutes={usedMinutes}
-        onWorkHoursChange={handleWorkHoursChange}
-        onWorkModeChange={handleWorkModeChange}
-        meetingMinutes={meetingMinutes}
-        originalCapacityMinutes={capacityMinutes}
-      />
-      
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(600px,2fr)_minmax(400px,1fr)] gap-6">
         {/* Main content area with improved spacing */}
         <div className="space-y-6 min-w-0">
@@ -2125,6 +2110,8 @@ function DayAssistantV2Content() {
             suggestedTasks={suggestedTasksForExtraTime}
             manualTimeBlock={manualTimeBlock}
           />
+        )}
+        
         {/* MUST Tasks Section */}
         {mustTasks.length > 0 && (
           <Card className="border-brand-purple/40 relative shadow-md">
