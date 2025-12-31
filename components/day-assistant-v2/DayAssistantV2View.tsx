@@ -759,6 +759,16 @@ function DayAssistantV2Content() {
     return fitting
   }, [isAfterWorkHours, manualTimeBlock, queue, remainingToday, overflowToday])
 
+  // Computed: Check if there are no tasks at all
+  const hasNoTasks = useMemo(() => {
+    return mustTasks.length === 0 && 
+           top3Tasks.length === 0 && 
+           remainingToday.length === 0 && 
+           overflowToday.length === 0 &&
+           laterTasks.length === 0 && 
+           overdueTasks.length === 0
+  }, [mustTasks, top3Tasks, remainingToday, overflowToday, laterTasks, overdueTasks])
+
   // Update task risks when tasks or queue changes
   useEffect(() => {
     if (tasks.length > 0 && queue.length > 0) {
@@ -2258,12 +2268,7 @@ function DayAssistantV2Content() {
         )}
 
         {/* Empty state - ONLY if truly no tasks */}
-        {mustTasks.length === 0 && 
-         top3Tasks.length === 0 && 
-         remainingToday.length === 0 && 
-         overflowToday.length === 0 &&
-         laterTasks.length === 0 && 
-         overdueTasks.length === 0 && (
+        {hasNoTasks && (
           <Card className="border-green-300 bg-green-50">
             <CardContent className="pt-6 text-center">
               <p className="text-green-800 font-semibold">
@@ -2274,12 +2279,7 @@ function DayAssistantV2Content() {
         )}
 
         {/* Low Focus fallback - when there are tasks but none match the work mode */}
-        {mustTasks.length === 0 && 
-         top3Tasks.length === 0 && 
-         remainingToday.length === 0 && 
-         overflowToday.length === 0 &&
-         laterTasks.length === 0 &&
-         overdueTasks.length === 0 &&
+        {hasNoTasks &&
          tasks.length > 0 && (
           <Card className="border-orange-300 bg-orange-50">
             <CardContent className="pt-6 space-y-4">
