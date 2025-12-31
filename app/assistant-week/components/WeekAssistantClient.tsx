@@ -6,6 +6,7 @@ import { CheckCircle, Lightning, ArrowClockwise, XCircle } from '@phosphor-icons
 import Button from '@/components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { useToast } from '@/components/ui/Toast'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { applyRecommendation, rejectRecommendation, runWeekAnalysis } from '../actions'
 import { WeekDaySummary, WeekRecommendation, WeekSnapshot } from '../types'
 
@@ -24,6 +25,29 @@ function StatusBadge({ status }: { status: WeekDaySummary['status'] }) {
 }
 
 function DayCard({ day }: { day: WeekDaySummary }) {
+  const formatTime = (time?: string | null) => {
+    if (!time) return ''
+    return time.substring(0, 5) // HH:MM format
+  }
+
+  const formatDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60)
+    const mins = minutes % 60
+    if (hours > 0 && mins > 0) return `${hours}h ${mins}min`
+    if (hours > 0) return `${hours}h`
+    return `${mins}min`
+  }
+
+  const getPriorityLabel = (priority?: string | null) => {
+    if (!priority) return ''
+    const labels: Record<string, string> = {
+      now: '🔴 Teraz',
+      next: '🟡 Następne',
+      later: '🔵 Później',
+    }
+    return labels[priority] || priority
+  }
+
   return (
     <div className="min-w-[220px] rounded-xl border border-gray-200 bg-white/70 shadow-soft p-4 flex flex-col gap-3">
       <div className="flex items-center justify-between">
@@ -40,14 +64,72 @@ function DayCard({ day }: { day: WeekDaySummary }) {
         />
       </div>
       <div className="grid grid-cols-2 gap-2 text-sm">
-        <div className="rounded-lg bg-gray-50 px-3 py-2">
-          <p className="text-xs text-gray-500">Zadania</p>
-          <p className="font-semibold">{day.tasksCount}</p>
-        </div>
-        <div className="rounded-lg bg-gray-50 px-3 py-2">
-          <p className="text-xs text-gray-500">Spotkania</p>
-          <p className="font-semibold">{day.eventsCount}</p>
-        </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="rounded-lg bg-gray-50 px-3 py-2 cursor-help hover:bg-gray-100 transition-colors">
+              <p className="text-xs text-gray-500">Zadania</p>
+              <p className="font-semibold">{day.tasksCount}</p>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs max-h-80 overflow-y-auto">
+            <div className="space-y-2">
+              <p className="font-semibold text-xs uppercase tracking-wide border-b border-gray-700 pb-1">
+                Zadania ({day.tasksCount})
+              </p>
+              {day.tasks.length === 0 ? (
+                <p className="text-xs text-gray-300">Brak zadań na ten dzień</p>
+              ) : (
+                day.tasks.map((task) => (
+                  <div key={task.id} className="text-xs space-y-1 border-b border-gray-700/30 pb-2 last:border-0">
+                    <p className="font-medium">{task.title}</p>
+                    <div className="flex flex-wrap gap-2 text-gray-300">
+                      {task.priority && (
+                        <span className="text-[10px]">{getPriorityLabel(task.priority)}</span>
+                      )}
+                      <span className="text-[10px]">⏱️ {formatDuration(task.estimatedDuration)}</span>
+                      {task.completed && (
+                        <span className="text-[10px] text-green-300">✓ Ukończone</span>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="rounded-lg bg-gray-50 px-3 py-2 cursor-help hover:bg-gray-100 transition-colors">
+              <p className="text-xs text-gray-500">Spotkania</p>
+              <p className="font-semibold">{day.eventsCount}</p>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs max-h-80 overflow-y-auto">
+            <div className="space-y-2">
+              <p className="font-semibold text-xs uppercase tracking-wide border-b border-gray-700 pb-1">
+                Spotkania ({day.eventsCount})
+              </p>
+              {day.events.length === 0 ? (
+                <p className="text-xs text-gray-300">Brak spotkań na ten dzień</p>
+              ) : (
+                day.events.map((event) => (
+                  <div key={event.id} className="text-xs space-y-1 border-b border-gray-700/30 pb-2 last:border-0">
+                    <p className="font-medium">{event.title}</p>
+                    <div className="flex flex-wrap gap-2 text-gray-300">
+                      {event.startTime && event.endTime && (
+                        <span className="text-[10px]">
+                          🕐 {formatTime(event.startTime)} - {formatTime(event.endTime)}
+                        </span>
+                      )}
+                      <span className="text-[10px]">⏱️ {formatDuration(event.durationMinutes)}</span>
+                      <span className="text-[10px] capitalize">{event.type}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </TooltipContent>
+        </Tooltip>
       </div>
       {day.warnings.length > 0 && (
         <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800 space-y-1">
