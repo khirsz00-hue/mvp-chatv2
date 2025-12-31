@@ -5,7 +5,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 
-export type WorkMode = 'low_focus' | 'standard' | 'hyperfocus' | 'quick_wins'
+export type WorkMode = 'low_focus' | 'standard' | 'hyperfocus' | 'quick_wins' | 'crisis'
 
 interface Props {
   value: WorkMode
@@ -17,27 +17,33 @@ export function WorkModeSelector({ value, onChange, isUpdating }: Props) {
   const modes = [
     {
       id: 'low_focus' as WorkMode,
-      emoji: '🔴',
+      emoji: '🧘',
       label: 'Low Focus',
       description: 'Pokazuj tylko łatwe zadania (cognitive load ≤ 2). Idealne gdy jesteś zmęczony.'
     },
     {
       id: 'standard' as WorkMode,
-      emoji: '🟡',
+      emoji: '🎯',
       label: 'Standard',
       description: 'Normalne sortowanie według priorytetu i dopasowania. Standardowy tryb pracy.'
     },
     {
       id: 'quick_wins' as WorkMode,
-      emoji: '⏱️',
+      emoji: '⚡',
       label: 'Quick Wins',
       description: 'Błyskawiczne zadania z est. czasem < 20 min — złap szybkie wygrane.'
     },
     {
       id: 'hyperfocus' as WorkMode,
-      emoji: '⚡',
+      emoji: '🔥',
       label: 'HyperFocus',
       description: 'Tylko trudne zadania (cognitive load ≥ 4). Wykorzystaj wysoki focus!'
+    },
+    {
+      id: 'crisis' as WorkMode,
+      emoji: '🚨',
+      label: 'Crisis Mode',
+      description: 'Tylko MUST i deadline dziś. Ekstremalny fokus na najpilniejszych zadaniach.'
     }
   ]
 
@@ -100,4 +106,21 @@ export function WorkModeSelector({ value, onChange, isUpdating }: Props) {
       )}
     </Card>
   )
+}
+
+// Export icons and labels for use in other components
+export const MODE_ICONS: Record<WorkMode, string> = {
+  standard: '🎯',
+  low_focus: '🧘',
+  quick_wins: '⚡',
+  hyperfocus: '🔥',
+  crisis: '🚨'
+}
+
+export const MODE_LABELS: Record<WorkMode, string> = {
+  standard: 'Standard',
+  low_focus: 'Low Focus',
+  quick_wins: 'Quick Wins',
+  hyperfocus: 'HyperFocus',
+  crisis: 'Crisis Mode'
 }
