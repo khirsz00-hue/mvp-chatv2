@@ -3,7 +3,7 @@
 import { addDays, format, parseISO, startOfWeek } from 'date-fns'
 import { revalidatePath } from 'next/cache'
 import { createAuthenticatedSupabaseClient, getAuthenticatedUser } from '@/lib/supabaseAuth'
-import { WeekDaySummary, WeekRecommendation, WeekSnapshot } from './types'
+import { WeekDaySummary, WeekRecommendation, WeekSnapshot, WeekTaskDetail, WeekEventDetail } from './types'
 
 const configuredCapacity = Number(process.env.NEXT_PUBLIC_WEEK_CAPACITY_MINUTES || '420')
 const DAY_CAPACITY_MINUTES =
@@ -75,6 +75,26 @@ function buildDaySummaries(tasks: WeekTask[], events: WeekEvent[], weekStartDate
     if (dayTasks.some(t => minutesForTask(t) >= 90) && dayEvents.length > 0) {
       warnings.push('Ciężkie zadanie + spotkanie w tym samym dniu')
     }
+    
+    // Map tasks and events to detail objects for tooltip display
+    const taskDetails: WeekTaskDetail[] = dayTasks.map(t => ({
+      id: t.id,
+      title: t.title,
+      dueDate: t.due_date,
+      estimatedDuration: minutesForTask(t),
+      priority: t.priority,
+    }))
+    
+    const eventDetails: WeekEventDetail[] = dayEvents.map(e => ({
+      id: e.id,
+      title: e.title,
+      date: e.date,
+      startTime: e.start_time,
+      endTime: e.end_time,
+      durationMinutes: e.duration_minutes || 0,
+      type: e.type,
+    }))
+    
     daySummaries.push({
       date: iso,
       label: format(date, 'EEE dd.MM'),
@@ -84,6 +104,8 @@ function buildDaySummaries(tasks: WeekTask[], events: WeekEvent[], weekStartDate
       eventsCount: dayEvents.length,
       totalMinutes,
       warnings,
+      tasks: taskDetails,
+      events: eventDetails,
     })
   }
   // Ensure ordering from Monday
