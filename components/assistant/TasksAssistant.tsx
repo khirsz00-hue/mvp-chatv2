@@ -9,8 +9,7 @@ import { useToast } from '@/components/ui/Toast'
 import { Plus, List, Kanban, CalendarBlank, Calendar, SortAscending, Timer as TimerIcon, CheckSquare, Trash, ArrowRight } from '@phosphor-icons/react'
 import { startOfDay, addDays, parseISO, isSameDay, isBefore, isWithinInterval, format } from 'date-fns'
 import { pl } from 'date-fns/locale'
-import { CreateTaskModal } from './CreateTaskModal'
-import { TaskDetailsModal } from './TaskDetailsModal'
+import { UniversalTaskModal, TaskData } from '@/components/common/UniversalTaskModal'
 import { TaskCard } from './TaskCard'
 import { SevenDaysBoardView } from './SevenDaysBoardView'
 import { MonthView } from './MonthView'
@@ -76,9 +75,8 @@ export function TasksAssistant() {
   const [sortBy, setSortBy] = useState<SortType>('date')
   const [groupBy, setGroupBy] = useState<GroupByType>('none')
   const [selectedProject, setSelectedProject] = useState<string>('all')
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
-  const [showDetailsModal, setShowDetailsModal] = useState(false)
+  const [showUniversalModal, setShowUniversalModal] = useState(false)
+  const [universalModalTask, setUniversalModalTask] = useState<Task | null>(null)
   const [showPomodoro, setShowPomodoro] = useState(false)
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
   const [bulkActionLoading, setBulkActionLoading] = useState(false)
@@ -633,6 +631,55 @@ export function TasksAssistant() {
     }
   }
   
+  // Unified handler for UniversalTaskModal (handles both create and update)
+  const handleUniversalSave = async (taskData: TaskData) => {
+    if (taskData.id) {
+      // UPDATE existing task
+      await handleUpdate(taskData.id, {
+        content: taskData.content,
+        description: taskData.description,
+        priority: taskData.priority,
+        due: taskData.due,
+        project_id: taskData.project_id,
+        labels: taskData.labels,
+        duration: taskData.estimated_minutes
+      })
+    } else {
+      // CREATE new task
+      await handleAddTask({
+        content: taskData.content,
+        description: taskData.description,
+        priority: taskData.priority,
+        due_date: taskData.due,
+        project_id: taskData.project_id,
+        labels: taskData.labels,
+        duration: taskData.estimated_minutes,
+        token
+      })
+    }
+    // Close modal after save
+    setShowUniversalModal(false)
+    setUniversalModalTask(null)
+  }
+  
+  // Convert Task to TaskData for UniversalTaskModal
+  const taskToTaskData = (task: Task | null): TaskData | null => {
+    if (!task) return null
+    return {
+      id: task.id,
+      content: task.content,
+      description: task.description,
+      estimated_minutes: task.duration || 0,
+      // Note: cognitive_load defaults to 0 as this field is not currently tracked in Task model
+      // Future enhancement: Add cognitive load tracking to Todoist tasks
+      cognitive_load: 0,
+      project_id: task.project_id,
+      priority: task.priority,
+      due: typeof task.due === 'string' ? task.due : task.due?.date,
+      labels: task.labels
+    }
+  }
+  
   // Bulk action handlers
   const toggleTaskSelection = (taskId: string) => {
     setSelectedTaskIds(prev => {
@@ -775,8 +822,8 @@ export function TasksAssistant() {
                 onClick={() => {
                   const task = tasks.find(t => t.id === activeTimerInfo.taskId)
                   if (task) {
-                    setSelectedTask(task)
-                    setShowDetailsModal(true)
+                    setUniversalModalTask(task)
+                    setShowUniversalModal(true)
                   }
                 }}
               >
@@ -833,7 +880,10 @@ export function TasksAssistant() {
             </Button>
             
             <Button 
-              onClick={() => setShowCreateModal(true)} 
+              onClick={() => {
+                setUniversalModalTask(null)
+                setShowUniversalModal(true)
+              }} 
               className="gap-2 bg-gradient-to-r from-brand-purple to-brand-pink hover:shadow-lg transition-all hover:scale-105"
               size="lg"
             >
@@ -1054,7 +1104,10 @@ export function TasksAssistant() {
                 {filter === 'overdue' && 'Nie masz przeterminowanych zadań'}
                 {filter === 'completed' && 'Nie masz ukończonych zadań'}
               </p>
-              <Button onClick={() => setShowCreateModal(true)} className="gap-2">
+              <Button onClick={() => {
+                setUniversalModalTask(null)
+                setShowUniversalModal(true)
+              }} className="gap-2">
                 <Plus size={18} />
                 Dodaj pierwsze zadanie
               </Button>
@@ -1079,8 +1132,8 @@ export function TasksAssistant() {
                         onComplete={handleComplete}
                         onDelete={handleDelete}
                         onDetails={(t) => {
-                          setSelectedTask(t)
-                          setShowDetailsModal(true)
+                          setUniversalModalTask(t)
+                          setShowUniversalModal(true)
                         }}
                         selectable={selectedTaskIds.size > 0}
                         selected={selectedTaskIds.has(task.id)}
@@ -1099,39 +1152,36 @@ export function TasksAssistant() {
             onComplete={handleComplete}
             onDelete={handleDelete}
             onDetails={(t) => {
-              setSelectedTask(t)
-              setShowDetailsModal(true)
+              setUniversalModalTask(t)
+              setShowUniversalModal(true)
             }}
             onAddForDate={(date) => {
-              setShowCreateModal(true)
-              // TODO: Pre-fill date in CreateTaskModal
+              setUniversalModalTask(null)
+              setShowUniversalModal(true)
+              // TODO: Pre-fill date in UniversalTaskModal
             }}
           />
         ) : null}
       </div>
       
       {/* Modals */}
-      <CreateTaskModal 
-        open={showCreateModal}
-        onOpenChange={setShowCreateModal}
-        onCreateTask={handleAddTask}
-      />
-      
-      <TaskDetailsModal
-        open={showDetailsModal}
-        onOpenChange={setShowDetailsModal}
-        task={selectedTask}
-        onUpdate={handleUpdate}
+      {/* Note: UniversalTaskModal replaces CreateTaskModal and TaskDetailsModal
+          Trade-off: Duplicate functionality removed in favor of simpler unified interface
+          Users can still create new tasks easily via the "Dodaj zadanie" button */}
+      <UniversalTaskModal 
+        open={showUniversalModal}
+        onOpenChange={setShowUniversalModal}
+        task={taskToTaskData(universalModalTask)}
+        onSave={handleUniversalSave}
         onDelete={handleDelete}
         onComplete={handleComplete}
-        onDuplicate={handleDuplicate}
       />
       
       <PomodoroTimer
         open={showPomodoro}
         onOpenChange={setShowPomodoro}
-        taskId={selectedTask?.id}
-        taskTitle={selectedTask?.content}
+        taskId={universalModalTask?.id}
+        taskTitle={universalModalTask?.content}
       />
       
       {/* Task Timer (floating widget) */}
