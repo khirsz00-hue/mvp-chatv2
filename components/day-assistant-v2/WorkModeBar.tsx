@@ -58,13 +58,22 @@ export function WorkModeBar({
                     value={workHoursStart}
                     onChange={(e) => onWorkHoursChange?.(e.target.value, workHoursEnd)}
                     onBlur={() => setIsEditingStartTime(false)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        setIsEditingStartTime(false)
+                      }
+                    }}
                     className="w-20 bg-white text-gray-900 rounded px-1 text-sm"
+                    aria-label="Godzina rozpoczęcia pracy"
                     autoFocus
                   />
                 ) : (
                   <span 
                     className="cursor-pointer hover:underline"
                     onClick={() => setIsEditingStartTime(true)}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Godzina rozpoczęcia: ${workHoursStart}. Kliknij aby edytować`}
                   >
                     {workHoursStart}
                   </span>
@@ -76,13 +85,22 @@ export function WorkModeBar({
                     value={workHoursEnd}
                     onChange={(e) => onWorkHoursChange?.(workHoursStart, e.target.value)}
                     onBlur={() => setIsEditingEndTime(false)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        setIsEditingEndTime(false)
+                      }
+                    }}
                     className="w-20 bg-white text-gray-900 rounded px-1 text-sm"
+                    aria-label="Godzina zakończenia pracy"
                     autoFocus
                   />
                 ) : (
                   <span 
                     className="cursor-pointer hover:underline"
                     onClick={() => setIsEditingEndTime(true)}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Godzina zakończenia: ${workHoursEnd}. Kliknij aby edytować`}
                   >
                     {workHoursEnd}
                   </span>
