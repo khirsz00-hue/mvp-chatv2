@@ -41,6 +41,13 @@ export function DayAssistantV2UnifiedTopBar({
   // Capitalize first letter
   const capitalizedDate = formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1)
 
+  // Polish pluralization for tasks
+  const getTasksText = (count: number) => {
+    if (count === 1) return '1 zadanie pozostało'
+    if (count >= 2 && count <= 4) return `${count} zadania pozostały`
+    return `${count} zadań pozostało`
+  }
+
   return (
     <>
       {/* Sticky top bar */}
@@ -100,7 +107,7 @@ export function DayAssistantV2UnifiedTopBar({
             {/* Remaining tasks badge */}
             <div className="px-3 py-1 bg-gray-100 rounded-full whitespace-nowrap">
               <span className="text-sm font-medium text-gray-700">
-                {remainingTasks} zadań pozostało
+                {getTasksText(remainingTasks)}
               </span>
             </div>
           </div>

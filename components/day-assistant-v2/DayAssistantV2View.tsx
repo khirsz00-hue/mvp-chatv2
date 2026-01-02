@@ -37,7 +37,7 @@ import { TaskContextMenu } from './TaskContextMenu'
 import { DayAssistantV2TaskCard } from './DayAssistantV2TaskCard'
 import { UniversalTaskModal, TaskData } from '@/components/common/UniversalTaskModal'
 
-import { WorkModeSelector, WorkMode, MODE_ICONS, MODE_LABELS } from './WorkModeSelector'
+import { WorkMode, MODE_ICONS, MODE_LABELS } from './WorkModeSelector'
 import { DayAssistantV2UnifiedTopBar } from './DayAssistantV2UnifiedTopBar'
 import { HelpMeModal } from './HelpMeModal'
 import { WorkHoursConfigModal } from './WorkHoursConfigModal'
