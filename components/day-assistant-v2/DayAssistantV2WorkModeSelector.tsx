@@ -8,7 +8,7 @@
 import { cn } from '@/lib/utils'
 import Button from '@/components/ui/Button'
 
-export type WorkMode = 'low_focus' | 'standard' | 'hyperfocus' | 'quick_wins' | 'crisis'
+export type WorkMode = 'low_focus' | 'standard' | 'hyperfocus' | 'quick_wins'
 
 interface DayAssistantV2WorkModeSelectorProps {
   currentMode: WorkMode
@@ -40,12 +40,6 @@ export function DayAssistantV2WorkModeSelector({ currentMode, onChange }: DayAss
       emoji: '⚡',
       label: 'HyperFocus',
       description: 'Trudne zadania (cognitive > 3)'
-    },
-    {
-      id: 'crisis' as WorkMode,
-      emoji: '🚨',
-      label: 'Crisis Mode',
-      description: 'Tylko MUST + deadline dziś'
     }
   ]
 
