@@ -2111,6 +2111,7 @@ function DayAssistantV2Content() {
             manualTimeBlock={manualTimeBlock}
           />
         )}
+
         
         {/* MUST Tasks Section */}
         {mustTasks.length > 0 && (
