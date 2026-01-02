@@ -2112,6 +2112,7 @@ function DayAssistantV2Content() {
           />
         )}
 
+        
         {/* MUST Tasks Section */}
         {mustTasks.length > 0 && (
           <Card className="border-brand-purple/40 relative shadow-md">
