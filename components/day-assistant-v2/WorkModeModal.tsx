@@ -39,13 +39,6 @@ const WORK_MODE_OPTIONS = {
     details: 'Tylko trudne, wymagające zadania (cognitive load ≥ 4). Wykorzystaj szczytową produktywność na najbardziej wymagające wyzwania.',
     when: 'Szczytowa energia, długi blok czasu, chęć do trudnych zadań',
     filters: 'Zadania cognitive load ≥ 4'
-  },
-  crisis: {
-    name: '🚨 Crisis Mode',
-    description: 'Tylko MUST i deadline dziś',
-    details: 'Ekstremalny fokus na najpilniejszych zadaniach. Ignoruje optymalizację - pokazuje tylko to, co MUSI być zrobione dziś.',
-    when: 'Przeciążenie, deadline\'y, sytuacja kryzysowa',
-    filters: 'Tylko MUST + deadline dziś'
   }
 }
 

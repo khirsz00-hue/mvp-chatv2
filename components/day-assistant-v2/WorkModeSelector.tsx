@@ -5,7 +5,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 
-export type WorkMode = 'low_focus' | 'standard' | 'hyperfocus' | 'quick_wins' | 'crisis'
+export type WorkMode = 'low_focus' | 'standard' | 'hyperfocus' | 'quick_wins'
 
 interface Props {
   value: WorkMode
@@ -38,12 +38,6 @@ export function WorkModeSelector({ value, onChange, isUpdating }: Props) {
       emoji: '🔥',
       label: 'HyperFocus',
       description: 'Tylko trudne zadania (cognitive load ≥ 4). Wykorzystaj wysoki focus!'
-    },
-    {
-      id: 'crisis' as WorkMode,
-      emoji: '🚨',
-      label: 'Crisis Mode',
-      description: 'Tylko MUST i deadline dziś. Ekstremalny fokus na najpilniejszych zadaniach.'
     }
   ]
 
@@ -113,14 +107,12 @@ export const MODE_ICONS: Record<WorkMode, string> = {
   standard: '🎯',
   low_focus: '🧘',
   quick_wins: '⚡',
-  hyperfocus: '🔥',
-  crisis: '🚨'
+  hyperfocus: '🔥'
 }
 
 export const MODE_LABELS: Record<WorkMode, string> = {
   standard: 'Standard',
   low_focus: 'Low Focus',
   quick_wins: 'Quick Wins',
-  hyperfocus: 'HyperFocus',
-  crisis: 'Crisis Mode'
+  hyperfocus: 'HyperFocus'
 }

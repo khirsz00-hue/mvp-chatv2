@@ -26,8 +26,7 @@ const WORK_MODE_OPTIONS = {
   low_focus: '🔴 Low Focus',
   standard: '🟡 Standard',
   hyperfocus: '⚡ HyperFocus',
-  quick_wins: '⏱️ Quick Wins',
-  crisis: '🚨 Crisis Mode'
+  quick_wins: '⏱️ Quick Wins'
 }
 
 export function DayAssistantV2TopBar({

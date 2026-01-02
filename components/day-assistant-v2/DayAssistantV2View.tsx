@@ -2002,8 +2002,11 @@ function DayAssistantV2Content() {
         workMode={workMode}
         workHoursStart={workHoursStart}
         workHoursEnd={workHoursEnd}
-        energy={dayPlan?.energy || 3}
         onWorkModeChange={handleWorkModeChange}
+        onWorkHoursChange={handleWorkHoursChange}
+        usedMinutes={usedMinutes}
+        totalCapacity={adjustedCapacity}
+        meetingMinutes={meetingMinutes}
       />
       
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(600px,2fr)_minmax(400px,1fr)] gap-6">
