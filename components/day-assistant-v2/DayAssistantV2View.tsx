@@ -1,619 +1,398 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Dimensions, TextInput, FlatList, ActivityIndicator } from 'react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Text, Animated, Dimensions, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import TaskCard from '../TaskCard';
-import UniversalTaskModal from '../UniversalTaskModal';
-import { Task } from '../../types/task';
-import { useRouter } from 'expo-router';
+import DayAssistantHeader from './DayAssistantHeader';
+import TimeBlockSection from './TimeBlockSection';
+import TaskListSection from './TaskListSection';
+import QuickAddModal from './QuickAddModal';
+import UniversalModal from './UniversalModal';
+import { Task, TimeBlock } from '@/types';
+import { deleteTask, toggleTaskCompletion, updateTaskTimeBlock, updateTask, deleteTimeBlock, updateTimeBlock } from '@/services/database';
+import CalendarIntegrationService from '@/services/CalendarIntegrationService';
+import { useFocusEffect } from '@react-navigation/native';
 
-const { width } = Dimensions.get('window');
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface DayAssistantV2ViewProps {
+  selectedDate: Date;
   tasks: Task[];
-  onTaskUpdate: (taskId: string, updates: Partial<Task>) => void;
-  onTaskDelete: (taskId: string) => void;
-  onTaskCreate: (task: Omit<Task, 'id'>) => void;
-  currentUser?: { name?: string };
+  timeBlocks: TimeBlock[];
+  onTasksChange: () => void;
+  onTimeBlocksChange: () => void;
+  navigation: any;
 }
 
-export default function DayAssistantV2View({
+const DayAssistantV2View: React.FC<DayAssistantV2ViewProps> = ({
+  selectedDate,
   tasks,
-  onTaskUpdate,
-  onTaskDelete,
-  onTaskCreate,
-  currentUser,
-}: DayAssistantV2ViewProps) {
-  const router = useRouter();
+  timeBlocks,
+  onTasksChange,
+  onTimeBlocksChange,
+  navigation,
+}) => {
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [showUniversalModal, setShowUniversalModal] = useState(false);
   const [universalModalTask, setUniversalModalTask] = useState<Task | null>(null);
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [chatMessage, setChatMessage] = useState('');
-  const [chatHistory, setChatHistory] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [universalModalTimeBlock, setUniversalModalTimeBlock] = useState<TimeBlock | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
-  const chatScrollRef = useRef<FlatList>(null);
+  const fabAnimation = useRef(new Animated.Value(1)).current;
+  const lastScrollY = useRef(0);
 
-  // Animation values
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-
+  // Reset modals when component unmounts or date changes
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(slideAnim, {
-        toValue: 1,
-        duration: 600,
+    return () => {
+      setShowQuickAdd(false);
+      setShowUniversalModal(false);
+      setUniversalModalTask(null);
+      setUniversalModalTimeBlock(null);
+    };
+  }, [selectedDate]);
+
+  // Reset modals when screen loses focus
+  useFocusEffect(
+    React.useCallback(() => {
+      return () => {
+        setShowQuickAdd(false);
+        setShowUniversalModal(false);
+        setUniversalModalTask(null);
+        setUniversalModalTimeBlock(null);
+      };
+    }, [])
+  );
+
+  const handleScroll = (event: any) => {
+    const currentScrollY = event.nativeEvent.contentOffset.y;
+    const scrollDiff = currentScrollY - lastScrollY.current;
+
+    if (scrollDiff > 5 && currentScrollY > 50) {
+      // Scrolling down
+      Animated.timing(fabAnimation, {
+        toValue: 0,
+        duration: 200,
         useNativeDriver: true,
-      }),
-      Animated.timing(fadeAnim, {
+      }).start();
+    } else if (scrollDiff < -5 || currentScrollY <= 50) {
+      // Scrolling up or near top
+      Animated.timing(fabAnimation, {
         toValue: 1,
-        duration: 800,
+        duration: 200,
         useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
+      }).start();
+    }
 
-  // Filter tasks for today
-  const todayTasks = tasks.filter(task => {
-    const taskDate = new Date(task.date);
-    const today = new Date();
-    return (
-      taskDate.getDate() === today.getDate() &&
-      taskDate.getMonth() === today.getMonth() &&
-      taskDate.getFullYear() === today.getFullYear()
-    );
-  });
-
-  // Categorize tasks
-  const overdueTasks = todayTasks.filter(task => {
-    if (!task.time) return false;
-    const taskDateTime = new Date(`${task.date}T${task.time}`);
-    return taskDateTime < new Date() && !task.completed;
-  });
-
-  const upcomingTasks = todayTasks.filter(task => {
-    if (!task.time) return !task.completed;
-    const taskDateTime = new Date(`${task.date}T${task.time}`);
-    return taskDateTime >= new Date() && !task.completed;
-  });
-
-  const completedTasks = todayTasks.filter(task => task.completed);
-
-  // Calculate progress
-  const totalTasks = todayTasks.length;
-  const completedCount = completedTasks.length;
-  const progressPercentage = totalTasks > 0 ? (completedCount / totalTasks) * 100 : 0;
-
-  // Get greeting based on time of day
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good Morning';
-    if (hour < 18) return 'Good Afternoon';
-    return 'Good Evening';
+    lastScrollY.current = currentScrollY;
   };
 
-  const handleSendMessage = async () => {
-    if (!chatMessage.trim()) return;
-
-    const userMessage = chatMessage.trim();
-    setChatMessage('');
-    
-    // Add user message to history
-    const newHistory = [...chatHistory, { role: 'user' as const, content: userMessage }];
-    setChatHistory(newHistory);
-    setIsLoading(true);
-
+  const handleDeleteTask = async (taskId: string) => {
     try {
-      // Call your AI endpoint here
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: userMessage,
-          context: {
-            tasks: todayTasks,
-            date: new Date().toISOString(),
-          },
-        }),
-      });
-
-      const data = await response.json();
-      
-      // Add assistant response to history
-      setChatHistory([...newHistory, { role: 'assistant', content: data.response }]);
+      await deleteTask(taskId);
+      onTasksChange();
+      setShowUniversalModal(false);
+      setUniversalModalTask(null);
     } catch (error) {
-      console.error('Error sending message:', error);
-      setChatHistory([...newHistory, { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' }]);
-    } finally {
-      setIsLoading(false);
-      // Scroll to bottom after response
-      setTimeout(() => {
-        chatScrollRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+      console.error('Error deleting task:', error);
+    }
+  };
+
+  const handleToggleTaskCompletion = async (taskId: string, completed: boolean) => {
+    try {
+      await toggleTaskCompletion(taskId, completed);
+      onTasksChange();
+    } catch (error) {
+      console.error('Error toggling task completion:', error);
+    }
+  };
+
+  const handleUpdateTaskTimeBlock = async (taskId: string, timeBlockId: string | null) => {
+    try {
+      await updateTaskTimeBlock(taskId, timeBlockId);
+      onTasksChange();
+    } catch (error) {
+      console.error('Error updating task time block:', error);
+    }
+  };
+
+  const handleSaveTask = async (taskData: Partial<Task>) => {
+    try {
+      if (universalModalTask) {
+        // Updating existing task
+        await updateTask(universalModalTask.id, taskData);
+      }
+      onTasksChange();
+      setShowUniversalModal(false);
+      setUniversalModalTask(null);
+    } catch (error) {
+      console.error('Error saving task:', error);
+    }
+  };
+
+  const handleDeleteTimeBlock = async (timeBlockId: string) => {
+    try {
+      await deleteTimeBlock(timeBlockId);
+      // Also update any tasks that were in this time block
+      const tasksInBlock = tasks.filter(t => t.timeBlockId === timeBlockId);
+      for (const task of tasksInBlock) {
+        await updateTaskTimeBlock(task.id, null);
+      }
+      onTimeBlocksChange();
+      onTasksChange();
+      setShowUniversalModal(false);
+      setUniversalModalTimeBlock(null);
+    } catch (error) {
+      console.error('Error deleting time block:', error);
+    }
+  };
+
+  const handleSaveTimeBlock = async (timeBlockData: Partial<TimeBlock>) => {
+    try {
+      if (universalModalTimeBlock) {
+        await updateTimeBlock(universalModalTimeBlock.id, timeBlockData);
+      }
+      onTimeBlocksChange();
+      setShowUniversalModal(false);
+      setUniversalModalTimeBlock(null);
+    } catch (error) {
+      console.error('Error saving time block:', error);
     }
   };
 
   const handleTaskPress = (task: Task) => {
     setUniversalModalTask(task);
+    setUniversalModalTimeBlock(null);
     setShowUniversalModal(true);
   };
 
-  const handleTaskComplete = (taskId: string, completed: boolean) => {
-    onTaskUpdate(taskId, { completed });
+  const handleTimeBlockPress = (timeBlock: TimeBlock) => {
+    setUniversalModalTimeBlock(timeBlock);
+    setUniversalModalTask(null);
+    setShowUniversalModal(true);
   };
 
-  const renderTaskSection = (title: string, tasks: Task[], icon: string, color: string) => {
-    if (tasks.length === 0) return null;
+  const handleCreateTimeBlockFromTask = async (task: Task) => {
+    try {
+      // Get task details for time block creation
+      const taskDetails = tasks.find(t => t.id === task.id);
+      if (!taskDetails) return;
 
+      // Create a time block from the task
+      const calendarService = CalendarIntegrationService.getInstance();
+      
+      // Find a suitable time slot for the task
+      const startTime = new Date(selectedDate);
+      startTime.setHours(9, 0, 0, 0); // Default to 9 AM
+      
+      const duration = taskDetails.estimatedDuration || 60; // Default to 1 hour
+      const endTime = new Date(startTime.getTime() + duration * 60000);
+
+      const newTimeBlock = await calendarService.createTimeBlock(
+        taskDetails.title,
+        startTime,
+        endTime,
+        taskDetails.description || undefined,
+        'work'
+      );
+
+      // Link the task to the new time block
+      await updateTaskTimeBlock(task.id, newTimeBlock.id);
+      
+      onTimeBlocksChange();
+      onTasksChange();
+      setShowUniversalModal(false);
+      setUniversalModalTask(null);
+    } catch (error) {
+      console.error('Error creating time block from task:', error);
+    }
+  };
+
+  const handleUnlinkFromTimeBlock = async (task: Task) => {
+    try {
+      await updateTaskTimeBlock(task.id, null);
+      onTasksChange();
+      // Keep modal open so user can see the change
+    } catch (error) {
+      console.error('Error unlinking task from time block:', error);
+    }
+  };
+
+  const handleLinkToTimeBlock = async (task: Task, timeBlockId: string) => {
+    try {
+      await updateTaskTimeBlock(task.id, timeBlockId);
+      onTasksChange();
+      // Keep modal open so user can see the change
+    } catch (error) {
+      console.error('Error linking task to time block:', error);
+    }
+  };
+
+  // Filter tasks for the selected date
+  const filteredTasks = tasks.filter(task => {
+    if (!task.dueDate) return false;
+    const taskDate = new Date(task.dueDate);
     return (
-      <View style={styles.taskSection}>
-        <View style={styles.sectionHeader}>
-          <Ionicons name={icon as any} size={20} color={color} />
-          <Text style={[styles.sectionTitle, { color }]}>
-            {title} ({tasks.length})
-          </Text>
-        </View>
-        {tasks.map((task) => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            onPress={() => handleTaskPress(task)}
-            onComplete={(completed) => handleTaskComplete(task.id, completed)}
-            compact
-          />
-        ))}
-      </View>
+      taskDate.getDate() === selectedDate.getDate() &&
+      taskDate.getMonth() === selectedDate.getMonth() &&
+      taskDate.getFullYear() === selectedDate.getFullYear()
     );
+  });
+
+  // Filter time blocks for the selected date
+  const filteredTimeBlocks = timeBlocks.filter(block => {
+    const blockDate = new Date(block.startTime);
+    return (
+      blockDate.getDate() === selectedDate.getDate() &&
+      blockDate.getMonth() === selectedDate.getMonth() &&
+      blockDate.getFullYear() === selectedDate.getFullYear()
+    );
+  });
+
+  // Separate unscheduled tasks (tasks without time blocks)
+  const unscheduledTasks = filteredTasks.filter(task => !task.timeBlockId);
+
+  // Get tasks for each time block
+  const getTasksForTimeBlock = (timeBlockId: string) => {
+    return filteredTasks.filter(task => task.timeBlockId === timeBlockId);
   };
 
-  const renderChatMessage = ({ item, index }: { item: { role: 'user' | 'assistant'; content: string }; index: number }) => (
-    <View
-      style={[
-        styles.chatMessage,
-        item.role === 'user' ? styles.userMessage : styles.assistantMessage,
-      ]}
-    >
-      <Text style={styles.chatMessageText}>{item.content}</Text>
-    </View>
-  );
-
-  const translateY = slideAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [50, 0],
-  });
+  const handleQuickAddPress = () => {
+    setUniversalModalTask(null);
+    setShowUniversalModal(true);
+  };
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <Animated.View 
+      <DayAssistantHeader
+        selectedDate={selectedDate}
+        onDateChange={() => {}}
+        navigation={navigation}
+      />
+      
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+      >
+        <TimeBlockSection
+          timeBlocks={filteredTimeBlocks}
+          getTasksForTimeBlock={getTasksForTimeBlock}
+          onTaskPress={handleTaskPress}
+          onTimeBlockPress={handleTimeBlockPress}
+          onToggleTaskCompletion={handleToggleTaskCompletion}
+          selectedDate={selectedDate}
+        />
+
+        <TaskListSection
+          tasks={unscheduledTasks}
+          onTaskPress={handleTaskPress}
+          onToggleTaskCompletion={handleToggleTaskCompletion}
+        />
+
+        {/* Bottom padding to ensure content is not hidden by FAB */}
+        <View style={{ height: 100 }} />
+      </ScrollView>
+
+      {/* Floating Action Button */}
+      <Animated.View
         style={[
-          styles.header,
+          styles.fabContainer,
           {
-            opacity: fadeAnim,
-            transform: [{ translateY }],
+            transform: [
+              {
+                translateY: fabAnimation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [100, 0],
+                }),
+              },
+              {
+                scale: fabAnimation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.8, 1],
+                }),
+              },
+            ],
+            opacity: fabAnimation,
           },
         ]}
       >
-        <View style={styles.headerTop}>
-          <View>
-            <Text style={styles.greeting}>{getGreeting()}</Text>
-            <Text style={styles.userName}>{currentUser?.name || 'User'}</Text>
-          </View>
-          <TouchableOpacity 
-            style={styles.settingsButton}
-            onPress={() => router.push('/settings')}
-          >
-            <Ionicons name="settings-outline" size={24} color="#666" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Progress Card */}
-        <Animated.View style={[styles.progressCard, { opacity: fadeAnim }]}>
-          <View style={styles.progressHeader}>
-            <Text style={styles.progressTitle}>Today's Progress</Text>
-            <Text style={styles.progressPercentage}>{Math.round(progressPercentage)}%</Text>
-          </View>
-          <View style={styles.progressBarContainer}>
-            <View style={[styles.progressBar, { width: `${progressPercentage}%` }]} />
-          </View>
-          <Text style={styles.progressText}>
-            {completedCount} of {totalTasks} tasks completed
-          </Text>
-        </Animated.View>
-
-        {/* Quick Stats */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Ionicons name="alert-circle" size={24} color="#FF6B6B" />
-            <Text style={styles.statNumber}>{overdueTasks.length}</Text>
-            <Text style={styles.statLabel}>Overdue</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Ionicons name="time" size={24} color="#4ECDC4" />
-            <Text style={styles.statNumber}>{upcomingTasks.length}</Text>
-            <Text style={styles.statLabel}>Upcoming</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Ionicons name="checkmark-circle" size={24} color="#95E1D3" />
-            <Text style={styles.statNumber}>{completedTasks.length}</Text>
-            <Text style={styles.statLabel}>Completed</Text>
-          </View>
-        </View>
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={handleQuickAddPress}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="add" size={28} color="#FFFFFF" />
+        </TouchableOpacity>
       </Animated.View>
 
-      {/* Main Content - Split View */}
-      <View style={styles.mainContent}>
-        {/* Tasks Column */}
-        <Animated.View style={[styles.tasksColumn, { opacity: fadeAnim }]}>
-          <View style={styles.columnHeader}>
-            <Text style={styles.columnTitle}>Today's Tasks</Text>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => {
-                setUniversalModalTask(null);
-                setShowUniversalModal(true);
-              }}
-            >
-              <Ionicons name="add" size={24} color="#fff" />
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView 
-            ref={scrollViewRef}
-            style={styles.tasksScroll}
-            contentContainerStyle={styles.tasksContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {totalTasks === 0 ? (
-              <View style={styles.emptyState}>
-                <Ionicons name="calendar-outline" size={64} color="#ccc" />
-                <Text style={styles.emptyStateText}>No tasks for today</Text>
-                <Text style={styles.emptyStateSubtext}>
-                  Tap the + button to add a task
-                </Text>
-              </View>
-            ) : (
-              <>
-                {renderTaskSection('Overdue', overdueTasks, 'alert-circle', '#FF6B6B')}
-                {renderTaskSection('Upcoming', upcomingTasks, 'time', '#4ECDC4')}
-                {renderTaskSection('Completed', completedTasks, 'checkmark-circle', '#95E1D3')}
-              </>
-            )}
-          </ScrollView>
-        </Animated.View>
+      {/* Quick Add Modal */}
+      <QuickAddModal
+        visible={showQuickAdd}
+        onClose={() => setShowQuickAdd(false)}
+        selectedDate={selectedDate}
+        onTaskCreated={onTasksChange}
+        onTimeBlockCreated={onTimeBlocksChange}
+      />
 
-        {/* Chat Column */}
-        <Animated.View style={[styles.chatColumn, { opacity: fadeAnim }]}>
-          <View style={styles.columnHeader}>
-            <Ionicons name="chatbubbles" size={24} color="#4ECDC4" />
-            <Text style={styles.columnTitle}>AI Assistant</Text>
-          </View>
-
-          {chatHistory.length === 0 ? (
-            <View style={styles.chatEmptyState}>
-              <Ionicons name="chatbubbles-outline" size={64} color="#ccc" />
-              <Text style={styles.emptyStateText}>Start a conversation</Text>
-              <Text style={styles.emptyStateSubtext}>
-                Ask me about your tasks, schedule, or anything else!
-              </Text>
-            </View>
-          ) : (
-            <FlatList
-              ref={chatScrollRef}
-              data={chatHistory}
-              renderItem={renderChatMessage}
-              keyExtractor={(item, index) => index.toString()}
-              style={styles.chatHistory}
-              contentContainerStyle={styles.chatContent}
-              showsVerticalScrollIndicator={false}
-              onContentSizeChange={() => chatScrollRef.current?.scrollToEnd({ animated: true })}
-            />
-          )}
-
-          {isLoading && (
-            <View style={styles.loadingIndicator}>
-              <ActivityIndicator size="small" color="#4ECDC4" />
-              <Text style={styles.loadingText}>Thinking...</Text>
-            </View>
-          )}
-
-          {/* Chat Input */}
-          <View style={styles.chatInputContainer}>
-            <TextInput
-              style={styles.chatInput}
-              placeholder="Ask me anything..."
-              placeholderTextColor="#999"
-              value={chatMessage}
-              onChangeText={setChatMessage}
-              onSubmitEditing={handleSendMessage}
-              multiline
-              maxLength={500}
-            />
-            <TouchableOpacity
-              style={[styles.sendButton, !chatMessage.trim() && styles.sendButtonDisabled]}
-              onPress={handleSendMessage}
-              disabled={!chatMessage.trim() || isLoading}
-            >
-              <Ionicons name="send" size={20} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        </Animated.View>
-      </View>
-
-      {/* Universal Task Modal */}
-      <UniversalTaskModal
+      {/* Universal Modal */}
+      <UniversalModal
         visible={showUniversalModal}
         onClose={() => {
           setShowUniversalModal(false);
           setUniversalModalTask(null);
+          setUniversalModalTimeBlock(null);
         }}
-        onSave={(taskData) => {
-          if (universalModalTask) {
-            onTaskUpdate(universalModalTask.id, taskData);
-          } else {
-            onTaskCreate(taskData as Omit<Task, 'id'>);
-          }
-          setShowUniversalModal(false);
-          setUniversalModalTask(null);
-        }}
-        initialTask={universalModalTask}
-        initialDate={selectedDate}
+        task={universalModalTask}
+        timeBlock={universalModalTimeBlock}
+        selectedDate={selectedDate}
+        onTaskCreated={onTasksChange}
+        onTimeBlockCreated={onTimeBlocksChange}
+        onDeleteTask={handleDeleteTask}
+        onSaveTask={handleSaveTask}
+        onDeleteTimeBlock={handleDeleteTimeBlock}
+        onSaveTimeBlock={handleSaveTimeBlock}
+        onCreateTimeBlockFromTask={handleCreateTimeBlockFromTask}
+        onUnlinkFromTimeBlock={handleUnlinkFromTimeBlock}
+        onLinkToTimeBlock={handleLinkToTimeBlock}
+        availableTimeBlocks={filteredTimeBlocks}
       />
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#FFFFFF',
   },
-  header: {
-    padding: 20,
-    paddingTop: 60,
-    backgroundColor: '#fff',
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 20,
+  },
+  fabContainer: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 90 : 80,
+    right: 20,
+    zIndex: 1000,
+  },
+  fab: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 20,
-  },
-  greeting: {
-    fontSize: 16,
-    color: '#666',
-    fontWeight: '500',
-  },
-  userName: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginTop: 4,
-  },
-  settingsButton: {
-    padding: 8,
-  },
-  progressCard: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  progressTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
-  },
-  progressPercentage: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#4ECDC4',
-  },
-  progressBarContainer: {
-    height: 8,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  progressBar: {
-    height: '100%',
-    backgroundColor: '#4ECDC4',
-    borderRadius: 4,
-  },
-  progressText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    padding: 12,
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginTop: 8,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-  },
-  mainContent: {
-    flex: 1,
-    flexDirection: 'row',
-    padding: 16,
-    gap: 16,
-  },
-  tasksColumn: {
-    flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  chatColumn: {
-    flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  columnHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  columnTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginLeft: 8,
-  },
-  addButton: {
-    backgroundColor: '#4ECDC4',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tasksScroll: {
-    flex: 1,
-  },
-  tasksContent: {
-    padding: 16,
-  },
-  taskSection: {
-    marginBottom: 24,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 8,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  emptyStateText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#666',
-    marginTop: 16,
-  },
-  emptyStateSubtext: {
-    fontSize: 14,
-    color: '#999',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  chatEmptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  chatHistory: {
-    flex: 1,
-  },
-  chatContent: {
-    padding: 16,
-  },
-  chatMessage: {
-    maxWidth: '80%',
-    padding: 12,
-    borderRadius: 16,
-    marginBottom: 12,
-  },
-  userMessage: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#4ECDC4',
-  },
-  assistantMessage: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#f0f0f0',
-  },
-  chatMessageText: {
-    fontSize: 14,
-    color: '#1a1a1a',
-  },
-  loadingIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    gap: 8,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: '#666',
-    fontStyle: 'italic',
-  },
-  chatInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    gap: 12,
-  },
-  chatInput: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 14,
-    maxHeight: 100,
-  },
-  sendButton: {
-    backgroundColor: '#4ECDC4',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sendButtonDisabled: {
-    backgroundColor: '#ccc',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
   },
 });
+
+export default DayAssistantV2View;
