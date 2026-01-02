@@ -670,7 +670,9 @@ export function TasksAssistant() {
       content: task.content,
       description: task.description,
       estimated_minutes: task.duration || 0,
-      cognitive_load: 0, // Default value, adjust if available
+      // Note: cognitive_load defaults to 0 as this field is not currently tracked in Task model
+      // Future enhancement: Add cognitive load tracking to Todoist tasks
+      cognitive_load: 0,
       project_id: task.project_id,
       priority: task.priority,
       due: typeof task.due === 'string' ? task.due : task.due?.date,
@@ -1163,6 +1165,9 @@ export function TasksAssistant() {
       </div>
       
       {/* Modals */}
+      {/* Note: UniversalTaskModal replaces CreateTaskModal and TaskDetailsModal
+          Trade-off: Duplicate functionality removed in favor of simpler unified interface
+          Users can still create new tasks easily via the "Dodaj zadanie" button */}
       <UniversalTaskModal 
         open={showUniversalModal}
         onOpenChange={setShowUniversalModal}
