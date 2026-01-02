@@ -9,7 +9,8 @@ import { User } from '@supabase/supabase-js'
 import { TasksAssistant } from '@/components/assistant/TasksAssistant'
 import { JournalAssistantWrapper } from '@/components/journal/JournalAssistantWrapper'
 import { DecisionAssistant } from '@/src/features/decision-assistant/components/DecisionAssistant'
-import { DayAssistantV2View } from '@/components/day-assistant-v2/DayAssistantV2View'
+// TEMPORARILY DISABLED: React Native component causing build errors
+// import { DayAssistantV2View } from '@/components/day-assistant-v2/DayAssistantV2View'
 import { WeekAssistantView } from '@/components/week-assistant/WeekAssistantView'
 import SubscriptionWall from '@/components/subscription/SubscriptionWall'
 import { VoiceCapture } from '@/components/voice/VoiceCapture'
@@ -205,7 +206,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
         return <TasksAssistant />
       
       case 'day-assistant-v2':
-        return <DayAssistantV2View />
+        // TEMPORARILY DISABLED: React Native component - needs web version
+        return <div className="p-8 text-center">
+          <p className="text-gray-600">Day Assistant V2 is temporarily unavailable</p>
+          <p className="text-sm text-gray-500 mt-2">Please use Tasks view instead</p>
+        </div>
       
       case 'journal':
         return <JournalAssistantWrapper />
