@@ -42,6 +42,7 @@ export function DayAssistantV2UnifiedTopBar({
   const capitalizedDate = formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1)
 
   // Polish pluralization for tasks
+  // TODO: Consider extracting to a shared utility function if used elsewhere
   const getTasksText = (count: number) => {
     if (count === 1) return '1 zadanie pozostało'
     if (count >= 2 && count <= 4) return `${count} zadania pozostały`
