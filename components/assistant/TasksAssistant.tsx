@@ -852,7 +852,7 @@ export function TasksAssistant() {
           onDelete={handleDelete}
           onMove={handleMove}
           onDetails={(t) => {
-            setSelectedTask(t)
+            setUniversalModalTask(t)
             setShowUniversalModal(true)
           }}
           selectable={selectedTaskIds.size > 0}
@@ -1031,7 +1031,10 @@ export function TasksAssistant() {
           
           <div className="flex items-center gap-2 md:gap-3">
             <Button 
-              onClick={() => setUniversalModalTask(null); setShowUniversalModal(true)} 
+              onClick={() => {
+                setUniversalModalTask(null)
+                setShowUniversalModal(true)
+              }} 
               className="gap-2 bg-gradient-to-r from-brand-purple to-brand-pink hover:shadow-lg transition-all hover:scale-105"
               size="md"
             >
@@ -1419,7 +1422,10 @@ export function TasksAssistant() {
                 {filter === 'scheduled' && 'Nie masz zadań do zaplanowania'}
                 {filter === 'completed' && 'Nie masz ukończonych zadań'}
               </p>
-              <Button onClick={() => setUniversalModalTask(null); setShowUniversalModal(true)} className="gap-2">
+              <Button onClick={() => {
+                setUniversalModalTask(null)
+                setShowUniversalModal(true)
+              }} className="gap-2">
                 <Plus size={18} />
                 Dodaj pierwsze zadanie
               </Button>
@@ -1492,12 +1498,13 @@ export function TasksAssistant() {
             onComplete={handleComplete}
             onDelete={handleDelete}
             onDetails={(t) => {
-              setSelectedTask(t)
+              setUniversalModalTask(t)
               setShowUniversalModal(true)
             }}
             onAddForDate={(date) => {
-              setUniversalModalTask(null); setShowUniversalModal(true)
-              // TODO: Pre-fill date in CreateTaskModal
+              setUniversalModalTask(null)
+              setShowUniversalModal(true)
+              // TODO: Pre-fill date in UniversalTaskModal
             }}
           />
         ) : null}
