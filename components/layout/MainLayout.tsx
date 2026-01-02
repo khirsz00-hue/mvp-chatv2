@@ -15,8 +15,7 @@ import SubscriptionWall from '@/components/subscription/SubscriptionWall'
 import { VoiceCapture } from '@/components/voice/VoiceCapture'
 import TrialBanner from '@/components/subscription/TrialBanner'
 import { FloatingAddButton } from '@/components/day-assistant-v2/FloatingAddButton'
-import { QuickAddModal } from '@/components/day-assistant-v2/QuickAddModal'
-import { NewTaskModal, NewTaskData } from '@/components/day-assistant-v2/NewTaskModal'
+import { UniversalTaskModal, TaskData } from '@/components/common/UniversalTaskModal'
 import { TaskContext } from '@/lib/services/contextInferenceService'
 import { toast } from 'sonner'
 import { recalculateDailyTotal } from '@/lib/gamification'
@@ -139,7 +138,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
   
-  const handleQuickAdd = async (taskData: NewTaskData) => {
+  const handleQuickAdd = async (taskData: TaskData) => {
     try {
       // Get fresh session token
       const { data: { session } } = await supabase.auth.getSession()
@@ -157,16 +156,18 @@ export default function MainLayout({ children }: MainLayoutProps) {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          title: taskData.title,
+          title: taskData.content,
           description: taskData.description,
-          estimate_min: taskData.estimateMin,
-          cognitive_load: taskData.cognitiveLoad,
-          is_must: taskData.isMust,
-          is_important: taskData.isImportant,
-          due_date: taskData.dueDate,
-          context_type: taskData.contextType,
+          estimate_min: taskData.estimated_minutes,
+          cognitive_load: taskData.cognitive_load,
+          is_must: false,
+          is_important: false,
+          due_date: taskData.due,
+          context_type: 'deep_work', // default
           priority: taskData.priority,
-          tags: taskData.tags
+          tags: taskData.labels || [],
+          project_id: taskData.project_id,
+          labels: taskData.labels
         })
       })
       
@@ -330,12 +331,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
               <VoiceCapture />
             </div>
             
-            {/* Full Featured Task Modal (replaces simplified QuickAddModal) */}
-            <NewTaskModal
-              isOpen={showQuickAdd}
-              onClose={() => setShowQuickAdd(false)}
-              onSubmit={handleQuickAdd}
+            {/* Universal Task Modal for Quick Add (Ctrl+K) */}
+            <UniversalTaskModal
+              open={showQuickAdd}
+              onOpenChange={setShowQuickAdd}
+              task={null}
               defaultDate={new Date().toISOString().split('T')[0]}
+              onSave={handleQuickAdd}
             />
           </div>
         </SubscriptionWall>
@@ -378,12 +380,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
             <VoiceCapture />
           </div>
           
-          {/* Full Featured Task Modal (replaces simplified QuickAddModal) */}
-          <NewTaskModal
-            isOpen={showQuickAdd}
-            onClose={() => setShowQuickAdd(false)}
-            onSubmit={handleQuickAdd}
+          {/* Universal Task Modal for Quick Add (Ctrl+K) */}
+          <UniversalTaskModal
+            open={showQuickAdd}
+            onOpenChange={setShowQuickAdd}
+            task={null}
             defaultDate={new Date().toISOString().split('T')[0]}
+            onSave={handleQuickAdd}
           />
         </div>
       )}
