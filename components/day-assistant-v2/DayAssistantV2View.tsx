@@ -34,8 +34,8 @@ import { useRecommendations } from '@/hooks/useRecommendations'
 import { getSmartEstimate, getFormattedEstimate } from '@/lib/utils/estimateHelpers'
 import { TaskBadges } from './TaskBadges'
 import { TaskContextMenu } from './TaskContextMenu'
-import { TaskDetailsModal } from './TaskDetailsModal'
 import { DayAssistantV2TaskCard } from './DayAssistantV2TaskCard'
+import { UniversalTaskModal, TaskData } from '@/components/common/UniversalTaskModal'
 
 import { WorkModeSelector, WorkMode, MODE_ICONS, MODE_LABELS } from './WorkModeSelector'
 import { WorkModeBar } from './WorkModeBar'
@@ -50,9 +50,7 @@ import { QueueReorderingOverlay } from './LoadingStates'
 import { CurrentActivityBox } from './CurrentActivityBox'
 import { BreakTimer } from './BreakTimer'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
-import { QuickAddModal } from './QuickAddModal'
-import { NewTaskModal, NewTaskData } from './NewTaskModal'
-import { CreateTaskModal } from '@/components/assistant/CreateTaskModal'
+
 import { updateStreakOnCompletion, updateDailyStats, triggerConfetti, triggerMilestoneToast, recalculateDailyTotal } from '@/lib/gamification'
 import { useOverdueTasks } from '@/hooks/useOverdueTasks'
 import { RiskBadge } from './RiskBadge'
@@ -125,7 +123,7 @@ function DayAssistantV2Content() {
   const [decisionLog, setDecisionLog] = useState<DecisionLogEntry[]>([])
   const [warningTask, setWarningTask] = useState<TestDayTask | null>(null)
   const [warningDetails, setWarningDetails] = useState<{ title: string; message: string; details: string[] } | null>(null)
-  const [selectedTask, setSelectedTask] = useState<TestDayTask | null>(null)
+
   const [showConfigModal, setShowConfigModal] = useState(false)
   const [clarifyTask, setClarifyTask] = useState<TestDayTask | null>(null)
   const [showLaterQueue, setShowLaterQueue] = useState(false)
@@ -143,8 +141,9 @@ function DayAssistantV2Content() {
   // NEW: Help me modal state
   const [helpMeTask, setHelpMeTask] = useState<TestDayTask | null>(null)
   
-  // NEW: Create task modal state
-  const [showCreateTaskModal, setShowCreateTaskModal] = useState(false)
+  // Universal Task Modal state (replaces CreateTaskModal, NewTaskModal, TaskDetailsModal)
+  const [showUniversalModal, setShowUniversalModal] = useState(false)
+  const [universalModalTask, setUniversalModalTask] = useState<TestDayTask | null>(null)
   
   // NEW: Add time block modal state
   const [showAddTimeBlockModal, setShowAddTimeBlockModal] = useState(false)
@@ -154,9 +153,6 @@ function DayAssistantV2Content() {
   const [showBreakModal, setShowBreakModal] = useState(false)
   const [breakActive, setBreakActive] = useState(false)
   const [breakTimeRemaining, setBreakTimeRemaining] = useState(0)
-  
-  // NEW: Quick add modal state
-  const [showQuickAdd, setShowQuickAdd] = useState(false)
   
   // NEW: Work hours state (for inline editing)
   const [workHoursStart, setWorkHoursStart] = useState<string>('09:00')
@@ -1138,43 +1134,76 @@ function DayAssistantV2Content() {
     }
   }
 
-  // Handler for NewTaskModal submission
-  const handleNewTaskSubmit = async (taskData: NewTaskData) => {
-    const response = await authFetch('/api/day-assistant-v2/task', {
-      method: 'POST',
-      body: JSON.stringify({
-        title: taskData.title,
-        description: taskData.description,
-        estimate_min: taskData.estimateMin,
-        cognitive_load: taskData.cognitiveLoad,
-        is_must: taskData.isMust,
-        is_important: taskData.isImportant,
-        due_date: taskData.dueDate,
-        context_type: taskData.contextType,
-        priority: taskData.priority,
-        tags: taskData.tags
+  // Handler for UniversalTaskModal submission
+  const handleUniversalTaskSave = async (taskData: TaskData) => {
+    const isEditMode = Boolean(taskData.id)
+    
+    if (isEditMode) {
+      // UPDATE existing task
+      const response = await authFetch(`/api/day-assistant-v2/task/${taskData.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          title: taskData.content,
+          description: taskData.description,
+          estimate_min: taskData.estimated_minutes,
+          cognitive_load: taskData.cognitive_load,
+          due_date: taskData.due,
+          priority: taskData.priority,
+          project_id: taskData.project_id,
+          labels: taskData.labels
+        })
       })
-    })
-    
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}))
-      showToast(err.message || 'Nie udało się dodać zadania', 'error')
-      return
-    }
-    
-    const data = await response.json()
-    setTasks(prev => [...prev, data.task])
-    applyAdditionToStats(data.task)
-    if (data.proposal) {
-      setProposals(prev => [data.proposal, ...prev].slice(0, 3))
-    }
-    showToast('✅ Zadanie dodane!', 'success')
-    addDecisionLog(`Dodano zadanie "${data.task.title}"`)
-    
-    // 🎮 GAMIFICATION: Recalculate daily stats after adding task
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      await recalculateDailyTotal(user.id)
+      
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        showToast(err.message || 'Nie udało się zaktualizować zadania', 'error')
+        return
+      }
+      
+      const data = await response.json()
+      setTasks(prev => prev.map(t => t.id === data.task.id ? data.task : t))
+      showToast('✅ Zadanie zaktualizowane!', 'success')
+      addDecisionLog(`Zaktualizowano zadanie "${data.task.title}"`)
+    } else {
+      // CREATE new task
+      const response = await authFetch('/api/day-assistant-v2/task', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: taskData.content,
+          description: taskData.description,
+          estimate_min: taskData.estimated_minutes,
+          cognitive_load: taskData.cognitive_load,
+          is_must: false,
+          is_important: false,
+          due_date: taskData.due || selectedDate,
+          context_type: 'deep_work', // default
+          priority: taskData.priority,
+          tags: [],
+          project_id: taskData.project_id,
+          labels: taskData.labels
+        })
+      })
+      
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        showToast(err.message || 'Nie udało się dodać zadania', 'error')
+        return
+      }
+      
+      const data = await response.json()
+      setTasks(prev => [...prev, data.task])
+      applyAdditionToStats(data.task)
+      if (data.proposal) {
+        setProposals(prev => [data.proposal, ...prev].slice(0, 3))
+      }
+      showToast('✅ Zadanie dodane!', 'success')
+      addDecisionLog(`Dodano zadanie "${data.task.title}"`)
+      
+      // 🎮 GAMIFICATION: Recalculate daily stats after adding task
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await recalculateDailyTotal(user.id)
+      }
     }
   }
 
@@ -2150,7 +2179,7 @@ function DayAssistantV2Content() {
                   onDelete={handleDeleteById}
                   onOpenDetails={(id) => {
                     const task = mustTasks.find(t => t.id === id)
-                    if (task) setSelectedTask(task)
+                    if (task) { setUniversalModalTask(task); setShowUniversalModal(true) }
                   }}
                 />
               ))}
@@ -2190,7 +2219,7 @@ function DayAssistantV2Content() {
                       onDelete={handleDeleteById}
                       onOpenDetails={(id) => {
                         const task = mustTasks.find(t => t.id === id)
-                        if (task) setSelectedTask(task)
+                        if (task) { setUniversalModalTask(task); setShowUniversalModal(true) }
                       }}
                     />
                   ))}
@@ -2244,7 +2273,7 @@ function DayAssistantV2Content() {
                   onDelete={handleDeleteById}
                   onOpenDetails={(id) => {
                     const task = top3Tasks.find(t => t.id === id)
-                    if (task) setSelectedTask(task)
+                    if (task) { setUniversalModalTask(task); setShowUniversalModal(true) }
                   }}
                 />
               ))
@@ -2295,7 +2324,7 @@ function DayAssistantV2Content() {
                     onDelete={handleDeleteById}
                     onOpenDetails={(id) => {
                       const task = remainingToday.find(t => t.id === id)
-                      if (task) setSelectedTask(task)
+                      if (task) { setUniversalModalTask(task); setShowUniversalModal(true) }
                     }}
                   />
                 ))}
@@ -2346,7 +2375,10 @@ function DayAssistantV2Content() {
                     onPin={handlePinById}
                     onPostpone={handlePostponeById}
                     onDelete={handleDeleteById}
-                    onOpenDetails={(id) => setSelectedTask(easiestTask)}
+                    onOpenDetails={(id) => {
+                      setUniversalModalTask(easiestTask)
+                      setShowUniversalModal(true)
+                    }}
                   />
                   <div className="text-center mt-3">
                     <Button
@@ -2405,7 +2437,7 @@ function DayAssistantV2Content() {
                     onDelete={handleDeleteById}
                     onOpenDetails={(id) => {
                       const task = overflowToday.find(t => t.id === id)
-                      if (task) setSelectedTask(task)
+                      if (task) { setUniversalModalTask(task); setShowUniversalModal(true) }
                     }}
                   />
                 ))}
@@ -2453,7 +2485,7 @@ function DayAssistantV2Content() {
                     onDelete={handleDeleteById}
                     onOpenDetails={(id) => {
                       const task = laterTasks.find(t => t.id === id)
-                      if (task) setSelectedTask(task)
+                      if (task) { setUniversalModalTask(task); setShowUniversalModal(true) }
                     }}
                   />
                 ))}
@@ -2468,7 +2500,10 @@ function DayAssistantV2Content() {
           </CardHeader>
           <CardContent>
             <Button 
-              onClick={() => setShowCreateTaskModal(true)}
+              onClick={() => {
+                setUniversalModalTask(null)
+                setShowUniversalModal(true)
+              }}
               className="w-full gap-2"
             >
               <Plus size={20} />
@@ -2698,13 +2733,42 @@ function DayAssistantV2Content() {
         </div>
       )}
 
-      {selectedTask && (
-        <TaskDetailsModal
-          task={selectedTask}
-          onClose={() => setSelectedTask(null)}
-          selectedDate={selectedDate}
-        />
-      )}
+      {/* Universal Task Modal - replaces TaskDetailsModal, CreateTaskModal, QuickAddModal, NewTaskModal */}
+      <UniversalTaskModal
+        open={showUniversalModal}
+        onOpenChange={setShowUniversalModal}
+        task={universalModalTask ? {
+          id: universalModalTask.id,
+          content: universalModalTask.title,
+          description: universalModalTask.description || '',
+          estimated_minutes: universalModalTask.estimate_min || 25,
+          cognitive_load: universalModalTask.cognitive_load || 3,
+          project_id: universalModalTask.project_id,
+          priority: universalModalTask.priority || 3,
+          due: universalModalTask.due_date,
+          labels: universalModalTask.tags || []
+        } : null}
+        defaultDate={selectedDate}
+        onSave={handleUniversalTaskSave}
+        onDelete={async (taskId) => {
+          try {
+            await deleteTaskMutation.mutateAsync(taskId)
+            showToast('✅ Zadanie usunięte!', 'success')
+          } catch (error) {
+            console.error('Error deleting task:', error)
+            showToast('Nie udało się usunąć zadania', 'error')
+          }
+        }}
+        onComplete={async (taskId) => {
+          try {
+            await completeTaskMutation.mutateAsync(taskId)
+            showToast('✅ Zadanie ukończone!', 'success')
+          } catch (error) {
+            console.error('Error completing task:', error)
+            showToast('Nie udało się oznaczyć zadania jako ukończone', 'error')
+          }
+        }}
+      />
 
       {/* Work Hours Config Modal */}
       <WorkHoursConfigModal
@@ -2782,65 +2846,7 @@ function DayAssistantV2Content() {
         onStartBreak={handleStartBreak}
       />
 
-      {/* 🎮 GAMIFICATION: Quick Add Modal */}
-      <QuickAddModal
-        isOpen={showQuickAdd}
-        onClose={() => setShowQuickAdd(false)}
-        onSubmit={handleQuickAdd}
-      />
-      
-      {/* Create Task Modal */}
-      <CreateTaskModal
-        open={showCreateTaskModal}
-        onOpenChange={setShowCreateTaskModal}
-        onCreateTask={async (taskData) => {
-          try {
-            // Create task via API
-            const response = await authFetch('/api/day-assistant-v2/task', {
-              method: 'POST',
-              body: JSON.stringify({
-                title: taskData.content,
-                estimate_min: taskData.duration || 25,
-                cognitive_load: 2, // default
-                is_must: false,
-                is_important: false,
-                due_date: taskData.due || selectedDate,
-                context_type: 'deep_work', // default
-                priority: taskData.priority || 3,
-                description: taskData.description || '',
-                // If project_id is provided
-                ...(taskData.project_id && { project_id: taskData.project_id }),
-                // If labels are provided
-                ...(taskData.labels && { labels: taskData.labels })
-              })
-            })
-            
-            if (!response.ok) {
-              const err = await response.json().catch(() => ({}))
-              showToast(err.message || 'Nie udało się dodać zadania', 'error')
-              throw new Error(err.message)
-            }
-            
-            const data = await response.json()
-            
-            // Add to local state
-            setTasks(prev => [...prev, data.task])
-            applyAdditionToStats(data.task)
-            addDecisionLog(`Dodano zadanie "${data.task.title}"`)
-            showToast('✅ Zadanie dodane!', 'success')
-            
-            // 🎮 GAMIFICATION: Recalculate daily stats
-            const { data: { user } } = await supabase.auth.getUser()
-            if (user) {
-              await recalculateDailyTotal(user.id)
-            }
-          } catch (error) {
-            console.error('Error creating task:', error)
-            throw error
-          }
-        }}
-      />
-      
+
       {/* Morning Review Modal */}
       <MorningReviewModal
         overdueTasks={overdueTasks}
