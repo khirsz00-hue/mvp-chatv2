@@ -38,7 +38,7 @@ import { DayAssistantV2TaskCard } from './DayAssistantV2TaskCard'
 import { UniversalTaskModal, TaskData } from '@/components/common/UniversalTaskModal'
 
 import { WorkModeSelector, WorkMode, MODE_ICONS, MODE_LABELS } from './WorkModeSelector'
-import { WorkModeBar } from './WorkModeBar'
+import { DayAssistantV2UnifiedTopBar } from './DayAssistantV2UnifiedTopBar'
 import { HelpMeModal } from './HelpMeModal'
 import { WorkHoursConfigModal } from './WorkHoursConfigModal'
 import { AddTimeBlockModal } from './AddTimeBlockModal'
@@ -2026,16 +2026,17 @@ function DayAssistantV2Content() {
         />
       )}
       
-      {/* NEW: Global State Bar (sticky, 1 linia) */}
-      <WorkModeBar
+      {/* Unified Sticky Top Bar */}
+      <DayAssistantV2UnifiedTopBar
+        selectedDate={selectedDate}
         workMode={workMode}
         workHoursStart={workHoursStart}
         workHoursEnd={workHoursEnd}
-        onWorkModeChange={handleWorkModeChange}
-        onWorkHoursChange={handleWorkHoursChange}
+        capacityMinutes={adjustedCapacity}
         usedMinutes={usedMinutes}
-        totalCapacity={adjustedCapacity}
-        meetingMinutes={meetingMinutes}
+        usagePercentage={usagePercentage}
+        remainingTasks={queue.length + remainingToday.length + overflowToday.length}
+        onWorkModeChange={handleWorkModeChange}
       />
       
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(600px,2fr)_minmax(400px,1fr)] gap-6">
