@@ -70,7 +70,7 @@ export function TodaysFlowPanel({
     <Card>
       <CardHeader>
         <CardTitle className="text-lg font-semibold">
-          Today's Flow
+          Today&apos;s Flow
         </CardTitle>
       </CardHeader>
       <CardContent className="p-4 pt-0">
