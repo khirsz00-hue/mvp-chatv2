@@ -6,22 +6,25 @@
 
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { UniversalTaskModal, TaskData } from '@/components/common/UniversalTaskModal'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabaseClient'
 import { TestDayTask, DayPlan, Recommendation, WorkMode } from '@/lib/types/dayAssistantV2'
-import { TopStatusBar } from './TopStatusBar'
-import { WorkModeBar } from './WorkModeBar'
-import { CurrentActivityBox } from './CurrentActivityBox'
+import { DayAssistantV2TopBar } from './DayAssistantV2TopBar'
+import { ActiveTimerBar } from './ActiveTimerBar'
+import { OverdueAlert } from './OverdueAlert'
+import { MeetingsSection } from './MeetingsSection'
+import { TodaysFlowPanel } from './TodaysFlowPanel'
+import { DecisionLogPanel, Decision } from './DecisionLogPanel'
+import { OverdueTasksSection } from './OverdueTasksSection'
 import { DayAssistantV2TaskCard } from './DayAssistantV2TaskCard'
-import { WorkModeSelector } from './WorkModeSelector'
 import { RecommendationPanel } from './RecommendationPanel'
-import { Card, CardContent } from '@/components/ui/Card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { useTaskTimer } from '@/hooks/useTaskTimer'
 import { useDayPlan } from '@/hooks/useDayPlan'
 import Button from '@/components/ui/Button'
-import { Plus, Clock, CalendarBlank, ChartLineUp } from '@phosphor-icons/react'
+import { Plus, CalendarBlank, CaretDown, CaretUp } from '@phosphor-icons/react'
 
 interface TaskStats {
   completedToday: number
@@ -53,6 +56,13 @@ export function DayAssistantV2View() {
   const [showUniversalModal, setShowUniversalModal] = useState(false)
   const [editingTask, setEditingTask] = useState<TestDayTask | null>(null)
   const [showWorkModeModal, setShowWorkModeModal] = useState(false)
+  const [workHoursStart, setWorkHoursStart] = useState('09:00')
+  const [workHoursEnd, setWorkHoursEnd] = useState('17:00')
+  const [queueCollapsed, setQueueCollapsed] = useState(true)
+  const [overflowCollapsed, setOverflowCollapsed] = useState(true)
+  const [decisions, setDecisions] = useState<Decision[]>([])
+  const [meetings, setMeetings] = useState<any[]>([])
+  const overdueRef = useRef<HTMLDivElement>(null)
 
   // Custom hooks
   const { activeTimer, startTimer, pauseTimer, resumeTimer, stopTimer, formatTime } = useTaskTimer()
@@ -368,6 +378,37 @@ export function DayAssistantV2View() {
     // Work mode is client-side filtering only
   }
 
+  const handleWorkHoursChange = (start: string, end: string) => {
+    setWorkHoursStart(start)
+    setWorkHoursEnd(end)
+    // Could persist to backend if needed
+  }
+
+  const handleReviewOverdue = () => {
+    // Scroll to overdue section
+    overdueRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const handleLogDecision = (text: string) => {
+    const newDecision: Decision = {
+      id: Date.now().toString(),
+      text,
+      timestamp: new Date().toISOString()
+    }
+    setDecisions(prev => [newDecision, ...prev])
+    toast.success('✅ Decyzja zapisana')
+  }
+
+  const handleKeepOverdueToday = async (task: TestDayTask) => {
+    // Just keep the due date as today - no API call needed for now
+    toast.success(`📅 ${task.title} pozostaje na dziś`)
+  }
+
+  const handleRefreshMeetings = async () => {
+    // Placeholder for meetings refresh
+    toast.info('🔄 Odświeżanie spotkań...')
+  }
+
   // Filter tasks by work mode
   const filteredTasks = tasks.filter(task => {
     if (workMode === 'low_focus') {
@@ -386,11 +427,14 @@ export function DayAssistantV2View() {
   }
 
   // Organize tasks into sections (optimized single pass)
-  const { mustTasks, top3Tasks, queueTasks, overflowTasks } = filteredTasks.reduce(
+  const { mustTasks, top3Tasks, queueTasks, overflowTasks, overdueTasks } = filteredTasks.reduce(
     (acc, task) => {
       if (task.completed) return acc
       
-      if (task.is_must) {
+      // Check if overdue
+      if (task.due_date && task.due_date < selectedDate) {
+        acc.overdueTasks.push(task)
+      } else if (task.is_must) {
         acc.mustTasks.push(task)
       } else if (!task.due_date || task.due_date > selectedDate) {
         acc.overflowTasks.push(task)
@@ -406,7 +450,8 @@ export function DayAssistantV2View() {
       mustTasks: [] as TestDayTask[],
       top3Tasks: [] as TestDayTask[],
       queueTasks: [] as TestDayTask[],
-      overflowTasks: [] as TestDayTask[]
+      overflowTasks: [] as TestDayTask[],
+      overdueTasks: [] as TestDayTask[]
     }
   )
 
@@ -428,55 +473,64 @@ export function DayAssistantV2View() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50">
-      {/* Top Status Bar */}
-      <TopStatusBar
-        completedToday={taskStats.completedToday}
-        totalToday={taskStats.totalToday}
-        usedMinutes={completedMinutes}
-        availableMinutes={availableMinutes}
-        usagePercentage={usagePercentage}
-        workMode={workMode}
-        activeTimer={activeTimer ? {
-          taskId: activeTimer.taskId,
-          taskTitle: tasks.find(t => t.id === activeTimer.taskId)?.title || '',
-          elapsedSeconds: activeTimer.elapsedSeconds,
-          estimatedMinutes: activeTimer.estimatedMinutes
-        } : undefined}
-        firstInQueue={top3Tasks[0] ? { title: top3Tasks[0].title } : undefined}
-      />
+      {/* Conditional Top Bar - Light mode when no timer, Dark mode when timer active */}
+      {activeTimer ? (
+        <ActiveTimerBar
+          taskTitle={tasks.find(t => t.id === activeTimer.taskId)?.title || ''}
+          elapsedSeconds={activeTimer.elapsedSeconds}
+          estimatedMinutes={activeTimer.estimatedMinutes}
+          isPaused={activeTimer.isPaused || false}
+          onPause={pauseTimer}
+          onResume={resumeTimer}
+          onStop={stopTimer}
+          onComplete={() => handleCompleteTask(activeTimer.taskId)}
+        />
+      ) : (
+        <DayAssistantV2TopBar
+          selectedDate={selectedDate}
+          workHoursStart={workHoursStart}
+          workHoursEnd={workHoursEnd}
+          capacityMinutes={availableMinutes}
+          workMode={workMode}
+          completedMinutes={completedMinutes}
+          onWorkHoursChange={handleWorkHoursChange}
+          onWorkModeChange={handleWorkModeChange}
+        />
+      )}
 
-      {/* Work Mode Bar */}
-      <WorkModeBar
-        workMode={workMode}
-        workHoursStart="09:00"
-        workHoursEnd="17:00"
-        onWorkModeChange={handleWorkModeChange}
-        usedMinutes={completedMinutes}
-        totalCapacity={availableMinutes}
+      {/* Overdue Alert Banner */}
+      <OverdueAlert 
+        overdueCount={overdueTasks.length}
+        onReview={handleReviewOverdue}
       />
 
       {/* Main Layout: Content + Sidebar */}
-      <div className="max-w-7xl mx-auto px-6 py-6 flex gap-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 flex flex-col lg:flex-row gap-4 lg:gap-6">
         {/* Main Content */}
-        <div className="flex-1">
-          {/* Current Activity Box */}
-          {activeTimer && (
-            <CurrentActivityBox
-              activeTimer={activeTimer}
-              taskTitle={tasks.find(t => t.id === activeTimer.taskId)?.title}
-              breakActive={false}
-              breakTimeRemaining={0}
-              formatTime={formatTime}
-              onPause={pauseTimer}
-              onResume={resumeTimer}
-              onComplete={() => handleCompleteTask(activeTimer.taskId)}
-              onStop={stopTimer}
-            />
+        <div className="flex-1 min-w-0">
+          
+          {/* Meetings Section */}
+          <MeetingsSection
+            meetings={meetings}
+            onRefresh={handleRefreshMeetings}
+          />
+
+          {/* Overdue Tasks Section */}
+          {overdueTasks.length > 0 && (
+            <div ref={overdueRef} className="mb-6">
+              <OverdueTasksSection
+                overdueTasks={overdueTasks}
+                selectedDate={selectedDate}
+                onComplete={(task) => handleCompleteTask(task.id)}
+                onKeepToday={handleKeepOverdueToday}
+                onPostpone={(task) => handlePostponeTask(task.id)}
+              />
+            </div>
           )}
 
           {/* MUST Section */}
           {mustTasks.length > 0 && (
-            <Card className="mb-6">
+            <Card className="mb-6 border-l-4 border-l-red-600">
               <CardContent className="p-6">
                 <h2 className="text-xl font-bold mb-4 text-red-600">
                   🔴 MUST (max 3)
@@ -502,10 +556,10 @@ export function DayAssistantV2View() {
 
           {/* Top 3 Section */}
           {top3Tasks.length > 0 && (
-            <Card className="mb-6">
+            <Card className="mb-6 border-2 border-purple-300">
               <CardContent className="p-6">
-                <h2 className="text-xl font-bold mb-4">
-                  ⭐ Top 3
+                <h2 className="text-xl font-bold mb-4 text-purple-900">
+                  ⭐ Top 3 zadania na dziś
                 </h2>
                 <div className="space-y-3">
                   {top3Tasks.map((task, idx) => (
@@ -527,56 +581,76 @@ export function DayAssistantV2View() {
             </Card>
           )}
 
-          {/* Queue Section */}
+          {/* Queue Section - Collapsible */}
           {queueTasks.length > 0 && (
             <Card className="mb-6">
-              <CardContent className="p-6">
-                <h2 className="text-xl font-bold mb-4">
-                  📋 Kolejka ({queueTasks.length})
-                </h2>
-                <div className="space-y-3">
-                  {queueTasks.map((task, idx) => (
-                    <DayAssistantV2TaskCard
-                      key={task.id}
-                      task={task}
-                      queuePosition={idx + 4}
-                      onStartTimer={handleStartTimer}
-                      onComplete={handleCompleteTask}
-                      onHelp={handleHelp}
-                      onPin={handlePinTask}
-                      onPostpone={handlePostponeTask}
-                      onDelete={handleDeleteTask}
-                      onOpenDetails={handleOpenDetails}
-                    />
-                  ))}
+              <CardHeader 
+                className="cursor-pointer hover:bg-gray-50 transition-colors"
+                onClick={() => setQueueCollapsed(!queueCollapsed)}
+              >
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg font-bold flex items-center gap-2">
+                    {queueCollapsed ? <CaretDown size={20} /> : <CaretUp size={20} />}
+                    📋 Kolejka ({queueTasks.length})
+                  </CardTitle>
                 </div>
-              </CardContent>
+              </CardHeader>
+              {!queueCollapsed && (
+                <CardContent className="pt-0">
+                  <div className="space-y-3">
+                    {queueTasks.map((task, idx) => (
+                      <DayAssistantV2TaskCard
+                        key={task.id}
+                        task={task}
+                        queuePosition={idx + 4}
+                        onStartTimer={handleStartTimer}
+                        onComplete={handleCompleteTask}
+                        onHelp={handleHelp}
+                        onPin={handlePinTask}
+                        onPostpone={handlePostponeTask}
+                        onDelete={handleDeleteTask}
+                        onOpenDetails={handleOpenDetails}
+                      />
+                    ))}
+                  </div>
+                </CardContent>
+              )}
             </Card>
           )}
 
-          {/* Overflow Section */}
+          {/* Overflow Section - Collapsible */}
           {overflowTasks.length > 0 && (
             <Card className="mb-6">
-              <CardContent className="p-6">
-                <h2 className="text-xl font-bold mb-4 text-gray-500">
-                  📦 Na później ({overflowTasks.length})
-                </h2>
-                <div className="space-y-3">
-                  {overflowTasks.map(task => (
-                    <DayAssistantV2TaskCard
-                      key={task.id}
-                      task={task}
-                      onStartTimer={handleStartTimer}
-                      onComplete={handleCompleteTask}
-                      onHelp={handleHelp}
-                      onPin={handlePinTask}
-                      onPostpone={handlePostponeTask}
-                      onDelete={handleDeleteTask}
-                      onOpenDetails={handleOpenDetails}
-                    />
-                  ))}
+              <CardHeader
+                className="cursor-pointer hover:bg-gray-50 transition-colors"
+                onClick={() => setOverflowCollapsed(!overflowCollapsed)}
+              >
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg font-bold flex items-center gap-2 text-gray-600">
+                    {overflowCollapsed ? <CaretDown size={20} /> : <CaretUp size={20} />}
+                    📦 Zadania na dziś, które nie zmieszczą się w dostępnym czasie pracy ({overflowTasks.length})
+                  </CardTitle>
                 </div>
-              </CardContent>
+              </CardHeader>
+              {!overflowCollapsed && (
+                <CardContent className="pt-0">
+                  <div className="space-y-3">
+                    {overflowTasks.map(task => (
+                      <DayAssistantV2TaskCard
+                        key={task.id}
+                        task={task}
+                        onStartTimer={handleStartTimer}
+                        onComplete={handleCompleteTask}
+                        onHelp={handleHelp}
+                        onPin={handlePinTask}
+                        onPostpone={handlePostponeTask}
+                        onDelete={handleDeleteTask}
+                        onOpenDetails={handleOpenDetails}
+                      />
+                    ))}
+                  </div>
+                </CardContent>
+              )}
             </Card>
           )}
 
@@ -603,53 +677,35 @@ export function DayAssistantV2View() {
           )}
         </div>
 
-        {/* Sidebar */}
-        <div className="w-80 space-y-6">
-          {/* Work Mode Selector */}
-          <WorkModeSelector
-            value={workMode}
-            onChange={handleWorkModeChange}
+        {/* Right Sidebar */}
+        <div className="w-full lg:w-80 space-y-4 lg:space-y-6">
+          
+          {/* Today's Flow Panel */}
+          <TodaysFlowPanel
+            completedCount={taskStats.completedToday}
+            presentedCount={0} // Placeholder
+            addedCount={taskStats.addedToday}
+            workTimeMinutes={completedMinutes}
+          />
+
+          {/* Decision Log Panel */}
+          <DecisionLogPanel
+            decisions={decisions}
+            onLogDecision={handleLogDecision}
           />
 
           {/* AI Recommendations */}
           <Card>
-            <CardContent className="p-4">
-              <h3 className="font-semibold mb-3 flex items-center">
-                <ChartLineUp size={20} className="mr-2" />
-                AI Insights
-              </h3>
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold">
+                🤖 AI Insights
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
               <RecommendationPanel
                 recommendations={recommendations}
                 onApply={handleApplyRecommendation}
               />
-            </CardContent>
-          </Card>
-
-          {/* Quick Stats */}
-          <Card>
-            <CardContent className="p-4">
-              <h3 className="font-semibold mb-3 flex items-center">
-                <Clock size={20} className="mr-2" />
-                Statystyki
-              </h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Ukończone:</span>
-                  <span className="font-semibold">{taskStats.completedToday}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Razem dziś:</span>
-                  <span className="font-semibold">{taskStats.totalToday}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Dodane dziś:</span>
-                  <span className="font-semibold">{taskStats.addedToday}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Przesunięte:</span>
-                  <span className="font-semibold">{taskStats.movedFromToday}</span>
-                </div>
-              </div>
             </CardContent>
           </Card>
         </div>
