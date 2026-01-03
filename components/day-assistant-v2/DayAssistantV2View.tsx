@@ -279,21 +279,31 @@ export function DayAssistantV2View() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
       
+      const payload = {
+        title: taskData.content,
+        description: taskData.description,
+        estimate_min: taskData.estimated_minutes,
+        cognitive_load: taskData.cognitive_load,
+        due_date: taskData.due,
+        priority: taskData.priority,
+        tags: taskData.labels || []
+      }
+      
       if (editingTask) {
         // Update existing task
-        const response = await fetch(`/api/day-assistant-v2/tasks/${editingTask.id}`, {
-          method: 'PATCH',
+        if (!editingTask.id) {
+          toast.error('Brak ID zadania')
+          return
+        }
+        const response = await fetch('/api/day-assistant-v2/task', {
+          method: 'PUT',
           headers: {
             Authorization: `Bearer ${session.access_token}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            title: taskData.content,
-            description: taskData.description,
-            estimate_min: taskData.estimated_minutes,
-            cognitive_load: taskData.cognitive_load,
-            due_date: taskData.due,
-            priority: taskData.priority
+            task_id: editingTask.id,
+            ...payload
           })
         })
         
@@ -308,12 +318,7 @@ export function DayAssistantV2View() {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            title: taskData.content,
-            description: taskData.description,
-            estimate_min: taskData.estimated_minutes,
-            cognitive_load: taskData.cognitive_load,
-            due_date: taskData.due,
-            priority: taskData.priority,
+            ...payload,
             is_must: false,
             is_important: false,
             context_type: 'deep_work'
