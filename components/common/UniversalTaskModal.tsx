@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/Dialog'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Textarea from '@/components/ui/Textarea'
@@ -20,8 +20,13 @@ import {
   CheckCircle,
   Play,
   Pause,
-  Stop
+  Stop,
+  Clock,
+  CalendarBlank,
+  Flag,
+  Trash
 } from '@phosphor-icons/react'
+import { format, addDays } from 'date-fns'
 import { CollapsibleSection } from './CollapsibleSection'
 
 /* =======================
@@ -123,6 +128,7 @@ export function UniversalTaskModal({
   const [priority, setPriority] = useState<1 | 2 | 3 | 4>(3)
   const [dueDate, setDueDate] = useState('')
   const [selectedLabels, setSelectedLabels] = useState<string[]>([])
+  const [newLabel, setNewLabel] = useState('')
   
   // Data
   const [projects, setProjects] = useState<Project[]>([])
@@ -207,6 +213,7 @@ export function UniversalTaskModal({
       setPriority(3)
       setDueDate(defaultDate || new Date().toISOString().split('T')[0])
       setSelectedLabels([])
+      setNewLabel('')
       setAiUnderstanding('')
       setSubtasks([])
       setChangeHistory([])
@@ -309,6 +316,17 @@ export function UniversalTaskModal({
   const startPomodoro = () => {
     // TODO: Implement Pomodoro timer
     alert('Pomodoro timer will be implemented')
+  }
+  
+  const handleAddLabel = () => {
+    if (!newLabel.trim()) return
+    if (selectedLabels.includes(newLabel.trim())) return
+    setSelectedLabels([...selectedLabels, newLabel.trim()])
+    setNewLabel('')
+  }
+  
+  const handleRemoveLabel = (label: string) => {
+    setSelectedLabels(selectedLabels.filter(l => l !== label))
   }
   
   const formatTime = (seconds: number): string => {
@@ -420,160 +438,200 @@ export function UniversalTaskModal({
             />
           </div>
 
-          {/* Estimate Buttons */}
-          <div>
-            <label className="text-sm font-medium mb-2 block">Estymat czasu:</label>
-            <div className="flex gap-2 flex-wrap">
-              {[5, 15, 25, 30, 45, 60, 90, 120].map(min => (
-                <button
-                  key={min}
-                  type="button"
-                  onClick={() => setEstimatedMinutes(min)}
-                  className={`
-                    px-3 py-2 rounded-lg border-2 transition-all text-sm
-                    ${estimatedMinutes === min
-                      ? 'border-brand-purple bg-brand-purple/10 text-brand-purple font-semibold'
-                      : 'border-gray-200 hover:border-gray-300'
-                    }
-                  `}
-                >
-                  {min} min
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Cognitive Load Slider */}
-          <div>
-            <label className="text-sm font-medium mb-2 block">
-              Obciążenie kognitywne: <span className="font-bold text-brand-purple">{cognitiveLoad}/5</span>
-            </label>
-            <input
-              type="range"
-              min={1}
-              max={5}
-              value={cognitiveLoad}
-              onChange={(e) => setCognitiveLoad(Number(e.target.value))}
-              className="w-full accent-brand-purple"
-            />
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
-              <span>Łatwe</span>
-              <span>Średnie</span>
-              <span>Trudne</span>
-            </div>
-          </div>
-
-          {/* Project Dropdown */}
-          <div>
-            <label className="text-sm font-medium mb-1 block flex items-center gap-2">
-              <FolderOpen size={16} />
-              Projekt:
-            </label>
-            <select
-              value={projectId}
-              onChange={(e) => setProjectId(e.target.value)}
-              className="w-full px-4 py-2 rounded-lg border-2 border-gray-200 focus:border-brand-purple focus:outline-none"
-              disabled={loading}
-            >
-              <option value="">Brak projektu</option>
-              {projects.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Priority */}
-          <div>
-            <label className="text-sm font-medium mb-2 block">
-              Priorytet: <span className="font-bold text-brand-purple">{priority}</span>
-            </label>
-            <div className="flex gap-2">
-              {[1, 2, 3, 4].map(p => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setPriority(p as 1 | 2 | 3 | 4)}
-                  className={`
-                    flex-1 py-2 rounded-lg border-2 transition-all text-sm font-medium
-                    ${priority === p
-                      ? 'border-brand-purple bg-brand-purple/10 text-brand-purple'
-                      : 'border-gray-200 hover:border-gray-300'
-                    }
-                  `}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
-              <span>Najwyższy</span>
-              <span>Najniższy</span>
-            </div>
-          </div>
-
-          {/* Due Date */}
-          <div>
-            <label className="text-sm font-medium mb-1 block flex items-center gap-2">
-              <Calendar size={16} />
-              Termin:
-            </label>
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="w-full px-4 py-2 rounded-lg border-2 border-gray-200 focus:border-brand-purple focus:outline-none"
-            />
-          </div>
-
-          {/* Labels */}
-          <div>
-            <label className="text-sm font-medium mb-1 block flex items-center gap-2">
-              <Tag size={16} />
-              Etykiety:
-            </label>
-            
-            {/* Selected Labels */}
-            {selectedLabels.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-2">
-                {selectedLabels.map((label, idx) => (
-                  <Badge 
-                    key={idx} 
-                    className="bg-blue-100 text-blue-700 cursor-pointer hover:bg-red-100 hover:text-red-700"
-                    onClick={() => setSelectedLabels(selectedLabels.filter((_, i) => i !== idx))}
+          {/* Grid Layout for 2 columns on desktop */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Estimated Time */}
+            <div>
+              <label className="text-sm font-medium mb-2 block flex items-center gap-2">
+                <Clock size={18} />
+                Estymat czasu:
+              </label>
+              <div className="grid grid-cols-4 gap-2 mb-2">
+                {[5, 15, 25, 30, 45, 60, 90, 120].map(time => (
+                  <button
+                    key={time}
+                    type="button"
+                    onClick={() => setEstimatedMinutes(time)}
+                    className={`px-2 py-1.5 text-xs rounded border transition ${
+                      estimatedMinutes === time
+                        ? 'bg-brand-purple text-white border-brand-purple'
+                        : 'bg-white border-gray-300 hover:border-brand-purple'
+                    }`}
                   >
-                    {label} ×
-                  </Badge>
+                    {time}min
+                  </button>
                 ))}
               </div>
-            )}
-            
-            {/* Label Selector */}
-            <select
-              className="w-full px-4 py-2 rounded-lg border-2 border-gray-200 focus:border-brand-purple focus:outline-none"
-              value=""
-              onChange={(e) => {
-                const label = e.target.value
-                if (label && !selectedLabels.includes(label)) {
-                  setSelectedLabels([...selectedLabels, label])
-                }
-              }}
-              disabled={loading}
-            >
-              <option value="">Wybierz etykietę...</option>
-              {availableLabels
-                .filter(label => !selectedLabels.includes(label.name))
-                .map(label => (
-                  <option key={label.id} value={label.name}>
-                    {label.name}
-                  </option>
+            </div>
+
+            {/* Cognitive Load Slider */}
+            <div>
+              <label className="text-sm font-medium mb-2 block flex items-center gap-2">
+                <Brain size={18} />
+                Obciążenie kognitywne: <span className="font-bold text-brand-purple">{cognitiveLoad}/5</span>
+              </label>
+              <input
+                type="range"
+                min={1}
+                max={5}
+                value={cognitiveLoad}
+                onChange={(e) => setCognitiveLoad(Number(e.target.value))}
+                className="w-full accent-brand-purple"
+              />
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>Łatwe</span>
+                <span>Średnie</span>
+                <span>Trudne</span>
+              </div>
+            </div>
+
+            {/* Due Date */}
+            <div>
+              <label className="text-sm font-medium mb-1 block flex items-center gap-2">
+                <CalendarBlank size={18} />
+                Termin:
+              </label>
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="w-full px-4 py-2 rounded-lg border-2 border-gray-200 focus:border-brand-purple focus:outline-none"
+              />
+              {/* Quick date buttons */}
+              <div className="flex gap-2 mt-2 flex-wrap">
+                {[
+                  { label: 'Dziś', value: format(new Date(), 'yyyy-MM-dd') },
+                  { label: 'Jutro', value: format(addDays(new Date(), 1), 'yyyy-MM-dd') },
+                  { label: 'Za 3 dni', value: format(addDays(new Date(), 3), 'yyyy-MM-dd') },
+                  { label: 'Za tydzień', value: format(addDays(new Date(), 7), 'yyyy-MM-dd') }
+                ].map(qd => (
+                  <button
+                    key={qd.label}
+                    type="button"
+                    onClick={() => setDueDate(qd.value)}
+                    className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition"
+                  >
+                    {qd.label}
+                  </button>
                 ))}
-            </select>
-            
-            {availableLabels.length > 0 && (
-              <p className="text-xs text-gray-500 mt-1">
-                Kliknij na etykietę aby ją usunąć
-              </p>
-            )}
+              </div>
+            </div>
+
+            {/* Priority */}
+            <div>
+              <label className="text-sm font-medium mb-2 block flex items-center gap-2">
+                <Flag size={18} />
+                Priorytet:
+              </label>
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { value: 1, label: 'P1', color: 'bg-red-500', textColor: 'text-red-700', borderColor: 'border-red-500' },
+                  { value: 2, label: 'P2', color: 'bg-orange-500', textColor: 'text-orange-700', borderColor: 'border-orange-500' },
+                  { value: 3, label: 'P3', color: 'bg-blue-500', textColor: 'text-blue-700', borderColor: 'border-blue-500' },
+                  { value: 4, label: 'P4', color: 'bg-gray-400', textColor: 'text-gray-700', borderColor: 'border-gray-400' }
+                ].map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setPriority(opt.value as 1 | 2 | 3 | 4)}
+                    className={`px-3 py-2 rounded-lg border-2 transition text-sm font-medium ${
+                      priority === opt.value
+                        ? `${opt.borderColor} bg-opacity-10 ${opt.textColor}`
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex flex-col items-center gap-1">
+                      <div className={`w-3 h-3 rounded-full ${opt.color}`} />
+                      {opt.label}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Project Dropdown */}
+            <div>
+              <label className="text-sm font-medium mb-1 block flex items-center gap-2">
+                <FolderOpen size={18} />
+                Projekt:
+              </label>
+              <select
+                value={projectId}
+                onChange={(e) => setProjectId(e.target.value)}
+                className="w-full px-4 py-2 rounded-lg border-2 border-gray-200 focus:border-brand-purple focus:outline-none"
+                disabled={loading}
+              >
+                <option value="">Brak projektu</option>
+                {projects.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Labels */}
+            <div>
+              <label className="text-sm font-medium mb-1 block flex items-center gap-2">
+                <Tag size={18} />
+                Etykiety:
+              </label>
+              
+              {/* Add new label input */}
+              <div className="flex gap-2 mb-2">
+                <Input
+                  value={newLabel}
+                  onChange={(e) => setNewLabel(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddLabel())}
+                  placeholder="Dodaj etykietę..."
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  onClick={handleAddLabel}
+                  disabled={!newLabel.trim()}
+                >
+                  +
+                </Button>
+              </div>
+              
+              {/* Selected Labels - click to remove */}
+              <div className="flex flex-wrap gap-2">
+                {selectedLabels.map(label => (
+                  <span
+                    key={label}
+                    className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs flex items-center gap-1 cursor-pointer hover:bg-red-100 hover:text-red-800 transition"
+                    onClick={() => handleRemoveLabel(label)}
+                    title="Kliknij aby usunąć"
+                  >
+                    {label}
+                    <span className="font-bold">×</span>
+                  </span>
+                ))}
+              </div>
+              
+              {/* Available labels dropdown (from Todoist) */}
+              {availableLabels.length > 0 && (
+                <select
+                  className="w-full px-4 py-2 rounded-lg border-2 border-gray-200 focus:border-brand-purple focus:outline-none mt-2"
+                  value=""
+                  onChange={(e) => {
+                    const label = e.target.value
+                    if (label && !selectedLabels.includes(label)) {
+                      setSelectedLabels([...selectedLabels, label])
+                    }
+                  }}
+                  disabled={loading}
+                >
+                  <option value="">Wybierz z Todoist...</option>
+                  {availableLabels
+                    .filter(label => !selectedLabels.includes(label.name))
+                    .map(label => (
+                      <option key={label.id} value={label.name}>
+                        {label.name}
+                      </option>
+                    ))}
+                </select>
+              )}
+            </div>
           </div>
 
           {/* Collapsible Sections */}
@@ -791,49 +849,57 @@ export function UniversalTaskModal({
             )}
           </div>
 
-          {/* Submit Buttons */}
-          <div className="flex gap-2 pt-4 border-t">
-            {isEditMode && onDelete && (
+          {/* Submit Buttons with improved layout */}
+          <DialogFooter className="flex justify-between pt-4 border-t">
+            <div className="flex gap-2">
+              {isEditMode && onDelete && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleDelete}
+                  className="text-red-600 hover:bg-red-50 gap-2"
+                >
+                  <Trash size={18} />
+                  Usuń
+                </Button>
+              )}
+              {isEditMode && onComplete && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleComplete}
+                  className="text-green-600 hover:bg-green-50 gap-2"
+                >
+                  <CheckCircle size={18} />
+                  Ukończ
+                </Button>
+              )}
+            </div>
+
+            <div className="flex gap-2">
               <Button
                 type="button"
                 variant="ghost"
-                onClick={handleDelete}
-                className="text-red-600 hover:bg-red-50"
+                onClick={() => onOpenChange(false)}
               >
-                Usuń
+                Anuluj
               </Button>
-            )}
-            
-            {isEditMode && onComplete && (
               <Button
-                type="button"
-                variant="ghost"
-                onClick={handleComplete}
-                className="text-green-600 hover:bg-green-50"
+                type="submit"
+                disabled={!content.trim() || saving}
+                className="bg-gradient-to-r from-brand-purple to-brand-pink gap-2"
               >
-                <CheckCircle size={18} className="mr-1" />
-                Ukończ
+                {saving ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Zapisywanie...
+                  </>
+                ) : (
+                  isEditMode ? 'Zapisz zmiany' : 'Utwórz zadanie'
+                )}
               </Button>
-            )}
-            
-            <div className="flex-1" />
-            
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => onOpenChange(false)}
-            >
-              Anuluj
-            </Button>
-            
-            <Button
-              type="submit"
-              disabled={!content.trim() || saving}
-              className="bg-gradient-to-r from-brand-purple to-brand-pink"
-            >
-              {saving ? 'Zapisywanie...' : (isEditMode ? 'Zapisz' : 'Dodaj zadanie')}
-            </Button>
-          </div>
+            </div>
+          </DialogFooter>
 
           <p className="text-xs text-center text-gray-500" role="note">
             Naciśnij <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">Enter</kbd> aby zapisać lub <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">Esc</kbd> aby anulować
