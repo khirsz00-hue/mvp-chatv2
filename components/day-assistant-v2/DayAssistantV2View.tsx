@@ -81,6 +81,7 @@ export function DayAssistantV2View() {
     return () => {
       window.removeEventListener('task-added', handleTaskAdded)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const loadData = async () => {
@@ -636,7 +637,7 @@ export function DayAssistantV2View() {
           content: editingTask.title,
           description: editingTask.description || '',
           due: editingTask.due_date || '',
-          priority: editingTask.priority,
+          priority: (editingTask.priority >= 1 && editingTask.priority <= 4 ? editingTask.priority : 1) as 1 | 2 | 3 | 4,
           estimated_minutes: editingTask.estimate_min,
           cognitive_load: editingTask.cognitive_load,
           labels: editingTask.tags || []
