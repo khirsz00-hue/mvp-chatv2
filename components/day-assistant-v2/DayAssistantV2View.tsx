@@ -82,6 +82,7 @@ export function DayAssistantV2View() {
       window.removeEventListener('task-added', handleTaskAdded)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+    // loadData is intentionally omitted - it has internal state dependencies that would cause infinite re-renders
   }, [])
 
   const loadData = async () => {
@@ -374,11 +375,35 @@ export function DayAssistantV2View() {
     return true // standard mode shows all
   })
 
-  // Organize tasks into sections
-  const mustTasks = filteredTasks.filter(t => t.is_must && !t.completed)
-  const top3Tasks = filteredTasks.filter(t => !t.is_must && !t.completed).slice(0, 3)
-  const queueTasks = filteredTasks.filter(t => !t.is_must && !t.completed).slice(3)
-  const overflowTasks = filteredTasks.filter(t => !t.due_date || t.due_date > selectedDate)
+  // Helper function to validate priority
+  const validatePriority = (priority: number): 1 | 2 | 3 | 4 => {
+    return (priority >= 1 && priority <= 4 ? priority : 1) as 1 | 2 | 3 | 4
+  }
+
+  // Organize tasks into sections (optimized single pass)
+  const { mustTasks, top3Tasks, queueTasks, overflowTasks } = filteredTasks.reduce(
+    (acc, task) => {
+      if (task.completed) return acc
+      
+      if (task.is_must) {
+        acc.mustTasks.push(task)
+      } else if (!task.due_date || task.due_date > selectedDate) {
+        acc.overflowTasks.push(task)
+      } else if (acc.top3Tasks.length < 3) {
+        acc.top3Tasks.push(task)
+      } else {
+        acc.queueTasks.push(task)
+      }
+      
+      return acc
+    },
+    {
+      mustTasks: [] as TestDayTask[],
+      top3Tasks: [] as TestDayTask[],
+      queueTasks: [] as TestDayTask[],
+      overflowTasks: [] as TestDayTask[]
+    }
+  )
 
   // Calculate time stats
   const totalEstimatedMinutes = tasks.reduce((sum, t) => sum + (t.estimate_min || 0), 0)
@@ -637,7 +662,7 @@ export function DayAssistantV2View() {
           content: editingTask.title,
           description: editingTask.description || '',
           due: editingTask.due_date || '',
-          priority: (editingTask.priority >= 1 && editingTask.priority <= 4 ? editingTask.priority : 1) as 1 | 2 | 3 | 4,
+          priority: validatePriority(editingTask.priority),
           estimated_minutes: editingTask.estimate_min,
           cognitive_load: editingTask.cognitive_load,
           labels: editingTask.tags || []
