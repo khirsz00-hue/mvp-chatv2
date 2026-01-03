@@ -19,20 +19,20 @@ export function OverdueAlert({ overdueCount, onReview }: OverdueAlertProps) {
 
   return (
     <div className="w-full bg-red-600 border-b-2 border-red-700 shadow-md">
-      <div className="max-w-7xl mx-auto px-6 py-3">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <Warning size={24} weight="fill" className="text-white" />
-            <p className="text-white font-semibold">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 sm:py-3">
+        <div className="flex items-center justify-between gap-3 sm:gap-4 flex-wrap">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Warning size={20} weight="fill" className="text-white flex-shrink-0" />
+            <p className="text-white font-semibold text-xs sm:text-base">
               🔴 {overdueCount} {overdueCount === 1 ? 'Przeterminowane zadanie' : 'Przeterminowane zadania'} wykryte. 
-              Przejrzeć?
+              <span className="hidden sm:inline"> Przejrzeć?</span>
             </p>
           </div>
           
           <Button
             onClick={onReview}
             size="sm"
-            className="bg-white text-red-600 hover:bg-gray-100 font-semibold"
+            className="bg-white text-red-600 hover:bg-gray-100 font-semibold text-xs sm:text-sm"
           >
             Przejrzyj
           </Button>

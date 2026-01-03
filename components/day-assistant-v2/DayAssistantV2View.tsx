@@ -505,7 +505,7 @@ export function DayAssistantV2View() {
       />
 
       {/* Main Layout: Content + Sidebar */}
-      <div className="max-w-7xl mx-auto px-6 py-6 flex gap-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 flex flex-col lg:flex-row gap-4 lg:gap-6">
         {/* Main Content */}
         <div className="flex-1 min-w-0">
           
@@ -678,7 +678,7 @@ export function DayAssistantV2View() {
         </div>
 
         {/* Right Sidebar */}
-        <div className="w-80 space-y-6">
+        <div className="w-full lg:w-80 space-y-4 lg:space-y-6">
           
           {/* Today's Flow Panel */}
           <TodaysFlowPanel

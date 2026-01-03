@@ -60,15 +60,15 @@ export function DayAssistantV2TopBar({
 
   return (
     <div className="sticky top-0 z-50 w-full bg-white border-b shadow-md">
-      <div className="max-w-7xl mx-auto px-6 py-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
         
         {/* Line 1: Date */}
-        <div className="text-sm font-semibold text-gray-900 mb-3">
+        <div className="text-xs sm:text-sm font-semibold text-gray-900 mb-2 sm:mb-3">
           📅 {formatDate(selectedDate)}
         </div>
 
         {/* Line 2: Work hours + Mode + Progress */}
-        <div className="flex items-center gap-6 flex-wrap">
+        <div className="flex items-center gap-3 sm:gap-6 flex-wrap">
           
           {/* Editable work hours */}
           <div className="flex items-center gap-2">
@@ -79,21 +79,21 @@ export function DayAssistantV2TopBar({
               onChange={(e) => {
                 onWorkHoursChange(e.target.value, workHoursEnd)
               }}
-              className="border border-gray-300 rounded-md px-2 py-1 text-sm font-medium hover:border-purple-500 focus:border-purple-600 focus:ring-2 focus:ring-purple-200 outline-none transition-colors"
+              className="border border-gray-300 rounded-md px-2 py-1 text-xs sm:text-sm font-medium hover:border-purple-500 focus:border-purple-600 focus:ring-2 focus:ring-purple-200 outline-none transition-colors"
             />
-            <span className="text-gray-400">→</span>
+            <span className="text-gray-400 text-sm">→</span>
             <input 
               type="time" 
               value={workHoursEnd}
               onChange={(e) => {
                 onWorkHoursChange(workHoursStart, e.target.value)
               }}
-              className="border border-gray-300 rounded-md px-2 py-1 text-sm font-medium hover:border-purple-500 focus:border-purple-600 focus:ring-2 focus:ring-purple-200 outline-none transition-colors"
+              className="border border-gray-300 rounded-md px-2 py-1 text-xs sm:text-sm font-medium hover:border-purple-500 focus:border-purple-600 focus:ring-2 focus:ring-purple-200 outline-none transition-colors"
             />
-            <span className="text-gray-600 text-sm">
+            <span className="text-gray-600 text-xs sm:text-sm">
               • {capacityHours}h
               {meetingMinutes && meetingMinutes > 0 && (
-                <span className="text-xs text-gray-500 ml-2">
+                <span className="hidden md:inline text-xs text-gray-500 ml-2">
                   ({originalHours}h praca - {meetingHours}h spotkania + bufory)
                 </span>
               )}
@@ -106,7 +106,7 @@ export function DayAssistantV2TopBar({
             <select 
               value={workMode}
               onChange={(e) => onWorkModeChange(e.target.value as WorkMode)}
-              className="border border-gray-300 rounded-md px-3 py-1.5 text-sm font-medium bg-white hover:border-purple-500 focus:border-purple-600 focus:ring-2 focus:ring-purple-200 outline-none cursor-pointer transition-colors"
+              className="border border-gray-300 rounded-md px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium bg-white hover:border-purple-500 focus:border-purple-600 focus:ring-2 focus:ring-purple-200 outline-none cursor-pointer transition-colors"
             >
               {Object.entries(WORK_MODE_OPTIONS).map(([value, label]) => (
                 <option key={value} value={value}>
@@ -117,10 +117,11 @@ export function DayAssistantV2TopBar({
           </div>
 
           {/* Progress */}
-          <div className="flex items-center gap-2 text-sm text-gray-600" aria-label="Postęp dnia pracy">
+          <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600" aria-label="Postęp dnia pracy">
             <ChartBar size={18} className="text-purple-600" aria-hidden="true" />
             <span>
-              Progress: <strong className="text-gray-900">{completedMinutes}/{capacityMinutes} min</strong> 
+              <span className="hidden sm:inline">Progress: </span>
+              <strong className="text-gray-900">{completedMinutes}/{capacityMinutes} min</strong> 
               <span className="text-gray-500 ml-1">({progressPercent}%)</span>
             </span>
           </div>
