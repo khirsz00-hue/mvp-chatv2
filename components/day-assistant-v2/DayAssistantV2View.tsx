@@ -8,10 +8,11 @@
 import { useState, useEffect } from 'react'
 import { UniversalTaskModal, TaskData } from '@/components/common/UniversalTaskModal'
 import { toast } from 'sonner'
+import { supabase } from '@/lib/supabaseClient'
 
 export function DayAssistantV2View() {
   const [showUniversalModal, setShowUniversalModal] = useState(false)
-  const [universalModalTask, setUniversalModalTask] = useState<any | null>(null)
+  const [universalModalTask, setUniversalModalTask] = useState<TaskData | null>(null)
 
   // 🎮 GAMIFICATION: Keyboard shortcut for quick add (Ctrl/Cmd+K)
   useEffect(() => {
@@ -30,8 +31,66 @@ export function DayAssistantV2View() {
 
   const handleTaskSave = async (taskData: TaskData) => {
     try {
-      // Task save logic would go here
-      toast.success('Zadanie zapisane')
+      // Get fresh session token
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.user) {
+        toast.error('Sesja wygasła - zaloguj się ponownie')
+        return
+      }
+
+      const accessToken = session.access_token
+
+      if (universalModalTask) {
+        // Update existing task
+        const response = await fetch('/api/todoist/update', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`
+          },
+          body: JSON.stringify({
+            id: universalModalTask.id,
+            content: taskData.content,
+            description: taskData.description || '',
+            due_date: taskData.due,
+            priority: taskData.priority || 1,
+            labels: taskData.labels || [],
+            duration: taskData.estimated_minutes
+          })
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to update task')
+        }
+
+        toast.success('Zadanie zaktualizowane')
+      } else {
+        // Create new task
+        const response = await fetch('/api/todoist/tasks/add', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`
+          },
+          body: JSON.stringify({
+            content: taskData.content,
+            description: taskData.description || '',
+            due_date: taskData.due,
+            priority: taskData.priority || 1,
+            labels: taskData.labels || [],
+            project_id: taskData.project_id,
+            duration: taskData.estimated_minutes
+          })
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to create task')
+        }
+
+        toast.success('Zadanie dodane')
+      }
+      
       setShowUniversalModal(false)
       setUniversalModalTask(null)
     } catch (error) {
