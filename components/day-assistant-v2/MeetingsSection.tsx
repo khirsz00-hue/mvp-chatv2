@@ -37,10 +37,10 @@ export function MeetingsSection({ meetings, onRefresh }: MeetingsSectionProps) {
 
   if (meetings.length === 0) {
     return (
-      <Card className="mb-4 bg-blue-50 border-blue-200">
+      <Card className="mb-6 bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200">
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-gray-600 font-medium">
               📅 Brak spotkań dziś
             </span>
             <Button 
@@ -58,15 +58,15 @@ export function MeetingsSection({ meetings, onRefresh }: MeetingsSectionProps) {
   }
 
   return (
-    <Card className="mb-4 border-blue-300 bg-blue-50">
+    <Card className="mb-6 border-emerald-300 bg-gradient-to-r from-emerald-50 to-teal-50 shadow-md">
       <CardHeader 
-        className="cursor-pointer hover:bg-blue-100 transition-colors"
+        className="cursor-pointer hover:bg-emerald-100/50 transition-colors"
         onClick={() => setExpanded(!expanded)}
       >
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg flex items-center gap-2">
+          <CardTitle className="text-lg font-bold flex items-center gap-2 text-emerald-900">
             <span>{expanded ? '▼' : '▶'}</span>
-            📅 SPOTKANIA DZIŚ ({meetings.length})
+            📅 Spotkania na dziś ({meetings.length})
           </CardTitle>
           <Button 
             variant="ghost" 
@@ -145,10 +145,10 @@ function MeetingCard({ meeting }: { meeting: Meeting }) {
 
   return (
     <div className={`
-      p-3 rounded-lg border-l-4 transition-colors
-      ${isPast ? 'border-gray-300 bg-gray-50 opacity-60' : ''}
-      ${isUpcoming ? 'border-orange-500 bg-orange-50' : ''}
-      ${!isPast && !isUpcoming ? 'border-blue-500 bg-white' : ''}
+      p-4 rounded-lg border-l-4 transition-all shadow-sm
+      ${isPast ? 'border-gray-300 bg-gray-50/50 opacity-60' : ''}
+      ${isUpcoming ? 'border-orange-500 bg-gradient-to-r from-orange-50 to-yellow-50' : ''}
+      ${!isPast && !isUpcoming ? 'border-emerald-500 bg-gradient-to-r from-white to-emerald-50/30' : ''}
     `}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
