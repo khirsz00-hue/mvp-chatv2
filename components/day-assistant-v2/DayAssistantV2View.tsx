@@ -291,6 +291,10 @@ export function DayAssistantV2View() {
       
       if (editingTask) {
         // Update existing task
+        if (!editingTask.id) {
+          toast.error('Brak ID zadania')
+          return
+        }
         const response = await fetch('/api/day-assistant-v2/task', {
           method: 'PUT',
           headers: {
