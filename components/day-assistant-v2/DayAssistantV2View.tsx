@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import { supabase } from '@/lib/supabaseClient'
 import { TestDayTask, DayPlan, Recommendation, WorkMode } from '@/lib/types/dayAssistantV2'
 import { scoreAndSortTasksV3 } from '@/lib/services/dayAssistantV2RecommendationEngine'
+import { calculateAvailableMinutes } from '@/hooks/useTaskQueue'
 import { DayAssistantV2TopBar } from './DayAssistantV2TopBar'
 import { ActiveTimerBar } from './ActiveTimerBar'
 import { OverdueAlert } from './OverdueAlert'
@@ -538,15 +539,6 @@ export function DayAssistantV2View() {
     return scored
   }, [filteredTasks, dayPlan, selectedDate, selectedProjectId])
 
-  // Helper function to calculate work hours
-  function calculateWorkHours(start: string, end: string): number {
-    const [startH, startM] = start.split(':').map(Number)
-    const [endH, endM] = end.split(':').map(Number)
-    const startMinutes = startH * 60 + startM
-    const endMinutes = endH * 60 + endM
-    return Math.max(0, (endMinutes - startMinutes) / 60)
-  }
-
   // THEN divide into sections based on scoring and capacity
   const { mustTasks, top3Tasks, queueTasks, overflowTasks, overdueTasks } = useMemo(() => {
     const sections = {
@@ -573,14 +565,42 @@ export function DayAssistantV2View() {
       t.due_date === selectedDate
     )
     
-    // Top 3 purely by scoring (first 3 tasks for today, independent of capacity)
+    // Calculate capacity using available minutes (considers if work hours have ended)
+    // This returns 0 if current time is after work end time
+    const capacityMinutes = calculateAvailableMinutes(workHoursEnd, 0)
+    
+    // If no capacity available (work hours ended), move all today tasks to overflow
+    if (capacityMinutes <= 0) {
+      console.log('⚠️ [DayAssistantV2] No capacity available - work hours have ended')
+      
+      // All today tasks go to overflow
+      sections.overflowTasks.push(...todayNonMustTasks)
+      
+      // Tasks without due date or future dates also go to overflow
+      const futureTasks = scoredTasks.filter(t =>
+        !t.completed &&
+        !t.is_must &&
+        !(t.due_date && t.due_date < selectedDate) &&
+        (!t.due_date || t.due_date > selectedDate)
+      )
+      sections.overflowTasks.push(...futureTasks)
+      
+      console.log('📊 [DayAssistantV2] Final sections (after work hours):', {
+        must: sections.mustTasks.length,
+        top3: 0,
+        queue: 0,
+        overflow: sections.overflowTasks.length,
+        overdue: sections.overdueTasks.length,
+        remainingCapacity: 0
+      })
+      
+      return sections
+    }
+    
+    // Top 3 purely by scoring (first 3 tasks for today, when capacity is available)
     sections.top3Tasks = todayNonMustTasks.slice(0, TOP_TASKS_COUNT)
     
     const remainingTodayTasks = todayNonMustTasks.slice(TOP_TASKS_COUNT)
-    
-    // Calculate capacity
-    const workHours = calculateWorkHours(workHoursStart, workHoursEnd)
-    const capacityMinutes = workHours * 60
     
     // Calculate used capacity by MUST and Top 3 tasks
     const mustMinutes = must.reduce((sum, t) => sum + (t.estimate_min || 0), 0)
