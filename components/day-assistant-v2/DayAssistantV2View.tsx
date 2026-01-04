@@ -497,17 +497,18 @@ export function DayAssistantV2View() {
     const must = scoredTasks.filter(t => !t.completed && t.is_must && !(t.due_date && t.due_date < selectedDate))
     sections.mustTasks = must
     
-    // Tasks due today (exclude overdue)
-    const todayTasks = scoredTasks.filter(t => 
+    // Tasks due today (exclude overdue and MUST - handled separately)
+    const todayNonMustTasks = scoredTasks.filter(t => 
       !t.completed && 
+      !t.is_must &&
       !(t.due_date && t.due_date < selectedDate) &&
       t.due_date === selectedDate
     )
     
     // Top 3 purely by scoring (first 3 tasks for today, independent of capacity)
-    sections.top3Tasks = todayTasks.slice(0, 3)
+    sections.top3Tasks = todayNonMustTasks.slice(0, 3)
     
-    const remainingTodayTasks = todayTasks.filter(t => !sections.top3Tasks.includes(t) && !t.is_must)
+    const remainingTodayTasks = todayNonMustTasks.slice(sections.top3Tasks.length)
     
     // Calculate capacity
     const workHours = calculateWorkHours(workHoursStart, workHoursEnd)
@@ -515,9 +516,7 @@ export function DayAssistantV2View() {
     
     // Calculate used capacity by MUST and Top 3 tasks
     const mustMinutes = must.reduce((sum, t) => sum + (t.estimate_min || 0), 0)
-    const top3Minutes = sections.top3Tasks
-      .filter(t => !t.is_must) // avoid double-counting MUST tasks
-      .reduce((sum, t) => sum + (t.estimate_min || 0), 0)
+    const top3Minutes = sections.top3Tasks.reduce((sum, t) => sum + (t.estimate_min || 0), 0)
     let remainingCapacity = capacityMinutes - mustMinutes - top3Minutes
     
     console.log('📊 [DayAssistantV2] Capacity:', {
@@ -525,7 +524,7 @@ export function DayAssistantV2View() {
       mustUsed: mustMinutes,
       top3Used: top3Minutes,
       remaining: remainingCapacity,
-      todayTasksCount: todayTasks.length
+      todayTasksCount: todayNonMustTasks.length
     })
     
     // Allocate remaining tasks to Queue or Overflow based on remaining capacity
