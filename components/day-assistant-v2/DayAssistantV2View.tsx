@@ -411,24 +411,24 @@ export function DayAssistantV2View() {
 
   const handleWorkHoursChange = async (start: string, end: string) => {
     if (!isValidTimeFormat(start) || !isValidTimeFormat(end)) {
-      toast.error('Invalid work hours format')
+      toast.error('Nieprawidłowy format godzin pracy')
       return
     }
     
     const workHours = calculateWorkHours(start, end)
     if (workHours <= 0) {
-      toast.error('Work end time must be after start time')
+      toast.error('Zakończenie pracy musi być po rozpoczęciu')
       return
     }
     
     setWorkHoursStart(start)
     setWorkHoursEnd(end)
-    const capacityMinutes = Math.max(0, workHours * 60)
+    const capacityMinutes = workHours * 60
     
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
-        toast.error('Session expired - please log in again')
+        toast.error('Sesja wygasła - zaloguj się ponownie')
         return
       }
       
@@ -455,17 +455,23 @@ export function DayAssistantV2View() {
       const updated = await response.json()
       const updatedMetadata = updated?.dayPlan?.metadata
       
-      if (updatedMetadata) {
-        setDayPlan(prev => prev ? {
-          ...prev,
-          metadata: { ...prev.metadata, ...updatedMetadata }
-        } : { ...updated.dayPlan, metadata: updatedMetadata })
-      } else {
-        console.warn('Unexpected response when updating work hours', updated)
+      if (!updatedMetadata) {
+        console.warn('[DayAssistantV2] Unexpected response when updating work hours', updated)
+        return
       }
+      
+      setDayPlan(prev => {
+        if (prev) {
+          return { ...prev, metadata: { ...prev.metadata, ...updatedMetadata } }
+        }
+        if (updated?.dayPlan) {
+          return { ...updated.dayPlan, metadata: updatedMetadata }
+        }
+        return prev
+      })
     } catch (error) {
       console.error('Error updating work hours:', error)
-      toast.error('Failed to save work hours')
+      toast.error('Nie udało się zapisać godzin pracy')
     }
   }
 
