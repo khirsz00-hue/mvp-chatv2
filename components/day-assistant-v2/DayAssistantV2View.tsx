@@ -411,13 +411,13 @@ export function DayAssistantV2View() {
 
   const handleWorkHoursChange = async (start: string, end: string) => {
     if (!isValidTimeFormat(start) || !isValidTimeFormat(end)) {
-      toast.error('Nieprawidłowy format godzin pracy')
+      toast.error('Invalid work hours format')
       return
     }
     
     const workHours = calculateWorkHours(start, end)
     if (workHours <= 0) {
-      toast.error('Zakończenie pracy musi być po rozpoczęciu')
+      toast.error('Work end time must be after start time')
       return
     }
     
@@ -428,7 +428,7 @@ export function DayAssistantV2View() {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
-        toast.error('Sesja wygasła - zaloguj się ponownie')
+        toast.error('Session expired - please log in again')
         return
       }
       
@@ -453,17 +453,19 @@ export function DayAssistantV2View() {
       }
       
       const updated = await response.json()
-      if (updated?.dayPlan?.metadata) {
+      const updatedMetadata = updated?.dayPlan?.metadata
+      
+      if (updatedMetadata) {
         setDayPlan(prev => prev ? {
           ...prev,
-          metadata: { ...prev.metadata, ...updated.dayPlan.metadata }
-        } : updated.dayPlan)
+          metadata: { ...prev.metadata, ...updatedMetadata }
+        } : { ...updated.dayPlan, metadata: updatedMetadata })
       } else {
         console.warn('Unexpected response when updating work hours', updated)
       }
     } catch (error) {
       console.error('Error updating work hours:', error)
-      toast.error('Nie udało się zapisać godzin pracy')
+      toast.error('Failed to save work hours')
     }
   }
 
