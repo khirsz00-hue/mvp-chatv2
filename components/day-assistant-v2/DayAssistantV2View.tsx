@@ -520,20 +520,35 @@ export function DayAssistantV2View() {
       todayTasksCount: todayTasks.length
     })
     
-    // Allocate Top 3 (highest scored tasks that fit in capacity)
+    // PHASE 1: Allocate Top 3 (first 3 tasks that FIT in capacity)
     for (const task of todayTasks) {
-      const taskMinutes = task.estimate_min || 0
+      if (sections.top3Tasks.length >= 3) break  // Top 3 is full, stop
       
-      if (sections.top3Tasks.length < 3 && remainingCapacity >= taskMinutes) {
+      const taskMinutes = task.estimate_min || 0
+      if (remainingCapacity >= taskMinutes) {
         sections.top3Tasks.push(task)
         remainingCapacity -= taskMinutes
-      } else if (remainingCapacity >= taskMinutes) {
-        // Fits in capacity - add to queue
+        console.log(`  ✅ Top 3 #${sections.top3Tasks.length}: "${task.title}" (${taskMinutes}min, score: ${task.metadata?._score || 0})`)
+      } else {
+        console.log(`  ⏭️ Skipping for Top 3: "${task.title}" (${taskMinutes}min > ${remainingCapacity}min remaining)`)
+      }
+    }
+    
+    // PHASE 2: Allocate remaining tasks to Queue or Overflow
+    const remainingTodayTasks = todayTasks.filter(t => !sections.top3Tasks.includes(t))
+    
+    for (const task of remainingTodayTasks) {
+      const taskMinutes = task.estimate_min || 0
+      
+      if (remainingCapacity >= taskMinutes) {
+        // Fits in capacity - add to Queue
         sections.queueTasks.push(task)
         remainingCapacity -= taskMinutes
+        console.log(`  ✅ Queue: "${task.title}" (${taskMinutes}min, score: ${task.metadata?._score || 0})`)
       } else {
-        // Doesn't fit in capacity - add to overflow
+        // Doesn't fit in capacity - add to Overflow
         sections.overflowTasks.push(task)
+        console.log(`  📦 Overflow: "${task.title}" (${taskMinutes}min > ${remainingCapacity}min remaining)`)
       }
     }
     
@@ -546,12 +561,13 @@ export function DayAssistantV2View() {
     )
     sections.overflowTasks.push(...futureTasks)
     
-    console.log('📊 [DayAssistantV2] Sections:', {
+    console.log('📊 [DayAssistantV2] Final sections:', {
       must: sections.mustTasks.length,
       top3: sections.top3Tasks.length,
       queue: sections.queueTasks.length,
       overflow: sections.overflowTasks.length,
-      overdue: sections.overdueTasks.length
+      overdue: sections.overdueTasks.length,
+      remainingCapacity: remainingCapacity
     })
     
     return sections
