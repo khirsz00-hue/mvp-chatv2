@@ -93,12 +93,6 @@ export function DayAssistantV2View() {
     // loadData is intentionally omitted - it has internal state dependencies that would cause infinite re-renders
   }, [])
   
-  // Load meetings on mount and when selectedDate changes
-  useEffect(() => {
-    loadMeetings()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate])
-  
   // Fetch projects on mount
   useEffect(() => {
     const fetchProjects = async () => {
@@ -127,7 +121,7 @@ export function DayAssistantV2View() {
     fetchProjects()
   }, [])
 
-  const loadMeetings = async () => {
+  const loadMeetings = useCallback(async () => {
     try {
       console.log('🔍 [DayAssistantV2] Loading meetings for date:', selectedDate)
       
@@ -165,7 +159,12 @@ export function DayAssistantV2View() {
       console.error('❌ [DayAssistantV2] Error loading meetings:', error)
       setMeetings([])
     }
-  }
+  }, [selectedDate])
+
+  // Load meetings on mount and when selectedDate changes
+  useEffect(() => {
+    loadMeetings()
+  }, [loadMeetings])
 
   const loadData = async () => {
     try {
