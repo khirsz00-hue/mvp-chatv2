@@ -1,38 +1,73 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url)
-  const token = searchParams.get('token')
+export const dynamic = 'force-dynamic'
 
-  if (!token) {
-    return NextResponse.json({ error: 'Brak tokenu Todoist' }, { status: 401 })
-  }
-
+export async function GET(request: NextRequest) {
   try {
-    console.log('🔍 Fetching projects from Todoist API')
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        global: {
+          headers: {
+            Authorization: request.headers.get('Authorization') || ''
+          }
+        }
+      }
+    )
     
-    const res = await fetch('https://api.todoist.com/rest/v2/projects', {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-    })
-
-    if (!res.ok) {
-      const err = await res.text()
-      console.error('❌ Błąd Todoist API:', err, 'Status:', res.status)
-      return NextResponse.json({ error: `Błąd Todoist API: ${err}` }, { status: res.status })
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      console.error('🔍 [Todoist Projects API] Authentication failed:', authError)
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const projects = await res.json()
-    console.log(`✅ Pobrano ${projects.length} projektów z Todoist`)
-
-    const simplified = projects.map((p: any) => ({
-      id: p.id,
-      name: p.name,
-    }))
-
-    return NextResponse.json({ projects: simplified })
-  } catch (error: any) {
-    console.error('❌ Błąd /api/todoist/projects:', error?.message || error)
-    return NextResponse.json({ error: 'Nie udało się pobrać projektów' }, { status: 500 })
+    
+    console.log('🔍 [Todoist Projects API] Authenticated user:', user.id)
+    
+    // Get Todoist token from user_profiles
+    const { data: profile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('todoist_token')
+      .eq('id', user.id)
+      .single()
+    
+    if (profileError) {
+      console.error('❌ [Todoist Projects API] Error fetching profile:', profileError)
+      return NextResponse.json({ projects: [] })
+    }
+    
+    if (!profile?.todoist_token) {
+      console.log('⚠️ [Todoist Projects API] No Todoist token found for user')
+      return NextResponse.json({ projects: [] })
+    }
+    
+    console.log('🔍 [Todoist Projects API] Fetching projects from Todoist')
+    
+    // Fetch projects from Todoist API
+    const response = await fetch('https://api.todoist.com/rest/v2/projects', {
+      headers: {
+        Authorization: `Bearer ${profile.todoist_token}`
+      }
+    })
+    
+    if (!response.ok) {
+      console.error('❌ [Todoist Projects API] Failed to fetch Todoist projects:', response.status)
+      return NextResponse.json({ projects: [] })
+    }
+    
+    const projects = await response.json()
+    console.log(`✅ [Todoist Projects API] Fetched ${projects.length} projects from Todoist`)
+    
+    return NextResponse.json({ 
+      projects: projects.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        color: p.color
+      }))
+    })
+  } catch (error) {
+    console.error('❌ [Todoist Projects API] Error:', error)
+    return NextResponse.json({ projects: [] })
   }
 }
