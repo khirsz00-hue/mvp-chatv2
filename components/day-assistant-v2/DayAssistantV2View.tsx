@@ -28,6 +28,7 @@ import Button from '@/components/ui/Button'
 import { Plus, CalendarBlank, CaretDown, CaretUp } from '@phosphor-icons/react'
 
 const TOP_TASKS_COUNT = 3
+const isValidTimeFormat = (value: string) => /^\d{2}:\d{2}$/.test(value)
 
 interface TaskStats {
   completedToday: number
@@ -71,7 +72,6 @@ export function DayAssistantV2View() {
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [loadingProjects, setLoadingProjects] = useState(false)
-
   // Custom hooks
   const { activeTimer, startTimer, pauseTimer, resumeTimer, stopTimer, formatTime } = useTaskTimer()
 
@@ -149,6 +149,12 @@ export function DayAssistantV2View() {
       setTasks(data.tasks || [])
       setAssistant(data.assistant)
       setTaskStats(data.taskStats || taskStats)
+      if (data.dayPlan?.metadata?.work_start_time && isValidTimeFormat(data.dayPlan.metadata.work_start_time)) {
+        setWorkHoursStart(data.dayPlan.metadata.work_start_time)
+      }
+      if (data.dayPlan?.metadata?.work_end_time && isValidTimeFormat(data.dayPlan.metadata.work_end_time)) {
+        setWorkHoursEnd(data.dayPlan.metadata.work_end_time)
+      }
       
       // Fetch recommendations
       await fetchRecommendations()
@@ -192,7 +198,7 @@ export function DayAssistantV2View() {
           Authorization: `Bearer ${session.access_token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ taskId, date: selectedDate })
+        body: JSON.stringify({ task_id: taskId })
       })
       
       if (!response.ok) throw new Error('Failed to complete task')
@@ -224,7 +230,7 @@ export function DayAssistantV2View() {
           Authorization: `Bearer ${session.access_token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ taskId, isMust: newIsMust })
+        body: JSON.stringify({ task_id: taskId, pin: newIsMust })
       })
       
       if (!response.ok) throw new Error('Failed to pin task')
@@ -248,7 +254,7 @@ export function DayAssistantV2View() {
           Authorization: `Bearer ${session.access_token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ taskId })
+        body: JSON.stringify({ task_id: taskId })
       })
       
       if (!response.ok) throw new Error('Failed to postpone task')
@@ -403,10 +409,70 @@ export function DayAssistantV2View() {
     // Work mode is client-side filtering only
   }
 
-  const handleWorkHoursChange = (start: string, end: string) => {
+  const handleWorkHoursChange = async (start: string, end: string) => {
+    if (!isValidTimeFormat(start) || !isValidTimeFormat(end)) {
+      toast.error('Nieprawidłowy format godzin pracy')
+      return
+    }
+    
+    const workHours = calculateWorkHours(start, end)
+    if (workHours <= 0) {
+      toast.error('Zakończenie pracy musi być po rozpoczęciu')
+      return
+    }
+    
     setWorkHoursStart(start)
     setWorkHoursEnd(end)
-    // Could persist to backend if needed
+    const capacityMinutes = workHours * 60
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        toast.error('Sesja wygasła - zaloguj się ponownie')
+        return
+      }
+      
+      const response = await fetch('/api/day-assistant-v2/dayplan', {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          date: selectedDate,
+          metadata: {
+            work_start_time: start,
+            work_end_time: end,
+            capacity_minutes: capacityMinutes
+          }
+        })
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to update work hours')
+      }
+      
+      const updated = await response.json()
+      const updatedMetadata = updated?.dayPlan?.metadata
+      
+      if (!updatedMetadata) {
+        console.warn('[DayAssistantV2] Unexpected response when updating work hours', updated)
+        return
+      }
+      
+      setDayPlan(prev => {
+        if (prev) {
+          return { ...prev, metadata: { ...prev.metadata, ...updatedMetadata } }
+        }
+        if (updated?.dayPlan) {
+          return { ...updated.dayPlan, metadata: updatedMetadata }
+        }
+        return prev
+      })
+    } catch (error) {
+      console.error('Error updating work hours:', error)
+      toast.error('Nie udało się zapisać godzin pracy')
+    }
   }
 
   const handleReviewOverdue = () => {
@@ -478,7 +544,7 @@ export function DayAssistantV2View() {
     const [endH, endM] = end.split(':').map(Number)
     const startMinutes = startH * 60 + startM
     const endMinutes = endH * 60 + endM
-    return (endMinutes - startMinutes) / 60
+    return Math.max(0, (endMinutes - startMinutes) / 60)
   }
 
   // THEN divide into sections based on scoring and capacity
@@ -569,8 +635,10 @@ export function DayAssistantV2View() {
   const completedMinutes = tasks
     .filter(t => t.completed)
     .reduce((sum, t) => sum + (t.estimate_min || 0), 0)
-  const availableMinutes = 480 // 8 hours default
-  const usagePercentage = Math.min(100, Math.round((totalEstimatedMinutes / availableMinutes) * 100))
+  const availableMinutes = Math.max(0, calculateWorkHours(workHoursStart, workHoursEnd) * 60)
+  const usagePercentage = availableMinutes > 0
+    ? Math.min(100, Math.round((totalEstimatedMinutes / availableMinutes) * 100))
+    : 0
 
   if (loading) {
     return (
