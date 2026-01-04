@@ -6,11 +6,12 @@
 
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { UniversalTaskModal, TaskData } from '@/components/common/UniversalTaskModal'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabaseClient'
 import { TestDayTask, DayPlan, Recommendation, WorkMode } from '@/lib/types/dayAssistantV2'
+import { scoreAndSortTasksV3 } from '@/lib/services/dayAssistantV2RecommendationEngine'
 import { DayAssistantV2TopBar } from './DayAssistantV2TopBar'
 import { ActiveTimerBar } from './ActiveTimerBar'
 import { OverdueAlert } from './OverdueAlert'
@@ -454,34 +455,107 @@ export function DayAssistantV2View() {
     return (priority >= 1 && priority <= 4 ? priority : 1) as 1 | 2 | 3 | 4
   }
 
-  // Organize tasks into sections (optimized single pass)
-  const { mustTasks, top3Tasks, queueTasks, overflowTasks, overdueTasks } = filteredTasks.reduce(
-    (acc, task) => {
-      if (task.completed) return acc
-      
-      // Check if overdue
-      if (task.due_date && task.due_date < selectedDate) {
-        acc.overdueTasks.push(task)
-      } else if (task.is_must) {
-        acc.mustTasks.push(task)
-      } else if (!task.due_date || task.due_date > selectedDate) {
-        acc.overflowTasks.push(task)
-      } else if (acc.top3Tasks.length < 3) {
-        acc.top3Tasks.push(task)
-      } else {
-        acc.queueTasks.push(task)
-      }
-      
-      return acc
-    },
-    {
+  // Score and sort tasks FIRST using V3 algorithm
+  const scoredTasks = useMemo(() => {
+    if (!dayPlan) return filteredTasks
+    
+    console.log('🎯 [DayAssistantV2] Scoring', filteredTasks.length, 'tasks with scoreAndSortTasksV3')
+    const scored = scoreAndSortTasksV3(filteredTasks, dayPlan, selectedDate, selectedProjectId)
+    
+    console.log('📊 [DayAssistantV2] Top 5 scored tasks:')
+    scored.slice(0, 5).forEach((task, idx) => {
+      console.log(`  #${idx + 1}. "${task.title.substring(0, 40)}" - Score: ${task.metadata?._score || 0}`)
+    })
+    
+    return scored
+  }, [filteredTasks, dayPlan, selectedDate, selectedProjectId])
+
+  // Helper function to calculate work hours
+  function calculateWorkHours(start: string, end: string): number {
+    const [startH, startM] = start.split(':').map(Number)
+    const [endH, endM] = end.split(':').map(Number)
+    const startMinutes = startH * 60 + startM
+    const endMinutes = endH * 60 + endM
+    return (endMinutes - startMinutes) / 60
+  }
+
+  // THEN divide into sections based on scoring and capacity
+  const { mustTasks, top3Tasks, queueTasks, overflowTasks, overdueTasks } = useMemo(() => {
+    const sections = {
       mustTasks: [] as TestDayTask[],
       top3Tasks: [] as TestDayTask[],
       queueTasks: [] as TestDayTask[],
       overflowTasks: [] as TestDayTask[],
       overdueTasks: [] as TestDayTask[]
     }
-  )
+    
+    // Extract overdue tasks first
+    const overdue = scoredTasks.filter(t => !t.completed && t.due_date && t.due_date < selectedDate)
+    sections.overdueTasks = overdue
+    
+    // Extract MUST tasks (excluding overdue)
+    const must = scoredTasks.filter(t => !t.completed && t.is_must && !(t.due_date && t.due_date < selectedDate))
+    sections.mustTasks = must
+    
+    // Remaining tasks for today (excluding MUST and overdue)
+    const todayTasks = scoredTasks.filter(t => 
+      !t.completed && 
+      !t.is_must && 
+      !(t.due_date && t.due_date < selectedDate) &&
+      t.due_date === selectedDate
+    )
+    
+    // Calculate capacity
+    const workHours = calculateWorkHours(workHoursStart, workHoursEnd)
+    const capacityMinutes = workHours * 60
+    
+    // Calculate used capacity by MUST tasks
+    const mustMinutes = must.reduce((sum, t) => sum + (t.estimate_min || 0), 0)
+    let remainingCapacity = capacityMinutes - mustMinutes
+    
+    console.log('📊 [DayAssistantV2] Capacity:', {
+      total: capacityMinutes,
+      mustUsed: mustMinutes,
+      remaining: remainingCapacity,
+      todayTasksCount: todayTasks.length
+    })
+    
+    // Allocate Top 3 (highest scored tasks that fit in capacity)
+    for (const task of todayTasks) {
+      const taskMinutes = task.estimate_min || 0
+      
+      if (sections.top3Tasks.length < 3 && remainingCapacity >= taskMinutes) {
+        sections.top3Tasks.push(task)
+        remainingCapacity -= taskMinutes
+      } else if (remainingCapacity >= taskMinutes) {
+        // Fits in capacity - add to queue
+        sections.queueTasks.push(task)
+        remainingCapacity -= taskMinutes
+      } else {
+        // Doesn't fit in capacity - add to overflow
+        sections.overflowTasks.push(task)
+      }
+    }
+    
+    // Tasks without due date or future dates also go to overflow
+    const futureTasks = scoredTasks.filter(t =>
+      !t.completed &&
+      !t.is_must &&
+      !(t.due_date && t.due_date < selectedDate) &&
+      (!t.due_date || t.due_date > selectedDate)
+    )
+    sections.overflowTasks.push(...futureTasks)
+    
+    console.log('📊 [DayAssistantV2] Sections:', {
+      must: sections.mustTasks.length,
+      top3: sections.top3Tasks.length,
+      queue: sections.queueTasks.length,
+      overflow: sections.overflowTasks.length,
+      overdue: sections.overdueTasks.length
+    })
+    
+    return sections
+  }, [scoredTasks, selectedDate, workHoursStart, workHoursEnd])
 
   // Calculate time stats
   const totalEstimatedMinutes = tasks.reduce((sum, t) => sum + (t.estimate_min || 0), 0)
