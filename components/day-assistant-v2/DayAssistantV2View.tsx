@@ -750,6 +750,14 @@ export function DayAssistantV2View() {
   const completedMinutes = tasks
     .filter(t => t.completed)
     .reduce((sum, t) => sum + (t.estimate_min || 0), 0)
+  
+  // Calculate scheduled minutes - all non-completed tasks scheduled for today
+  const scheduledMinutes = useMemo(() => {
+    return tasks
+      .filter(t => t.due_date === selectedDate && !t.completed)
+      .reduce((sum, t) => sum + (t.estimate_min || 0), 0)
+  }, [tasks, selectedDate])
+  
   const availableMinutes = Math.max(0, calculateWorkHours(workHoursStart, workHoursEnd) * 60)
   const usagePercentage = availableMinutes > 0
     ? Math.min(100, Math.round((totalEstimatedMinutes / availableMinutes) * 100))
@@ -786,7 +794,7 @@ export function DayAssistantV2View() {
           workHoursStart={workHoursStart}
           workHoursEnd={workHoursEnd}
           workMode={workMode}
-          usedMinutes={completedMinutes}
+          usedMinutes={scheduledMinutes}
           totalCapacity={availableMinutes}
           onEditWorkHours={() => setShowWorkHoursModal(true)}
           onEditMode={() => setShowWorkModeModal(true)}
