@@ -108,7 +108,7 @@ export function buildSmartQueue(
   const todayTasks = scoredTasks.filter(t => t.due_date === todayISO)
   const futureTasks = scoredTasks.filter(t => t.due_date && t.due_date > todayISO)
   
-  // **NEW**: If no capacity (after work hours), all today tasks go to overflow
+  // Check if capacity available: if no capacity (work hours ended), move all today tasks to overflow
   if (capacity <= 0) {
     const later = [...todayTasks, ...futureTasks]
       .sort((a, b) => {
