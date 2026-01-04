@@ -758,12 +758,13 @@ export function DayAssistantV2View() {
     
     // Optional debug logging (can be enabled for debugging)
     if (process.env.NODE_ENV === 'development') {
+      const available = Math.max(0, calculateWorkHours(workHoursStart, workHoursEnd) * 60)
       console.log('🔍 [Day Overload Debug]', {
         totalTasks: tasks.length,
         todayTasks: todayTasks.length,
         scheduledMinutes: scheduled,
-        availableMinutes: Math.max(0, calculateWorkHours(workHoursStart, workHoursEnd) * 60),
-        overloadPercent: Math.round((scheduled / Math.max(0, calculateWorkHours(workHoursStart, workHoursEnd) * 60)) * 100)
+        availableMinutes: available,
+        overloadPercent: available > 0 ? Math.round((scheduled / available) * 100) : 0
       })
     }
     
