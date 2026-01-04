@@ -433,8 +433,8 @@ export function DayAssistantV2View() {
 
   // Filter tasks by work mode and project
   const filteredTasks = tasks.filter(task => {
-    // Filter by project if selected
-    if (selectedProjectId && task.project_id !== selectedProjectId) {
+    // Filter by project if selected (handle both null and empty string)
+    if (selectedProjectId && selectedProjectId.trim() !== '' && task.project_id !== selectedProjectId) {
       return false
     }
     

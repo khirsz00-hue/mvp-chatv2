@@ -546,8 +546,8 @@ export async function getTasks(
     
     // Extract project_id and project_name from metadata if available
     const metadata = taskWithRelations.metadata || {}
-    const project_id = metadata.project_id as string | null | undefined
-    const project_name = metadata.project_name as string | null | undefined
+    const project_id = metadata.project_id
+    const project_name = metadata.project_name
     
     return {
       ...taskWithRelations,
