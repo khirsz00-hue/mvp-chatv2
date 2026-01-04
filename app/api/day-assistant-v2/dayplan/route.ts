@@ -14,7 +14,6 @@ import {
   getTasks,
   getActiveProposals
 } from '@/lib/services/dayAssistantV2Service'
-import { generateSliderChangeRecommendation } from '@/lib/services/dayAssistantV2RecommendationEngine'
 
 interface DayPlanMetadata {
   work_hours_start?: string
@@ -232,24 +231,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to update day plan' }, { status: 500 })
     }
     
-    // Generate recommendation if sliders changed significantly
-    let newProposal = null
-    if (energy !== undefined || focus !== undefined) {
-      const tasks = await getTasks(user.id, assistant.id, { date, includeCompleted: false })
-      newProposal = await generateSliderChangeRecommendation(
-        user.id,
-        assistant.id,
-        assistant,
-        tasks,
-        oldPlan,
-        updatedPlan,
-        date
-      )
-    }
-    
     return NextResponse.json({
       dayPlan: updatedPlan,
-      proposal: newProposal,
       message: 'Day plan updated successfully'
     })
   } catch (error) {

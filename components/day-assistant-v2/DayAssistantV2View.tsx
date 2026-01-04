@@ -22,7 +22,6 @@ import { DayAssistantV2TaskCard } from './DayAssistantV2TaskCard'
 import { RecommendationPanel } from './RecommendationPanel'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { useTaskTimer } from '@/hooks/useTaskTimer'
-import { useDayPlan } from '@/hooks/useDayPlan'
 import Button from '@/components/ui/Button'
 import { Plus, CalendarBlank, CaretDown, CaretUp } from '@phosphor-icons/react'
 
@@ -66,17 +65,6 @@ export function DayAssistantV2View() {
 
   // Custom hooks
   const { activeTimer, startTimer, pauseTimer, resumeTimer, stopTimer, formatTime } = useTaskTimer()
-  const { energy, focus, updateEnergy, updateFocus } = useDayPlan(
-    sessionToken,
-    selectedDate,
-    dayPlan,
-    {
-      onUpdate: async () => {
-        // Refresh recommendations when sliders change
-        await fetchRecommendations()
-      }
-    }
-  )
 
   // Load data on mount
   useEffect(() => {
