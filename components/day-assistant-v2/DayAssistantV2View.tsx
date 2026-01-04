@@ -412,12 +412,13 @@ export function DayAssistantV2View() {
   const handleWorkHoursChange = async (start: string, end: string) => {
     setWorkHoursStart(start)
     setWorkHoursEnd(end)
+    const capacityMinutes = Math.max(0, calculateWorkHours(start, end) * 60)
     
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
       
-      await fetch('/api/day-assistant-v2/dayplan', {
+      const response = await fetch('/api/day-assistant-v2/dayplan', {
         method: 'PUT',
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -428,10 +429,22 @@ export function DayAssistantV2View() {
           metadata: {
             work_start_time: start,
             work_end_time: end,
-            capacity_minutes: Math.max(0, calculateWorkHours(start, end) * 60)
+            capacity_minutes: capacityMinutes
           }
         })
       })
+      
+      if (!response.ok) {
+        throw new Error('Failed to update work hours')
+      }
+      
+      const updated = await response.json()
+      if (updated?.dayPlan?.metadata) {
+        setDayPlan(prev => prev ? {
+          ...prev,
+          metadata: { ...prev.metadata, ...updated.dayPlan.metadata }
+        } : updated.dayPlan)
+      }
     } catch (error) {
       console.error('Error updating work hours:', error)
       toast.error('Nie udało się zapisać godzin pracy')
@@ -507,7 +520,7 @@ export function DayAssistantV2View() {
     const [endH, endM] = end.split(':').map(Number)
     const startMinutes = startH * 60 + startM
     const endMinutes = endH * 60 + endM
-    return (endMinutes - startMinutes) / 60
+    return Math.max(0, (endMinutes - startMinutes) / 60)
   }
 
   // THEN divide into sections based on scoring and capacity
