@@ -543,9 +543,17 @@ export async function getTasks(
     if (options?.includeSubtasks) {
       subtasks = Array.isArray(taskWithRelations.day_assistant_v2_subtasks) ? taskWithRelations.day_assistant_v2_subtasks : []
     }
+    
+    // Extract project_id and project_name from metadata if available
+    const metadata = taskWithRelations.metadata || {}
+    const project_id = metadata.project_id as string | null | undefined
+    const project_name = metadata.project_name as string | null | undefined
+    
     return {
       ...taskWithRelations,
-      subtasks
+      subtasks,
+      project_id: project_id || null,
+      project_name: project_name || null
     }
   }) as TestDayTask[]
   
