@@ -539,6 +539,16 @@ export function DayAssistantV2View() {
     return scored
   }, [filteredTasks, dayPlan, selectedDate, selectedProjectId])
 
+  // Helper function to calculate total work hours (for validation only)
+  // For actual capacity calculation, use calculateAvailableMinutes
+  function calculateWorkHours(start: string, end: string): number {
+    const [startH, startM] = start.split(':').map(Number)
+    const [endH, endM] = end.split(':').map(Number)
+    const startMinutes = startH * 60 + startM
+    const endMinutes = endH * 60 + endM
+    return Math.max(0, (endMinutes - startMinutes) / 60)
+  }
+
   // THEN divide into sections based on scoring and capacity
   const { mustTasks, top3Tasks, queueTasks, overflowTasks, overdueTasks } = useMemo(() => {
     const sections = {
@@ -648,7 +658,7 @@ export function DayAssistantV2View() {
     })
     
     return sections
-  }, [scoredTasks, selectedDate, workHoursStart, workHoursEnd])
+  }, [scoredTasks, selectedDate, workHoursEnd])
 
   // Calculate time stats
   const totalEstimatedMinutes = tasks.reduce((sum, t) => sum + (t.estimate_min || 0), 0)
