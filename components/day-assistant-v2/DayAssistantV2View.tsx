@@ -519,8 +519,7 @@ export function DayAssistantV2View() {
     // Calculate used capacity by MUST and Top 3 tasks
     const mustMinutes = must.reduce((sum, t) => sum + (t.estimate_min || 0), 0)
     const top3Minutes = sections.top3Tasks.reduce((sum, t) => sum + (t.estimate_min || 0), 0)
-    const initialRemainingCapacity = Math.max(0, capacityMinutes - mustMinutes - top3Minutes)
-    let remainingCapacity = initialRemainingCapacity
+    let remainingCapacity = Math.max(0, capacityMinutes - mustMinutes - top3Minutes)
     
     console.log('📊 [DayAssistantV2] Capacity:', {
       total: capacityMinutes,
@@ -722,7 +721,7 @@ export function DayAssistantV2View() {
                       <DayAssistantV2TaskCard
                         key={task.id}
                         task={task}
-                        queuePosition={idx + TOP_TASKS_COUNT + 1}
+                        queuePosition={idx + TOP_TASKS_COUNT + 1} // +1 to keep positions 1-based after Top 3
                         onStartTimer={handleStartTimer}
                         onComplete={handleCompleteTask}
                         onHelp={handleHelp}
