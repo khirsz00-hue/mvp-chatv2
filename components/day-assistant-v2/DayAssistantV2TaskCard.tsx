@@ -13,7 +13,6 @@ import {
   PriorityBadge,
   DeadlineBadge,
   CognitiveLoadBadge,
-  DurationBadge,
   ContextBadge,
   PostponeAlertBanner
 } from './DayAssistantV2TaskBadges'
@@ -33,6 +32,9 @@ interface DayAssistantV2TaskCardProps {
   onDelete: (taskId: string) => void
   onOpenDetails: (taskId: string) => void
 }
+
+// Constants
+const POSTPONE_ALERT_THRESHOLD = 3
 
 // Helper function to get priority border color (bg-* for left border)
 function getPriorityBorderColor(priority: number): string {
@@ -252,7 +254,7 @@ export function DayAssistantV2TaskCard({
       </div>
       
       {/* Postpone alert */}
-      {task.postpone_count >= 3 && (
+      {task.postpone_count >= POSTPONE_ALERT_THRESHOLD && (
         <div className="mt-3">
           <PostponeAlertBanner postponeCount={task.postpone_count} />
         </div>
