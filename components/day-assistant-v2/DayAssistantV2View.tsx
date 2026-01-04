@@ -27,6 +27,8 @@ import { useTaskTimer } from '@/hooks/useTaskTimer'
 import Button from '@/components/ui/Button'
 import { Plus, CalendarBlank, CaretDown, CaretUp } from '@phosphor-icons/react'
 
+const TOP_TASKS_COUNT = 3
+
 interface TaskStats {
   completedToday: number
   totalToday: number
@@ -497,56 +499,45 @@ export function DayAssistantV2View() {
     const must = scoredTasks.filter(t => !t.completed && t.is_must && !(t.due_date && t.due_date < selectedDate))
     sections.mustTasks = must
     
-    // Remaining tasks for today (excluding MUST and overdue)
-    const todayTasks = scoredTasks.filter(t => 
+    // Tasks due today (exclude overdue and MUST - handled separately)
+    const todayNonMustTasks = scoredTasks.filter(t => 
       !t.completed && 
-      !t.is_must && 
+      !t.is_must &&
       !(t.due_date && t.due_date < selectedDate) &&
       t.due_date === selectedDate
     )
+    
+    // Top 3 purely by scoring (first 3 tasks for today, independent of capacity)
+    sections.top3Tasks = todayNonMustTasks.slice(0, TOP_TASKS_COUNT)
+    
+    const remainingTodayTasks = todayNonMustTasks.slice(TOP_TASKS_COUNT)
     
     // Calculate capacity
     const workHours = calculateWorkHours(workHoursStart, workHoursEnd)
     const capacityMinutes = workHours * 60
     
-    // Calculate used capacity by MUST tasks
+    // Calculate used capacity by MUST and Top 3 tasks
     const mustMinutes = must.reduce((sum, t) => sum + (t.estimate_min || 0), 0)
-    let remainingCapacity = capacityMinutes - mustMinutes
+    const top3Minutes = sections.top3Tasks.reduce((sum, t) => sum + (t.estimate_min || 0), 0)
+    let remainingCapacity = Math.max(0, capacityMinutes - mustMinutes - top3Minutes)
     
     console.log('📊 [DayAssistantV2] Capacity:', {
       total: capacityMinutes,
       mustUsed: mustMinutes,
+      top3Used: top3Minutes,
       remaining: remainingCapacity,
-      todayTasksCount: todayTasks.length
+      todayTasksCount: todayNonMustTasks.length
     })
     
-    // PHASE 1: Allocate Top 3 (first 3 tasks that FIT in capacity)
-    for (const task of todayTasks) {
-      if (sections.top3Tasks.length >= 3) break  // Top 3 is full, stop
-      
-      const taskMinutes = task.estimate_min || 0
-      if (remainingCapacity >= taskMinutes) {
-        sections.top3Tasks.push(task)
-        remainingCapacity -= taskMinutes
-        console.log(`  ✅ Top 3 #${sections.top3Tasks.length}: "${task.title}" (${taskMinutes}min, score: ${task.metadata?._score || 0})`)
-      } else {
-        console.log(`  ⏭️ Skipping for Top 3: "${task.title}" (${taskMinutes}min > ${remainingCapacity}min remaining)`)
-      }
-    }
-    
-    // PHASE 2: Allocate remaining tasks to Queue or Overflow
-    const remainingTodayTasks = todayTasks.filter(t => !sections.top3Tasks.includes(t))
-    
+    // Allocate remaining tasks to Queue or Overflow based on remaining capacity
     for (const task of remainingTodayTasks) {
       const taskMinutes = task.estimate_min || 0
       
       if (remainingCapacity >= taskMinutes) {
-        // Fits in capacity - add to Queue
         sections.queueTasks.push(task)
         remainingCapacity -= taskMinutes
         console.log(`  ✅ Queue: "${task.title}" (${taskMinutes}min, score: ${task.metadata?._score || 0})`)
       } else {
-        // Doesn't fit in capacity - add to Overflow
         sections.overflowTasks.push(task)
         console.log(`  📦 Overflow: "${task.title}" (${taskMinutes}min > ${remainingCapacity}min remaining)`)
       }
@@ -719,7 +710,7 @@ export function DayAssistantV2View() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg font-bold flex items-center gap-2">
                     {queueCollapsed ? <CaretDown size={20} /> : <CaretUp size={20} />}
-                    📋 Kolejka ({queueTasks.length})
+                    📋 Zadania na dziś w godzinach pracy ({queueTasks.length})
                   </CardTitle>
                 </div>
               </CardHeader>
@@ -730,7 +721,7 @@ export function DayAssistantV2View() {
                       <DayAssistantV2TaskCard
                         key={task.id}
                         task={task}
-                        queuePosition={idx + 4}
+                        queuePosition={idx + TOP_TASKS_COUNT + 1} // +1 to keep positions 1-based after Top 3
                         onStartTimer={handleStartTimer}
                         onComplete={handleCompleteTask}
                         onHelp={handleHelp}
@@ -756,7 +747,7 @@ export function DayAssistantV2View() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg font-bold flex items-center gap-2 text-gray-600">
                     {overflowCollapsed ? <CaretDown size={20} /> : <CaretUp size={20} />}
-                    📦 Zadania na dziś, które nie zmieszczą się w dostępnym czasie pracy ({overflowTasks.length})
+                    📦 Zadania na dziś poza godzinami pracy ({overflowTasks.length})
                   </CardTitle>
                 </div>
               </CardHeader>
