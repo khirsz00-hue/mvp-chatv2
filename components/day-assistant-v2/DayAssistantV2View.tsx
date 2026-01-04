@@ -520,6 +520,9 @@ export function DayAssistantV2View() {
     const mustMinutes = must.reduce((sum, t) => sum + (t.estimate_min || 0), 0)
     const top3Minutes = sections.top3Tasks.reduce((sum, t) => sum + (t.estimate_min || 0), 0)
     let remainingCapacity = capacityMinutes - mustMinutes - top3Minutes
+    if (remainingCapacity < 0) {
+      remainingCapacity = 0
+    }
     
     console.log('📊 [DayAssistantV2] Capacity:', {
       total: capacityMinutes,
