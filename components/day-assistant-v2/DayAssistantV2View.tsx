@@ -155,6 +155,7 @@ export function DayAssistantV2View() {
         return
       }
       
+      console.log(`🔍 [DayAssistantV2] API returned ${data.meetings?.length || 0} meetings:`, data.meetings)
       setMeetings(data.meetings || [])
       console.log(`✅ [DayAssistantV2] Loaded ${data.meetings?.length || 0} meetings`)
       

@@ -95,6 +95,8 @@ export async function GET(req: NextRequest) {
     const endOfDay = new Date(date)
     endOfDay.setHours(23, 59, 59, 999)
 
+    console.log(`🔍 [Meetings API] Date range: ${startOfDay.toISOString()} to ${endOfDay.toISOString()}`)
+
     const events = await calendarService.listEvents({
       timeMin: startOfDay.toISOString(),
       timeMax: endOfDay.toISOString(),
@@ -102,6 +104,9 @@ export async function GET(req: NextRequest) {
     })
 
     console.log(`🔍 [Meetings API] Found ${events.length} events from Google Calendar`)
+    events.forEach((event, idx) => {
+      console.log(`  Event ${idx + 1}: "${event.summary}" - ${event.start?.dateTime} to ${event.end?.dateTime}`)
+    })
 
     // Transform and save to cache
     const meetings: Meeting[] = []
