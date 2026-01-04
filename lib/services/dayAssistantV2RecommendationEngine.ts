@@ -442,19 +442,21 @@ export function calculateTaskScoreV3(
   reasoning.push(`🚩 Priorytet ${priorityLabel}: +${priorityScore}`)
   
   // 4. Cognitive load (ENHANCED - now as penalty, subtracted)
-  const cogLoadPenalty = -advancedScore.breakdown.cognitiveLoad  // Convert back to positive for penalty
+  // Note: advancedScore.breakdown.cognitiveLoad is already negative (e.g., -6)
+  // We add it to the score (which effectively subtracts the penalty)
   const cogLoad = task.cognitive_load || DEFAULT_COGNITIVE_LOAD
-  score -= cogLoadPenalty
+  const cogLoadPenaltyValue = Math.abs(advancedScore.breakdown.cognitiveLoad)  // Convert to positive for display
+  score += advancedScore.breakdown.cognitiveLoad  // Add negative value = subtract penalty
   
   // Also keep work mode matching bonus
   if (context.workMode === 'low_focus' && cogLoad <= LOW_FOCUS_MAX_COGNITIVE_LOAD) {
     score += 15
-    reasoning.push(`🧠 Cognitive Load ${cogLoad}/5 (dopasowanie Low Focus): +15, penalty: -${cogLoadPenalty}`)
+    reasoning.push(`🧠 Cognitive Load ${cogLoad}/5 (dopasowanie Low Focus): +15, penalty: ${advancedScore.breakdown.cognitiveLoad}`)
   } else if (context.workMode === 'hyperfocus' && cogLoad >= HYPERFOCUS_MIN_COGNITIVE_LOAD) {
     score += 15
-    reasoning.push(`🧠 Cognitive Load ${cogLoad}/5 (dopasowanie HyperFocus): +15, penalty: -${cogLoadPenalty}`)
+    reasoning.push(`🧠 Cognitive Load ${cogLoad}/5 (dopasowanie HyperFocus): +15, penalty: ${advancedScore.breakdown.cognitiveLoad}`)
   } else {
-    reasoning.push(`🧠 Cognitive Load ${cogLoad}/5: penalty -${cogLoadPenalty}`)
+    reasoning.push(`🧠 Cognitive Load ${cogLoad}/5: penalty ${advancedScore.breakdown.cognitiveLoad}`)
   }
   
   // 5. Postpone bonus (ENHANCED - now bonus instead of penalty)

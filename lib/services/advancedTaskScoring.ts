@@ -72,16 +72,17 @@ export function calculateDeadlineScore(dueDate: string | null | undefined): numb
  */
 export function calculatePriorityScore(priority: number | string | undefined): number {
   // Handle string formats like 'P1', 'P2', 'P3'
+  // Note: String 'P1' maps to 50 points, which is also what Todoist priority 4 maps to
   if (typeof priority === 'string') {
     const match = priority.match(/P?(\d+)/i)
     if (match) {
       const num = parseInt(match[1])
-      // If string format 'P1', 'P2', 'P3' - convert to points directly
+      // String format: P1=50, P2=30, P3=10
       switch (num) {
-        case 1: return 50  // P1
+        case 1: return 50  // P1 (highest)
         case 2: return 30  // P2
         case 3: return 10  // P3
-        default: return 5
+        default: return 5  // P4 or unknown
       }
     }
   }
@@ -89,18 +90,19 @@ export function calculatePriorityScore(priority: number | string | undefined): n
   // Convert to number if needed
   const priorityNum = typeof priority === 'number' ? priority : 0
 
-  // Todoist priority: 4=P1 (highest), 3=P2, 2=P3, 1=P4 (lowest)
+  // Todoist numeric format: 4=P1 (highest), 3=P2, 2=P3, 1=P4 (lowest)
+  // Note: Todoist priority 4 (P1) also maps to 50 points, same as string 'P1'
   switch (priorityNum) {
     case 4:
-      return 50  // P1 - highest
+      return 50  // P1 - highest priority
     case 3:
       return 30  // P2
     case 2:
       return 10  // P3
     case 1:
-      return 5   // P4 - lowest
+      return 5   // P4 - lowest priority
     default:
-      return 5   // Default
+      return 5   // Default/unknown
   }
 }
 
