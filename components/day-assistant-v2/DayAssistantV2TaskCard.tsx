@@ -7,7 +7,7 @@ import React from 'react'
 import { TestDayTask } from '@/lib/types/dayAssistantV2'
 import { Card, CardContent } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
-import { Play, DotsThreeVertical } from '@phosphor-icons/react'
+import { Play } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import {
   PositionBadge,
