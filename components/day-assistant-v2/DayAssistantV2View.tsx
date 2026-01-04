@@ -508,7 +508,7 @@ export function DayAssistantV2View() {
     // Top 3 purely by scoring (first 3 tasks for today, independent of capacity)
     sections.top3Tasks = todayNonMustTasks.slice(0, 3)
     
-    const remainingTodayTasks = todayNonMustTasks.slice(sections.top3Tasks.length)
+    const remainingTodayTasks = todayNonMustTasks.slice(3)
     
     // Calculate capacity
     const workHours = calculateWorkHours(workHoursStart, workHoursEnd)
@@ -708,7 +708,7 @@ export function DayAssistantV2View() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg font-bold flex items-center gap-2">
                     {queueCollapsed ? <CaretDown size={20} /> : <CaretUp size={20} />}
-                    📋 Pozostałe na dziś (w godzinach pracy) ({queueTasks.length})
+                    📋 Zadania na dziś w godzinach pracy ({queueTasks.length})
                   </CardTitle>
                 </div>
               </CardHeader>
@@ -745,7 +745,7 @@ export function DayAssistantV2View() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg font-bold flex items-center gap-2 text-gray-600">
                     {overflowCollapsed ? <CaretDown size={20} /> : <CaretUp size={20} />}
-                    📦 Pozostałe na dziś, nie mieszczące się w godzinach pracy ({overflowTasks.length})
+                    📦 Zadania na dziś poza godzinami pracy ({overflowTasks.length})
                   </CardTitle>
                 </div>
               </CardHeader>
