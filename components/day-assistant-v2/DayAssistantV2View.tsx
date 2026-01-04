@@ -497,56 +497,46 @@ export function DayAssistantV2View() {
     const must = scoredTasks.filter(t => !t.completed && t.is_must && !(t.due_date && t.due_date < selectedDate))
     sections.mustTasks = must
     
-    // Remaining tasks for today (excluding MUST and overdue)
+    // Tasks due today (exclude overdue)
     const todayTasks = scoredTasks.filter(t => 
       !t.completed && 
-      !t.is_must && 
       !(t.due_date && t.due_date < selectedDate) &&
       t.due_date === selectedDate
     )
+    
+    // Top 3 purely by scoring (first 3 tasks for today, independent of capacity)
+    sections.top3Tasks = todayTasks.slice(0, 3)
+    
+    const remainingTodayTasks = todayTasks.filter(t => !sections.top3Tasks.includes(t) && !t.is_must)
     
     // Calculate capacity
     const workHours = calculateWorkHours(workHoursStart, workHoursEnd)
     const capacityMinutes = workHours * 60
     
-    // Calculate used capacity by MUST tasks
+    // Calculate used capacity by MUST and Top 3 tasks
     const mustMinutes = must.reduce((sum, t) => sum + (t.estimate_min || 0), 0)
-    let remainingCapacity = capacityMinutes - mustMinutes
+    const top3Minutes = sections.top3Tasks
+      .filter(t => !t.is_must) // avoid double-counting MUST tasks
+      .reduce((sum, t) => sum + (t.estimate_min || 0), 0)
+    let remainingCapacity = capacityMinutes - mustMinutes - top3Minutes
     
     console.log('📊 [DayAssistantV2] Capacity:', {
       total: capacityMinutes,
       mustUsed: mustMinutes,
+      top3Used: top3Minutes,
       remaining: remainingCapacity,
       todayTasksCount: todayTasks.length
     })
     
-    // PHASE 1: Allocate Top 3 (first 3 tasks that FIT in capacity)
-    for (const task of todayTasks) {
-      if (sections.top3Tasks.length >= 3) break  // Top 3 is full, stop
-      
-      const taskMinutes = task.estimate_min || 0
-      if (remainingCapacity >= taskMinutes) {
-        sections.top3Tasks.push(task)
-        remainingCapacity -= taskMinutes
-        console.log(`  ✅ Top 3 #${sections.top3Tasks.length}: "${task.title}" (${taskMinutes}min, score: ${task.metadata?._score || 0})`)
-      } else {
-        console.log(`  ⏭️ Skipping for Top 3: "${task.title}" (${taskMinutes}min > ${remainingCapacity}min remaining)`)
-      }
-    }
-    
-    // PHASE 2: Allocate remaining tasks to Queue or Overflow
-    const remainingTodayTasks = todayTasks.filter(t => !sections.top3Tasks.includes(t))
-    
+    // Allocate remaining tasks to Queue or Overflow based on remaining capacity
     for (const task of remainingTodayTasks) {
       const taskMinutes = task.estimate_min || 0
       
       if (remainingCapacity >= taskMinutes) {
-        // Fits in capacity - add to Queue
         sections.queueTasks.push(task)
         remainingCapacity -= taskMinutes
         console.log(`  ✅ Queue: "${task.title}" (${taskMinutes}min, score: ${task.metadata?._score || 0})`)
       } else {
-        // Doesn't fit in capacity - add to Overflow
         sections.overflowTasks.push(task)
         console.log(`  📦 Overflow: "${task.title}" (${taskMinutes}min > ${remainingCapacity}min remaining)`)
       }
@@ -719,7 +709,7 @@ export function DayAssistantV2View() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg font-bold flex items-center gap-2">
                     {queueCollapsed ? <CaretDown size={20} /> : <CaretUp size={20} />}
-                    📋 Kolejka ({queueTasks.length})
+                    📋 Pozostałe na dziś (w godzinach pracy) ({queueTasks.length})
                   </CardTitle>
                 </div>
               </CardHeader>
@@ -756,7 +746,7 @@ export function DayAssistantV2View() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg font-bold flex items-center gap-2 text-gray-600">
                     {overflowCollapsed ? <CaretDown size={20} /> : <CaretUp size={20} />}
-                    📦 Zadania na dziś, które nie zmieszczą się w dostępnym czasie pracy ({overflowTasks.length})
+                    📦 Pozostałe na dziś, nie mieszczące się w godzinach pracy ({overflowTasks.length})
                   </CardTitle>
                 </div>
               </CardHeader>
