@@ -30,7 +30,7 @@ export function DayAssistantV2FocusBar({
 }: FocusBarProps) {
   if (!task) return null
 
-  // Format jako MM:SS (nie HH:MM:SS)
+  // Format as MM:SS (not HH:MM:SS)
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60)
     const s = seconds % 60

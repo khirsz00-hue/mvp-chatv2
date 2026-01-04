@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X } from '@phosphor-icons/react'
 
 interface WorkHoursModalProps {
@@ -25,6 +25,14 @@ export function WorkHoursModal({
 }: WorkHoursModalProps) {
   const [start, setStart] = useState(currentStart)
   const [end, setEnd] = useState(currentEnd)
+
+  // Sync state with props when modal opens or props change
+  useEffect(() => {
+    if (isOpen) {
+      setStart(currentStart)
+      setEnd(currentEnd)
+    }
+  }, [isOpen, currentStart, currentEnd])
 
   if (!isOpen) return null
 

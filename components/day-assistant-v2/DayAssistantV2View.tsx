@@ -683,7 +683,7 @@ export function DayAssistantV2View() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50">
-      {/* Focus Bar - pokazuje się NAD status barem gdy timer aktywny */}
+      {/* Focus Bar - shows ABOVE status bar when timer is active */}
       {activeTimer && (
         <div className="sticky top-0 z-50 bg-gradient-to-br from-purple-50 via-white to-pink-50 pt-6 px-6">
           <DayAssistantV2FocusBar
@@ -698,7 +698,7 @@ export function DayAssistantV2View() {
         </div>
       )}
 
-      {/* Status Bar - ZAWSZE WIDOCZNY */}
+      {/* Status Bar - ALWAYS VISIBLE */}
       <div className={`${activeTimer ? '' : 'sticky top-0 z-40'} bg-gradient-to-br from-purple-50 via-white to-pink-50 px-6 ${activeTimer ? 'pt-0' : 'pt-6'}`}>
         <DayAssistantV2StatusBar
           workHoursStart={workHoursStart}

@@ -6,7 +6,7 @@
 
 'use client'
 
-import { Clock, Target, Warning } from '@phosphor-icons/react'
+import { Clock, Target, Warning, Pencil, CaretDown } from '@phosphor-icons/react'
 import { WorkMode } from './WorkModeSelector'
 
 export interface StatusBarProps {
@@ -59,7 +59,7 @@ export function DayAssistantV2StatusBar({
               {workHoursStart} - {workHoursEnd}
             </p>
           </div>
-          <i className="fa-solid fa-pen text-[10px] text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <Pencil size={10} className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
 
         {/* Separator */}
@@ -81,7 +81,7 @@ export function DayAssistantV2StatusBar({
               {MODE_LABELS[workMode]}
             </p>
           </div>
-          <i className="fa-solid fa-chevron-down text-[10px] text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CaretDown size={10} className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
 
         {/* Separator */}
