@@ -164,9 +164,18 @@ export async function GET(req: NextRequest) {
         // hangoutLink is specifically for video meetings, htmlLink is the general event URL
         meeting_link: event.hangoutLink || event.htmlLink || null,
         metadata: {
-          description: event.description,
-          attendees: event.attendees?.length || 0,
+          description: event.description || null,
+          attendees: event.attendees?.map((att: any) => ({
+            email: att.email,
+            displayName: att.displayName || att.email?.split('@')[0],
+            responseStatus: att.responseStatus,
+            self: att.self || false
+          })) || [],
           hasVideoCall: !!event.hangoutLink,
+          platform: event.hangoutLink ? 'Google Meet' : 
+                    event.conferenceData?.entryPoints?.[0]?.label || 
+                    (event.location?.includes('zoom') || event.location?.includes('Zoom')) ? 'Zoom' : 
+                    event.location ? 'Room' : null,
           isAllDay: isAllDay
         }
       }
