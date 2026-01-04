@@ -155,6 +155,12 @@ export function UniversalTaskModal({
   
   // Change history
   const [changeHistory, setChangeHistory] = useState<ChangeHistoryItem[]>([])
+  const lastValuesRef = useRef({
+    content: '',
+    description: '',
+    priority: 3 as 1 | 2 | 3 | 4,
+    dueDate: ''
+  })
   
   const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
   
@@ -164,23 +170,31 @@ export function UniversalTaskModal({
   
   // Fetch projects and labels on mount
   useEffect(() => {
-    if (!open || !token) return
+    if (!open) return
     
     const fetchData = async () => {
       setLoading(true)
       try {
-        // Fetch projects
-        const projectsRes = await fetch(`/api/todoist/projects?token=${token}`)
-        if (projectsRes.ok) {
-          const data = await projectsRes.json()
-          setProjects(data.projects || data || [])
+        // Fetch projects with proper auth
+        if (token) {
+          const projectsRes = await fetch('/api/todoist/projects', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          })
+          if (projectsRes.ok) {
+            const data = await projectsRes.json()
+            setProjects(data.projects || data || [])
+          }
         }
         
         // Fetch labels
-        const labelsRes = await fetch(`/api/todoist/labels?token=${token}`)
-        if (labelsRes.ok) {
-          const data = await labelsRes.json()
-          setAvailableLabels(data.labels || [])
+        if (token) {
+          const labelsRes = await fetch(`/api/todoist/labels?token=${token}`)
+          if (labelsRes.ok) {
+            const data = await labelsRes.json()
+            setAvailableLabels(data.labels || [])
+          }
         }
       } catch (error) {
         console.error('Failed to fetch data:', error)
@@ -195,14 +209,27 @@ export function UniversalTaskModal({
   // Load task data in edit mode
   useEffect(() => {
     if (open && task) {
-      setContent(task.content || '')
-      setDescription(task.description || '')
+      const initialContent = task.content || ''
+      const initialDescription = task.description || ''
+      const initialPriority = task.priority || 3
+      const initialDueDate = task.due || defaultDate || ''
+      
+      setContent(initialContent)
+      setDescription(initialDescription)
       setEstimatedMinutes(task.estimated_minutes || 25)
       setCognitiveLoad(task.cognitive_load || 3)
       setProjectId(task.project_id || '')
-      setPriority(task.priority || 3)
-      setDueDate(task.due || defaultDate || '')
+      setPriority(initialPriority)
+      setDueDate(initialDueDate)
       setSelectedLabels(task.labels || [])
+      
+      // Initialize lastValuesRef
+      lastValuesRef.current = {
+        content: initialContent,
+        description: initialDescription,
+        priority: initialPriority,
+        dueDate: initialDueDate
+      }
     } else if (open) {
       // Reset form for create mode
       setContent('')
@@ -217,6 +244,13 @@ export function UniversalTaskModal({
       setAiUnderstanding('')
       setSubtasks([])
       setChangeHistory([])
+      
+      lastValuesRef.current = {
+        content: '',
+        description: '',
+        priority: 3,
+        dueDate: ''
+      }
     }
   }, [open, task, defaultDate])
   
@@ -250,6 +284,102 @@ export function UniversalTaskModal({
     }
   }, [isTimerRunning])
   
+  // Auto-save and change tracking for edit mode
+  useEffect(() => {
+    if (!task?.id || !isEditMode) return
+    
+    // Check if anything changed
+    if (
+      content === (task.content || '') &&
+      description === (task.description || '') &&
+      priority === (task.priority || 3) &&
+      dueDate === (task.due || '') &&
+      projectId === (task.project_id || '') &&
+      JSON.stringify(selectedLabels) === JSON.stringify(task.labels || []) &&
+      estimatedMinutes === (task.estimated_minutes || 25)
+    ) {
+      return
+    }
+    
+    const timeout = setTimeout(() => {
+      const now = new Date().toISOString()
+      const changes: ChangeHistoryItem[] = []
+      
+      // Helper to generate unique IDs
+      const generateId = (field: string) => {
+        return crypto.randomUUID?.() || `change-${field}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      }
+      
+      // Track changes
+      if (content !== lastValuesRef.current.content && lastValuesRef.current.content !== '') {
+        changes.push({
+          id: generateId('content'),
+          field: 'Tytuł',
+          oldValue: lastValuesRef.current.content,
+          newValue: content,
+          timestamp: now
+        })
+      }
+      
+      if (description !== lastValuesRef.current.description && lastValuesRef.current.description !== '') {
+        changes.push({
+          id: generateId('description'),
+          field: 'Opis',
+          oldValue: lastValuesRef.current.description || '(pusty)',
+          newValue: description || '(pusty)',
+          timestamp: now
+        })
+      }
+      
+      if (priority !== lastValuesRef.current.priority) {
+        changes.push({
+          id: generateId('priority'),
+          field: 'Priorytet',
+          oldValue: `P${lastValuesRef.current.priority}`,
+          newValue: `P${priority}`,
+          timestamp: now
+        })
+      }
+      
+      if (dueDate !== lastValuesRef.current.dueDate && lastValuesRef.current.dueDate !== '') {
+        changes.push({
+          id: generateId('dueDate'),
+          field: 'Termin',
+          oldValue: lastValuesRef.current.dueDate || '(brak)',
+          newValue: dueDate || '(brak)',
+          timestamp: now
+        })
+      }
+      
+      if (changes.length > 0) {
+        setChangeHistory(prev => [...changes, ...prev])
+      }
+      
+      // Update lastValuesRef
+      lastValuesRef.current = {
+        content,
+        description,
+        priority,
+        dueDate
+      }
+      
+      // Auto-save via onSave callback
+      onSave({
+        ...(task.id && { id: task.id }),
+        content,
+        description,
+        priority,
+        due: dueDate || undefined,
+        project_id: projectId || undefined,
+        labels: selectedLabels,
+        estimated_minutes: estimatedMinutes,
+        cognitive_load: cognitiveLoad
+      })
+    }, 800)
+    
+    return () => clearTimeout(timeout)
+  }, [content, description, priority, dueDate, projectId, selectedLabels, estimatedMinutes, cognitiveLoad, task, isEditMode, onSave])
+  
   /* =======================
      HANDLERS
   ======================= */
@@ -258,14 +388,99 @@ export function UniversalTaskModal({
     setShowClarifyModal(true)
   }
   
+  const handleSubmitClarification = async () => {
+    if (!clarifyText.trim()) return
+    
+    setLoadingAI(true)
+    setShowClarifyModal(false)
+    
+    try {
+      // Call AI to get updated understanding with clarification
+      const prompt = `Poprzednia analiza: ${aiUnderstanding}
+
+Zadanie: ${content}
+Opis: ${description || ''}
+
+Kontekst doprecyzowania: ${clarifyText}
+
+Zaktualizuj swoją analizę zadania uwzględniając nowy kontekst. Odpowiedz w 1-2 zwięzłych zdaniach, jak rozumiesz to zadanie.`
+
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: prompt }]
+        })
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setAiUnderstanding(data.response || '')
+      }
+    } catch (error) {
+      console.error('Failed to clarify:', error)
+    } finally {
+      setLoadingAI(false)
+      setClarifyText('')
+    }
+  }
+  
   const handleGeneratePlan = async () => {
+    if (!content.trim()) return
+    
     setLoadingAI(true)
     try {
-      // TODO: Call AI API to generate plan
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      setAiUnderstanding(`Plan wygenerowany dla: "${content}"`)
+      // Call AI API to generate plan
+      const prompt = `Zadanie: "${content}"
+Opis: "${description || ''}"
+
+Wygeneruj 4-7 konkretnych subtasków (podzadań) dla tego zadania w formacie JSON:
+{
+  "subtasks": [
+    {"content": "Krok 1 - konkretna akcja", "description": "Szczegóły"}
+  ]
+}
+
+Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
+
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: 'Jesteś asystentem specjalizującym się w dekompozycji zadań.' },
+            { role: 'user', content: prompt }
+          ],
+          jsonMode: true
+        })
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        let parsed
+        try {
+          parsed = JSON.parse(data.response || '{}')
+        } catch (parseError) {
+          console.error('Failed to parse AI response:', parseError)
+          setAiUnderstanding('Nie udało się przetworzyć odpowiedzi AI')
+          return
+        }
+        
+        if (parsed.subtasks && Array.isArray(parsed.subtasks) && parsed.subtasks.length > 0) {
+          // Add subtasks to the state
+          const newSubtasks = parsed.subtasks.map((st: any) => ({
+            id: crypto.randomUUID?.() || `subtask-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            content: st.content || st.title,
+            completed: false
+          }))
+          
+          setSubtasks([...subtasks, ...newSubtasks])
+          setAiUnderstanding(`Plan wygenerowany - dodano ${newSubtasks.length} podzadań`)
+        }
+      }
     } catch (error) {
       console.error('Failed to generate plan:', error)
+      setAiUnderstanding('Nie udało się wygenerować planu')
     } finally {
       setLoadingAI(false)
     }
@@ -834,7 +1049,12 @@ export function UniversalTaskModal({
                       <div key={change.id} className="bg-gray-50 p-2 rounded">
                         <div className="flex justify-between">
                           <span className="font-semibold">{change.field}</span>
-                          <span className="text-gray-500">{change.timestamp}</span>
+                          <span className="text-gray-500">
+                            {new Date(change.timestamp).toLocaleTimeString('pl-PL', { 
+                              hour: '2-digit', 
+                              minute: '2-digit' 
+                            })}
+                          </span>
                         </div>
                         <div className="flex items-center gap-2 text-gray-600 mt-1">
                           <span className="line-through text-red-600">{change.oldValue}</span>
@@ -906,6 +1126,51 @@ export function UniversalTaskModal({
           </p>
         </form>
       </DialogContent>
+
+      {/* Clarification Modal */}
+      <Dialog open={showClarifyModal} onOpenChange={setShowClarifyModal}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-purple-800">
+              <Sparkle size={18} weight="fill" />
+              Doprecyzuj zadanie
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-gray-600">
+              Opisz, co chcesz doprecyzować lub co wymaga wyjaśnienia w tym zadaniu:
+            </p>
+            <Textarea
+              value={clarifyText}
+              onChange={e => setClarifyText(e.target.value)}
+              placeholder="Np. 'Czy to zadanie dotyczy tylko backend czy również frontend?'"
+              rows={4}
+              className="resize-none focus:ring-2 focus:ring-purple-500"
+            />
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setShowClarifyModal(false)
+                  setClarifyText('')
+                }}
+              >
+                Anuluj
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSubmitClarification}
+                disabled={!clarifyText.trim() || loadingAI}
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+              >
+                <Sparkle size={16} weight="fill" />
+                {loadingAI ? 'Analizuję...' : 'Doprecyzuj'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   )
 }
