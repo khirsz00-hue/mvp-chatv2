@@ -14,7 +14,6 @@ export interface StatusBarProps {
   workMode: string
   usedMinutes: number
   totalCapacity: number
-  onWorkHoursChange?: (start: string, end: string) => void
   onWorkModeClick?: () => void
 }
 
@@ -24,7 +23,6 @@ export function DayAssistantV2StatusBar({
   workMode,
   usedMinutes,
   totalCapacity,
-  onWorkHoursChange,
   onWorkModeClick
 }: StatusBarProps) {
   const remainingMinutes = totalCapacity - usedMinutes
@@ -81,9 +79,13 @@ export function DayAssistantV2StatusBar({
           {/* Capacity Display */}
           <div className="flex flex-col items-end">
             <div className={`text-sm font-medium ${isOverloaded ? 'text-orange-600' : 'text-gray-900'}`}>
-              {usedMinutes} min / {totalCapacity} min left
+              {usedMinutes} / {totalCapacity} min
             </div>
-            {remainingMinutes < 0 && (
+            {remainingMinutes > 0 ? (
+              <div className="text-xs text-gray-500">
+                {remainingMinutes} min remaining
+              </div>
+            ) : (
               <div className="text-xs text-red-600 font-medium">
                 Over by {Math.abs(remainingMinutes)} min
               </div>
