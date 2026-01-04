@@ -28,6 +28,7 @@ import Button from '@/components/ui/Button'
 import { Plus, CalendarBlank, CaretDown, CaretUp } from '@phosphor-icons/react'
 
 const TOP_TASKS_COUNT = 3
+const isValidTimeFormat = (value: string) => /^\d{2}:\d{2}$/.test(value)
 
 interface TaskStats {
   completedToday: number
@@ -71,8 +72,6 @@ export function DayAssistantV2View() {
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [loadingProjects, setLoadingProjects] = useState(false)
-  const isValidTimeFormat = (value: string) => /^\d{2}:\d{2}$/.test(value)
-
   // Custom hooks
   const { activeTimer, startTimer, pauseTimer, resumeTimer, stopTimer, formatTime } = useTaskTimer()
 
@@ -416,9 +415,15 @@ export function DayAssistantV2View() {
       return
     }
     
+    const workHours = calculateWorkHours(start, end)
+    if (workHours <= 0) {
+      toast.error('Zakończenie pracy musi być po rozpoczęciu')
+      return
+    }
+    
     setWorkHoursStart(start)
     setWorkHoursEnd(end)
-    const capacityMinutes = Math.max(0, calculateWorkHours(start, end) * 60)
+    const capacityMinutes = Math.max(0, workHours * 60)
     
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -453,6 +458,8 @@ export function DayAssistantV2View() {
           ...prev,
           metadata: { ...prev.metadata, ...updated.dayPlan.metadata }
         } : updated.dayPlan)
+      } else {
+        console.warn('Unexpected response when updating work hours', updated)
       }
     } catch (error) {
       console.error('Error updating work hours:', error)
