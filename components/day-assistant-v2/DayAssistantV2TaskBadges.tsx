@@ -25,20 +25,20 @@ export function MustBadge() {
   )
 }
 
-// Priority Badge - P1 (red), P2 (orange), P3 (blue), P4 (gray)
+// Priority Badge - P1 (orange), P2 (blue), P3 (violet), P4 (gray)
 export function PriorityBadge({ priority }: { priority: 1 | 2 | 3 | 4 }) {
   const variants = {
-    4: { className: 'bg-red-100 text-red-800 border-red-300', label: 'P1' },
-    3: { className: 'bg-orange-100 text-orange-800 border-orange-300', label: 'P2' },
-    2: { className: 'bg-blue-100 text-blue-800 border-blue-300', label: 'P3' },
-    1: { className: 'bg-gray-100 text-gray-600 border-gray-300', label: 'P4' }
+    4: { className: 'bg-orange-50 text-orange-600 border-orange-100 text-[10px] font-bold uppercase tracking-wider', label: 'P1' },
+    3: { className: 'bg-blue-50 text-blue-600 border-blue-100 text-[10px] font-bold uppercase tracking-wider', label: 'P2' },
+    2: { className: 'bg-violet-50 text-violet-600 border-violet-100 text-[10px] font-bold uppercase tracking-wider', label: 'P3' },
+    1: { className: 'bg-slate-50 text-slate-600 border-slate-100 text-[10px] font-bold uppercase tracking-wider', label: 'P4' }
   }
   
   const config = variants[priority] || variants[1]
   
   return (
     <Badge className={config.className}>
-      🚩 {config.label}
+      {config.label}
     </Badge>
   )
 }
@@ -55,7 +55,7 @@ export function DeadlineBadge({ dueDate, todayDate }: { dueDate: string | null, 
   // Overdue
   if (diffDays < 0) {
     return (
-      <Badge className="bg-red-600 text-white border-red-700 font-bold">
+      <Badge className="bg-red-50 text-red-600 border-red-100 text-xs font-semibold">
         🔴 Przeterminowane
       </Badge>
     )
@@ -69,14 +69,14 @@ export function DeadlineBadge({ dueDate, todayDate }: { dueDate: string | null, 
       const hours = timeMatch[1]
       const minutes = timeMatch[2]
       return (
-        <Badge className="bg-orange-100 text-orange-800 border-orange-300 font-semibold">
-          ⏰ Dziś {hours}:{minutes}
+        <Badge className="bg-orange-50 text-orange-600 border-orange-100 text-xs font-semibold">
+          📅 Dziś {hours}:{minutes}
         </Badge>
       )
     }
     return (
-      <Badge className="bg-orange-100 text-orange-800 border-orange-300 font-semibold">
-        ⏰ Dziś
+      <Badge className="bg-orange-50 text-orange-600 border-orange-100 text-xs font-semibold">
+        📅 Dziś
       </Badge>
     )
   }
@@ -84,7 +84,7 @@ export function DeadlineBadge({ dueDate, todayDate }: { dueDate: string | null, 
   // Due tomorrow
   if (diffDays === 1) {
     return (
-      <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">
+      <Badge className="bg-amber-50 text-amber-600 border-amber-100 text-xs font-semibold">
         📅 Jutro
       </Badge>
     )
@@ -93,7 +93,7 @@ export function DeadlineBadge({ dueDate, todayDate }: { dueDate: string | null, 
   // Due in 2-7 days
   if (diffDays <= 7) {
     return (
-      <Badge className="bg-blue-100 text-blue-800 border-blue-300">
+      <Badge className="bg-blue-50 text-blue-600 border-blue-100 text-xs font-semibold">
         📅 Za {diffDays}d
       </Badge>
     )
@@ -101,7 +101,7 @@ export function DeadlineBadge({ dueDate, todayDate }: { dueDate: string | null, 
   
   // Future (> 7 days)
   return (
-    <Badge variant="outline" className="text-gray-600">
+    <Badge variant="outline" className="bg-slate-50 text-slate-500 border-slate-100 text-xs">
       📅 Za {diffDays}d
     </Badge>
   )
@@ -119,16 +119,16 @@ export function CognitiveLoadBadge({ load }: { load: number }) {
   }
   
   const getLoadColor = (load: number): string => {
-    if (load <= 2) return 'bg-green-100 text-green-800 border-green-300'
-    if (load === 3) return 'bg-yellow-100 text-yellow-800 border-yellow-300'
-    return 'bg-red-100 text-red-800 border-red-300'
+    if (load <= 2) return 'bg-emerald-50 text-emerald-600 border-emerald-100'
+    if (load === 3) return 'bg-amber-50 text-amber-600 border-amber-100'
+    return 'bg-red-50 text-red-600 border-red-100'
   }
   
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <div>
-          <Badge className={getLoadColor(load)}>
+          <Badge className={cn(getLoadColor(load), 'text-xs font-semibold')}>
             🧠 {load}/5
           </Badge>
         </div>
@@ -146,7 +146,7 @@ export function CognitiveLoadBadge({ load }: { load: number }) {
 export function DurationBadge({ minutes }: { minutes: number }) {
   const formatDuration = (mins: number): string => {
     if (mins < 60) {
-      return `${mins}m`
+      return `${mins} min`
     }
     const hours = Math.floor(mins / 60)
     const remainingMins = mins % 60
@@ -157,8 +157,8 @@ export function DurationBadge({ minutes }: { minutes: number }) {
   }
   
   return (
-    <Badge className="bg-purple-100 text-purple-800 border-purple-300">
-      ⏱ {formatDuration(minutes)}
+    <Badge className="bg-slate-50 text-slate-600 border-slate-100 text-xs font-semibold">
+      {formatDuration(minutes)}
     </Badge>
   )
 }
@@ -171,7 +171,7 @@ export function ContextBadge({ context, aiInferred }: { context: string, aiInfer
     <Tooltip>
       <TooltipTrigger asChild>
         <div>
-          <Badge className="bg-indigo-100 text-indigo-800 border-indigo-300">
+          <Badge className="bg-slate-50 text-slate-600 border-slate-100 text-xs font-medium">
             📁 {context} {aiInferred && '✨'}
           </Badge>
         </div>
