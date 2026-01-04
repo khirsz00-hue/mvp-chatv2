@@ -121,6 +121,51 @@ export function DayAssistantV2View() {
     fetchProjects()
   }, [])
 
+  const loadMeetings = useCallback(async () => {
+    try {
+      console.log('🔍 [DayAssistantV2] Loading meetings for date:', selectedDate)
+      
+      // Get session
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        console.error('❌ [DayAssistantV2] No session available for loading meetings')
+        return
+      }
+      
+      // Fetch meetings
+      const response = await fetch(`/api/day-assistant-v2/meetings?date=${selectedDate}`, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch meetings')
+      }
+      
+      const data = await response.json()
+      
+      // Check if Google Calendar is not connected
+      if (data.error === 'Google Calendar not connected') {
+        console.log('⚠️ [DayAssistantV2] Google Calendar not connected')
+        setMeetings([])
+        return
+      }
+      
+      setMeetings(data.meetings || [])
+      console.log(`✅ [DayAssistantV2] Loaded ${data.meetings?.length || 0} meetings`)
+      
+    } catch (error) {
+      console.error('❌ [DayAssistantV2] Error loading meetings:', error)
+      setMeetings([])
+    }
+  }, [selectedDate])
+
+  // Load meetings on mount and when selectedDate changes
+  useEffect(() => {
+    loadMeetings()
+  }, [loadMeetings])
+
   const loadData = async () => {
     try {
       setLoading(true)
@@ -497,8 +542,44 @@ export function DayAssistantV2View() {
   }
 
   const handleRefreshMeetings = async () => {
-    // Placeholder for meetings refresh
-    toast.info('🔄 Odświeżanie spotkań...')
+    try {
+      console.log('🔄 [DayAssistantV2] Refreshing meetings')
+      
+      // Get session
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        toast.error('Sesja wygasła - zaloguj się ponownie')
+        return
+      }
+      
+      // Fetch meetings with force refresh
+      const response = await fetch(`/api/day-assistant-v2/meetings?date=${selectedDate}&force=true`, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to refresh meetings')
+      }
+      
+      const data = await response.json()
+      
+      // Check if Google Calendar is not connected
+      if (data.error === 'Google Calendar not connected') {
+        toast.error('📅 Google Calendar nie jest połączony')
+        setMeetings([])
+        return
+      }
+      
+      setMeetings(data.meetings || [])
+      toast.success('✅ Spotkania odświeżone')
+      console.log(`✅ [DayAssistantV2] Refreshed ${data.meetings?.length || 0} meetings`)
+      
+    } catch (error) {
+      console.error('❌ [DayAssistantV2] Error refreshing meetings:', error)
+      toast.error('❌ Błąd podczas ładowania spotkań')
+    }
   }
 
   // Filter tasks by work mode and project
