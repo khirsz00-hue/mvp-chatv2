@@ -139,6 +139,7 @@ export async function GET(req: NextRequest) {
         startTime.setHours(0, 0, 0, 0)
         
         endTime = new Date(endDateTime)
+        // Set to last millisecond of the day (23:59:59.999) to cover entire day
         endTime.setHours(23, 59, 59, 999)
         
         durationMinutes = 1440 // cały dzień = 24h = 1440 min
