@@ -25,6 +25,9 @@ import {
 } from './aiRecommendationEngine'
 import { getUserBehaviorProfile } from './behaviorLearningService'
 import { getDefaultProfile } from './intelligentScoringEngine'
+import {
+  calculateTaskScore as calculateAdvancedTaskScore
+} from './advancedTaskScoring'
 
 // Scoring weights
 const WEIGHTS = {
@@ -380,6 +383,12 @@ function calculateTieBreaker(task: TestDayTask): number {
 /**
  * SCORING ALGORITHM V3 - Complete overhaul with new weights
  * Part of Day Assistant V2 Complete Overhaul
+ * 
+ * NOW ENHANCED with Advanced Task Scoring System:
+ * - Uses time-based deadline scoring (0-150 points based on hours until due)
+ * - Enhanced priority scoring (P1=50, P2=30, P3=10)
+ * - Cognitive load as penalty (subtracted from score)
+ * - Postpone bonus (instead of penalty) to prevent perpetual postponement
  */
 export function calculateTaskScoreV3(
   task: TestDayTask,
@@ -392,65 +401,70 @@ export function calculateTaskScoreV3(
   let score = 0
   const reasoning: string[] = []
   
+  // Get advanced scoring components
+  const advancedScore = calculateAdvancedTaskScore(task)
+  
   // 1. MUST task - highest priority (+50)
   if (task.is_must) {
     score += 50
     reasoning.push('📌 MUST przypięte: +50')
   }
   
-  // 2. Priority scoring
-  const priorityPoints = {
-    4: 30, // P1
-    3: 20, // P2
-    2: 10, // P3
-    1: 5   // P4
+  // 2. Deadline scoring (ENHANCED - now time-based, 0-150 points)
+  const deadlineScore = advancedScore.breakdown.deadline
+  score += deadlineScore
+  
+  if (task.due_date) {
+    const now = new Date()
+    const due = new Date(task.due_date)
+    const hoursUntil = (due.getTime() - now.getTime()) / (1000 * 60 * 60)
+    
+    if (hoursUntil < 0) {
+      reasoning.push(`🔴 PRZETERMINOWANE: +${deadlineScore}`)
+    } else if (hoursUntil < 2) {
+      reasoning.push(`⏰ Deadline za ${Math.round(hoursUntil)}h: +${deadlineScore}`)
+    } else if (hoursUntil < 24) {
+      reasoning.push(`⏰ Deadline dziś: +${deadlineScore}`)
+    } else if (hoursUntil < 48) {
+      reasoning.push(`📅 Deadline jutro: +${deadlineScore}`)
+    } else {
+      const daysUntil = Math.floor(hoursUntil / 24)
+      reasoning.push(`📅 Deadline za ${daysUntil}d: +${deadlineScore}`)
+    }
+  } else {
+    reasoning.push(`📅 Brak deadline: +${deadlineScore}`)
   }
-  const priorityScore = priorityPoints[task.priority as keyof typeof priorityPoints] || 5
+  
+  // 3. Priority scoring (ENHANCED - P1=50, P2=30, P3=10)
+  const priorityScore = advancedScore.breakdown.priority
   score += priorityScore
   const priorityLabel = task.priority === 4 ? 'P1' : task.priority === 3 ? 'P2' : task.priority === 2 ? 'P3' : 'P4'
   reasoning.push(`🚩 Priorytet ${priorityLabel}: +${priorityScore}`)
   
-  // 3. Deadline scoring
-  if (task.due_date) {
-    const today = new Date(context.todayDate)
-    const due = new Date(task.due_date)
-    const diffMs = due.getTime() - today.getTime()
-    const daysUntil = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-    
-    if (daysUntil < 0) {
-      score += 40
-      reasoning.push('🔴 PRZETERMINOWANE: +40')
-    } else if (daysUntil === 0) {
-      const timeMatch = task.due_date.match(/T(\d{2}):(\d{2})/)
-      if (timeMatch) {
-        score += 30
-        reasoning.push(`⏰ Deadline dziś o ${timeMatch[1]}:${timeMatch[2]}: +30`)
-      } else {
-        score += 30
-        reasoning.push('⏰ Deadline dziś: +30')
-      }
-    } else if (daysUntil === 1) {
-      score += 20
-      reasoning.push('📅 Deadline jutro: +20')
-    } else if (daysUntil >= 2 && daysUntil <= 7) {
-      score += 10
-      reasoning.push(`📅 Deadline za ${daysUntil}d: +10`)
-    }
-  }
-  
-  // 4. Cognitive load matching with work mode
+  // 4. Cognitive load (ENHANCED - now as penalty, subtracted)
+  const cogLoadPenalty = -advancedScore.breakdown.cognitiveLoad  // Convert back to positive for penalty
   const cogLoad = task.cognitive_load || DEFAULT_COGNITIVE_LOAD
+  score -= cogLoadPenalty
+  
+  // Also keep work mode matching bonus
   if (context.workMode === 'low_focus' && cogLoad <= LOW_FOCUS_MAX_COGNITIVE_LOAD) {
     score += 15
-    reasoning.push(`🧠 Cognitive Load ${cogLoad}/5 (dopasowanie Low Focus): +15`)
+    reasoning.push(`🧠 Cognitive Load ${cogLoad}/5 (dopasowanie Low Focus): +15, penalty: -${cogLoadPenalty}`)
   } else if (context.workMode === 'hyperfocus' && cogLoad >= HYPERFOCUS_MIN_COGNITIVE_LOAD) {
     score += 15
-    reasoning.push(`🧠 Cognitive Load ${cogLoad}/5 (dopasowanie HyperFocus): +15`)
+    reasoning.push(`🧠 Cognitive Load ${cogLoad}/5 (dopasowanie HyperFocus): +15, penalty: -${cogLoadPenalty}`)
   } else {
-    reasoning.push(`🧠 Cognitive Load ${cogLoad}/5: +0`)
+    reasoning.push(`🧠 Cognitive Load ${cogLoad}/5: penalty -${cogLoadPenalty}`)
   }
   
-  // 5. Context matching
+  // 5. Postpone bonus (ENHANCED - now bonus instead of penalty)
+  const postponeBonus = advancedScore.breakdown.postpone
+  if (postponeBonus > 0) {
+    score += postponeBonus
+    reasoning.push(`⏭️ Odkładane ${task.postpone_count}x: +${postponeBonus} (bonus zapobiegający wiecznemu odkładaniu)`)
+  }
+  
+  // 6. Context matching
   if (context.contextFilter && task.context_type === context.contextFilter) {
     score += 10
     reasoning.push(`📁 Kontekst ${task.context_type} (filtr aktywny): +10`)
@@ -458,7 +472,7 @@ export function calculateTaskScoreV3(
     reasoning.push(`📁 Kontekst ${task.context_type}: +0`)
   }
   
-  // 6. Short task bonus (Standard mode)
+  // 7. Short task bonus (Standard mode)
   if (context.workMode === 'standard' && task.estimate_min <= 40) {
     score += 5
     reasoning.push(`⏱ Krótkie zadanie (${task.estimate_min}min): +5`)
@@ -466,17 +480,10 @@ export function calculateTaskScoreV3(
     reasoning.push(`⏱ Czas ${task.estimate_min}min: +0`)
   }
   
-  // 7. Long task penalty
+  // 8. Long task penalty
   if (task.estimate_min > 90) {
     score -= 10
     reasoning.push(`⏱ Bardzo długie zadanie (${task.estimate_min}min): -10`)
-  }
-  
-  // 8. Postpone penalty
-  if (task.postpone_count > 0) {
-    const penalty = task.postpone_count * 5
-    score -= penalty
-    reasoning.push(`⏭️ Odkładane ${task.postpone_count}x: -${penalty}`)
   }
   
   const breakdown: ScoreBreakdown = {
