@@ -25,6 +25,7 @@ import { DayAssistantV2TaskTooltip } from './DayAssistantV2TaskTooltip'
 interface DayAssistantV2TaskCardProps {
   task: TestDayTask
   queuePosition?: number  // Optional - only shown for tasks in queue
+  isOverflow?: boolean    // Optional - marks card as overflow (reduced opacity)
   onStartTimer: (taskId: string) => void
   onComplete: (taskId: string) => void
   onHelp: (taskId: string) => void
@@ -34,9 +35,21 @@ interface DayAssistantV2TaskCardProps {
   onOpenDetails: (taskId: string) => void
 }
 
+// Helper function to get priority border color
+function getPriorityBorderColor(priority: number): string {
+  const borderColors = {
+    4: 'border-l-orange-500',  // P1 - orange
+    3: 'border-l-blue-500',    // P2 - blue
+    2: 'border-l-violet-500',  // P3 - violet
+    1: 'border-l-slate-300'    // P4 - slate
+  }
+  return borderColors[priority as keyof typeof borderColors] || borderColors[1]
+}
+
 export function DayAssistantV2TaskCard({
   task,
   queuePosition,
+  isOverflow = false,
   onStartTimer,
   onComplete,
   onHelp,
@@ -46,17 +59,21 @@ export function DayAssistantV2TaskCard({
   onOpenDetails
 }: DayAssistantV2TaskCardProps) {
   const todayDate = new Date().toISOString().split('T')[0]
+  const priorityBorderColor = getPriorityBorderColor(task.priority)
 
   return (
     <Card 
       className={cn(
-        "transition-all hover:shadow-md cursor-pointer",
-        task.is_must && "border-l-4 border-l-red-600"
+        "group bg-white border border-slate-200 rounded-xl shadow-sm transition-all cursor-pointer",
+        "hover:shadow-md",
+        "border-l-4",
+        task.is_must ? "border-l-red-600" : priorityBorderColor,
+        isOverflow && "opacity-60"
       )}
       onClick={() => onOpenDetails(task.id)}
     >
       <CardContent className="p-4">
-        {/* Header row with all badges */}
+        {/* Top Row: Badges */}
         <div className="flex flex-wrap items-center gap-2 mb-3">
           {queuePosition !== undefined && queuePosition > 0 && (
             <PositionBadge position={queuePosition} />
@@ -66,34 +83,54 @@ export function DayAssistantV2TaskCard({
           
           <PriorityBadge priority={task.priority as 1 | 2 | 3 | 4} />
           
-          <DeadlineBadge dueDate={task.due_date || null} todayDate={todayDate} />
-          
-          <CognitiveLoadBadge load={task.cognitive_load} />
-          
-          <DurationBadge minutes={task.estimate_min} />
-          
           {task.context_type && (
             <ContextBadge 
               context={task.context_type} 
               aiInferred={task.metadata?.ai_inferred_context || false} 
             />
           )}
+          
+          <CognitiveLoadBadge load={task.cognitive_load} />
+          
+          <DeadlineBadge dueDate={task.due_date || null} todayDate={todayDate} />
+          
+          <DurationBadge minutes={task.estimate_min} />
         </div>
 
-        {/* Action buttons row */}
-        <div className="flex items-center justify-between mb-3">
+        {/* Task Title */}
+        <h3 className={cn(
+          "font-semibold text-slate-800 mb-2 transition-colors",
+          "group-hover:text-indigo-600"
+        )}>
+          {task.title}
+        </h3>
+
+        {/* Description (if exists) - truncated to 1 line */}
+        {task.description && (
+          <p className="text-xs text-slate-500 mb-3 line-clamp-1">
+            {task.description}
+          </p>
+        )}
+
+        {/* Bottom Row: Action buttons */}
+        <div className="flex items-center justify-between gap-2">
+          {/* Play Button - Hidden by default, visible on hover */}
           <Button
             size="sm"
             onClick={(e) => {
               e.stopPropagation()
               onStartTimer(task.id)
             }}
-            className="bg-purple-600 hover:bg-purple-700 text-white"
+            className={cn(
+              "bg-indigo-600 hover:bg-indigo-700 text-white transition-all",
+              "opacity-0 group-hover:opacity-100"
+            )}
           >
             <Play size={16} weight="fill" className="mr-1" />
             Start
           </Button>
 
+          {/* Menu Button */}
           <DayAssistantV2TaskMenu
             taskId={task.id}
             isMust={task.is_must}
@@ -106,23 +143,11 @@ export function DayAssistantV2TaskCard({
           />
         </div>
 
-        {/* Task title */}
-        <h3 className="font-semibold text-gray-900 mb-2 text-base">
-          {task.title}
-        </h3>
-
-        {/* Description (if exists) */}
-        {task.description && (
-          <p className="text-sm text-gray-600 mb-2 line-clamp-2">
-            {task.description}
-          </p>
-        )}
-
         {/* Postpone alert */}
         <PostponeAlertBanner postponeCount={task.postpone_count} />
 
         {/* Score tooltip */}
-        <div className="mt-3 pt-3 border-t border-gray-100">
+        <div className="mt-3 pt-3 border-t border-slate-100">
           <DayAssistantV2TaskTooltip task={task} queuePosition={queuePosition} />
         </div>
       </CardContent>

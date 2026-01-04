@@ -944,6 +944,7 @@ export function DayAssistantV2View() {
                       <DayAssistantV2TaskCard
                         key={task.id}
                         task={task}
+                        isOverflow={true}
                         onStartTimer={handleStartTimer}
                         onComplete={handleCompleteTask}
                         onHelp={handleHelp}
