@@ -75,23 +75,32 @@ export function calculatePriorityScore(priority: number | string | undefined): n
   if (typeof priority === 'string') {
     const match = priority.match(/P?(\d+)/i)
     if (match) {
-      priority = parseInt(match[1])
+      const num = parseInt(match[1])
+      // If string format 'P1', 'P2', 'P3' - convert to points directly
+      switch (num) {
+        case 1: return 50  // P1
+        case 2: return 30  // P2
+        case 3: return 10  // P3
+        default: return 5
+      }
     }
   }
 
   // Convert to number if needed
   const priorityNum = typeof priority === 'number' ? priority : 0
 
-  // Handle both Todoist format (4=highest) and standard format (1=highest)
-  // Todoist: 4=P1, 3=P2, 2=P3, 1=P4
-  if (priorityNum === 4 || priorityNum === 1) {
-    return 50  // P1 - highest
-  } else if (priorityNum === 3 || priorityNum === 2) {
-    return 30  // P2
-  } else if (priorityNum === 2 || priorityNum === 3) {
-    return 10  // P3
-  } else {
-    return 5   // Default/P4
+  // Todoist priority: 4=P1 (highest), 3=P2, 2=P3, 1=P4 (lowest)
+  switch (priorityNum) {
+    case 4:
+      return 50  // P1 - highest
+    case 3:
+      return 30  // P2
+    case 2:
+      return 10  // P3
+    case 1:
+      return 5   // P4 - lowest
+    default:
+      return 5   // Default
   }
 }
 
