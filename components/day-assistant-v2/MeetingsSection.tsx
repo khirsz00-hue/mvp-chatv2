@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react'
 import Button from '@/components/ui/Button'
 import { Card, CardContent } from '@/components/ui/Card'
-import { format, differenceInMinutes, isWithinInterval } from 'date-fns'
-import { VideoCamera, MapPin, ArrowSquareOut, Clock, Users } from '@phosphor-icons/react'
+import { format } from 'date-fns'
+import { VideoCamera, MapPin, ArrowSquareOut, Users } from '@phosphor-icons/react'
 
 interface Meeting {
   id: string
