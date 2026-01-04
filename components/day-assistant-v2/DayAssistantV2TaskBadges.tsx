@@ -32,25 +32,25 @@ export function PriorityBadge({ priority, isOverflow = false }: { priority: 1 | 
     // All overflow badges are muted slate
     const label = priority === 4 ? 'P1' : priority === 3 ? 'P2' : priority === 2 ? 'P3' : 'P4'
     return (
-      <Badge className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-bold uppercase tracking-wider rounded border border-slate-200">
+      <span className="text-slate-500 text-sm font-bold">
         {label}
-      </Badge>
+      </span>
     )
   }
   
   const variants = {
-    4: { className: 'px-2 py-0.5 bg-orange-50 text-orange-600 border-orange-100 text-[10px] font-bold uppercase tracking-wider', label: 'P1' },
-    3: { className: 'px-2 py-0.5 bg-blue-50 text-blue-600 border-blue-100 text-[10px] font-bold uppercase tracking-wider', label: 'P2' },
-    2: { className: 'px-2 py-0.5 bg-violet-50 text-violet-600 border-violet-100 text-[10px] font-bold uppercase tracking-wider', label: 'P3' },
-    1: { className: 'px-2 py-0.5 bg-slate-50 text-slate-600 border-slate-100 text-[10px] font-bold uppercase tracking-wider', label: 'P4' }
+    4: { className: 'text-orange-600 text-sm font-bold', label: 'P1' },
+    3: { className: 'text-blue-600 text-sm font-bold', label: 'P2' },
+    2: { className: 'text-slate-500 text-sm font-bold', label: 'P3' },
+    1: { className: 'text-slate-500 text-sm font-bold', label: 'P4' }
   }
   
   const config = variants[priority] || variants[1]
   
   return (
-    <Badge className={config.className}>
+    <span className={config.className}>
       {config.label}
-    </Badge>
+    </span>
   )
 }
 
@@ -121,19 +121,17 @@ export function CognitiveLoadBadge({ load }: { load: number }) {
   }
   
   const getLoadColor = (load: number): string => {
-    if (load <= 2) return 'px-2 py-0.5 bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold'
-    if (load <= 4) return 'px-2 py-0.5 bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-bold'
-    return 'px-2 py-0.5 bg-red-50 text-red-700 border-red-200 text-[10px] font-bold'
+    if (load <= 2) return 'inline-flex items-center gap-1 px-2 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded border border-emerald-200'
+    if (load <= 4) return 'inline-flex items-center gap-1 px-2 py-1 bg-orange-50 text-orange-700 text-xs font-bold rounded border border-orange-200'
+    return 'inline-flex items-center gap-1 px-2 py-1 bg-red-50 text-red-700 text-xs font-bold rounded border border-red-200'
   }
   
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div>
-          <Badge className={cn(getLoadColor(load), 'rounded inline-flex items-center')}>
-            <Brain size={10} className="mr-1" />{load}/5
-          </Badge>
-        </div>
+        <span className={getLoadColor(load)}>
+          <Brain size={10} />{load}/5
+        </span>
       </TooltipTrigger>
       <TooltipContent>
         <div className="text-xs">
@@ -172,11 +170,9 @@ export function ContextBadge({ context, aiInferred }: { context: string, aiInfer
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div>
-          <Badge className="px-2 py-0.5 bg-slate-50 text-slate-500 text-[10px] font-medium rounded border border-slate-100 inline-flex items-center">
-            <Tag size={10} className="mr-1" />{context} {aiInferred && '✨'}
-          </Badge>
-        </div>
+        <span className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-600 text-xs font-medium rounded">
+          <Tag size={10} />{context} {aiInferred && '✨'}
+        </span>
       </TooltipTrigger>
       {aiInferred && (
         <TooltipContent>
