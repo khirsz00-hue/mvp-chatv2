@@ -117,6 +117,8 @@ export interface TestDayTask {
   cognitive_load: number  // 1-5: 1=light, 5=heavy
   tags: string[]
   context_type?: string | null  // 'code', 'admin', 'komunikacja', 'prywatne'
+  project_id?: string | null  // Todoist project ID for filtering
+  project_name?: string | null  // Project name for display
   due_date?: string | null  // DATE
   completed: boolean
   completed_at?: string | null

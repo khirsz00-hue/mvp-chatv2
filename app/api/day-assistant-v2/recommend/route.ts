@@ -10,7 +10,6 @@ import {
   getOrCreateDayPlan
 } from '@/lib/services/dayAssistantV2Service'
 import {
-  generateSliderChangeRecommendation,
   generateRecommendation
 } from '@/lib/services/dayAssistantV2RecommendationEngine'
 import { TestDayTask, DayPlan, Recommendation } from '@/lib/types/dayAssistantV2'

@@ -20,9 +20,9 @@ import { DecisionLogPanel, Decision } from './DecisionLogPanel'
 import { OverdueTasksSection } from './OverdueTasksSection'
 import { DayAssistantV2TaskCard } from './DayAssistantV2TaskCard'
 import { RecommendationPanel } from './RecommendationPanel'
+import { ProjectFilter } from './ProjectFilter'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { useTaskTimer } from '@/hooks/useTaskTimer'
-import { useDayPlan } from '@/hooks/useDayPlan'
 import Button from '@/components/ui/Button'
 import { Plus, CalendarBlank, CaretDown, CaretUp } from '@phosphor-icons/react'
 
@@ -63,20 +63,14 @@ export function DayAssistantV2View() {
   const [decisions, setDecisions] = useState<Decision[]>([])
   const [meetings, setMeetings] = useState<any[]>([])
   const overdueRef = useRef<HTMLDivElement>(null)
+  
+  // Project filtering state
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>([])
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
+  const [loadingProjects, setLoadingProjects] = useState(false)
 
   // Custom hooks
   const { activeTimer, startTimer, pauseTimer, resumeTimer, stopTimer, formatTime } = useTaskTimer()
-  const { energy, focus, updateEnergy, updateFocus } = useDayPlan(
-    sessionToken,
-    selectedDate,
-    dayPlan,
-    {
-      onUpdate: async () => {
-        // Refresh recommendations when sliders change
-        await fetchRecommendations()
-      }
-    }
-  )
 
   // Load data on mount
   useEffect(() => {
@@ -93,6 +87,34 @@ export function DayAssistantV2View() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     // loadData is intentionally omitted - it has internal state dependencies that would cause infinite re-renders
+  }, [])
+  
+  // Fetch projects on mount
+  useEffect(() => {
+    const fetchProjects = async () => {
+      setLoadingProjects(true)
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) return
+        
+        const response = await fetch('/api/todoist/projects', {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`
+          }
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          setProjects(data.projects || [])
+        }
+      } catch (error) {
+        console.error('Error fetching projects:', error)
+      } finally {
+        setLoadingProjects(false)
+      }
+    }
+    
+    fetchProjects()
   }, [])
 
   const loadData = async () => {
@@ -409,8 +431,14 @@ export function DayAssistantV2View() {
     toast.info('🔄 Odświeżanie spotkań...')
   }
 
-  // Filter tasks by work mode
+  // Filter tasks by work mode and project
   const filteredTasks = tasks.filter(task => {
+    // Filter by project if selected (handle both null and empty string)
+    if (selectedProjectId && selectedProjectId.trim() !== '' && task.project_id !== selectedProjectId) {
+      return false
+    }
+    
+    // Filter by work mode
     if (workMode === 'low_focus') {
       return task.cognitive_load <= 2
     } else if (workMode === 'hyperfocus') {
@@ -514,6 +542,16 @@ export function DayAssistantV2View() {
             meetings={meetings}
             onRefresh={handleRefreshMeetings}
           />
+          
+          {/* Project Filter */}
+          {projects.length > 0 && (
+            <ProjectFilter
+              projects={projects}
+              selectedProjectId={selectedProjectId}
+              onChange={setSelectedProjectId}
+              loading={loadingProjects}
+            />
+          )}
 
           {/* Overdue Tasks Section */}
           {overdueTasks.length > 0 && (

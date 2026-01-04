@@ -254,7 +254,9 @@ async function mapTodoistToDayAssistantTask(
     postpone_count: 0,
     auto_moved: false,
     metadata: {
-      ai_inferred_context: aiInferredContext
+      ai_inferred_context: aiInferredContext,
+      project_id: task.project_id || null,
+      project_name: task.project_id && projects.has(task.project_id) ? projects.get(task.project_id) : null
     },
     completed: false
   }
