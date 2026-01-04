@@ -15,6 +15,8 @@ import { scoreAndSortTasksV3 } from '@/lib/services/dayAssistantV2Recommendation
 import { calculateAvailableMinutes } from '@/hooks/useTaskQueue'
 import { DayAssistantV2StatusBar } from './DayAssistantV2StatusBar'
 import { DayAssistantV2FocusBar } from './DayAssistantV2FocusBar'
+import { WorkHoursModal } from './WorkHoursModal'
+import { WorkModeModal } from './WorkModeModal'
 import { OverdueAlert } from './OverdueAlert'
 import { MeetingsSection } from './MeetingsSection'
 import { TodaysFlowPanel } from './TodaysFlowPanel'
@@ -61,6 +63,7 @@ export function DayAssistantV2View() {
   const [showUniversalModal, setShowUniversalModal] = useState(false)
   const [editingTask, setEditingTask] = useState<TestDayTask | null>(null)
   const [showWorkModeModal, setShowWorkModeModal] = useState(false)
+  const [showWorkHoursModal, setShowWorkHoursModal] = useState(false)
   const [workHoursStart, setWorkHoursStart] = useState('09:00')
   const [workHoursEnd, setWorkHoursEnd] = useState('17:00')
   const [queueCollapsed, setQueueCollapsed] = useState(true)
@@ -761,27 +764,33 @@ export function DayAssistantV2View() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50">
-      {/* Conditional Top Bar - Light mode when no timer, Dark mode when timer active */}
-      {activeTimer ? (
-        <DayAssistantV2FocusBar
-          task={tasks.find(t => t.id === activeTimer.taskId) || null}
-          elapsedSeconds={activeTimer.elapsedSeconds}
-          isPaused={activeTimer.isPaused || false}
-          onPause={pauseTimer}
-          onResume={resumeTimer}
-          onComplete={() => handleCompleteTask(activeTimer.taskId)}
-          onStop={stopTimer}
-        />
-      ) : (
+      {/* Focus Bar - shows ABOVE status bar when timer is active */}
+      {activeTimer && (
+        <div className="sticky top-0 z-50 bg-gradient-to-br from-purple-50 via-white to-pink-50 pt-6 px-6">
+          <DayAssistantV2FocusBar
+            task={tasks.find(t => t.id === activeTimer.taskId) || null}
+            elapsedSeconds={activeTimer.elapsedSeconds}
+            isPaused={activeTimer.isPaused || false}
+            onPause={pauseTimer}
+            onResume={resumeTimer}
+            onComplete={() => handleCompleteTask(activeTimer.taskId)}
+            onStop={stopTimer}
+          />
+        </div>
+      )}
+
+      {/* Status Bar - ALWAYS VISIBLE */}
+      <div className={`${activeTimer ? '' : 'sticky top-0 z-40'} bg-gradient-to-br from-purple-50 via-white to-pink-50 px-6 ${activeTimer ? 'pt-0' : 'pt-6'}`}>
         <DayAssistantV2StatusBar
           workHoursStart={workHoursStart}
           workHoursEnd={workHoursEnd}
           workMode={workMode}
           usedMinutes={completedMinutes}
           totalCapacity={availableMinutes}
-          onWorkModeClick={() => setShowWorkModeModal(true)}
+          onEditWorkHours={() => setShowWorkHoursModal(true)}
+          onEditMode={() => setShowWorkModeModal(true)}
         />
-      )}
+      </div>
 
       {/* Overdue Alert Banner */}
       <OverdueAlert 
@@ -1025,6 +1034,23 @@ export function DayAssistantV2View() {
         } : null}
         defaultDate={selectedDate}
         onSave={handleTaskSave}
+      />
+
+      {/* Work Hours Modal */}
+      <WorkHoursModal
+        isOpen={showWorkHoursModal}
+        currentStart={workHoursStart}
+        currentEnd={workHoursEnd}
+        onClose={() => setShowWorkHoursModal(false)}
+        onSave={handleWorkHoursChange}
+      />
+
+      {/* Work Mode Modal */}
+      <WorkModeModal
+        isOpen={showWorkModeModal}
+        onClose={() => setShowWorkModeModal(false)}
+        currentMode={workMode}
+        onSelect={handleWorkModeChange}
       />
     </div>
   )

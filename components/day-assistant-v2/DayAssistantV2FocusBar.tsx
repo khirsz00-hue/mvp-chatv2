@@ -1,7 +1,7 @@
 /**
  * DayAssistantV2FocusBar Component
  * ADHD-friendly ultra-visible focus bar that appears when timer is active
- * Provides constant reminder of current task to prevent context switching
+ * Dark slate-900 design with red pulse indicator
  */
 
 'use client'
@@ -30,6 +30,7 @@ export function DayAssistantV2FocusBar({
 }: FocusBarProps) {
   if (!task) return null
 
+  // Format as MM:SS (not HH:MM:SS)
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60)
     const s = seconds % 60
@@ -37,70 +38,76 @@ export function DayAssistantV2FocusBar({
   }
 
   return (
-    // Using custom color #1a1a2e as specified in design requirements for dark focus mode
-    <div className="sticky top-0 z-[100] w-full bg-[#1a1a2e] text-white shadow-2xl border-b border-gray-800">
-      <div className="max-w-7xl mx-auto px-6 py-3">
-        <div className="flex items-center justify-between gap-6">
-          
-          {/* Left: Timer + Task info */}
-          <div className="flex items-start gap-4 flex-1 min-w-0">
-            {/* Large timer */}
-            <div className="text-4xl font-mono font-bold tabular-nums text-white">
-              {formatTime(elapsedSeconds)}
-            </div>
-            
-            {/* Task details */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 text-sm text-gray-400 mb-1">
-                <span className="uppercase tracking-wide font-medium">Current Focus</span>
-                <span>Est. {task.estimate_min}m</span>
-              </div>
-              <h3 className="text-base font-semibold text-white truncate">
-                {task.title}
-              </h3>
-            </div>
-          </div>
+    <div className="bg-slate-900 rounded-xl shadow-lg hover:shadow-xl transition-shadow mb-3">
+      <div className="flex items-center gap-4 p-3">
+        
+        {/* Timer Display */}
+        <div className="relative w-20 h-12 flex-shrink-0 bg-black/30 rounded-lg flex items-center justify-center gap-2 px-2 border border-slate-800">
+          {!isPaused && (
+            <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse shadow-lg shadow-red-500/50" />
+          )}
+          {isPaused && (
+            <div className="w-3 h-3 bg-yellow-400 rounded-full" />
+          )}
+          <span className="text-lg font-bold text-white font-mono tracking-tight">
+            {formatTime(elapsedSeconds)}
+          </span>
+        </div>
 
-          {/* Right: Action buttons (icon only) */}
-          <div className="flex items-center gap-2">
-            {!isPaused ? (
-              <button
-                onClick={onPause}
-                className="p-3 hover:bg-gray-700 rounded-lg transition-colors"
-                title="Pause"
-                aria-label="Pause timer"
-              >
-                <Pause size={24} weight="fill" className="text-gray-300" />
-              </button>
-            ) : (
-              <button
-                onClick={onResume}
-                className="p-3 hover:bg-gray-700 rounded-lg transition-colors"
-                title="Resume"
-                aria-label="Resume timer"
-              >
-                <Play size={24} weight="fill" className="text-green-400" />
-              </button>
-            )}
-            
-            <button
-              onClick={onComplete}
-              className="p-3 hover:bg-green-700 rounded-lg transition-colors"
-              title="Mark as done"
-              aria-label="Mark task as complete"
-            >
-              <Check size={24} weight="bold" className="text-green-400" />
-            </button>
-            
-            <button
-              onClick={onStop}
-              className="p-3 hover:bg-red-700 rounded-lg transition-colors"
-              title="Stop timer"
-              aria-label="Stop timer"
-            >
-              <X size={24} weight="bold" className="text-red-400" />
-            </button>
+        {/* Task Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide border border-emerald-500/30">
+              Current Focus
+            </span>
+            <span className="text-xs text-slate-400">
+              Est. {task.estimate_min}m
+            </span>
           </div>
+          <h3 className="font-bold text-white text-sm truncate">
+            {task.title}
+          </h3>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {!isPaused ? (
+            <button
+              onClick={onPause}
+              className="w-8 h-8 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg transition-all flex items-center justify-center"
+              title="Pause"
+              aria-label="Pause timer"
+            >
+              <Pause size={14} weight="fill" />
+            </button>
+          ) : (
+            <button
+              onClick={onResume}
+              className="w-8 h-8 bg-slate-800 hover:bg-slate-700 text-green-400 hover:text-green-300 rounded-lg transition-all flex items-center justify-center"
+              title="Resume"
+              aria-label="Resume timer"
+            >
+              <Play size={14} weight="fill" />
+            </button>
+          )}
+          
+          <button
+            onClick={onComplete}
+            className="w-8 h-8 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-md shadow-emerald-900/50 transition-all flex items-center justify-center"
+            title="Complete"
+            aria-label="Mark as complete"
+          >
+            <Check size={14} weight="bold" />
+          </button>
+          
+          <button
+            onClick={onStop}
+            className="w-8 h-8 bg-slate-800 border border-red-500/30 text-red-400 hover:bg-red-500/20 hover:border-red-500 rounded-lg transition-all flex items-center justify-center"
+            title="Stop"
+            aria-label="Stop timer"
+          >
+            <X size={14} weight="bold" />
+          </button>
         </div>
       </div>
     </div>
