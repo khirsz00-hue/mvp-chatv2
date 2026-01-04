@@ -36,8 +36,15 @@ export function DayAssistantV2StatusBar({
   onEditMode
 }: StatusBarProps) {
   const remainingMinutes = totalCapacity - usedMinutes
-  const overloadPercent = totalCapacity > 0 ? Math.round((usedMinutes / totalCapacity) * 100) : 0
+  const overloadPercent = totalCapacity > 0 ? Math.min(Math.round((usedMinutes / totalCapacity) * 100), 100) : 0
   const isOverloaded = overloadPercent > 80
+
+  const handleKeyDown = (e: React.KeyboardEvent, callback?: () => void) => {
+    if (callback && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault()
+      callback()
+    }
+  }
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-6">
@@ -47,6 +54,7 @@ export function DayAssistantV2StatusBar({
         <div 
           className="flex items-center gap-3 group cursor-pointer hover:bg-slate-50 px-3 py-2 rounded-lg transition-all"
           onClick={onEditWorkHours}
+          onKeyDown={(e) => handleKeyDown(e, onEditWorkHours)}
           role="button"
           tabIndex={0}
         >
@@ -69,6 +77,7 @@ export function DayAssistantV2StatusBar({
         <div 
           className="flex items-center gap-3 group cursor-pointer hover:bg-slate-50 px-3 py-2 rounded-lg transition-all"
           onClick={onEditMode}
+          onKeyDown={(e) => handleKeyDown(e, onEditMode)}
           role="button"
           tabIndex={0}
         >
@@ -106,7 +115,7 @@ export function DayAssistantV2StatusBar({
                     ? 'bg-gradient-to-r from-amber-400 to-orange-500' 
                     : 'bg-gradient-to-r from-blue-400 to-indigo-500'
                 }`}
-                style={{ width: `${Math.min(overloadPercent, 100)}%` }}
+                style={{ width: `${overloadPercent}%` }}
               />
             </div>
           </div>
