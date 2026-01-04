@@ -13,8 +13,8 @@ import { supabase } from '@/lib/supabaseClient'
 import { TestDayTask, DayPlan, Recommendation, WorkMode } from '@/lib/types/dayAssistantV2'
 import { scoreAndSortTasksV3 } from '@/lib/services/dayAssistantV2RecommendationEngine'
 import { calculateAvailableMinutes } from '@/hooks/useTaskQueue'
-import { DayAssistantV2TopBar } from './DayAssistantV2TopBar'
-import { ActiveTimerBar } from './ActiveTimerBar'
+import { DayAssistantV2StatusBar } from './DayAssistantV2StatusBar'
+import { DayAssistantV2FocusBar } from './DayAssistantV2FocusBar'
 import { OverdueAlert } from './OverdueAlert'
 import { MeetingsSection } from './MeetingsSection'
 import { TodaysFlowPanel } from './TodaysFlowPanel'
@@ -682,26 +682,23 @@ export function DayAssistantV2View() {
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50">
       {/* Conditional Top Bar - Light mode when no timer, Dark mode when timer active */}
       {activeTimer ? (
-        <ActiveTimerBar
-          taskTitle={tasks.find(t => t.id === activeTimer.taskId)?.title || ''}
+        <DayAssistantV2FocusBar
+          task={tasks.find(t => t.id === activeTimer.taskId) || null}
           elapsedSeconds={activeTimer.elapsedSeconds}
-          estimatedMinutes={activeTimer.estimatedMinutes}
           isPaused={activeTimer.isPaused || false}
           onPause={pauseTimer}
           onResume={resumeTimer}
-          onStop={stopTimer}
           onComplete={() => handleCompleteTask(activeTimer.taskId)}
+          onStop={stopTimer}
         />
       ) : (
-        <DayAssistantV2TopBar
-          selectedDate={selectedDate}
+        <DayAssistantV2StatusBar
           workHoursStart={workHoursStart}
           workHoursEnd={workHoursEnd}
-          capacityMinutes={availableMinutes}
           workMode={workMode}
-          completedMinutes={completedMinutes}
-          onWorkHoursChange={handleWorkHoursChange}
-          onWorkModeChange={handleWorkModeChange}
+          usedMinutes={completedMinutes}
+          totalCapacity={availableMinutes}
+          onWorkModeClick={() => setShowWorkModeModal(true)}
         />
       )}
 

@@ -7,7 +7,6 @@
 'use client'
 
 import { TestDayTask } from '@/lib/types/dayAssistantV2'
-import Button from '@/components/ui/Button'
 import { Pause, Check, X, Play } from '@phosphor-icons/react'
 
 interface FocusBarProps {
@@ -32,83 +31,74 @@ export function DayAssistantV2FocusBar({
   if (!task) return null
 
   const formatTime = (seconds: number) => {
-    const h = Math.floor(seconds / 3600)
-    const m = Math.floor((seconds % 3600) / 60)
+    const m = Math.floor(seconds / 60)
     const s = seconds % 60
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
   }
 
   return (
-    <div className="sticky top-0 z-[100] w-full bg-black text-white shadow-2xl">
-      <div className="max-w-7xl mx-auto px-6 py-4">
-        <div className="flex items-center justify-between gap-4">
+    <div className="sticky top-0 z-[100] w-full bg-[#1a1a2e] text-white shadow-2xl border-b border-gray-800">
+      <div className="max-w-7xl mx-auto px-6 py-3">
+        <div className="flex items-center justify-between gap-6">
           
-          {/* Left: Task info */}
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="relative" role="status" aria-label={isPaused ? 'Timer wstrzymany' : 'Timer aktywny'}>
-              {!isPaused && (
-                <>
-                  <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" aria-hidden="true" />
-                  <div className="absolute inset-0 w-3 h-3 bg-red-500 rounded-full animate-ping" aria-hidden="true" />
-                </>
-              )}
-              {isPaused && (
-                <div className="w-3 h-3 bg-yellow-500 rounded-full" aria-hidden="true" />
-              )}
+          {/* Left: Timer + Task info */}
+          <div className="flex items-start gap-4 flex-1 min-w-0">
+            {/* Large timer */}
+            <div className="text-4xl font-mono font-bold tabular-nums text-white">
+              {formatTime(elapsedSeconds)}
             </div>
+            
+            {/* Task details */}
             <div className="flex-1 min-w-0">
-              <div className="text-xs text-gray-400 uppercase tracking-wide font-semibold">
-                {isPaused ? 'PAUZA - PRACOWAŁEŚ NAD' : 'PRACUJESZ NAD'}
+              <div className="flex items-center gap-2 text-sm text-gray-400 mb-1">
+                <span className="uppercase tracking-wide font-medium">Current Focus</span>
+                <span>Est. {task.estimate_min}m</span>
               </div>
-              <div className="text-lg font-bold truncate">
+              <h3 className="text-base font-semibold text-white truncate">
                 {task.title}
-              </div>
+              </h3>
             </div>
           </div>
 
-          {/* Right: Timer + Actions */}
-          <div className="flex items-center gap-4">
-            <div className="text-2xl font-mono font-bold tabular-nums">
-              ⏱ {formatTime(elapsedSeconds)}
-            </div>
-            
+          {/* Right: Action buttons (icon only) */}
+          <div className="flex items-center gap-2">
             {!isPaused ? (
-              <Button
-                size="sm"
+              <button
                 onClick={onPause}
-                className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                className="p-3 hover:bg-gray-700 rounded-lg transition-colors"
+                title="Pause"
+                aria-label="Pause timer"
               >
-                <Pause size={16} weight="fill" />
-                <span className="hidden sm:inline ml-1">Pauza</span>
-              </Button>
+                <Pause size={24} weight="fill" className="text-gray-300" />
+              </button>
             ) : (
-              <Button
-                size="sm"
+              <button
                 onClick={onResume}
-                className="bg-green-600 hover:bg-green-700 text-white"
+                className="p-3 hover:bg-gray-700 rounded-lg transition-colors"
+                title="Resume"
+                aria-label="Resume timer"
               >
-                <Play size={16} weight="fill" />
-                <span className="hidden sm:inline ml-1">Wznów</span>
-              </Button>
+                <Play size={24} weight="fill" className="text-green-400" />
+              </button>
             )}
             
-            <Button
-              size="sm"
+            <button
               onClick={onComplete}
-              className="bg-green-600 hover:bg-green-700 text-white"
+              className="p-3 hover:bg-green-700 rounded-lg transition-colors"
+              title="Mark as done"
+              aria-label="Mark task as complete"
             >
-              <Check size={16} weight="bold" />
-              <span className="hidden sm:inline ml-1">Ukończ</span>
-            </Button>
+              <Check size={24} weight="bold" className="text-green-400" />
+            </button>
             
-            <Button
-              size="sm"
+            <button
               onClick={onStop}
-              variant="ghost"
-              className="text-white hover:bg-gray-800"
+              className="p-3 hover:bg-red-700 rounded-lg transition-colors"
+              title="Stop timer"
+              aria-label="Stop timer"
             >
-              <X size={16} />
-            </Button>
+              <X size={24} weight="bold" className="text-red-400" />
+            </button>
           </div>
         </div>
       </div>
