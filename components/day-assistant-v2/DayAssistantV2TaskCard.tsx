@@ -39,9 +39,9 @@ const POSTPONE_ALERT_THRESHOLD = 3
 // Helper function to get priority border color (bg-* for left border)
 function getPriorityBorderColor(priority: number): string {
   const borderColors = {
-    4: 'bg-orange-400',  // P1 - orange
-    3: 'bg-blue-400',    // P2 - blue
-    2: 'bg-violet-400',  // P3 - violet
+    4: 'bg-orange-500',  // P1 - orange
+    3: 'bg-blue-500',    // P2 - blue
+    2: 'bg-violet-500',  // P3 - violet
     1: 'bg-slate-300'    // P4 - slate
   }
   return borderColors[priority as keyof typeof borderColors] || borderColors[1]
@@ -77,17 +77,17 @@ export function DayAssistantV2TaskCard({
           {/* LEFT SIDE: Task info */}
           <div className="flex-1 pr-4">
             {/* Badges row - all muted for overflow */}
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-3 mb-1">
               <PriorityBadge priority={task.priority as 1 | 2 | 3 | 4} isOverflow={true} />
               
               {task.context_type && (
-                <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-medium rounded border border-slate-200 inline-flex items-center">
-                  <Tag size={10} className="mr-1" />{task.context_type}
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-500 text-xs font-medium rounded">
+                  <Tag size={10} />{task.context_type}
                 </span>
               )}
               
-              <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-bold rounded border border-slate-200 inline-flex items-center">
-                <Brain size={10} className="mr-1" />{task.cognitive_load}/5
+              <span className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-500 text-xs font-bold rounded border border-slate-200">
+                <Brain size={10} />{task.cognitive_load}/5
               </span>
             </div>
             
@@ -130,7 +130,7 @@ export function DayAssistantV2TaskCard({
           {/* LEFT SIDE: Task info */}
           <div className="flex-1 pr-4">
             {/* Badges row */}
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-3 mb-1">
               <PriorityBadge priority={task.priority as 1 | 2 | 3 | 4} />
               
               {task.context_type && (
@@ -186,7 +186,7 @@ export function DayAssistantV2TaskCard({
         {/* LEFT SIDE: Task info */}
         <div className="flex-1 pr-4">
           {/* Badges row */}
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-3 mb-2">
             {queuePosition !== undefined && queuePosition > 0 && (
               <PositionBadge position={queuePosition} />
             )}
