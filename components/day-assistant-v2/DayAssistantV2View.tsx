@@ -27,6 +27,8 @@ import { useTaskTimer } from '@/hooks/useTaskTimer'
 import Button from '@/components/ui/Button'
 import { Plus, CalendarBlank, CaretDown, CaretUp } from '@phosphor-icons/react'
 
+const TOP_TASKS_COUNT = 3
+
 interface TaskStats {
   completedToday: number
   totalToday: number
@@ -506,9 +508,9 @@ export function DayAssistantV2View() {
     )
     
     // Top 3 purely by scoring (first 3 tasks for today, independent of capacity)
-    sections.top3Tasks = todayNonMustTasks.slice(0, 3)
+    sections.top3Tasks = todayNonMustTasks.slice(0, TOP_TASKS_COUNT)
     
-    const remainingTodayTasks = todayNonMustTasks.slice(3)
+    const remainingTodayTasks = todayNonMustTasks.slice(TOP_TASKS_COUNT)
     
     // Calculate capacity
     const workHours = calculateWorkHours(workHoursStart, workHoursEnd)
@@ -719,7 +721,7 @@ export function DayAssistantV2View() {
                       <DayAssistantV2TaskCard
                         key={task.id}
                         task={task}
-                        queuePosition={idx + 4}
+                        queuePosition={idx + TOP_TASKS_COUNT + 1}
                         onStartTimer={handleStartTimer}
                         onComplete={handleCompleteTask}
                         onHelp={handleHelp}
