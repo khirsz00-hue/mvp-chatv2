@@ -8,7 +8,6 @@ import { TestDayTask } from '@/lib/types/dayAssistantV2'
 import { Play, DotsThreeVertical, Tag, Brain, Calendar } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import {
-  PositionBadge,
   MustBadge,
   PriorityBadge,
   DeadlineBadge,
@@ -39,10 +38,10 @@ const POSTPONE_ALERT_THRESHOLD = 3
 // Helper function to get priority border color (bg-* for left border)
 function getPriorityBorderColor(priority: number): string {
   const borderColors = {
-    4: 'bg-orange-500',  // P1 - orange
-    3: 'bg-blue-500',    // P2 - blue
-    2: 'bg-violet-500',  // P3 - violet
-    1: 'bg-slate-300'    // P4 - slate
+    4: 'bg-red-500',     // P1 - red
+    3: 'bg-orange-500',  // P2 - orange
+    2: 'bg-blue-500',    // P3 - blue
+    1: 'bg-gray-400'     // P4 - gray
   }
   return borderColors[priority as keyof typeof borderColors] || borderColors[1]
 }
@@ -71,7 +70,7 @@ export function DayAssistantV2TaskCard({
         onClick={() => onOpenDetails(task.id)}
       >
         {/* Thin left colored border */}
-        <div className="absolute left-0 top-0 bottom-0 w-1 bg-slate-300 rounded-l-lg"></div>
+        <div className={cn("absolute left-0 top-0 bottom-0 w-1 rounded-l-lg", priorityBorderColor)}></div>
         
         <div className="flex items-center justify-between">
           {/* LEFT SIDE: Task info */}
@@ -187,10 +186,6 @@ export function DayAssistantV2TaskCard({
         <div className="flex-1 pr-4">
           {/* Badges row */}
           <div className="flex items-center gap-3 mb-2">
-            {queuePosition !== undefined && queuePosition > 0 && (
-              <PositionBadge position={queuePosition} />
-            )}
-            
             {task.is_must && <MustBadge />}
             
             <PriorityBadge priority={task.priority as 1 | 2 | 3 | 4} />
