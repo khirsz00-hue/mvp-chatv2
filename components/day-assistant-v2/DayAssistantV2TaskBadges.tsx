@@ -6,6 +6,7 @@
 import Badge from '@/components/ui/Badge'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { Tag, Brain, Calendar } from '@phosphor-icons/react'
 
 // Position Badge - Shows queue position (#1, #2, etc.)
 export function PositionBadge({ position }: { position: number }) {
@@ -65,8 +66,8 @@ export function DeadlineBadge({ dueDate, todayDate }: { dueDate: string | null, 
   // Overdue
   if (diffDays < 0) {
     return (
-      <span className="text-[10px] text-red-600">
-        <i className="fa-regular fa-calendar mr-1"></i>Przeterminowane
+      <span className="text-[10px] text-red-600 inline-flex items-center">
+        <Calendar size={10} className="mr-1" />Przeterminowane
       </span>
     )
   }
@@ -79,14 +80,14 @@ export function DeadlineBadge({ dueDate, todayDate }: { dueDate: string | null, 
       const hours = timeMatch[1]
       const minutes = timeMatch[2]
       return (
-        <span className="text-[10px] text-slate-400">
-          <i className="fa-regular fa-calendar mr-1"></i>Due: Today {hours}:{minutes}
+        <span className="text-[10px] text-slate-400 inline-flex items-center">
+          <Calendar size={10} className="mr-1" />Due: Today {hours}:{minutes}
         </span>
       )
     }
     return (
-      <span className="text-[10px] text-slate-400">
-        <i className="fa-regular fa-calendar mr-1"></i>Due: Today
+      <span className="text-[10px] text-slate-400 inline-flex items-center">
+        <Calendar size={10} className="mr-1" />Due: Today
       </span>
     )
   }
@@ -94,16 +95,16 @@ export function DeadlineBadge({ dueDate, todayDate }: { dueDate: string | null, 
   // Due tomorrow
   if (diffDays === 1) {
     return (
-      <span className="text-[10px] text-slate-400">
-        <i className="fa-regular fa-calendar mr-1"></i>Due: Tomorrow
+      <span className="text-[10px] text-slate-400 inline-flex items-center">
+        <Calendar size={10} className="mr-1" />Due: Tomorrow
       </span>
     )
   }
   
   // Due in future
   return (
-    <span className="text-[10px] text-slate-400">
-      <i className="fa-regular fa-calendar mr-1"></i>Due: {diffDays}d
+    <span className="text-[10px] text-slate-400 inline-flex items-center">
+      <Calendar size={10} className="mr-1" />Due: {diffDays}d
     </span>
   )
 }
@@ -129,8 +130,8 @@ export function CognitiveLoadBadge({ load }: { load: number }) {
     <Tooltip>
       <TooltipTrigger asChild>
         <div>
-          <Badge className={cn(getLoadColor(load), 'rounded')}>
-            <i className="fa-solid fa-brain mr-1"></i>{load}/5
+          <Badge className={cn(getLoadColor(load), 'rounded inline-flex items-center')}>
+            <Brain size={10} className="mr-1" />{load}/5
           </Badge>
         </div>
       </TooltipTrigger>
@@ -172,8 +173,8 @@ export function ContextBadge({ context, aiInferred }: { context: string, aiInfer
     <Tooltip>
       <TooltipTrigger asChild>
         <div>
-          <Badge className="px-2 py-0.5 bg-slate-50 text-slate-500 text-[10px] font-medium rounded border border-slate-100">
-            <i className="fa-solid fa-tag mr-1"></i>{context} {aiInferred && '✨'}
+          <Badge className="px-2 py-0.5 bg-slate-50 text-slate-500 text-[10px] font-medium rounded border border-slate-100 inline-flex items-center">
+            <Tag size={10} className="mr-1" />{context} {aiInferred && '✨'}
           </Badge>
         </div>
       </TooltipTrigger>

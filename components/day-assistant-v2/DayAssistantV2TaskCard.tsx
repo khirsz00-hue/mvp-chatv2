@@ -5,7 +5,7 @@
 
 import React from 'react'
 import { TestDayTask } from '@/lib/types/dayAssistantV2'
-import { Play } from '@phosphor-icons/react'
+import { Play, DotsThreeVertical, Tag, Brain, Calendar } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import {
   PositionBadge,
@@ -79,13 +79,13 @@ export function DayAssistantV2TaskCard({
               <PriorityBadge priority={task.priority as 1 | 2 | 3 | 4} isOverflow={true} />
               
               {task.context_type && (
-                <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-medium rounded border border-slate-200">
-                  <i className="fa-solid fa-tag mr-1"></i>{task.context_type}
+                <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-medium rounded border border-slate-200 inline-flex items-center">
+                  <Tag size={10} className="mr-1" />{task.context_type}
                 </span>
               )}
               
-              <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-bold rounded border border-slate-200">
-                <i className="fa-solid fa-brain mr-1"></i>{task.cognitive_load}/5
+              <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-bold rounded border border-slate-200 inline-flex items-center">
+                <Brain size={10} className="mr-1" />{task.cognitive_load}/5
               </span>
             </div>
             
@@ -94,8 +94,8 @@ export function DayAssistantV2TaskCard({
             
             {/* Due date */}
             {task.due_date && (
-              <span className="text-[10px] text-slate-400">
-                <i className="fa-regular fa-calendar mr-1"></i>Due: {task.due_date}
+              <span className="text-[10px] text-slate-400 inline-flex items-center">
+                <Calendar size={10} className="mr-1" />Due: {task.due_date}
               </span>
             )}
           </div>
@@ -106,7 +106,7 @@ export function DayAssistantV2TaskCard({
               {task.estimate_min} min
             </span>
             <button className="w-6 h-6 text-slate-300 flex items-center justify-center cursor-not-allowed">
-              <i className="fa-solid fa-ellipsis-vertical text-sm"></i>
+              <DotsThreeVertical size={16} />
             </button>
           </div>
         </div>
@@ -246,7 +246,7 @@ export function DayAssistantV2TaskCard({
             }}
             className="opacity-0 group-hover:opacity-100 transition-opacity bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white w-8 h-8 rounded-lg flex items-center justify-center"
           >
-            <i className="fa-solid fa-play text-xs"></i>
+            <Play size={12} weight="fill" />
           </button>
         </div>
       </div>
