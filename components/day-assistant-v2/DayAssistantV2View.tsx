@@ -835,43 +835,91 @@ export function DayAssistantV2View() {
 
           {/* MUST Section */}
           {mustTasks.length > 0 && (
-            <Card className="mb-6 border-l-4 border-l-red-600">
-              <CardContent className="p-6">
-                <h2 className="text-xl font-bold mb-4 text-red-600">
-                  🔴 MUST (max 3)
-                </h2>
-                <div className="space-y-3">
-                  {mustTasks.map(task => (
-                    <DayAssistantV2TaskCard
-                      key={task.id}
-                      task={task}
-                      onStartTimer={handleStartTimer}
-                      onComplete={handleCompleteTask}
-                      onHelp={handleHelp}
-                      onPin={handlePinTask}
-                      onPostpone={handlePostponeTask}
-                      onDelete={handleDeleteTask}
-                      onOpenDetails={handleOpenDetails}
-                    />
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <div className="mb-6">
+              {/* Section Header - NO BACKGROUND BOX */}
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base font-bold text-red-600">🔴 MUST (max 3)</h3>
+              </div>
+              <p className="text-xs text-slate-500 mb-4">
+                Zadania krytyczne • <span className="font-semibold">{mustTasks.reduce((sum, t) => sum + t.estimate_min, 0)} min</span> (est time)
+              </p>
+              
+              {/* Task Cards */}
+              <div className="space-y-3">
+                {mustTasks.map(task => (
+                  <DayAssistantV2TaskCard
+                    key={task.id}
+                    task={task}
+                    onStartTimer={handleStartTimer}
+                    onComplete={handleCompleteTask}
+                    onHelp={handleHelp}
+                    onPin={handlePinTask}
+                    onPostpone={handlePostponeTask}
+                    onDelete={handleDeleteTask}
+                    onOpenDetails={handleOpenDetails}
+                  />
+                ))}
+              </div>
+            </div>
           )}
 
           {/* Top 3 Section */}
           {top3Tasks.length > 0 && (
-            <Card className="mb-6 border-2 border-purple-300">
-              <CardContent className="p-6">
-                <h2 className="text-xl font-bold mb-4 text-purple-900">
-                  ⭐ Top 3 zadania na dziś
-                </h2>
-                <div className="space-y-3">
-                  {top3Tasks.map((task, idx) => (
+            <div className="mb-6">
+              {/* Section Header - NO BACKGROUND BOX */}
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base font-bold text-slate-800">⭐ Top 3 zadania na dziś</h3>
+              </div>
+              <p className="text-xs text-slate-500 mb-4">
+                Top scored na dziś • <span className="font-semibold">{top3Tasks.reduce((sum, t) => sum + t.estimate_min, 0)} min</span> (est time)
+              </p>
+              
+              {/* Task Cards */}
+              <div className="space-y-3">
+                {top3Tasks.map((task, idx) => (
+                  <DayAssistantV2TaskCard
+                    key={task.id}
+                    task={task}
+                    queuePosition={idx + 1}
+                    onStartTimer={handleStartTimer}
+                    onComplete={handleCompleteTask}
+                    onHelp={handleHelp}
+                    onPin={handlePinTask}
+                    onPostpone={handlePostponeTask}
+                    onDelete={handleDeleteTask}
+                    onOpenDetails={handleOpenDetails}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Queue Section - Collapsible */}
+          {queueTasks.length > 0 && (
+            <div className="mb-6">
+              {/* Section Header - Collapsible */}
+              <div 
+                className="flex items-center justify-between mb-3 cursor-pointer"
+                onClick={() => setQueueCollapsed(!queueCollapsed)}
+              >
+                <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                  {queueCollapsed ? <CaretDown size={20} /> : <CaretUp size={20} />}
+                  📋 Pozostałe zadania na dziś ({queueTasks.length})
+                </h3>
+              </div>
+              <p className="text-xs text-slate-500 mb-4">
+                W godzinach pracy • <span className="font-semibold">{queueTasks.reduce((sum, t) => sum + t.estimate_min, 0)} min</span> (est time)
+              </p>
+              
+              {/* Task Cards - Compact Layout */}
+              {!queueCollapsed && (
+                <div className="space-y-2">
+                  {queueTasks.map((task, idx) => (
                     <DayAssistantV2TaskCard
                       key={task.id}
                       task={task}
-                      queuePosition={idx + 1}
+                      queuePosition={idx + TOP_TASKS_COUNT + 1}
+                      isCompact={true}
                       onStartTimer={handleStartTimer}
                       onComplete={handleCompleteTask}
                       onHelp={handleHelp}
@@ -882,82 +930,47 @@ export function DayAssistantV2View() {
                     />
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Queue Section - Collapsible */}
-          {queueTasks.length > 0 && (
-            <Card className="mb-6">
-              <CardHeader 
-                className="cursor-pointer hover:bg-gray-50 transition-colors"
-                onClick={() => setQueueCollapsed(!queueCollapsed)}
-              >
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg font-bold flex items-center gap-2">
-                    {queueCollapsed ? <CaretDown size={20} /> : <CaretUp size={20} />}
-                    📋 Zadania na dziś w godzinach pracy ({queueTasks.length})
-                  </CardTitle>
-                </div>
-              </CardHeader>
-              {!queueCollapsed && (
-                <CardContent className="pt-0">
-                  <div className="space-y-3">
-                    {queueTasks.map((task, idx) => (
-                      <DayAssistantV2TaskCard
-                        key={task.id}
-                        task={task}
-                        queuePosition={idx + TOP_TASKS_COUNT + 1} // +1 to keep positions 1-based after Top 3
-                        onStartTimer={handleStartTimer}
-                        onComplete={handleCompleteTask}
-                        onHelp={handleHelp}
-                        onPin={handlePinTask}
-                        onPostpone={handlePostponeTask}
-                        onDelete={handleDeleteTask}
-                        onOpenDetails={handleOpenDetails}
-                      />
-                    ))}
-                  </div>
-                </CardContent>
               )}
-            </Card>
+            </div>
           )}
 
           {/* Overflow Section - Collapsible */}
           {overflowTasks.length > 0 && (
-            <Card className="mb-6">
-              <CardHeader
-                className="cursor-pointer hover:bg-gray-50 transition-colors"
+            <div className="mb-6">
+              {/* Section Header - Collapsible */}
+              <div
+                className="flex items-center justify-between mb-3 cursor-pointer"
                 onClick={() => setOverflowCollapsed(!overflowCollapsed)}
               >
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg font-bold flex items-center gap-2 text-gray-600">
-                    {overflowCollapsed ? <CaretDown size={20} /> : <CaretUp size={20} />}
-                    📦 Zadania na dziś poza godzinami pracy ({overflowTasks.length})
-                  </CardTitle>
-                </div>
-              </CardHeader>
+                <h3 className="text-base font-bold text-slate-600 flex items-center gap-2">
+                  {overflowCollapsed ? <CaretDown size={20} /> : <CaretUp size={20} />}
+                  📦 Zadania poza godzinami pracy ({overflowTasks.length})
+                </h3>
+              </div>
+              <p className="text-xs text-slate-500 mb-4">
+                Nie zmieszczą się dzisiaj • <span className="font-semibold">{overflowTasks.reduce((sum, t) => sum + t.estimate_min, 0)} min</span> (est time)
+              </p>
+              
+              {/* Task Cards - Overflow Layout */}
               {!overflowCollapsed && (
-                <CardContent className="pt-0">
-                  <div className="space-y-3">
-                    {overflowTasks.map(task => (
-                      <DayAssistantV2TaskCard
-                        key={task.id}
-                        task={task}
-                        isOverflow={true}
-                        onStartTimer={handleStartTimer}
-                        onComplete={handleCompleteTask}
-                        onHelp={handleHelp}
-                        onPin={handlePinTask}
-                        onPostpone={handlePostponeTask}
-                        onDelete={handleDeleteTask}
-                        onOpenDetails={handleOpenDetails}
-                      />
-                    ))}
-                  </div>
-                </CardContent>
+                <div className="space-y-2">
+                  {overflowTasks.map(task => (
+                    <DayAssistantV2TaskCard
+                      key={task.id}
+                      task={task}
+                      isOverflow={true}
+                      onStartTimer={handleStartTimer}
+                      onComplete={handleCompleteTask}
+                      onHelp={handleHelp}
+                      onPin={handlePinTask}
+                      onPostpone={handlePostponeTask}
+                      onDelete={handleDeleteTask}
+                      onOpenDetails={handleOpenDetails}
+                    />
+                  ))}
+                </div>
               )}
-            </Card>
+            </div>
           )}
 
           {/* Empty State */}

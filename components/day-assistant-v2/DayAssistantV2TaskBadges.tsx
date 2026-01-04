@@ -6,6 +6,7 @@
 import Badge from '@/components/ui/Badge'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { Tag, Brain, Calendar } from '@phosphor-icons/react'
 
 // Position Badge - Shows queue position (#1, #2, etc.)
 export function PositionBadge({ position }: { position: number }) {
@@ -26,12 +27,22 @@ export function MustBadge() {
 }
 
 // Priority Badge - P1 (orange), P2 (blue), P3 (violet), P4 (gray)
-export function PriorityBadge({ priority }: { priority: 1 | 2 | 3 | 4 }) {
+export function PriorityBadge({ priority, isOverflow = false }: { priority: 1 | 2 | 3 | 4, isOverflow?: boolean }) {
+  if (isOverflow) {
+    // All overflow badges are muted slate
+    const label = priority === 4 ? 'P1' : priority === 3 ? 'P2' : priority === 2 ? 'P3' : 'P4'
+    return (
+      <Badge className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-bold uppercase tracking-wider rounded border border-slate-200">
+        {label}
+      </Badge>
+    )
+  }
+  
   const variants = {
-    4: { className: 'bg-orange-50 text-orange-600 border-orange-100 text-[10px] font-bold uppercase tracking-wider', label: 'P1' },
-    3: { className: 'bg-blue-50 text-blue-600 border-blue-100 text-[10px] font-bold uppercase tracking-wider', label: 'P2' },
-    2: { className: 'bg-violet-50 text-violet-600 border-violet-100 text-[10px] font-bold uppercase tracking-wider', label: 'P3' },
-    1: { className: 'bg-slate-50 text-slate-600 border-slate-100 text-[10px] font-bold uppercase tracking-wider', label: 'P4' }
+    4: { className: 'px-2 py-0.5 bg-orange-50 text-orange-600 border-orange-100 text-[10px] font-bold uppercase tracking-wider', label: 'P1' },
+    3: { className: 'px-2 py-0.5 bg-blue-50 text-blue-600 border-blue-100 text-[10px] font-bold uppercase tracking-wider', label: 'P2' },
+    2: { className: 'px-2 py-0.5 bg-violet-50 text-violet-600 border-violet-100 text-[10px] font-bold uppercase tracking-wider', label: 'P3' },
+    1: { className: 'px-2 py-0.5 bg-slate-50 text-slate-600 border-slate-100 text-[10px] font-bold uppercase tracking-wider', label: 'P4' }
   }
   
   const config = variants[priority] || variants[1]
@@ -55,9 +66,9 @@ export function DeadlineBadge({ dueDate, todayDate }: { dueDate: string | null, 
   // Overdue
   if (diffDays < 0) {
     return (
-      <Badge className="bg-red-50 text-red-600 border-red-100 text-xs font-semibold">
-        🔴 Przeterminowane
-      </Badge>
+      <span className="text-[10px] text-red-600 inline-flex items-center">
+        <Calendar size={10} className="mr-1" />Przeterminowane
+      </span>
     )
   }
   
@@ -69,41 +80,32 @@ export function DeadlineBadge({ dueDate, todayDate }: { dueDate: string | null, 
       const hours = timeMatch[1]
       const minutes = timeMatch[2]
       return (
-        <Badge className="bg-orange-50 text-orange-600 border-orange-100 text-xs font-semibold">
-          📅 Dziś {hours}:{minutes}
-        </Badge>
+        <span className="text-[10px] text-slate-400 inline-flex items-center">
+          <Calendar size={10} className="mr-1" />Due: Today {hours}:{minutes}
+        </span>
       )
     }
     return (
-      <Badge className="bg-orange-50 text-orange-600 border-orange-100 text-xs font-semibold">
-        📅 Dziś
-      </Badge>
+      <span className="text-[10px] text-slate-400 inline-flex items-center">
+        <Calendar size={10} className="mr-1" />Due: Today
+      </span>
     )
   }
   
   // Due tomorrow
   if (diffDays === 1) {
     return (
-      <Badge className="bg-amber-50 text-amber-600 border-amber-100 text-xs font-semibold">
-        📅 Jutro
-      </Badge>
+      <span className="text-[10px] text-slate-400 inline-flex items-center">
+        <Calendar size={10} className="mr-1" />Due: Tomorrow
+      </span>
     )
   }
   
-  // Due in 2-7 days
-  if (diffDays <= 7) {
-    return (
-      <Badge className="bg-blue-50 text-blue-600 border-blue-100 text-xs font-semibold">
-        📅 Za {diffDays}d
-      </Badge>
-    )
-  }
-  
-  // Future (> 7 days)
+  // Due in future
   return (
-    <Badge variant="outline" className="bg-slate-50 text-slate-500 border-slate-100 text-xs">
-      📅 Za {diffDays}d
-    </Badge>
+    <span className="text-[10px] text-slate-400 inline-flex items-center">
+      <Calendar size={10} className="mr-1" />Due: {diffDays}d
+    </span>
   )
 }
 
@@ -119,17 +121,17 @@ export function CognitiveLoadBadge({ load }: { load: number }) {
   }
   
   const getLoadColor = (load: number): string => {
-    if (load <= 2) return 'bg-emerald-50 text-emerald-600 border-emerald-100'
-    if (load === 3) return 'bg-amber-50 text-amber-600 border-amber-100'
-    return 'bg-red-50 text-red-600 border-red-100'
+    if (load <= 2) return 'px-2 py-0.5 bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold'
+    if (load <= 4) return 'px-2 py-0.5 bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-bold'
+    return 'px-2 py-0.5 bg-red-50 text-red-700 border-red-200 text-[10px] font-bold'
   }
   
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <div>
-          <Badge className={cn(getLoadColor(load), 'text-xs font-semibold')}>
-            🧠 {load}/5
+          <Badge className={cn(getLoadColor(load), 'rounded inline-flex items-center')}>
+            <Brain size={10} className="mr-1" />{load}/5
           </Badge>
         </div>
       </TooltipTrigger>
@@ -171,8 +173,8 @@ export function ContextBadge({ context, aiInferred }: { context: string, aiInfer
     <Tooltip>
       <TooltipTrigger asChild>
         <div>
-          <Badge className="bg-slate-50 text-slate-600 border-slate-100 text-xs font-medium">
-            📁 {context} {aiInferred && '✨'}
+          <Badge className="px-2 py-0.5 bg-slate-50 text-slate-500 text-[10px] font-medium rounded border border-slate-100 inline-flex items-center">
+            <Tag size={10} className="mr-1" />{context} {aiInferred && '✨'}
           </Badge>
         </div>
       </TooltipTrigger>
