@@ -176,14 +176,16 @@ export function UniversalTaskModal({
       setLoading(true)
       try {
         // Fetch projects with proper auth
-        const projectsRes = await fetch('/api/todoist/projects', {
-          headers: {
-            'Authorization': `Bearer ${token || ''}`
+        if (token) {
+          const projectsRes = await fetch('/api/todoist/projects', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          })
+          if (projectsRes.ok) {
+            const data = await projectsRes.json()
+            setProjects(data.projects || data || [])
           }
-        })
-        if (projectsRes.ok) {
-          const data = await projectsRes.json()
-          setProjects(data.projects || data || [])
         }
         
         // Fetch labels
@@ -303,10 +305,15 @@ export function UniversalTaskModal({
       const now = new Date().toISOString()
       const changes: ChangeHistoryItem[] = []
       
+      // Helper to generate unique IDs
+      const generateId = (field: string) => {
+        return crypto.randomUUID?.() || `change-${field}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      }
+      
       // Track changes
       if (content !== lastValuesRef.current.content && lastValuesRef.current.content !== '') {
         changes.push({
-          id: Date.now().toString() + '-content',
+          id: generateId('content'),
           field: 'Tytuł',
           oldValue: lastValuesRef.current.content,
           newValue: content,
@@ -316,7 +323,7 @@ export function UniversalTaskModal({
       
       if (description !== lastValuesRef.current.description && lastValuesRef.current.description !== '') {
         changes.push({
-          id: Date.now().toString() + '-desc',
+          id: generateId('description'),
           field: 'Opis',
           oldValue: lastValuesRef.current.description || '(pusty)',
           newValue: description || '(pusty)',
@@ -326,7 +333,7 @@ export function UniversalTaskModal({
       
       if (priority !== lastValuesRef.current.priority) {
         changes.push({
-          id: Date.now().toString() + '-priority',
+          id: generateId('priority'),
           field: 'Priorytet',
           oldValue: `P${lastValuesRef.current.priority}`,
           newValue: `P${priority}`,
@@ -336,7 +343,7 @@ export function UniversalTaskModal({
       
       if (dueDate !== lastValuesRef.current.dueDate && lastValuesRef.current.dueDate !== '') {
         changes.push({
-          id: Date.now().toString() + '-due',
+          id: generateId('dueDate'),
           field: 'Termin',
           oldValue: lastValuesRef.current.dueDate || '(brak)',
           newValue: dueDate || '(brak)',
@@ -450,12 +457,19 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
 
       if (res.ok) {
         const data = await res.json()
-        const parsed = JSON.parse(data.response || '{}')
+        let parsed
+        try {
+          parsed = JSON.parse(data.response || '{}')
+        } catch (parseError) {
+          console.error('Failed to parse AI response:', parseError)
+          setAiUnderstanding('Nie udało się przetworzyć odpowiedzi AI')
+          return
+        }
         
         if (parsed.subtasks && Array.isArray(parsed.subtasks) && parsed.subtasks.length > 0) {
           // Add subtasks to the state
           const newSubtasks = parsed.subtasks.map((st: any) => ({
-            id: Date.now().toString() + Math.random().toString(),
+            id: crypto.randomUUID?.() || `subtask-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             content: st.content || st.title,
             completed: false
           }))
