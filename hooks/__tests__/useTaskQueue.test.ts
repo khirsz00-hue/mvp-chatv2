@@ -176,4 +176,35 @@ describe('buildSmartQueue', () => {
     expect(result.later[0].due_date).toBe(todayISO)
     expect(result.later[1].due_date).toBe('2025-12-26')
   })
+
+  test('Test 6: Zero capacity - all tasks go to later', () => {
+    const tasks = [
+      createTask('1', 'MUST Task', 60, true, todayISO, 100),
+      createTask('2', 'Task 1', 30, false, todayISO, 90),
+      createTask('3', 'Task 2', 30, false, todayISO, 80),
+      createTask('4', 'Task 3', 30, false, todayISO, 70),
+      createTask('5', 'Future Task', 30, false, '2025-12-26', 60)
+    ]
+    
+    const capacity = 0 // No capacity (work hours ended)
+    const result = buildSmartQueue(tasks, capacity, todayISO)
+    
+    // Queue should be empty
+    expect(result.queue.length).toBe(0)
+    
+    // Remaining should be empty
+    expect(result.remainingToday.length).toBe(0)
+    
+    // All tasks should be in later (4 today + 1 future = 5)
+    expect(result.later.length).toBe(5)
+    expect(result.overflowCount).toBe(4) // 4 today tasks are overflow
+    
+    // Today tasks should come first
+    const todayTasksInLater = result.later.filter(t => t.due_date === todayISO)
+    expect(todayTasksInLater.length).toBe(4)
+    
+    // Used time should be 0
+    expect(result.usedTime).toBe(0)
+    expect(result.capacity).toBe(0)
+  })
 })

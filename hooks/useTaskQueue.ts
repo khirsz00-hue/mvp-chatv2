@@ -108,6 +108,30 @@ export function buildSmartQueue(
   const todayTasks = scoredTasks.filter(t => t.due_date === todayISO)
   const futureTasks = scoredTasks.filter(t => t.due_date && t.due_date > todayISO)
   
+  // Check if capacity available: if no capacity (work hours ended), move all today tasks to overflow
+  if (capacity <= 0) {
+    const later = [...todayTasks, ...futureTasks]
+      .sort((a, b) => {
+        // Tasks for today first
+        if (a.due_date === todayISO && b.due_date !== todayISO) return -1
+        if (a.due_date !== todayISO && b.due_date === todayISO) return 1
+        // Rest by date
+        if (!a.due_date && b.due_date) return 1
+        if (a.due_date && !b.due_date) return -1
+        if (!a.due_date && !b.due_date) return 0
+        return new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime()
+      })
+    
+    return {
+      queue: [],
+      remainingToday: [],
+      later,
+      usedTime: 0,
+      capacity: 0,
+      overflowCount: todayTasks.length
+    }
+  }
+  
   // 2. Separate pinned from unpinned
   const pinnedTasks = todayTasks.filter(t => t.is_must)
   const unpinnedTodayTasks = todayTasks
