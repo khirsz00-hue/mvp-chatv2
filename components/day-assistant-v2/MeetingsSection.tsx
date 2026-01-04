@@ -35,14 +35,24 @@ export function MeetingsSection({ meetings, onRefresh }: MeetingsSectionProps) {
     }
   }
 
+  // Sort meetings: all-day events first, then by start time
+  const sortedMeetings = [...meetings].sort((a, b) => {
+    // Całodniowe na początku
+    if (a.metadata?.isAllDay && !b.metadata?.isAllDay) return -1
+    if (!a.metadata?.isAllDay && b.metadata?.isAllDay) return 1
+    
+    // Reszta sortowana po czasie rozpoczęcia
+    return new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+  })
+
   // Calculate total time for all meetings
-  const totalMinutes = meetings.reduce((sum, m) => sum + m.duration_minutes, 0)
+  const totalMinutes = sortedMeetings.reduce((sum, m) => sum + m.duration_minutes, 0)
   const hours = Math.floor(totalMinutes / 60)
   const minutes = totalMinutes % 60
   const timeString = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`
 
   // No meetings case
-  if (meetings.length === 0) {
+  if (sortedMeetings.length === 0) {
     return (
       <Card className="mb-6 bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200 rounded-xl">
         <CardContent className="p-4">
@@ -64,8 +74,8 @@ export function MeetingsSection({ meetings, onRefresh }: MeetingsSectionProps) {
     )
   }
 
-  const firstMeeting = meetings[0]
-  const remainingMeetings = meetings.slice(1)
+  const firstMeeting = sortedMeetings[0]
+  const remainingMeetings = sortedMeetings.slice(1)
 
   return (
     <section className="mb-6 space-y-3">
@@ -74,7 +84,7 @@ export function MeetingsSection({ meetings, onRefresh }: MeetingsSectionProps) {
         <h3 className="text-lg font-bold text-gray-900">Spotkania na dziś</h3>
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-600">
-            {meetings.length} {meetings.length === 1 ? 'spotkanie' : meetings.length < 5 ? 'spotkania' : 'spotkań'} • {timeString}
+            {sortedMeetings.length} {sortedMeetings.length === 1 ? 'spotkanie' : sortedMeetings.length < 5 ? 'spotkania' : 'spotkań'} • {timeString}
           </span>
           <Button 
             variant="ghost" 
@@ -202,6 +212,7 @@ function useCountdown(startTime: string, endTime: string) {
 
 // Large featured card for first meeting
 function LargeMeetingCard({ meeting }: { meeting: Meeting }) {
+  const isAllDay = meeting.metadata?.isAllDay
   const { status, minutesUntil } = useCountdown(meeting.start_time, meeting.end_time)
   const meetingType = getMeetingType(meeting.title, meeting.metadata)
   const colors = getTypeColors(meetingType)
@@ -210,8 +221,8 @@ function LargeMeetingCard({ meeting }: { meeting: Meeting }) {
   const startTime = format(new Date(meeting.start_time), 'HH:mm')
   const endTime = format(new Date(meeting.end_time), 'HH:mm')
 
-  // Calculate progress for active meetings
-  const progress = status === 'active' ? (() => {
+  // Calculate progress for active meetings (not for all-day events)
+  const progress = !isAllDay && status === 'active' ? (() => {
     const now = new Date()
     const start = new Date(meeting.start_time)
     const end = new Date(meeting.end_time)
@@ -228,13 +239,19 @@ function LargeMeetingCard({ meeting }: { meeting: Meeting }) {
         <div className="flex flex-col sm:flex-row gap-4">
           {/* Left: Time section */}
           <div className="flex sm:flex-col items-center sm:items-start gap-2 sm:gap-1 sm:min-w-[80px]">
-            <div className="flex items-center gap-2 sm:flex-col sm:items-start sm:gap-0">
-              <span className="text-2xl font-bold text-gray-900">{startTime}</span>
-              <span className="text-xs text-gray-500">{meeting.duration_minutes} min</span>
-            </div>
+            {isAllDay ? (
+              <div className="px-2 py-1 bg-purple-50 text-purple-600 border border-purple-200 rounded text-xs font-bold uppercase">
+                📅 Cały dzień
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 sm:flex-col sm:items-start sm:gap-0">
+                <span className="text-2xl font-bold text-gray-900">{startTime}</span>
+                <span className="text-xs text-gray-500">{meeting.duration_minutes} min</span>
+              </div>
+            )}
             
-            {/* Progress bar - only for active meetings */}
-            {status === 'active' && (
+            {/* Progress bar - only for active meetings and not all-day */}
+            {!isAllDay && status === 'active' && (
               <div className="hidden sm:block w-full mt-2">
                 <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
                   <div 
@@ -255,19 +272,19 @@ function LargeMeetingCard({ meeting }: { meeting: Meeting }) {
                 {meetingType === '1on1' ? '1:1' : meetingType === 'client' ? 'Client' : 'Spotkanie'}
               </span>
               
-              {status === 'upcoming' && (
+              {!isAllDay && status === 'upcoming' && (
                 <span className="text-sm font-semibold text-orange-600">
                   Za {formatCountdown(minutesUntil)}
                 </span>
               )}
               
-              {status === 'active' && (
+              {!isAllDay && status === 'active' && (
                 <span className="text-sm font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded animate-pulse">
                   Trwa
                 </span>
               )}
               
-              {status === 'past' && (
+              {!isAllDay && status === 'past' && (
                 <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded">
                   Zakończone
                 </span>
@@ -307,14 +324,16 @@ function LargeMeetingCard({ meeting }: { meeting: Meeting }) {
                 </span>
               )}
               
-              <span className="text-xs text-gray-400">
-                {startTime}-{endTime}
-              </span>
+              {!isAllDay && (
+                <span className="text-xs text-gray-400">
+                  {startTime}-{endTime}
+                </span>
+              )}
             </div>
           </div>
 
           {/* Right: Actions */}
-          {meeting.meeting_link && status !== 'past' && (
+          {meeting.meeting_link && !isAllDay && status !== 'past' && (
             <div className="flex sm:flex-col items-center sm:items-end gap-2">
               <Button
                 size="sm"
@@ -334,6 +353,7 @@ function LargeMeetingCard({ meeting }: { meeting: Meeting }) {
 
 // Compact card for remaining meetings
 function CompactMeetingCard({ meeting }: { meeting: Meeting }) {
+  const isAllDay = meeting.metadata?.isAllDay
   const { status, minutesUntil } = useCountdown(meeting.start_time, meeting.end_time)
   const meetingType = getMeetingType(meeting.title, meeting.metadata)
   const colors = getTypeColors(meetingType)
@@ -341,8 +361,9 @@ function CompactMeetingCard({ meeting }: { meeting: Meeting }) {
   
   const startTime = format(new Date(meeting.start_time), 'HH:mm')
 
-  // Determine border color based on type
-  const borderColor = meetingType === 'client' ? 'border-violet-200' : 
+  // Determine border color based on type or all-day status
+  const borderColor = isAllDay ? 'border-purple-200' :
+                      meetingType === 'client' ? 'border-violet-200' : 
                       meetingType === '1on1' ? 'border-emerald-200' : 
                       'border-blue-200'
 
@@ -351,8 +372,16 @@ function CompactMeetingCard({ meeting }: { meeting: Meeting }) {
       <div className="flex items-start gap-2">
         {/* Left: Time */}
         <div className="flex flex-col items-start min-w-[60px]">
-          <span className="text-lg font-bold text-gray-900">{startTime}</span>
-          <span className="text-xs text-gray-500">{meeting.duration_minutes}m</span>
+          {isAllDay ? (
+            <div className="px-2 py-1 bg-purple-50 text-purple-600 border border-purple-200 rounded text-xs font-bold uppercase">
+              📅 Cały dzień
+            </div>
+          ) : (
+            <>
+              <span className="text-lg font-bold text-gray-900">{startTime}</span>
+              <span className="text-xs text-gray-500">{meeting.duration_minutes}m</span>
+            </>
+          )}
         </div>
 
         {/* Middle: Details */}
@@ -362,11 +391,11 @@ function CompactMeetingCard({ meeting }: { meeting: Meeting }) {
               {meetingType === '1on1' ? '1:1' : meetingType === 'client' ? 'Client' : 'Team'}
             </span>
             
-            {status === 'active' && (
+            {!isAllDay && status === 'active' && (
               <span className="text-xs font-semibold text-red-600">Trwa</span>
             )}
             
-            {status === 'upcoming' && minutesUntil <= 30 && (
+            {!isAllDay && status === 'upcoming' && minutesUntil <= 30 && (
               <span className="text-xs font-semibold text-orange-600">Za {minutesUntil}m</span>
             )}
           </div>
@@ -382,7 +411,7 @@ function CompactMeetingCard({ meeting }: { meeting: Meeting }) {
         </div>
 
         {/* Right: Join button */}
-        {meeting.meeting_link && status !== 'past' && (
+        {meeting.meeting_link && !isAllDay && status !== 'past' && (
           <button
             onClick={() => window.open(meeting.meeting_link, '_blank')}
             className="shrink-0 w-8 h-8 flex items-center justify-center bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"

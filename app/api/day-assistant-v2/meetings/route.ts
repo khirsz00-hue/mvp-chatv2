@@ -105,7 +105,9 @@ export async function GET(req: NextRequest) {
 
     console.log(`🔍 [Meetings API] Found ${events.length} events from Google Calendar`)
     events.forEach((event, idx) => {
-      console.log(`  Event ${idx + 1}: "${event.summary}" - ${event.start?.dateTime} to ${event.end?.dateTime}`)
+      const isAllDay = !event.start?.dateTime
+      const timeInfo = isAllDay ? 'ALL-DAY' : `${event.start?.dateTime} to ${event.end?.dateTime}`
+      console.log(`  Event ${idx + 1}: "${event.summary}" - ${timeInfo}`)
     })
 
     // Transform and save to cache
@@ -119,11 +121,33 @@ export async function GET(req: NextRequest) {
       .eq('date', date)
 
     for (const event of events) {
-      if (!event.start?.dateTime || !event.end?.dateTime) continue
+      // Obsłuż zarówno wydarzenia z czasem jak i całodniowe
+      const startDateTime = event.start?.dateTime || event.start?.date
+      const endDateTime = event.end?.dateTime || event.end?.date
 
-      const startTime = new Date(event.start.dateTime)
-      const endTime = new Date(event.end.dateTime)
-      const durationMinutes = Math.round((endTime.getTime() - startTime.getTime()) / 1000 / 60)
+      if (!startDateTime || !endDateTime) continue
+
+      const isAllDay = !event.start?.dateTime // jeśli nie ma dateTime, to all-day event
+
+      let startTime: Date
+      let endTime: Date
+      let durationMinutes: number
+
+      if (isAllDay) {
+        // Wydarzenie całodniowe - ustaw na cały dzień
+        startTime = new Date(startDateTime)
+        startTime.setHours(0, 0, 0, 0)
+        
+        endTime = new Date(endDateTime)
+        endTime.setHours(23, 59, 59, 999)
+        
+        durationMinutes = 1440 // cały dzień = 24h = 1440 min
+      } else {
+        // Wydarzenie z konkretnym czasem
+        startTime = new Date(startDateTime)
+        endTime = new Date(endDateTime)
+        durationMinutes = Math.round((endTime.getTime() - startTime.getTime()) / 1000 / 60)
+      }
 
       const meeting = {
         user_id: user.id,
@@ -141,7 +165,8 @@ export async function GET(req: NextRequest) {
         metadata: {
           description: event.description,
           attendees: event.attendees?.length || 0,
-          hasVideoCall: !!event.hangoutLink
+          hasVideoCall: !!event.hangoutLink,
+          isAllDay: isAllDay
         }
       }
 
