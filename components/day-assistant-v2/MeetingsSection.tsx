@@ -38,7 +38,6 @@ interface MeetingsSectionProps {
 
 export function MeetingsSection({ meetings, onRefresh }: MeetingsSectionProps) {
   const [refreshing, setRefreshing] = useState(false)
-  const [lastUpdate, setLastUpdate] = useState(Date.now())
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -49,14 +48,7 @@ export function MeetingsSection({ meetings, onRefresh }: MeetingsSectionProps) {
     }
   }
 
-  // Live updates - refresh countdown and progress every minute
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setLastUpdate(Date.now())
-    }, 60000) // 60 seconds
-    
-    return () => clearInterval(interval)
-  }, [])
+  // Live updates handled by useCountdown hook in child components
 
   // Sort meetings: all-day events first, then by start time
   const sortedMeetings = [...meetings].sort((a, b) => {
@@ -255,7 +247,9 @@ function useCountdown(startTime: string, endTime: string) {
 // Large featured card for first meeting
 function LargeMeetingCard({ meeting }: { meeting: Meeting }) {
   const isAllDay = meeting.metadata?.isAllDay
-  const { status, minutesUntil } = useCountdown(meeting.start_time, meeting.end_time)
+  
+  // Use countdown hook to trigger re-renders every minute
+  useCountdown(meeting.start_time, meeting.end_time)
   
   // Get countdown and progress info
   const countdownInfo = getCountdown(meeting.start_time, meeting.end_time)
@@ -297,8 +291,8 @@ function LargeMeetingCard({ meeting }: { meeting: Meeting }) {
         <div className="flex-1 min-w-0">
           {/* Badge + Countdown */}
           <div className="flex items-center gap-2 mb-1.5">
-            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold uppercase tracking-wider rounded">
-              Spotkanie
+            <span className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded ${getBadgeColor(meeting)}`}>
+              {getBadgeText(meeting)}
             </span>
             {!isAllDay && countdown && (
               <span className={`text-[10px] font-medium ${isActive ? 'text-red-600' : 'text-slate-400'}`}>
@@ -344,10 +338,7 @@ function LargeMeetingCard({ meeting }: { meeting: Meeting }) {
             {/* Platforma */}
             {meeting.metadata?.platform && (
               <span className="text-[10px] text-slate-400 flex items-center gap-1">
-                {meeting.metadata.platform === 'Google Meet' && '🎥'}
-                {meeting.metadata.platform === 'Zoom' && '📹'}
-                {meeting.metadata.platform === 'Room' && '📍'}
-                {meeting.metadata.platform}
+                {getPlatformIcon(meeting.metadata.platform)} {meeting.metadata.platform}
               </span>
             )}
           </div>
@@ -375,6 +366,10 @@ function LargeMeetingCard({ meeting }: { meeting: Meeting }) {
 // Compact card for remaining meetings
 function CompactMeetingCard({ meeting }: { meeting: Meeting }) {
   const isAllDay = meeting.metadata?.isAllDay
+  
+  // Use countdown hook to trigger re-renders every minute
+  useCountdown(meeting.start_time, meeting.end_time)
+  
   const countdownInfo = getCountdown(meeting.start_time, meeting.end_time)
   const countdown = countdownInfo.text
   const isActive = countdownInfo.isActive
