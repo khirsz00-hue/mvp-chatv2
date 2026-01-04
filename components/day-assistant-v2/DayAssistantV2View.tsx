@@ -71,6 +71,7 @@ export function DayAssistantV2View() {
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [loadingProjects, setLoadingProjects] = useState(false)
+  const isValidTimeFormat = (value: string) => /^\d{2}:\d{2}$/.test(value)
 
   // Custom hooks
   const { activeTimer, startTimer, pauseTimer, resumeTimer, stopTimer, formatTime } = useTaskTimer()
@@ -149,10 +150,10 @@ export function DayAssistantV2View() {
       setTasks(data.tasks || [])
       setAssistant(data.assistant)
       setTaskStats(data.taskStats || taskStats)
-      if (data.dayPlan?.metadata?.work_start_time) {
+      if (data.dayPlan?.metadata?.work_start_time && isValidTimeFormat(data.dayPlan.metadata.work_start_time)) {
         setWorkHoursStart(data.dayPlan.metadata.work_start_time)
       }
-      if (data.dayPlan?.metadata?.work_end_time) {
+      if (data.dayPlan?.metadata?.work_end_time && isValidTimeFormat(data.dayPlan.metadata.work_end_time)) {
         setWorkHoursEnd(data.dayPlan.metadata.work_end_time)
       }
       
@@ -410,13 +411,21 @@ export function DayAssistantV2View() {
   }
 
   const handleWorkHoursChange = async (start: string, end: string) => {
+    if (!isValidTimeFormat(start) || !isValidTimeFormat(end)) {
+      toast.error('Nieprawidłowy format godzin pracy')
+      return
+    }
+    
     setWorkHoursStart(start)
     setWorkHoursEnd(end)
     const capacityMinutes = Math.max(0, calculateWorkHours(start, end) * 60)
     
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
+      if (!session) {
+        toast.error('Sesja wygasła - zaloguj się ponownie')
+        return
+      }
       
       const response = await fetch('/api/day-assistant-v2/dayplan', {
         method: 'PUT',
