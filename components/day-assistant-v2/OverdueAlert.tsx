@@ -8,6 +8,17 @@
 
 import { Warning } from '@phosphor-icons/react'
 
+/**
+ * Polish pluralization helper for overdue tasks
+ */
+function getOverdueTasksPlural(count: number): string {
+  if (count === 1) return 'przeterminowane zadanie'
+  if (count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 10 || count % 100 >= 20)) {
+    return 'przeterminowane zadania'
+  }
+  return 'przeterminowanych zadań'
+}
+
 export interface OverdueAlertProps {
   overdueCount: number
   onReview: () => void
@@ -30,10 +41,10 @@ export function OverdueAlert({ overdueCount, onReview }: OverdueAlertProps) {
           {/* Text */}
           <div>
             <h3 className="text-sm font-bold text-red-700">
-              {overdueCount} Overdue Task{overdueCount > 1 ? 's' : ''} detected
+              Wykryto {overdueCount} {getOverdueTasksPlural(overdueCount)}
             </h3>
             <p className="text-xs text-red-600/80 mt-0.5">
-              These tasks were moved from yesterday. Review them?
+              Te zadania zostały przeniesione z wczoraj. Przejrzeć je?
             </p>
           </div>
         </div>
@@ -43,7 +54,7 @@ export function OverdueAlert({ overdueCount, onReview }: OverdueAlertProps) {
           onClick={onReview}
           className="text-xs font-semibold bg-white text-red-600 px-3 py-1.5 rounded-lg border border-red-200 hover:bg-red-50 transition-colors flex-shrink-0"
         >
-          Review
+          Przejrzyj
         </button>
       </div>
     </div>
