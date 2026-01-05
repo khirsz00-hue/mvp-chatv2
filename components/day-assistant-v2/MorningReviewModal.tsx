@@ -24,6 +24,8 @@ import {
 interface MorningReviewModalProps {
   overdueTasks: TestDayTask[]
   selectedDate: string
+  isOpen: boolean
+  onClose: () => void
   onAddToday: (task: TestDayTask) => void
   onMoveToTomorrow: (task: TestDayTask) => void
   onReschedule: (task: TestDayTask, date?: string) => void
@@ -57,30 +59,20 @@ function markReviewedToday(date: string): void {
 export function MorningReviewModal({
   overdueTasks,
   selectedDate,
+  isOpen,
+  onClose,
   onAddToday,
   onMoveToTomorrow,
   onReschedule,
   onDelete,
   onComplete
 }: MorningReviewModalProps) {
-  const [isOpen, setIsOpen] = useState(false)
   const [processedTasks, setProcessedTasks] = useState<Set<string>>(new Set())
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set())
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [rescheduleDate, setRescheduleDate] = useState('')
   const [rescheduleTaskId, setRescheduleTaskId] = useState<string | null>(null)
   const [isBulkReschedule, setIsBulkReschedule] = useState(false)
-
-  // Check if we should show the modal on mount
-  useEffect(() => {
-    const shouldShow = 
-      overdueTasks.length > 0 && 
-      !hasReviewedToday(selectedDate)
-    
-    if (shouldShow) {
-      setIsOpen(true)
-    }
-  }, [overdueTasks.length, selectedDate])
 
   // Reset processed tasks and selected tasks when date changes
   useEffect(() => {
@@ -90,7 +82,7 @@ export function MorningReviewModal({
 
   const handleReviewLater = () => {
     markReviewedToday(selectedDate)
-    setIsOpen(false)
+    onClose()
   }
 
   const handleAction = (task: TestDayTask, action: 'today' | 'tomorrow' | 'reschedule' | 'delete' | 'complete') => {
@@ -131,7 +123,7 @@ export function MorningReviewModal({
     const remainingAfterAction = overdueTasks.filter(t => !newProcessedTasks.has(t.id))
     if (remainingAfterAction.length === 0) {
       markReviewedToday(selectedDate)
-      setIsOpen(false)
+      onClose()
     }
   }
 
@@ -174,7 +166,7 @@ export function MorningReviewModal({
     const remainingAfterReschedule = overdueTasks.filter(t => !newProcessedSet.has(t.id))
     if (remainingAfterReschedule.length === 0) {
       markReviewedToday(selectedDate)
-      setIsOpen(false)
+      onClose()
     }
   }
 
@@ -214,7 +206,7 @@ export function MorningReviewModal({
     const remainingAfterBulk = overdueTasks.filter(t => !newProcessedTasks.has(t.id))
     if (remainingAfterBulk.length === 0) {
       markReviewedToday(selectedDate)
-      setIsOpen(false)
+      onClose()
     }
   }
 
@@ -234,7 +226,7 @@ export function MorningReviewModal({
     const remainingAfterBulk = overdueTasks.filter(t => !newProcessedTasks.has(t.id))
     if (remainingAfterBulk.length === 0) {
       markReviewedToday(selectedDate)
-      setIsOpen(false)
+      onClose()
     }
   }
 
@@ -247,13 +239,13 @@ export function MorningReviewModal({
   // Filter out processed tasks
   const remainingTasks = overdueTasks.filter(task => !processedTasks.has(task.id))
 
-  // Don't render if no tasks or already reviewed
-  if (overdueTasks.length === 0 || !isOpen) {
+  // Don't render if no tasks
+  if (overdueTasks.length === 0) {
     return null
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">

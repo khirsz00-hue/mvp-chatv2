@@ -21,7 +21,7 @@ import { OverdueAlert } from './OverdueAlert'
 import { MeetingsSection } from './MeetingsSection'
 import { TodaysFlowPanel } from './TodaysFlowPanel'
 import { DecisionLogPanel, Decision } from './DecisionLogPanel'
-import { OverdueTasksSection } from './OverdueTasksSection'
+import { MorningReviewModal } from './MorningReviewModal'
 import { DayAssistantV2TaskCard } from './DayAssistantV2TaskCard'
 import { RecommendationPanel } from './RecommendationPanel'
 import { ProjectFilter } from './ProjectFilter'
@@ -70,6 +70,7 @@ export function DayAssistantV2View() {
   const [overflowCollapsed, setOverflowCollapsed] = useState(true)
   const [decisions, setDecisions] = useState<Decision[]>([])
   const [meetings, setMeetings] = useState<any[]>([])
+  const [showOverdueModal, setShowOverdueModal] = useState(false)
   const overdueRef = useRef<HTMLDivElement>(null)
   
   // Project filtering state
@@ -526,8 +527,8 @@ export function DayAssistantV2View() {
   }
 
   const handleReviewOverdue = () => {
-    // Scroll to overdue section
-    overdueRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    // Open modal instead of scrolling
+    setShowOverdueModal(true)
   }
 
   const handleLogDecision = (text: string) => {
@@ -543,6 +544,76 @@ export function DayAssistantV2View() {
   const handleKeepOverdueToday = async (task: TestDayTask) => {
     // Just keep the due date as today - no API call needed for now
     toast.success(`📅 ${task.title} pozostaje na dziś`)
+    await loadData()
+  }
+
+  const handleOverdueAddToday = async (task: TestDayTask) => {
+    // Update task to have today's date
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      
+      const response = await fetch('/api/day-assistant-v2/task', {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          task_id: task.id,
+          due_date: selectedDate
+        })
+      })
+      
+      if (!response.ok) throw new Error('Failed to update task')
+      
+      toast.success(`📅 ${task.title} dodane na dziś`)
+      await loadData()
+    } catch (error) {
+      console.error('Error updating task date:', error)
+      toast.error('Błąd podczas aktualizacji zadania')
+    }
+  }
+
+  const handleOverdueMoveToTomorrow = async (task: TestDayTask) => {
+    await handlePostponeTask(task.id)
+  }
+
+  const handleOverdueReschedule = async (task: TestDayTask, date?: string) => {
+    if (!date) return
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      
+      const response = await fetch('/api/day-assistant-v2/task', {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          task_id: task.id,
+          due_date: date
+        })
+      })
+      
+      if (!response.ok) throw new Error('Failed to reschedule task')
+      
+      toast.success(`📅 ${task.title} przeniesione na ${date}`)
+      await loadData()
+    } catch (error) {
+      console.error('Error rescheduling task:', error)
+      toast.error('Błąd podczas przesuwania zadania')
+    }
+  }
+
+  const handleOverdueDelete = async (task: TestDayTask) => {
+    await handleDeleteTask(task.id)
+  }
+
+  const handleOverdueComplete = async (task: TestDayTask) => {
+    await handleCompleteTask(task.id)
   }
 
   const handleRefreshMeetings = async () => {
@@ -841,19 +912,6 @@ export function DayAssistantV2View() {
             />
           )}
 
-          {/* Overdue Tasks Section */}
-          {overdueTasks.length > 0 && (
-            <div ref={overdueRef} className="mb-6">
-              <OverdueTasksSection
-                overdueTasks={overdueTasks}
-                selectedDate={selectedDate}
-                onComplete={(task) => handleCompleteTask(task.id)}
-                onKeepToday={handleKeepOverdueToday}
-                onPostpone={(task) => handlePostponeTask(task.id)}
-              />
-            </div>
-          )}
-
           {/* MUST Section */}
           {mustTasks.length > 0 && (
             <div className="mb-6">
@@ -1087,6 +1145,19 @@ export function DayAssistantV2View() {
         onClose={() => setShowWorkModeModal(false)}
         currentMode={workMode}
         onSelect={handleWorkModeChange}
+      />
+
+      {/* Morning Review Modal */}
+      <MorningReviewModal
+        isOpen={showOverdueModal}
+        onClose={() => setShowOverdueModal(false)}
+        overdueTasks={overdueTasks}
+        selectedDate={selectedDate}
+        onAddToday={handleOverdueAddToday}
+        onMoveToTomorrow={handleOverdueMoveToTomorrow}
+        onReschedule={handleOverdueReschedule}
+        onDelete={handleOverdueDelete}
+        onComplete={handleOverdueComplete}
       />
     </div>
   )
