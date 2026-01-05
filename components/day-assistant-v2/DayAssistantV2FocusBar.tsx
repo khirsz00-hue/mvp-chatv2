@@ -38,35 +38,43 @@ export function DayAssistantV2FocusBar({
   }
 
   return (
-    <div className="bg-slate-900 rounded-xl shadow-lg hover:shadow-xl transition-shadow mb-3">
+    <div className="sticky top-0 z-50 bg-slate-900 rounded-xl shadow-lg hover:shadow-xl transition-shadow mb-3">
       <div className="flex items-center gap-4 p-3">
         
-        {/* Timer Display */}
-        <div className="relative w-20 h-12 flex-shrink-0 bg-black/30 rounded-lg flex items-center justify-center gap-2 px-2 border border-slate-800">
-          {!isPaused && (
-            <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse shadow-lg shadow-red-500/50" />
-          )}
-          {isPaused && (
-            <div className="w-3 h-3 bg-yellow-400 rounded-full" />
-          )}
+        {/* Timer Display - WITHOUT red dot */}
+        <div className="relative w-20 h-12 flex-shrink-0 bg-black/30 rounded-lg flex items-center justify-center px-2 border border-slate-800">
           <span className="text-lg font-bold text-white font-mono tracking-tight">
             {formatTime(elapsedSeconds)}
           </span>
         </div>
 
-        {/* Task Info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-0.5">
-            <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide border border-emerald-500/30">
-              Current Focus
-            </span>
-            <span className="text-xs text-slate-400">
-              Est. {task.estimate_min}m
-            </span>
+        {/* Task Info - CENTERED with red dot next to title */}
+        <div className="flex-1 flex items-center justify-center gap-3 min-w-0">
+          
+          {/* Red pulsing dot - next to title */}
+          {!isPaused && (
+            <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse shadow-lg shadow-red-500/50 flex-shrink-0" />
+          )}
+          {isPaused && (
+            <div className="w-3 h-3 bg-yellow-400 rounded-full flex-shrink-0" />
+          )}
+          
+          <div className="flex-1 min-w-0 text-center">
+            {/* Badge + Estimate */}
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide border border-emerald-500/30">
+                Current Focus
+              </span>
+              <span className="text-xs text-slate-400">
+                Est. {task.estimate_min}m
+              </span>
+            </div>
+            
+            {/* Task title - LARGER FONT */}
+            <h3 className="font-bold text-white text-lg leading-tight">
+              {task.title}
+            </h3>
           </div>
-          <h3 className="font-bold text-white text-sm truncate">
-            {task.title}
-          </h3>
         </div>
 
         {/* Action Buttons */}

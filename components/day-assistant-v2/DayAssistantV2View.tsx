@@ -750,6 +750,27 @@ export function DayAssistantV2View() {
   const completedMinutes = tasks
     .filter(t => t.completed)
     .reduce((sum, t) => sum + (t.estimate_min || 0), 0)
+  
+  // Calculate scheduled minutes - all non-completed tasks scheduled for today
+  const scheduledMinutes = useMemo(() => {
+    const todayTasks = tasks.filter(t => t.due_date === selectedDate && !t.completed)
+    const scheduled = todayTasks.reduce((sum, t) => sum + (t.estimate_min || 0), 0)
+    
+    // Optional debug logging (can be enabled for debugging)
+    if (process.env.NODE_ENV === 'development') {
+      const available = Math.max(0, calculateWorkHours(workHoursStart, workHoursEnd) * 60)
+      console.log('🔍 [Day Overload Debug]', {
+        totalTasks: tasks.length,
+        todayTasks: todayTasks.length,
+        scheduledMinutes: scheduled,
+        availableMinutes: available,
+        overloadPercent: available > 0 ? Math.round((scheduled / available) * 100) : 0
+      })
+    }
+    
+    return scheduled
+  }, [tasks, selectedDate, workHoursStart, workHoursEnd])
+  
   const availableMinutes = Math.max(0, calculateWorkHours(workHoursStart, workHoursEnd) * 60)
   const usagePercentage = availableMinutes > 0
     ? Math.min(100, Math.round((totalEstimatedMinutes / availableMinutes) * 100))
@@ -786,7 +807,7 @@ export function DayAssistantV2View() {
           workHoursStart={workHoursStart}
           workHoursEnd={workHoursEnd}
           workMode={workMode}
-          usedMinutes={completedMinutes}
+          usedMinutes={scheduledMinutes}
           totalCapacity={availableMinutes}
           onEditWorkHours={() => setShowWorkHoursModal(true)}
           onEditMode={() => setShowWorkModeModal(true)}
