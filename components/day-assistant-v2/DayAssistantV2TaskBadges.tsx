@@ -26,11 +26,11 @@ export function MustBadge() {
   )
 }
 
-// Priority Badge - P1 (orange), P2 (blue), P3 (violet), P4 (gray)
+// Priority Badge - P1 (red), P2 (orange), P3 (blue), P4 (gray)
 export function PriorityBadge({ priority, isOverflow = false }: { priority: 1 | 2 | 3 | 4, isOverflow?: boolean }) {
   if (isOverflow) {
     // All overflow badges are muted slate
-    const label = priority === 4 ? 'P1' : priority === 3 ? 'P2' : priority === 2 ? 'P3' : 'P4'
+    const label = priority === 1 ? 'P1' : priority === 2 ? 'P2' : priority === 3 ? 'P3' : 'P4'
     return (
       <span className="text-slate-500 text-sm font-bold">
         {label}
@@ -39,13 +39,13 @@ export function PriorityBadge({ priority, isOverflow = false }: { priority: 1 | 
   }
   
   const variants = {
-    4: { className: 'text-orange-600 text-sm font-bold', label: 'P1' },
-    3: { className: 'text-blue-600 text-sm font-bold', label: 'P2' },
-    2: { className: 'text-slate-500 text-sm font-bold', label: 'P3' },
-    1: { className: 'text-slate-500 text-sm font-bold', label: 'P4' }
+    1: { className: 'text-red-600 text-sm font-bold', label: 'P1' },     // Highest priority - red
+    2: { className: 'text-orange-600 text-sm font-bold', label: 'P2' },  // High priority - orange
+    3: { className: 'text-blue-600 text-sm font-bold', label: 'P3' },    // Medium priority - blue
+    4: { className: 'text-slate-500 text-sm font-bold', label: 'P4' }    // Low priority - gray
   }
   
-  const config = variants[priority] || variants[1]
+  const config = variants[priority] || variants[4]
   
   return (
     <span className={config.className}>

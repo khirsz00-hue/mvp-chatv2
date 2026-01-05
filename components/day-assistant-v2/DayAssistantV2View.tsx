@@ -371,6 +371,8 @@ export function DayAssistantV2View() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
       
+      console.log('🎯 [HANDLER] Received priority:', taskData.priority)
+      
       const payload = {
         title: taskData.content,
         description: taskData.description,
@@ -380,6 +382,8 @@ export function DayAssistantV2View() {
         priority: taskData.priority,
         tags: taskData.labels || []
       }
+      
+      console.log('🎯 [HANDLER] Payload priority:', payload.priority)
       
       if (editingTask) {
         // Update existing task

@@ -95,6 +95,8 @@ export async function POST(request: NextRequest) {
     
     const body = await request.json()
     
+    console.log('🎯 [API] Received priority:', body.priority)
+    
     // Get assistant
     const assistant = await getOrCreateDayAssistantV2(user.id)
     if (!assistant) {
@@ -148,6 +150,8 @@ export async function POST(request: NextRequest) {
     if (!newTask) {
       return NextResponse.json({ error: 'Failed to create task' }, { status: 500 })
     }
+    
+    console.log('🎯 [API] Created task with priority:', newTask.priority)
     
     // Generate recommendation if task is for today
     let proposal = null
