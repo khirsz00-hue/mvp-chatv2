@@ -206,7 +206,8 @@ export function calculateTaskScore(
  * Priority score (App's internal model: 1=highest, 4=lowest)
  */
 function calculatePriorityScore(priority: number): number {
-  return priority * WEIGHTS.priority
+  // Convert: P1(1) → 40 pts, P2(2) → 30 pts, P3(3) → 20 pts, P4(4) → 10 pts
+  return (5 - priority) * WEIGHTS.priority
 }
 
 /**
@@ -438,7 +439,7 @@ export function calculateTaskScoreV3(
   // 3. Priority scoring (ENHANCED - P1=50, P2=30, P3=10)
   const priorityScore = advancedScore.breakdown.priority
   score += priorityScore
-  const priorityLabel = task.priority === 4 ? 'P1' : task.priority === 3 ? 'P2' : task.priority === 2 ? 'P3' : 'P4'
+  const priorityLabel = task.priority === 1 ? 'P1' : task.priority === 2 ? 'P2' : task.priority === 3 ? 'P3' : 'P4'
   reasoning.push(`🚩 Priorytet ${priorityLabel}: +${priorityScore}`)
   
   // 4. Cognitive load (ENHANCED - now as penalty, subtracted)
