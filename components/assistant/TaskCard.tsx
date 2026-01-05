@@ -441,7 +441,7 @@ export function TaskCard({
           </Button>
           
           {showMobileMenu && (
-            <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-50 animate-scale-in">
+            <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-[200] animate-scale-in">
               <button
                 onClick={(e) => {
                   e.stopPropagation()
