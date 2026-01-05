@@ -66,7 +66,8 @@ export function calculateDeadlineScore(dueDate: string | null | undefined): numb
 
 /**
  * Calculate priority score based on task priority level
- * Supports both Todoist format (1-4) and P1-P3 format
+ * Supports both app's internal format (1-4) and P1-P3 format
+ * App's internal format: 1=P1 (highest), 2=P2, 3=P3, 4=P4 (lowest)
  * @param priority - Priority value (number or string)
  * @returns Score from 5 to 50
  */
@@ -90,16 +91,16 @@ export function calculatePriorityScore(priority: number | string | undefined): n
   // Convert to number if needed
   const priorityNum = typeof priority === 'number' ? priority : 0
 
-  // Todoist numeric format: 4=P1 (highest), 3=P2, 2=P3, 1=P4 (lowest)
-  // Note: Todoist priority 4 (P1) also maps to 50 points, same as string 'P1'
+  // App's internal format: 1=P1 (highest), 2=P2, 3=P3, 4=P4 (lowest)
+  // This matches the modal input and badge display
   switch (priorityNum) {
-    case 4:
-      return 50  // P1 - highest priority
-    case 3:
-      return 30  // P2
-    case 2:
-      return 10  // P3
     case 1:
+      return 50  // P1 - highest priority
+    case 2:
+      return 30  // P2
+    case 3:
+      return 10  // P3
+    case 4:
       return 5   // P4 - lowest priority
     default:
       return 5   // Default/unknown

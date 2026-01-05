@@ -110,7 +110,7 @@ export interface TestDayTask {
   todoist_id?: string | null
   title: string
   description?: string | null
-  priority: number  // Todoist priority
+  priority: number  // App's internal priority: 1=P1 (highest), 2=P2, 3=P3, 4=P4 (lowest)
   is_must: boolean  // MUST task (max 1-3 per day)
   is_important: boolean
   estimate_min: number

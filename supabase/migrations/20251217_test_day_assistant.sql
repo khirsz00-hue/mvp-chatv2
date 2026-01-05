@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS test_day_assistant_tasks (
   todoist_task_id TEXT,
   title TEXT NOT NULL,
   description TEXT,
-  priority INTEGER DEFAULT 3,  -- Todoist priority
+  priority INTEGER DEFAULT 3,  -- App's internal priority: 1=P1 (highest), 2=P2, 3=P3, 4=P4 (lowest)
   is_must BOOLEAN DEFAULT FALSE,  -- MUST task (max 1-3 per day)
   is_important BOOLEAN DEFAULT FALSE,
   estimate_min INTEGER DEFAULT 30,
