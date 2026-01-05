@@ -95,8 +95,13 @@ export const DropdownMenuContent: React.FC<DropdownMenuContentProps> = ({
 
       // Get collision padding values
       const padding = typeof collisionPadding === 'number' 
-        ? { top: collisionPadding, bottom: collisionPadding }
-        : { top: collisionPadding.top || 0, bottom: collisionPadding.bottom || 0 }
+        ? { top: collisionPadding, right: collisionPadding, bottom: collisionPadding, left: collisionPadding }
+        : { 
+            top: collisionPadding.top || 0, 
+            right: collisionPadding.right || 0, 
+            bottom: collisionPadding.bottom || 0, 
+            left: collisionPadding.left || 0 
+          }
 
       // Check if menu would clip at bottom
       const wouldClipBottom = rect.bottom > viewportHeight - padding.bottom

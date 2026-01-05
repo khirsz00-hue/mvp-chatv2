@@ -483,7 +483,7 @@ export function TaskCard({
               ref={mobileMenuContentRef}
               className={cn(
                 "absolute right-0 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-[200] animate-scale-in",
-                mobileMenuPosition === 'top' ? 'bottom-full mb-1' : 'top-full mt-1'
+                mobileMenuPosition === 'top' ? 'bottom-full' : 'top-full'
               )}
               style={{
                 marginTop: mobileMenuPosition === 'bottom' ? '4px' : undefined,
