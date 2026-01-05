@@ -42,7 +42,14 @@ export function DayAssistantV2TaskMenu({
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent 
+        align="end" 
+        side="bottom"
+        sideOffset={5}
+        collisionPadding={20}
+        avoidCollisions={true}
+        className="w-56"
+      >
         <DropdownMenuItem onClick={(e) => handleClick(e, () => onStartTimer(taskId))}>
           <Play size={16} className="mr-2" weight="fill" />
           Start timer

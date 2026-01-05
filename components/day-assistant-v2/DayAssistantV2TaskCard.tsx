@@ -67,7 +67,7 @@ export function DayAssistantV2TaskCard({
   if (isOverflow) {
     return (
       <div 
-        className="bg-slate-50 p-3 rounded-lg border border-slate-200 relative overflow-hidden opacity-60 group cursor-pointer"
+        className="bg-slate-50 p-3 rounded-lg border border-slate-200 relative overflow-visible opacity-60 group cursor-pointer"
         onClick={() => onOpenDetails(task.id)}
       >
         {/* Thin left colored border */}
@@ -120,7 +120,7 @@ export function DayAssistantV2TaskCard({
   if (isCompact) {
     return (
       <div 
-        className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:shadow-md transition-shadow group cursor-pointer relative overflow-hidden"
+        className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:shadow-md transition-shadow group cursor-pointer relative overflow-visible"
         onClick={() => onOpenDetails(task.id)}
       >
         {/* Thin left colored border */}
@@ -176,7 +176,7 @@ export function DayAssistantV2TaskCard({
   // Full-size layout for Top 3 tasks
   return (
     <div 
-      className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow group cursor-pointer relative overflow-hidden"
+      className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow group cursor-pointer relative overflow-visible"
       onClick={() => onOpenDetails(task.id)}
     >
       {/* Thin left colored border */}

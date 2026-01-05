@@ -36,7 +36,13 @@ export function TaskContextMenu({
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent 
+        align="end"
+        side="bottom"
+        sideOffset={5}
+        collisionPadding={20}
+        avoidCollisions={true}
+      >
         <DropdownMenuItem onClick={(e) => handleClick(e, onComplete)}>
           <Check size={16} className="mr-2" />
           Ukończ

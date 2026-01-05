@@ -64,7 +64,9 @@ export function TaskCard({
   const [showAITooltip, setShowAITooltip] = useState(false)
   const [aiUnderstanding, setAiUnderstanding] = useState<string>('')
   const [showMobileMenu, setShowMobileMenu] = useState(false)
+  const [mobileMenuPosition, setMobileMenuPosition] = useState<'top' | 'bottom'>('bottom')
   const mobileMenuRef = useRef<HTMLDivElement>(null)
+  const mobileMenuContentRef = useRef<HTMLDivElement>(null)
   const datePickerRef = useRef<HTMLInputElement>(null)
   
   const { startTimer, stopTimer, getActiveTimer } = useTaskTimer()
@@ -101,6 +103,42 @@ export function TaskCard({
     if (showMobileMenu) {
       document.addEventListener('mousedown', handleClickOutside)
       return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showMobileMenu])
+  
+  // Collision detection for mobile menu
+  useEffect(() => {
+    if (!showMobileMenu || !mobileMenuContentRef.current) return
+
+    const checkCollision = () => {
+      const content = mobileMenuContentRef.current
+      if (!content) return
+
+      const rect = content.getBoundingClientRect()
+      const viewportHeight = window.innerHeight
+      const collisionPadding = 20
+
+      // Check if menu would clip at bottom
+      const wouldClipBottom = rect.bottom > viewportHeight - collisionPadding
+      // Check if menu would clip at top
+      const wouldClipTop = rect.top < collisionPadding
+
+      // Determine best side
+      if (wouldClipBottom && !wouldClipTop) {
+        setMobileMenuPosition('top')
+      } else {
+        setMobileMenuPosition('bottom')
+      }
+    }
+
+    // Check immediately and on scroll/resize
+    checkCollision()
+    window.addEventListener('scroll', checkCollision, true)
+    window.addEventListener('resize', checkCollision)
+
+    return () => {
+      window.removeEventListener('scroll', checkCollision, true)
+      window.removeEventListener('resize', checkCollision)
     }
   }, [showMobileMenu])
   
@@ -441,7 +479,17 @@ export function TaskCard({
           </Button>
           
           {showMobileMenu && (
-            <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-[200] animate-scale-in">
+            <div 
+              ref={mobileMenuContentRef}
+              className={cn(
+                "absolute right-0 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-[200] animate-scale-in",
+                mobileMenuPosition === 'top' ? 'bottom-full' : 'top-full'
+              )}
+              style={{
+                marginTop: mobileMenuPosition === 'bottom' ? '4px' : undefined,
+                marginBottom: mobileMenuPosition === 'top' ? '4px' : undefined,
+              }}
+            >
               <button
                 onClick={(e) => {
                   e.stopPropagation()
