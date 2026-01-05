@@ -691,14 +691,14 @@ function MiniTaskCard({
       {showContextMenu && (
         <>
           <div 
-            className="fixed inset-0 z-[100]" 
+            className="fixed inset-0 z-[199]" 
             onClick={(e) => {
               e.stopPropagation()
               setShowContextMenu(false)
             }}
           />
           <div 
-            className="fixed z-[101] bg-white rounded-lg shadow-xl border border-gray-200 p-2 space-y-1 min-w-[160px]"
+            className="fixed z-[200] bg-white rounded-lg shadow-xl border border-gray-200 p-2 space-y-1 min-w-[160px]"
             style={{ left: menuPosition.x, top: menuPosition.y }}
             onClick={(e) => e.stopPropagation()}
           >
