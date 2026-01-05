@@ -3,8 +3,15 @@
 import { useState, useEffect } from 'react'
 import Button from '@/components/ui/Button'
 import { Card, CardContent } from '@/components/ui/Card'
-import { format } from 'date-fns'
-import { VideoCamera, MapPin, ArrowSquareOut, Users } from '@phosphor-icons/react'
+import { format, differenceInMinutes } from 'date-fns'
+import { VideoCamera, MapPin, ArrowSquareOut, Users, Clock } from '@phosphor-icons/react'
+
+interface Attendee {
+  email?: string
+  displayName?: string
+  responseStatus?: string
+  self?: boolean
+}
 
 interface Meeting {
   id: string
@@ -15,7 +22,13 @@ interface Meeting {
   duration_minutes: number
   location?: string
   meeting_link?: string
-  metadata?: any
+  metadata?: {
+    description?: string | null
+    attendees?: Attendee[]
+    hasVideoCall?: boolean
+    platform?: string | null
+    isAllDay?: boolean
+  }
 }
 
 interface MeetingsSectionProps {
@@ -34,6 +47,8 @@ export function MeetingsSection({ meetings, onRefresh }: MeetingsSectionProps) {
       setRefreshing(false)
     }
   }
+
+  // Live updates handled by useCountdown hook in child components
 
   // Sort meetings: all-day events first, then by start time
   const sortedMeetings = [...meetings].sort((a, b) => {
@@ -103,7 +118,7 @@ export function MeetingsSection({ meetings, onRefresh }: MeetingsSectionProps) {
 
       {/* Remaining meetings - compact grid */}
       {remainingMeetings.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
           {remainingMeetings.map(meeting => (
             <CompactMeetingCard key={meeting.id} meeting={meeting} />
           ))}
@@ -114,6 +129,10 @@ export function MeetingsSection({ meetings, onRefresh }: MeetingsSectionProps) {
 }
 
 // Helper functions
+function formatTime(timeString: string): string {
+  return format(new Date(timeString), 'HH:mm')
+}
+
 function formatCountdown(minutes: number): string {
   if (minutes < 60) return `${minutes}min`
   const hours = Math.floor(minutes / 60)
@@ -121,61 +140,76 @@ function formatCountdown(minutes: number): string {
   return mins > 0 ? `${hours}h ${mins}min` : `${hours}h`
 }
 
-function getMeetingType(title: string, metadata?: any): 'team' | 'client' | '1on1' {
-  const titleLower = title.toLowerCase()
-  const eventType = metadata?.eventType?.toLowerCase() || ''
+function getCountdown(startTime: string, endTime: string): { text: string, isActive: boolean, progress: number } {
+  const now = new Date()
+  const start = new Date(startTime)
+  const end = new Date(endTime)
   
-  if (titleLower.includes('client') || eventType.includes('client')) return 'client'
-  if (titleLower.includes('1:1') || titleLower.includes('1-on-1') || eventType.includes('1on1')) return '1on1'
-  return 'team'
+  if (now > end) {
+    return { text: 'Zakończone', isActive: false, progress: 100 }
+  }
+  
+  if (now >= start && now <= end) {
+    const total = end.getTime() - start.getTime()
+    const elapsed = now.getTime() - start.getTime()
+    const progress = Math.round((elapsed / total) * 100)
+    return { text: 'Trwa', isActive: true, progress }
+  }
+  
+  const minutesUntil = differenceInMinutes(start, now)
+  if (minutesUntil < 60) {
+    return { text: `Za ${minutesUntil} min`, isActive: false, progress: 0 }
+  }
+  
+  const hours = Math.floor(minutesUntil / 60)
+  const mins = minutesUntil % 60
+  return { text: `Za ${hours}h ${mins}m`, isActive: false, progress: 0 }
 }
 
-function getTypeColors(type: 'team' | 'client' | '1on1') {
-  switch (type) {
-    case 'client':
-      return {
-        gradient: 'from-violet-50 to-white',
-        border: 'border-violet-100',
-        badge: 'bg-violet-100 text-violet-700',
-        text: 'text-violet-600'
-      }
-    case '1on1':
-      return {
-        gradient: 'from-emerald-50 to-white',
-        border: 'border-emerald-100',
-        badge: 'bg-emerald-100 text-emerald-700',
-        text: 'text-emerald-600'
-      }
-    default:
-      return {
-        gradient: 'from-blue-50 to-white',
-        border: 'border-blue-100',
-        badge: 'bg-blue-100 text-blue-700',
-        text: 'text-blue-600'
-      }
+function getBadgeColor(meeting: Meeting): string {
+  const title = meeting.title.toLowerCase()
+  
+  if (title.includes('client') || title.includes('klient')) {
+    return 'bg-violet-50 text-violet-600 border border-violet-100'
   }
+  if (title.includes('1:1') || title.includes('one-on-one')) {
+    return 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+  }
+  return 'bg-blue-100 text-blue-700 border border-blue-100'
 }
 
-function getMeetingPlatform(link?: string): { name: string; icon: JSX.Element } {
-  if (!link) return { name: 'Link do spotkania', icon: <ArrowSquareOut size={16} /> }
+function getBadgeText(meeting: Meeting): string {
+  const title = meeting.title.toLowerCase()
   
-  try {
-    const url = new URL(link)
-    const hostname = url.hostname.toLowerCase()
-    
-    if (hostname === 'meet.google.com' || hostname.endsWith('.meet.google.com')) {
-      return { name: 'Google Meet', icon: <VideoCamera size={16} weight="fill" /> }
-    }
-    if (hostname === 'zoom.us' || hostname.endsWith('.zoom.us')) {
-      return { name: 'Zoom', icon: <VideoCamera size={16} weight="fill" /> }
-    }
-    if (hostname === 'teams.microsoft.com' || hostname.endsWith('.teams.microsoft.com')) {
-      return { name: 'Microsoft Teams', icon: <VideoCamera size={16} weight="fill" /> }
-    }
-    return { name: 'Link do spotkania', icon: <ArrowSquareOut size={16} /> }
-  } catch {
-    return { name: 'Link do spotkania', icon: <ArrowSquareOut size={16} /> }
+  if (title.includes('client') || title.includes('klient')) {
+    return 'Klient'
   }
+  if (title.includes('1:1') || title.includes('one-on-one')) {
+    return '1:1'
+  }
+  return 'Spotkanie'
+}
+
+function getBorderColor(meeting: Meeting): string {
+  const title = meeting.title.toLowerCase()
+  
+  if (meeting.metadata?.isAllDay) {
+    return 'border-purple-200'
+  }
+  if (title.includes('client') || title.includes('klient')) {
+    return 'border-violet-200'
+  }
+  if (title.includes('1:1') || title.includes('one-on-one')) {
+    return 'border-emerald-200'
+  }
+  return 'border-blue-200'
+}
+
+function getPlatformIcon(platform: string): string {
+  if (platform === 'Google Meet') return '🎥'
+  if (platform === 'Zoom') return '📹'
+  if (platform === 'Room') return '📍'
+  return '🔗'
 }
 
 // Hook for live countdown
@@ -213,211 +247,181 @@ function useCountdown(startTime: string, endTime: string) {
 // Large featured card for first meeting
 function LargeMeetingCard({ meeting }: { meeting: Meeting }) {
   const isAllDay = meeting.metadata?.isAllDay
-  const { status, minutesUntil } = useCountdown(meeting.start_time, meeting.end_time)
-  const meetingType = getMeetingType(meeting.title, meeting.metadata)
-  const colors = getTypeColors(meetingType)
-  const platform = getMeetingPlatform(meeting.meeting_link)
   
-  const startTime = format(new Date(meeting.start_time), 'HH:mm')
-  const endTime = format(new Date(meeting.end_time), 'HH:mm')
-
-  // Calculate progress for active meetings (not for all-day events)
-  const progress = !isAllDay && status === 'active' ? (() => {
-    const now = new Date()
-    const start = new Date(meeting.start_time)
-    const end = new Date(meeting.end_time)
-    const total = end.getTime() - start.getTime()
-    const elapsed = now.getTime() - start.getTime()
-    return Math.min(100, Math.max(0, (elapsed / total) * 100))
-  })() : status === 'past' ? 100 : 0
-
-  const attendeeCount = meeting.metadata?.attendees || 0
+  // Use countdown hook to trigger re-renders every minute
+  useCountdown(meeting.start_time, meeting.end_time)
+  
+  // Get countdown and progress info
+  const countdownInfo = getCountdown(meeting.start_time, meeting.end_time)
+  const countdown = countdownInfo.text
+  const isActive = countdownInfo.isActive
+  const progress = countdownInfo.progress
 
   return (
-    <Card className={`bg-gradient-to-r ${colors.gradient} border ${colors.border} shadow-sm hover:shadow-md transition-shadow`}>
-      <CardContent className="p-5">
-        <div className="flex flex-col sm:flex-row gap-4">
-          {/* Left: Time section */}
-          <div className="flex sm:flex-col items-center sm:items-start gap-2 sm:gap-1 sm:min-w-[80px]">
-            {isAllDay ? (
-              <div className="px-2 py-1 bg-purple-50 text-purple-600 border border-purple-200 rounded text-xs font-bold uppercase">
-                📅 Cały dzień
+    <div className="bg-gradient-to-r from-blue-50 to-white p-5 rounded-xl border border-blue-100 shadow-sm hover:shadow-md transition-shadow group cursor-pointer">
+      <div className="flex items-start gap-4">
+        {/* Lewa sekcja - Czas */}
+        <div className="flex-shrink-0 w-16 text-center">
+          {isAllDay ? (
+            <div className="px-2 py-1 bg-purple-50 text-purple-600 border border-purple-200 rounded text-xs font-bold uppercase flex items-center gap-1">
+              📅 Cały dzień
+            </div>
+          ) : (
+            <>
+              <div className="text-sm font-semibold text-blue-600 uppercase tracking-wide">
+                {formatTime(meeting.start_time)}
               </div>
-            ) : (
-              <div className="flex items-center gap-2 sm:flex-col sm:items-start sm:gap-0">
-                <span className="text-2xl font-bold text-gray-900">{startTime}</span>
-                <span className="text-xs text-gray-500">{meeting.duration_minutes} min</span>
+              <div className="text-[10px] text-slate-400 mt-0.5">
+                {meeting.duration_minutes} min
               </div>
-            )}
-            
-            {/* Progress bar - only for active meetings and not all-day */}
-            {!isAllDay && status === 'active' && (
-              <div className="hidden sm:block w-full mt-2">
-                <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+              {/* Progress bar - tylko dla aktywnych spotkań */}
+              {isActive && (
+                <div className="mt-2 w-full h-1 bg-blue-200 rounded-full overflow-hidden">
                   <div 
-                    className="h-full bg-blue-500 transition-all duration-1000"
-                    style={{ width: `${progress}%` }}
+                    className="h-full bg-blue-500 rounded-full transition-all" 
+                    style={{width: `${progress}%`}} 
                   />
                 </div>
-                <span className="text-xs text-gray-500 mt-1 block">{Math.round(progress)}%</span>
-              </div>
-            )}
-          </div>
-
-          {/* Middle: Details section */}
-          <div className="flex-1 min-w-0">
-            {/* Badge and countdown */}
-            <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <span className={`text-xs font-semibold px-2 py-0.5 rounded uppercase ${colors.badge}`}>
-                {meetingType === '1on1' ? '1:1' : meetingType === 'client' ? 'Client' : 'Spotkanie'}
-              </span>
-              
-              {!isAllDay && status === 'upcoming' && (
-                <span className="text-sm font-semibold text-orange-600">
-                  Za {formatCountdown(minutesUntil)}
-                </span>
               )}
-              
-              {!isAllDay && status === 'active' && (
-                <span className="text-sm font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded animate-pulse">
-                  Trwa
-                </span>
-              )}
-              
-              {!isAllDay && status === 'past' && (
-                <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded">
-                  Zakończone
-                </span>
-              )}
-            </div>
-
-            {/* Title */}
-            <h3 className={`text-lg font-bold mb-1 hover:${colors.text} transition-colors cursor-pointer truncate`}>
-              {meeting.title}
-            </h3>
-
-            {/* Description */}
-            {meeting.metadata?.description && (
-              <p className="text-xs text-gray-600 line-clamp-1 mb-2">
-                {meeting.metadata.description}
-              </p>
-            )}
-
-            {/* Attendees and platform */}
-            <div className="flex items-center gap-3 text-sm text-gray-600 flex-wrap">
-              {attendeeCount > 0 && (
-                <span className="flex items-center gap-1">
-                  <Users size={16} />
-                  {attendeeCount} {attendeeCount === 1 ? 'osoba' : 'osób'}
-                </span>
-              )}
-              
-              {meeting.meeting_link ? (
-                <span className="flex items-center gap-1">
-                  {platform.icon}
-                  {platform.name}
-                </span>
-              ) : meeting.location && (
-                <span className="flex items-center gap-1">
-                  <MapPin size={16} />
-                  {meeting.location}
-                </span>
-              )}
-              
-              {!isAllDay && (
-                <span className="text-xs text-gray-400">
-                  {startTime}-{endTime}
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Right: Actions */}
-          {meeting.meeting_link && !isAllDay && status !== 'past' && (
-            <div className="flex sm:flex-col items-center sm:items-end gap-2">
-              <Button
-                size="sm"
-                onClick={() => window.open(meeting.meeting_link, '_blank')}
-                className="w-full sm:w-auto"
-              >
-                <ArrowSquareOut size={16} className="mr-1" />
-                Dołącz
-              </Button>
-            </div>
+            </>
           )}
         </div>
-      </CardContent>
-    </Card>
+
+        {/* Środkowa sekcja - Szczegóły */}
+        <div className="flex-1 min-w-0">
+          {/* Badge + Countdown */}
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded ${getBadgeColor(meeting)}`}>
+              {getBadgeText(meeting)}
+            </span>
+            {!isAllDay && countdown && (
+              <span className={`text-[10px] font-medium ${isActive ? 'text-red-600' : 'text-slate-400'}`}>
+                {countdown}
+              </span>
+            )}
+          </div>
+
+          {/* Tytuł */}
+          <h4 className="font-semibold text-slate-800 mb-1.5 group-hover:text-blue-600 transition-colors">
+            {meeting.title}
+          </h4>
+
+          {/* Opis */}
+          {meeting.metadata?.description && (
+            <p className="text-xs text-slate-500 line-clamp-1 mb-2">
+              {meeting.metadata.description}
+            </p>
+          )}
+
+          {/* Avatary uczestników + Platforma */}
+          <div className="flex items-center gap-3">
+            {/* Avatary */}
+            {meeting.metadata?.attendees && meeting.metadata.attendees.length > 0 && (
+              <div className="flex -space-x-2">
+                {meeting.metadata.attendees.slice(0, 3).map((attendee, idx) => (
+                  <div
+                    key={idx}
+                    className="w-6 h-6 rounded-full border-2 border-white bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-[10px] font-semibold"
+                    title={attendee.displayName || attendee.email}
+                  >
+                    {(attendee.displayName || attendee.email)?.[0]?.toUpperCase()}
+                  </div>
+                ))}
+                {meeting.metadata.attendees.length > 3 && (
+                  <div className="w-6 h-6 rounded-full border-2 border-white bg-slate-200 flex items-center justify-center text-[10px] font-semibold text-slate-600">
+                    +{meeting.metadata.attendees.length - 3}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Platforma */}
+            {meeting.metadata?.platform && (
+              <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                {getPlatformIcon(meeting.metadata.platform)} {meeting.metadata.platform}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Prawa sekcja - Link */}
+        <div className="flex flex-col items-end gap-2">
+          {meeting.meeting_link && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                window.open(meeting.meeting_link, '_blank')
+              }}
+              className="w-8 h-8 bg-blue-100 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all flex items-center justify-center"
+            >
+              <ArrowSquareOut size={16} weight="bold" />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }
 
 // Compact card for remaining meetings
 function CompactMeetingCard({ meeting }: { meeting: Meeting }) {
   const isAllDay = meeting.metadata?.isAllDay
-  const { status, minutesUntil } = useCountdown(meeting.start_time, meeting.end_time)
-  const meetingType = getMeetingType(meeting.title, meeting.metadata)
-  const colors = getTypeColors(meetingType)
-  const platform = getMeetingPlatform(meeting.meeting_link)
   
-  const startTime = format(new Date(meeting.start_time), 'HH:mm')
-
-  // Determine border color based on type or all-day status
-  const borderColor = isAllDay ? 'border-purple-200' :
-                      meetingType === 'client' ? 'border-violet-200' : 
-                      meetingType === '1on1' ? 'border-emerald-200' : 
-                      'border-blue-200'
+  // Use countdown hook to trigger re-renders every minute
+  useCountdown(meeting.start_time, meeting.end_time)
+  
+  const countdownInfo = getCountdown(meeting.start_time, meeting.end_time)
+  const countdown = countdownInfo.text
+  const isActive = countdownInfo.isActive
 
   return (
-    <div className={`bg-white p-3 rounded-lg border-2 ${borderColor} hover:shadow-sm transition-shadow`}>
-      <div className="flex items-start gap-2">
-        {/* Left: Time */}
-        <div className="flex flex-col items-start min-w-[60px]">
+    <div className={`bg-white p-3 rounded-lg border hover:border-blue-200 transition-all group cursor-pointer ${getBorderColor(meeting)}`}>
+      <div className="flex items-center gap-3">
+        {/* Czas */}
+        <div className="flex-shrink-0 text-center">
           {isAllDay ? (
             <div className="px-2 py-1 bg-purple-50 text-purple-600 border border-purple-200 rounded text-xs font-bold uppercase">
-              📅 Cały dzień
+              📅
             </div>
           ) : (
             <>
-              <span className="text-lg font-bold text-gray-900">{startTime}</span>
-              <span className="text-xs text-gray-500">{meeting.duration_minutes}m</span>
+              <div className="text-xs font-semibold text-blue-600">
+                {formatTime(meeting.start_time)}
+              </div>
+              <div className="text-[9px] text-slate-400">
+                {meeting.duration_minutes}m
+              </div>
             </>
           )}
         </div>
 
-        {/* Middle: Details */}
+        {/* Szczegóły */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1 mb-1">
-            <span className={`text-xs font-semibold px-1.5 py-0.5 rounded uppercase ${colors.badge}`}>
-              {meetingType === '1on1' ? '1:1' : meetingType === 'client' ? 'Client' : 'Team'}
-            </span>
-            
-            {!isAllDay && status === 'active' && (
-              <span className="text-xs font-semibold text-red-600">Trwa</span>
-            )}
-            
-            {!isAllDay && status === 'upcoming' && minutesUntil <= 30 && (
-              <span className="text-xs font-semibold text-orange-600">Za {minutesUntil}m</span>
-            )}
-          </div>
-          
-          <h4 className="text-sm font-semibold text-gray-900 truncate mb-1">
+          <h4 className="font-medium text-sm text-slate-800 truncate group-hover:text-blue-600 transition-colors mb-1">
             {meeting.title}
           </h4>
-          
-          <div className="flex items-center gap-1 text-xs text-gray-500">
-            {platform.icon}
-            <span className="truncate">{platform.name}</span>
+          <div className="flex items-center gap-2">
+            <span className={`px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded ${getBadgeColor(meeting)}`}>
+              {getBadgeText(meeting)}
+            </span>
+            {meeting.metadata?.platform && (
+              <span className="text-[9px] text-slate-400">
+                {getPlatformIcon(meeting.metadata.platform)} {meeting.metadata.platform}
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Right: Join button */}
-        {meeting.meeting_link && !isAllDay && status !== 'past' && (
+        {/* Link */}
+        {meeting.meeting_link && (
           <button
-            onClick={() => window.open(meeting.meeting_link, '_blank')}
-            className="shrink-0 w-8 h-8 flex items-center justify-center bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
-            aria-label="Dołącz do spotkania"
+            onClick={(e) => {
+              e.stopPropagation()
+              window.open(meeting.meeting_link, '_blank')
+            }}
+            className="w-6 h-6 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all flex items-center justify-center flex-shrink-0"
           >
-            <ArrowSquareOut size={16} weight="bold" />
+            <ArrowSquareOut size={12} weight="bold" />
           </button>
         )}
       </div>
