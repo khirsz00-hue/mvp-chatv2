@@ -203,7 +203,7 @@ export function calculateTaskScore(
 }
 
 /**
- * Priority score (Todoist priority: 1=lowest, 4=highest)
+ * Priority score (App's internal model: 1=highest, 4=lowest)
  */
 function calculatePriorityScore(priority: number): number {
   return priority * WEIGHTS.priority

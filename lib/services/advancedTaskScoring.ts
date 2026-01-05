@@ -73,7 +73,6 @@ export function calculateDeadlineScore(dueDate: string | null | undefined): numb
  */
 export function calculatePriorityScore(priority: number | string | undefined): number {
   // Handle string formats like 'P1', 'P2', 'P3'
-  // Note: String 'P1' maps to 50 points, which is also what Todoist priority 4 maps to
   if (typeof priority === 'string') {
     const match = priority.match(/P?(\d+)/i)
     if (match) {
