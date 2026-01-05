@@ -37,13 +37,14 @@ const POSTPONE_ALERT_THRESHOLD = 3
 
 // Helper function to get priority border color (bg-* for left border)
 function getPriorityBorderColor(priority: number): string {
+  const DEFAULT_PRIORITY = 4  // Default to P4 (gray) for invalid values
   const borderColors = {
     1: 'bg-red-500',     // P1 - red (highest priority)
     2: 'bg-orange-500',  // P2 - orange
     3: 'bg-blue-500',    // P3 - blue
     4: 'bg-gray-400'     // P4 - gray (lowest priority)
   }
-  return borderColors[priority as keyof typeof borderColors] || borderColors[4]
+  return borderColors[priority as keyof typeof borderColors] || borderColors[DEFAULT_PRIORITY]
 }
 
 export function DayAssistantV2TaskCard({

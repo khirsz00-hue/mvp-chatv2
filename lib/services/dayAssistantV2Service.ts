@@ -582,7 +582,7 @@ export async function createTask(
       description: task.description,
       todoist_task_id: task.todoist_task_id,
       todoist_id: task.todoist_id,
-      priority: task.priority ?? 3,  // Use nullish coalescing to properly handle 0 and falsy values
+      priority: task.priority ?? 3,  // Use nullish coalescing - priority 1 is valid and should not fall back to default
       is_must: task.is_must || false,
       is_important: task.is_important || false,
       estimate_min: task.estimate_min || 30,
