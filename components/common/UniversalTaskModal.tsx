@@ -570,6 +570,8 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
         labels: selectedLabels
       }
       
+      console.log('🎯 [MODAL] Submitting priority:', taskData.priority)
+      
       await onSave(taskData)
       onOpenChange(false)
     } catch (error) {

@@ -571,6 +571,8 @@ export async function createTask(
 ): Promise<TestDayTask | null> {
   const db = client || supabaseServer
   
+  console.log('🎯 [DB] Inserting task with priority:', task.priority)
+  
   const { data, error } = await db
     .from('day_assistant_v2_tasks')
     .insert({
@@ -580,7 +582,7 @@ export async function createTask(
       description: task.description,
       todoist_task_id: task.todoist_task_id,
       todoist_id: task.todoist_id,
-      priority: task.priority || 3,
+      priority: task.priority ?? 3,  // Use nullish coalescing to properly handle 0 and falsy values
       is_must: task.is_must || false,
       is_important: task.is_important || false,
       estimate_min: task.estimate_min || 30,
@@ -598,6 +600,8 @@ export async function createTask(
     console.error('Error creating task:', error)
     return null
   }
+  
+  console.log('🎯 [DB] Task created with priority:', data.priority)
   
   return data as TestDayTask
 }
