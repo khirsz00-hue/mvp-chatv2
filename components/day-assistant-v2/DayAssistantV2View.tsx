@@ -896,7 +896,7 @@ export function DayAssistantV2View() {
       />
 
       {/* Main Layout: Content + Sidebar */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 flex flex-col lg:flex-row gap-4 lg:gap-6">
+      <div className="max-w-[1536px] mx-auto px-4 sm:px-6 py-4 sm:py-6 flex flex-col lg:flex-row gap-4 lg:gap-6">
         {/* Main Content */}
         <div className="flex-1 min-w-0">
           
