@@ -85,19 +85,19 @@ describe('Advanced Task Scoring', () => {
   })
 
   describe('calculatePriorityScore', () => {
-    test('P1 priority (4 in Todoist) gets 50 points', () => {
-      expect(calculatePriorityScore(4)).toBe(50)
+    test('P1 priority (1 in app) gets 50 points', () => {
+      expect(calculatePriorityScore(1)).toBe(50)
       expect(calculatePriorityScore('P1')).toBe(50)
       expect(calculatePriorityScore('1')).toBe(50)
     })
 
-    test('P2 priority (3 in Todoist) gets 30 points', () => {
-      expect(calculatePriorityScore(3)).toBe(30)
+    test('P2 priority (2 in app) gets 30 points', () => {
+      expect(calculatePriorityScore(2)).toBe(30)
       expect(calculatePriorityScore('P2')).toBe(30)
     })
 
-    test('P3 priority (2 in Todoist) gets 10 points', () => {
-      expect(calculatePriorityScore(2)).toBe(10)
+    test('P3 priority (3 in app) gets 10 points', () => {
+      expect(calculatePriorityScore(3)).toBe(10)
       expect(calculatePriorityScore('P3')).toBe(10)
     })
 
@@ -146,7 +146,7 @@ describe('Advanced Task Scoring', () => {
       // Task A: Due today 3h, P1, CL 3/5, 0 postpones = 80 + 50 - 6 + 0 = 124
       const taskA = createTestTask({
         due_date: threeHoursFromNow,
-        priority: 4, // P1 in Todoist
+        priority: 1, // P1 in app's internal model
         cognitive_load: 3,
         postpone_count: 0
       })
@@ -160,7 +160,7 @@ describe('Advanced Task Scoring', () => {
       // Task B: Due today 3h, P2, CL 3/5, 0 postpones = 80 + 30 - 6 + 0 = 104
       const taskB = createTestTask({
         due_date: threeHoursFromNow,
-        priority: 3, // P2 in Todoist
+        priority: 2, // P2 in app's internal model
         cognitive_load: 3,
         postpone_count: 0
       })
@@ -177,7 +177,7 @@ describe('Advanced Task Scoring', () => {
       // Task A: Due today 3h, P1, CL 5/5, 0 postpones = 80 + 50 - 10 + 0 = 120
       const taskA = createTestTask({
         due_date: threeHoursFromNow,
-        priority: 4, // P1 in Todoist
+        priority: 1, // P1 in app's internal model
         cognitive_load: 5,
         postpone_count: 0
       })
@@ -187,7 +187,7 @@ describe('Advanced Task Scoring', () => {
       // Task B: Due today 3h, P1, CL 2/5, 0 postpones = 80 + 50 - 4 + 0 = 126
       const taskB = createTestTask({
         due_date: threeHoursFromNow,
-        priority: 4, // P1 in Todoist
+        priority: 1, // P1 in app's internal model
         cognitive_load: 2,
         postpone_count: 0
       })
@@ -205,7 +205,7 @@ describe('Advanced Task Scoring', () => {
       // Task A: Due today 5h, P2, CL 3/5, 3 postpones = 60 + 30 - 6 + 15 = 99
       const taskA = createTestTask({
         due_date: fiveHoursFromNow,
-        priority: 3, // P2 in Todoist
+        priority: 2, // P2 in app's internal model
         cognitive_load: 3,
         postpone_count: 3
       })
@@ -216,7 +216,7 @@ describe('Advanced Task Scoring', () => {
       // Task B: Due today 3h, P3, CL 2/5, 0 postpones = 80 + 10 - 4 + 0 = 86
       const taskB = createTestTask({
         due_date: threeHoursFromNow,
-        priority: 2, // P3 in Todoist
+        priority: 3, // P3 in app's internal model
         cognitive_load: 2,
         postpone_count: 0
       })
@@ -234,7 +234,7 @@ describe('Advanced Task Scoring', () => {
       // Overdue task with low priority
       const overdueTask = createTestTask({
         due_date: yesterday,
-        priority: 1, // P4 in Todoist (lowest)
+        priority: 4, // P4 in app's internal model (lowest)
         cognitive_load: 5, // Highest load
         postpone_count: 0
       })
@@ -245,7 +245,7 @@ describe('Advanced Task Scoring', () => {
       // Future task with high priority
       const futureTask = createTestTask({
         due_date: tomorrow,
-        priority: 4, // P1 (highest)
+        priority: 1, // P1 in app's internal model (highest)
         cognitive_load: 1, // Lowest load
         postpone_count: 5 // 5 postpones
       })

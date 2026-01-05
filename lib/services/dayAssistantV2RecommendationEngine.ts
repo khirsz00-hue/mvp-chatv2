@@ -108,14 +108,14 @@ export function calculateTaskScore(
   const priorityScore = calculatePriorityScore(task.priority)
   breakdown.base_score += priorityScore
   // ALWAYS show priority in breakdown
-  // Todoist: priority=4 is P1 (highest), priority=1 is P4 (lowest)
+  // App's internal model: priority=1 is P1 (highest), priority=4 is P4 (lowest)
   const priorityLabels: Record<number, string> = {
-    4: 'P1',  // Highest
-    3: 'P2',
-    2: 'P3',
-    1: 'P4'   // Lowest
+    1: 'P1',  // Highest
+    2: 'P2',
+    3: 'P3',
+    4: 'P4'   // Lowest
   }
-  const priorityLabel = priorityLabels[task.priority] || 'P4'
+  const priorityLabel = priorityLabels[task.priority] || 'P3'
   reasoning.push(`🚩 Priorytet ${priorityLabel}: +${priorityScore}`)
   
   const deadlineScore = calculateDeadlineProximity(task.due_date, context.todayDate)
@@ -203,7 +203,7 @@ export function calculateTaskScore(
 }
 
 /**
- * Priority score (Todoist priority: 1=lowest, 4=highest)
+ * Priority score (App's internal model: 1=highest, 4=lowest)
  */
 function calculatePriorityScore(priority: number): number {
   return priority * WEIGHTS.priority
@@ -961,12 +961,12 @@ export function calculateScoreBreakdown(
   let priorityScore = 0
   let priorityDetail = ''
   let priorityExplanation = ''
-  // Todoist: priority=4 is P1 (highest), priority=1 is P4 (lowest)
+  // App's internal model: priority=1 is P1 (highest), priority=4 is P4 (lowest)
   const priorityLabels: Record<number, string> = {
-    4: 'P1',  // Highest
-    3: 'P2',
-    2: 'P3',
-    1: 'P4'   // Lowest
+    1: 'P1',  // Highest
+    2: 'P2',
+    3: 'P3',
+    4: 'P4'   // Lowest
   }
   if (task.is_must) {
     priorityScore = 30
@@ -976,15 +976,15 @@ export function calculateScoreBreakdown(
     priorityScore = 25
     priorityDetail = '⭐ Ważny'
     priorityExplanation = 'Wysokie znaczenie dla Twoich celów'
-  } else if (task.priority >= 3) {
+  } else if (task.priority <= 2) {
     priorityScore = 15
-    const priorityLabel = priorityLabels[task.priority] || 'P4'
+    const priorityLabel = priorityLabels[task.priority] || 'P3'
     priorityDetail = `Priorytet ${priorityLabel}`
-    priorityExplanation = task.priority === 4 ? 'Najwyższy priorytet w Todoist' : 'Wysoki priorytet'
+    priorityExplanation = task.priority === 1 ? 'Najwyższy priorytet' : 'Wysoki priorytet'
   } else {
-    priorityScore = task.priority * 5
-    const priorityLabel = priorityLabels[task.priority] || 'P4'
-    priorityDetail = task.priority === 1 ? 'Brak priorytetu' : `Priorytet ${priorityLabel}`
+    priorityScore = (5 - task.priority) * 5
+    const priorityLabel = priorityLabels[task.priority] || 'P3'
+    priorityDetail = task.priority === 4 ? 'Brak priorytetu' : `Priorytet ${priorityLabel}`
     priorityExplanation = 'Normalny priorytet'
   }
   

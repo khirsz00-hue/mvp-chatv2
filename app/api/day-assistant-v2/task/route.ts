@@ -47,6 +47,9 @@ async function createTodoistTask(
   }
 ): Promise<string | null> {
   try {
+    // Convert app priority (1=P1) to Todoist priority (4=P1) using formula: 5 - priority
+    const todoistPriority = payload.priority ? 5 - payload.priority : 2
+    
     const response = await fetch('https://api.todoist.com/rest/v2/tasks', {
       method: 'POST',
       headers: {
@@ -57,7 +60,7 @@ async function createTodoistTask(
         content: payload.title,
         description: payload.description,
         due_date: payload.due_date,
-        priority: payload.priority || 3
+        priority: todoistPriority
       })
     })
 
