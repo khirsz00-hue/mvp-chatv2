@@ -61,17 +61,68 @@ DropdownMenuTrigger.displayName = 'DropdownMenuTrigger'
 
 export interface DropdownMenuContentProps {
   align?: 'start' | 'end' | 'center'
+  side?: 'top' | 'bottom'
+  sideOffset?: number
+  collisionPadding?: number | { top?: number; right?: number; bottom?: number; left?: number }
+  avoidCollisions?: boolean
   className?: string
   children: React.ReactNode
 }
 
 export const DropdownMenuContent: React.FC<DropdownMenuContentProps> = ({
   align = 'end',
+  side = 'bottom',
+  sideOffset = 5,
+  collisionPadding = 20,
+  avoidCollisions = true,
   className = '',
   children
 }) => {
   const { open, setOpen } = React.useContext(DropdownMenuContext)
   const contentRef = React.useRef<HTMLDivElement>(null)
+  const [computedSide, setComputedSide] = React.useState<'top' | 'bottom'>(side)
+
+  // Handle collision detection
+  React.useEffect(() => {
+    if (!open || !avoidCollisions || !contentRef.current) return
+
+    const checkCollision = () => {
+      const content = contentRef.current
+      if (!content) return
+
+      const rect = content.getBoundingClientRect()
+      const viewportHeight = window.innerHeight
+
+      // Get collision padding values
+      const padding = typeof collisionPadding === 'number' 
+        ? { top: collisionPadding, bottom: collisionPadding }
+        : { top: collisionPadding.top || 0, bottom: collisionPadding.bottom || 0 }
+
+      // Check if menu would clip at bottom
+      const wouldClipBottom = rect.bottom > viewportHeight - padding.bottom
+      // Check if menu would clip at top
+      const wouldClipTop = rect.top < padding.top
+
+      // Determine best side
+      if (side === 'bottom' && wouldClipBottom && !wouldClipTop) {
+        setComputedSide('top')
+      } else if (side === 'top' && wouldClipTop && !wouldClipBottom) {
+        setComputedSide('bottom')
+      } else {
+        setComputedSide(side)
+      }
+    }
+
+    // Check immediately and on scroll/resize
+    checkCollision()
+    window.addEventListener('scroll', checkCollision, true)
+    window.addEventListener('resize', checkCollision)
+
+    return () => {
+      window.removeEventListener('scroll', checkCollision, true)
+      window.removeEventListener('resize', checkCollision)
+    }
+  }, [open, avoidCollisions, side, collisionPadding])
 
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -95,16 +146,29 @@ export const DropdownMenuContent: React.FC<DropdownMenuContentProps> = ({
     center: 'left-1/2 -translate-x-1/2'
   }[align]
 
+  // Position menu above or below trigger based on collision detection
+  const positionClass = computedSide === 'top' 
+    ? 'bottom-full' 
+    : 'top-full'
+
+  // Animation direction based on side
+  const initialY = computedSide === 'top' ? 10 : -10
+  const animateY = 0
+
   return (
     <AnimatePresence>
       {open && (
         <motion.div
           ref={contentRef}
-          initial={{ opacity: 0, scale: 0.95, y: -10 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: -10 }}
+          initial={{ opacity: 0, scale: 0.95, y: initialY }}
+          animate={{ opacity: 1, scale: 1, y: animateY }}
+          exit={{ opacity: 0, scale: 0.95, y: initialY }}
           transition={{ duration: 0.1 }}
-          className={`absolute ${alignmentClass} mt-2 z-[200] min-w-[12rem] rounded-lg bg-white border border-gray-200 shadow-lg ${className}`}
+          className={`absolute ${alignmentClass} ${positionClass} z-[200] min-w-[12rem] rounded-lg bg-white border border-gray-200 shadow-lg ${className}`}
+          style={{
+            marginTop: computedSide === 'bottom' ? `${sideOffset}px` : undefined,
+            marginBottom: computedSide === 'top' ? `${sideOffset}px` : undefined,
+          }}
         >
           <div className="p-1">
             {children}
