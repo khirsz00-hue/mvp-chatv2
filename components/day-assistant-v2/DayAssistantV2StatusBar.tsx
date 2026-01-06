@@ -17,6 +17,10 @@ export interface StatusBarProps {
   totalCapacity: number
   onEditWorkHours?: () => void
   onEditMode?: () => void
+  // Project filter props
+  selectedProject?: string | null
+  projects?: Array<{ id: string; name: string }>
+  onProjectChange?: (projectId: string | null) => void
 }
 
 const MODE_LABELS: Record<WorkMode, string> = {
@@ -33,7 +37,10 @@ export function DayAssistantV2StatusBar({
   usedMinutes,
   totalCapacity,
   onEditWorkHours,
-  onEditMode
+  onEditMode,
+  selectedProject,
+  projects = [],
+  onProjectChange
 }: StatusBarProps) {
   const remainingMinutes = totalCapacity - usedMinutes
   const overloadPercent = totalCapacity > 0 ? Math.min(Math.round((usedMinutes / totalCapacity) * 100), 100) : 0
@@ -48,11 +55,11 @@ export function DayAssistantV2StatusBar({
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-6">
-      <div className="flex items-center justify-between gap-6">
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-4 lg:gap-6">
         
         {/* WORKING HOURS */}
         <div 
-          className="flex items-center gap-3 group cursor-pointer hover:bg-slate-50 px-3 py-2 rounded-lg transition-all"
+          className="flex items-center gap-3 group cursor-pointer hover:bg-slate-50 px-3 py-2 rounded-lg transition-all flex-shrink-0"
           onClick={onEditWorkHours}
           onKeyDown={(e) => handleKeyDown(e, onEditWorkHours)}
           role="button"
@@ -70,12 +77,12 @@ export function DayAssistantV2StatusBar({
           <Pencil size={10} className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
 
-        {/* Separator */}
-        <div className="h-10 w-px bg-slate-200" />
+        {/* Separator - hidden on mobile */}
+        <div className="hidden lg:block h-10 w-px bg-slate-200" />
 
         {/* MODE */}
         <div 
-          className="flex items-center gap-3 group cursor-pointer hover:bg-slate-50 px-3 py-2 rounded-lg transition-all"
+          className="flex items-center gap-3 group cursor-pointer hover:bg-slate-50 px-3 py-2 rounded-lg transition-all flex-shrink-0"
           onClick={onEditMode}
           onKeyDown={(e) => handleKeyDown(e, onEditMode)}
           role="button"
@@ -93,13 +100,44 @@ export function DayAssistantV2StatusBar({
           <CaretDown size={10} className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
 
-        {/* Separator */}
-        <div className="h-10 w-px bg-slate-200" />
+        {/* Separator - hidden on mobile */}
+        <div className="hidden lg:block h-10 w-px bg-slate-200" />
+
+        {/* KONTEKST (PROJECT FILTER) */}
+        {projects.length > 0 && onProjectChange && (
+          <>
+            <div className="flex flex-col w-full lg:w-auto lg:min-w-[180px] flex-shrink-0">
+              <label 
+                htmlFor="project-filter"
+                className="text-[10px] text-slate-400 uppercase font-semibold tracking-wide mb-1"
+              >
+                Kontekst
+              </label>
+              <select
+                id="project-filter"
+                value={selectedProject || ''}
+                onChange={(e) => onProjectChange(e.target.value || null)}
+                aria-label="Filtruj zadania według projektu"
+                className="text-sm font-medium bg-transparent border-0 p-0 pr-6 focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer text-slate-800 hover:text-indigo-600 transition-colors rounded"
+              >
+                <option value="">Wszystkie projekty</option>
+                {projects.map(project => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Separator - hidden on mobile */}
+            <div className="hidden lg:block h-10 w-px bg-slate-200" />
+          </>
+        )}
 
         {/* DAY OVERLOAD */}
-        <div className="flex-1 flex items-center gap-3">
-          {isOverloaded && <Warning size={16} className="text-amber-500" weight="fill" />}
-          <div className="flex-1">
+        <div className="flex-1 flex items-center gap-3 min-w-0">
+          {isOverloaded && <Warning size={16} className="text-amber-500 flex-shrink-0" weight="fill" />}
+          <div className="flex-1 min-w-0">
             <div className="flex justify-between items-center mb-1">
               <p className="text-[10px] text-slate-400 uppercase font-semibold tracking-wide">
                 Day Overload
@@ -119,7 +157,7 @@ export function DayAssistantV2StatusBar({
               />
             </div>
           </div>
-          <span className={`text-lg font-bold ml-2 ${isOverloaded ? 'text-amber-600' : 'text-slate-600'}`}>
+          <span className={`text-lg font-bold ml-2 flex-shrink-0 ${isOverloaded ? 'text-amber-600' : 'text-slate-600'}`}>
             {overloadPercent}%
           </span>
         </div>
