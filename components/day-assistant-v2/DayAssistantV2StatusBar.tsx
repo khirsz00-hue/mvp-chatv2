@@ -107,13 +107,18 @@ export function DayAssistantV2StatusBar({
         {projects.length > 0 && onProjectChange && (
           <>
             <div className="flex flex-col w-full lg:w-auto lg:min-w-[180px] flex-shrink-0">
-              <label className="text-[10px] text-slate-400 uppercase font-semibold tracking-wide mb-1">
+              <label 
+                htmlFor="project-filter"
+                className="text-[10px] text-slate-400 uppercase font-semibold tracking-wide mb-1"
+              >
                 Kontekst
               </label>
               <select
+                id="project-filter"
                 value={selectedProject || ''}
                 onChange={(e) => onProjectChange(e.target.value || null)}
-                className="text-sm font-medium bg-transparent border-0 p-0 pr-6 focus:ring-0 focus:outline-none cursor-pointer text-slate-800 hover:text-indigo-600 transition-colors"
+                aria-label="Filtruj zadania według projektu"
+                className="text-sm font-medium bg-transparent border-0 p-0 pr-6 focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer text-slate-800 hover:text-indigo-600 transition-colors rounded"
               >
                 <option value="">Wszystkie projekty</option>
                 {projects.map(project => (
