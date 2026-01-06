@@ -862,33 +862,37 @@ export function DayAssistantV2View() {
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50">
       {/* Focus Bar - shows ABOVE status bar when timer is active */}
       {activeTimer && (
-        <div className="sticky top-0 z-50 bg-gradient-to-br from-purple-50 via-white to-pink-50 pt-6 px-6">
-          <DayAssistantV2FocusBar
-            task={tasks.find(t => t.id === activeTimer.taskId) || null}
-            elapsedSeconds={activeTimer.elapsedSeconds}
-            isPaused={activeTimer.isPaused || false}
-            onPause={pauseTimer}
-            onResume={resumeTimer}
-            onComplete={() => handleCompleteTask(activeTimer.taskId)}
-            onStop={stopTimer}
-          />
+        <div className="sticky top-0 z-50 bg-gradient-to-br from-purple-50 via-white to-pink-50 pt-6">
+          <div className="max-w-[1536px] mx-auto px-4 sm:px-6">
+            <DayAssistantV2FocusBar
+              task={tasks.find(t => t.id === activeTimer.taskId) || null}
+              elapsedSeconds={activeTimer.elapsedSeconds}
+              isPaused={activeTimer.isPaused || false}
+              onPause={pauseTimer}
+              onResume={resumeTimer}
+              onComplete={() => handleCompleteTask(activeTimer.taskId)}
+              onStop={stopTimer}
+            />
+          </div>
         </div>
       )}
 
       {/* Status Bar - ALWAYS VISIBLE */}
-      <div className={`${activeTimer ? '' : 'sticky top-0 z-40'} bg-gradient-to-br from-purple-50 via-white to-pink-50 px-6 ${activeTimer ? 'pt-0' : 'pt-6'}`}>
-        <DayAssistantV2StatusBar
-          workHoursStart={workHoursStart}
-          workHoursEnd={workHoursEnd}
-          workMode={workMode}
-          usedMinutes={scheduledMinutes}
-          totalCapacity={availableMinutes}
-          onEditWorkHours={() => setShowWorkHoursModal(true)}
-          onEditMode={() => setShowWorkModeModal(true)}
-          selectedProject={selectedProjectId}
-          projects={projects}
-          onProjectChange={setSelectedProjectId}
-        />
+      <div className={`${activeTimer ? '' : 'sticky top-0 z-40'} bg-gradient-to-br from-purple-50 via-white to-pink-50 ${activeTimer ? 'pt-0' : 'pt-6'}`}>
+        <div className="max-w-[1536px] mx-auto px-4 sm:px-6">
+          <DayAssistantV2StatusBar
+            workHoursStart={workHoursStart}
+            workHoursEnd={workHoursEnd}
+            workMode={workMode}
+            usedMinutes={scheduledMinutes}
+            totalCapacity={availableMinutes}
+            onEditWorkHours={() => setShowWorkHoursModal(true)}
+            onEditMode={() => setShowWorkModeModal(true)}
+            selectedProject={selectedProjectId}
+            projects={projects}
+            onProjectChange={setSelectedProjectId}
+          />
+        </div>
       </div>
 
       {/* Overdue Alert Banner */}
