@@ -24,7 +24,6 @@ import { DecisionLogPanel, Decision } from './DecisionLogPanel'
 import { MorningReviewModal } from './MorningReviewModal'
 import { DayAssistantV2TaskCard } from './DayAssistantV2TaskCard'
 import { RecommendationPanel } from './RecommendationPanel'
-import { ProjectFilter } from './ProjectFilter'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { useTaskTimer } from '@/hooks/useTaskTimer'
 import Button from '@/components/ui/Button'
@@ -886,6 +885,9 @@ export function DayAssistantV2View() {
           totalCapacity={availableMinutes}
           onEditWorkHours={() => setShowWorkHoursModal(true)}
           onEditMode={() => setShowWorkModeModal(true)}
+          selectedProject={selectedProjectId}
+          projects={projects}
+          onProjectChange={setSelectedProjectId}
         />
       </div>
 
@@ -905,16 +907,6 @@ export function DayAssistantV2View() {
             meetings={meetings}
             onRefresh={handleRefreshMeetings}
           />
-          
-          {/* Project Filter */}
-          {projects.length > 0 && (
-            <ProjectFilter
-              projects={projects}
-              selectedProjectId={selectedProjectId}
-              onChange={setSelectedProjectId}
-              loading={loadingProjects}
-            />
-          )}
 
           {/* MUST Section */}
           {mustTasks.length > 0 && (
