@@ -28,6 +28,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { useTaskTimer } from '@/hooks/useTaskTimer'
 import Button from '@/components/ui/Button'
 import { Plus, CalendarBlank, CaretDown, CaretUp } from '@phosphor-icons/react'
+import { useTasksQuery, useCompleteTask, useDeleteTask, useTogglePinTask, usePostponeTask } from '@/hooks/useTasksQuery'
+import { useQueryClient } from '@tanstack/react-query'
 
 const TOP_TASKS_COUNT = 3
 const isValidTimeFormat = (value: string) => /^\d{2}:\d{2}$/.test(value)
@@ -76,8 +78,17 @@ export function DayAssistantV2View() {
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [loadingProjects, setLoadingProjects] = useState(false)
+  
   // Custom hooks
   const { activeTimer, startTimer, pauseTimer, resumeTimer, stopTimer, formatTime } = useTaskTimer()
+  const queryClient = useQueryClient()
+  
+  // React Query hooks for optimistic updates
+  const { data: queryTasks, isLoading: tasksLoading, error: tasksError } = useTasksQuery(selectedDate)
+  const completeTaskMutation = useCompleteTask()
+  const deleteTaskMutation = useDeleteTask()
+  const togglePinMutation = useTogglePinTask()
+  const postponeTaskMutation = usePostponeTask()
 
   // Load data on mount
   useEffect(() => {
@@ -85,7 +96,8 @@ export function DayAssistantV2View() {
     
     // Listen for task-added events (from FloatingAddButton)
     const handleTaskAdded = () => {
-      loadData()
+      // Invalidate React Query cache to refetch tasks
+      queryClient.invalidateQueries({ queryKey: ['tasks', selectedDate] })
     }
     window.addEventListener('task-added', handleTaskAdded)
     
@@ -93,8 +105,23 @@ export function DayAssistantV2View() {
       window.removeEventListener('task-added', handleTaskAdded)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    // loadData is intentionally omitted - it has internal state dependencies that would cause infinite re-renders
-  }, [])
+  }, [selectedDate, queryClient])
+  
+  // Sync React Query tasks with local state
+  useEffect(() => {
+    if (queryTasks) {
+      // Cast Task[] to TestDayTask[] - they have compatible structures
+      setTasks(queryTasks as unknown as TestDayTask[])
+      setLoading(false)
+    }
+  }, [queryTasks])
+  
+  // Sync loading state
+  useEffect(() => {
+    if (tasksLoading) {
+      setLoading(true)
+    }
+  }, [tasksLoading])
   
   // Fetch projects on mount
   useEffect(() => {
@@ -183,7 +210,7 @@ export function DayAssistantV2View() {
       
       setSessionToken(session.access_token)
       
-      // Fetch day plan with tasks
+      // Fetch day plan metadata (tasks are handled by React Query)
       const response = await fetch(`/api/day-assistant-v2/dayplan?date=${selectedDate}`, {
         headers: {
           Authorization: `Bearer ${session.access_token}`
@@ -196,7 +223,7 @@ export function DayAssistantV2View() {
       
       const data = await response.json()
       setDayPlan(data.dayPlan)
-      setTasks(data.tasks || [])
+      // Don't set tasks here - React Query handles it
       setAssistant(data.assistant)
       setTaskStats(data.taskStats || taskStats)
       if (data.dayPlan?.metadata?.work_start_time && isValidTimeFormat(data.dayPlan.metadata.work_start_time)) {
@@ -213,7 +240,7 @@ export function DayAssistantV2View() {
       console.error('Error loading data:', error)
       toast.error('Błąd podczas ładowania danych')
     } finally {
-      setLoading(false)
+      // Don't set loading false here - React Query handles it
     }
   }
 
@@ -239,108 +266,54 @@ export function DayAssistantV2View() {
 
   const handleCompleteTask = async (taskId: string) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
-      
-      const response = await fetch('/api/day-assistant-v2/complete', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ task_id: taskId })
-      })
-      
-      if (!response.ok) throw new Error('Failed to complete task')
-      
-      toast.success('✅ Zadanie ukończone!')
-      await loadData()
+      // Use optimistic mutation - no loadData() call needed!
+      await completeTaskMutation.mutateAsync(taskId)
       
       // Stop timer if this task was active
       if (activeTimer?.taskId === taskId) {
         stopTimer()
       }
     } catch (error) {
+      // Error handling is done in the mutation hook
       console.error('Error completing task:', error)
-      toast.error('Błąd podczas ukończania zadania')
     }
   }
 
   const handlePinTask = async (taskId: string) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
-      
       const task = tasks.find(t => t.id === taskId)
       const newIsMust = !task?.is_must
       
-      const response = await fetch('/api/day-assistant-v2/pin', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ task_id: taskId, pin: newIsMust })
-      })
-      
-      if (!response.ok) throw new Error('Failed to pin task')
-      
-      toast.success(newIsMust ? '📌 Przypięto do MUST' : '📌 Odpięto z MUST')
-      await loadData()
+      // Use optimistic mutation - no loadData() call needed!
+      await togglePinMutation.mutateAsync({ taskId, pin: newIsMust })
     } catch (error) {
+      // Error handling is done in the mutation hook
       console.error('Error pinning task:', error)
-      toast.error('Błąd podczas przypinania zadania')
     }
   }
 
   const handlePostponeTask = async (taskId: string) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
-      
-      const response = await fetch('/api/day-assistant-v2/postpone', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ task_id: taskId })
-      })
-      
-      if (!response.ok) throw new Error('Failed to postpone task')
-      
-      toast.success('📅 Zadanie przesunięte na jutro')
-      await loadData()
+      // Use optimistic mutation - no loadData() call needed!
+      await postponeTaskMutation.mutateAsync({ taskId })
     } catch (error) {
+      // Error handling is done in the mutation hook
       console.error('Error postponing task:', error)
-      toast.error('Błąd podczas przesuwania zadania')
     }
   }
 
   const handleDeleteTask = async (taskId: string) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
-      
-      const response = await fetch(`/api/day-assistant-v2/tasks/${taskId}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        }
-      })
-      
-      if (!response.ok) throw new Error('Failed to delete task')
-      
-      toast.success('🗑️ Zadanie usunięte')
-      await loadData()
+      // Use optimistic mutation - no loadData() call needed!
+      await deleteTaskMutation.mutateAsync(taskId)
       
       // Stop timer if this task was active
       if (activeTimer?.taskId === taskId) {
         stopTimer()
       }
     } catch (error) {
+      // Error handling is done in the mutation hook
       console.error('Error deleting task:', error)
-      toast.error('Błąd podczas usuwania zadania')
     }
   }
 
@@ -426,7 +399,8 @@ export function DayAssistantV2View() {
       
       setShowUniversalModal(false)
       setEditingTask(null)
-      await loadData()
+      // Invalidate React Query cache to refetch tasks
+      queryClient.invalidateQueries({ queryKey: ['tasks', selectedDate] })
     } catch (error) {
       console.error('Error saving task:', error)
       toast.error('Błąd podczas zapisywania zadania')
@@ -450,7 +424,8 @@ export function DayAssistantV2View() {
       if (!response.ok) throw new Error('Failed to apply recommendation')
       
       toast.success('✅ Rekomendacja zastosowana')
-      await loadData()
+      // Invalidate React Query cache to refetch tasks
+      queryClient.invalidateQueries({ queryKey: ['tasks', selectedDate] })
     } catch (error) {
       console.error('Error applying recommendation:', error)
       toast.error('Błąd podczas stosowania rekomendacji')
@@ -547,7 +522,8 @@ export function DayAssistantV2View() {
   const handleKeepOverdueToday = async (task: TestDayTask) => {
     // Just keep the due date as today - no API call needed for now
     toast.success(`📅 ${task.title} pozostaje na dziś`)
-    await loadData()
+    // Invalidate to refresh
+    queryClient.invalidateQueries({ queryKey: ['tasks', selectedDate] })
   }
 
   const handleOverdueAddToday = async (task: TestDayTask) => {
@@ -571,7 +547,8 @@ export function DayAssistantV2View() {
       if (!response.ok) throw new Error('Failed to update task')
       
       toast.success(`📅 ${task.title} dodane na dziś`)
-      await loadData()
+      // Invalidate React Query cache to refetch tasks
+      queryClient.invalidateQueries({ queryKey: ['tasks', selectedDate] })
     } catch (error) {
       console.error('Error updating task date:', error)
       toast.error('Błąd podczas aktualizacji zadania')
@@ -604,7 +581,8 @@ export function DayAssistantV2View() {
       if (!response.ok) throw new Error('Failed to reschedule task')
       
       toast.success(`📅 ${task.title} przeniesione na ${date}`)
-      await loadData()
+      // Invalidate React Query cache to refetch tasks
+      queryClient.invalidateQueries({ queryKey: ['tasks', selectedDate] })
     } catch (error) {
       console.error('Error rescheduling task:', error)
       toast.error('Błąd podczas przesuwania zadania')

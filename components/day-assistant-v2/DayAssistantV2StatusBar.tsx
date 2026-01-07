@@ -6,8 +6,12 @@
 
 'use client'
 
-import { Clock, Target, Warning, Pencil, CaretDown } from '@phosphor-icons/react'
+import { useState } from 'react'
+import { Clock, Target, Warning, Pencil, CaretDown, ArrowsClockwise } from '@phosphor-icons/react'
 import { WorkMode } from './WorkModeSelector'
+import { toast } from 'sonner'
+import { useQueryClient } from '@tanstack/react-query'
+import { supabase } from '@/lib/supabaseClient'
 
 export interface StatusBarProps {
   workHoursStart: string
@@ -45,11 +49,49 @@ export function DayAssistantV2StatusBar({
   const remainingMinutes = totalCapacity - usedMinutes
   const overloadPercent = totalCapacity > 0 ? Math.min(Math.round((usedMinutes / totalCapacity) * 100), 100) : 0
   const isOverloaded = overloadPercent > 80
+  const queryClient = useQueryClient()
+  const [isSyncing, setIsSyncing] = useState(false)
 
   const handleKeyDown = (e: React.KeyboardEvent, callback?: () => void) => {
     if (callback && (e.key === 'Enter' || e.key === ' ')) {
       e.preventDefault()
       callback()
+    }
+  }
+
+  const handleSync = async () => {
+    setIsSyncing(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        toast.error('Sesja wygasła - zaloguj się ponownie')
+        return
+      }
+
+      // Trigger Todoist sync
+      const response = await fetch('/api/todoist/sync', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('Sync failed')
+      }
+
+      const data = await response.json()
+
+      // Invalidate queries to refetch tasks
+      const today = new Date().toISOString().split('T')[0]
+      queryClient.invalidateQueries({ queryKey: ['tasks', today] })
+
+      toast.success(`✅ Zsynchronizowano ${data.task_count || 0} zadań z Todoist`)
+    } catch (error) {
+      console.error('Sync error:', error)
+      toast.error('❌ Błąd synchronizacji z Todoist')
+    } finally {
+      setIsSyncing(false)
     }
   }
 
@@ -133,6 +175,24 @@ export function DayAssistantV2StatusBar({
             <div className="hidden lg:block h-10 w-px bg-slate-200" />
           </>
         )}
+
+        {/* SYNC BUTTON */}
+        <button
+          onClick={handleSync}
+          disabled={isSyncing}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-50 transition-all flex-shrink-0 text-slate-600 hover:text-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Synchronizuj z Todoist"
+        >
+          <ArrowsClockwise 
+            size={16} 
+            className={isSyncing ? 'animate-spin' : ''} 
+            weight="bold"
+          />
+          <span className="text-xs font-semibold hidden lg:inline">Sync</span>
+        </button>
+
+        {/* Separator - hidden on mobile */}
+        <div className="hidden lg:block h-10 w-px bg-slate-200" />
 
         {/* DAY OVERLOAD */}
         <div className="flex-1 flex items-center gap-3 min-w-0">

@@ -75,8 +75,10 @@ export function useTasksQuery(date: string) {
       const data = await response.json()
       return data.tasks as Task[]
     },
-    staleTime: 30000, // 30s cache
-    refetchInterval: 60000 // Auto-refetch every 60s
+    staleTime: 30000, // Match refetchInterval - data fresh for 30s
+    refetchInterval: 30000, // Auto-refetch every 30s for Todoist sync
+    refetchOnWindowFocus: true, // Refetch when user returns to tab
+    refetchOnReconnect: true // Refetch when internet reconnects
   })
 }
 
@@ -105,20 +107,27 @@ export function useCompleteTask() {
       return response.json()
     },
     onMutate: async (taskId) => {
-      // Optimistic update - remove completed task from list
+      // Optimistic update - remove completed task from all task queries
       await queryClient.cancelQueries({ queryKey: ['tasks'] })
       
-      const previousTasks = queryClient.getQueryData(['tasks'])
+      // Get all task query data (could be multiple dates)
+      const queries = queryClient.getQueriesData<Task[]>({ queryKey: ['tasks'] })
+      const previousQueries = queries.map(([queryKey, data]) => ({ queryKey, data }))
       
-      queryClient.setQueryData(['tasks'], (old: Task[] = []) =>
-        old.filter(t => t.id !== taskId)
-      )
+      // Optimistically update all task queries
+      queries.forEach(([queryKey]) => {
+        queryClient.setQueryData(queryKey, (old: Task[] = []) =>
+          old.filter(t => t.id !== taskId)
+        )
+      })
       
-      return { previousTasks }
+      return { previousQueries }
     },
     onError: (err, taskId, context) => {
-      // Rollback on error
-      queryClient.setQueryData(['tasks'], context?.previousTasks)
+      // Rollback on error - restore all queries
+      context?.previousQueries.forEach(({ queryKey, data }) => {
+        queryClient.setQueryData(queryKey, data)
+      })
       
       // Show specific error message
       const errorMessage = err instanceof Error ? err.message : 'Nie udało się ukończyć zadania'
@@ -161,16 +170,24 @@ export function useDeleteTask() {
     onMutate: async (taskId) => {
       await queryClient.cancelQueries({ queryKey: ['tasks'] })
       
-      const previousTasks = queryClient.getQueryData(['tasks'])
+      // Get all task query data
+      const queries = queryClient.getQueriesData<Task[]>({ queryKey: ['tasks'] })
+      const previousQueries = queries.map(([queryKey, data]) => ({ queryKey, data }))
       
-      queryClient.setQueryData(['tasks'], (old: Task[] = []) =>
-        old.filter(t => t.id !== taskId)
-      )
+      // Optimistically remove from all queries
+      queries.forEach(([queryKey]) => {
+        queryClient.setQueryData(queryKey, (old: Task[] = []) =>
+          old.filter(t => t.id !== taskId)
+        )
+      })
       
-      return { previousTasks, deletedTaskId: taskId }
+      return { previousQueries, deletedTaskId: taskId }
     },
     onError: (err, taskId, context) => {
-      queryClient.setQueryData(['tasks'], context?.previousTasks)
+      // Rollback on error
+      context?.previousQueries.forEach(({ queryKey, data }) => {
+        queryClient.setQueryData(queryKey, data)
+      })
       toast.error('Nie udało się usunąć zadania')
     },
     onSuccess: (data, taskId) => {
@@ -210,16 +227,24 @@ export function useTogglePinTask() {
     onMutate: async ({ taskId, pin }) => {
       await queryClient.cancelQueries({ queryKey: ['tasks'] })
       
-      const previousTasks = queryClient.getQueryData(['tasks'])
+      // Get all task query data
+      const queries = queryClient.getQueriesData<Task[]>({ queryKey: ['tasks'] })
+      const previousQueries = queries.map(([queryKey, data]) => ({ queryKey, data }))
       
-      queryClient.setQueryData(['tasks'], (old: Task[] = []) =>
-        old.map(t => t.id === taskId ? { ...t, is_must: pin } : t)
-      )
+      // Optimistically update all queries
+      queries.forEach(([queryKey]) => {
+        queryClient.setQueryData(queryKey, (old: Task[] = []) =>
+          old.map(t => t.id === taskId ? { ...t, is_must: pin } : t)
+        )
+      })
       
-      return { previousTasks }
+      return { previousQueries }
     },
     onError: (err: any, vars, context) => {
-      queryClient.setQueryData(['tasks'], context?.previousTasks)
+      // Rollback on error
+      context?.previousQueries.forEach(({ queryKey, data }) => {
+        queryClient.setQueryData(queryKey, data)
+      })
       toast.error(err.message || 'Nie udało się zmienić przypięcia')
     },
     onSuccess: (data, { pin }) => {
@@ -250,17 +275,24 @@ export function usePostponeTask() {
     onMutate: async ({ taskId }) => {
       await queryClient.cancelQueries({ queryKey: ['tasks'] })
       
-      const previousTasks = queryClient.getQueryData(['tasks'])
+      // Get all task query data
+      const queries = queryClient.getQueriesData<Task[]>({ queryKey: ['tasks'] })
+      const previousQueries = queries.map(([queryKey, data]) => ({ queryKey, data }))
       
-      // Optimistically remove from today's list
-      queryClient.setQueryData(['tasks'], (old: Task[] = []) =>
-        old.filter(t => t.id !== taskId)
-      )
+      // Optimistically remove from today's list (all queries)
+      queries.forEach(([queryKey]) => {
+        queryClient.setQueryData(queryKey, (old: Task[] = []) =>
+          old.filter(t => t.id !== taskId)
+        )
+      })
       
-      return { previousTasks }
+      return { previousQueries }
     },
     onError: (err, vars, context) => {
-      queryClient.setQueryData(['tasks'], context?.previousTasks)
+      // Rollback on error
+      context?.previousQueries.forEach(({ queryKey, data }) => {
+        queryClient.setQueryData(queryKey, data)
+      })
       toast.error('Nie udało się przenieść zadania')
     },
     onSuccess: (data) => {
@@ -292,22 +324,29 @@ export function useToggleSubtask() {
     onMutate: async ({ subtaskId, completed }) => {
       await queryClient.cancelQueries({ queryKey: ['tasks'] })
       
-      const previousTasks = queryClient.getQueryData(['tasks'])
+      // Get all task query data
+      const queries = queryClient.getQueriesData<Task[]>({ queryKey: ['tasks'] })
+      const previousQueries = queries.map(([queryKey, data]) => ({ queryKey, data }))
       
-      // Optimistically update subtask in task list
-      queryClient.setQueryData(['tasks'], (old: Task[] = []) =>
-        old.map(task => ({
-          ...task,
-          subtasks: task.subtasks?.map(sub =>
-            sub.id === subtaskId ? { ...sub, completed } : sub
-          )
-        }))
-      )
+      // Optimistically update subtask in all task lists
+      queries.forEach(([queryKey]) => {
+        queryClient.setQueryData(queryKey, (old: Task[] = []) =>
+          old.map(task => ({
+            ...task,
+            subtasks: task.subtasks?.map(sub =>
+              sub.id === subtaskId ? { ...sub, completed } : sub
+            )
+          }))
+        )
+      })
       
-      return { previousTasks }
+      return { previousQueries }
     },
     onError: (err, vars, context) => {
-      queryClient.setQueryData(['tasks'], context?.previousTasks)
+      // Rollback on error
+      context?.previousQueries.forEach(({ queryKey, data }) => {
+        queryClient.setQueryData(queryKey, data)
+      })
       toast.error('Nie udało się zaktualizować kroku')
     },
     onSuccess: (data, { completed }) => {

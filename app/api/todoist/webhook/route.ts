@@ -110,41 +110,64 @@ async function syncSingleTaskFromWebhook(userId: string, taskData: any) {
       completed: taskData.is_completed
     })
     
-    // Map priority
-    const priority = mapTodoistPriority(taskData)
+    // Get or create assistant
+    const { data: assistant } = await supabase
+      .from('assistant_config')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('name', 'asystent dnia v2')
+      .single()
+
+    if (!assistant) {
+      console.warn(`⚠️ [Webhook] No assistant found for user ${userId}`)
+      return
+    }
+
+    const assistantId = assistant.id
+    
+    // Map Todoist priority to internal priority (1-4)
+    const priority = taskData.priority || 1
     
     const taskPayload = {
       user_id: userId,
-      todoist_task_id: taskData.id,
+      assistant_id: assistantId,
+      todoist_id: taskData.id,
+      todoist_task_id: taskData.id, // Legacy field for compatibility
       title: taskData.content,
       description: taskData.description || null,
       priority: priority,
-      estimated_duration: taskData.duration?.amount || 15,
+      is_must: false, // Webhooks don't auto-pin
+      is_important: priority >= 3,
+      estimate_min: taskData.duration?.amount || 30,
+      cognitive_load: 2, // Default medium load
+      context_type: 'deep_work', // Default context
       due_date: taskData.due?.date || null,
       completed: taskData.is_completed || false,
-      is_pinned: false,
-      is_mega_important: taskData.priority === 4,
-      energy_mode_required: 'normal' as const,
       position: 0,
+      postpone_count: 0,
+      auto_moved: false,
+      tags: [],
       metadata: {
         todoist_priority: taskData.priority,
-        todoist_project_id: taskData.project_id,
+        project_id: taskData.project_id,
         todoist_labels: taskData.labels || []
-      }
+      },
+      synced_at: new Date().toISOString()
     }
     
-    // Check if task exists
+    // Check if task exists in day_assistant_v2_tasks
     const { data: existing } = await supabase
-      .from('day_assistant_tasks')
+      .from('day_assistant_v2_tasks')
       .select('id')
       .eq('user_id', userId)
-      .eq('todoist_task_id', taskData.id)
+      .eq('assistant_id', assistantId)
+      .eq('todoist_id', taskData.id)
       .single()
     
     if (existing) {
-      // Update
+      // Update existing task
       const { error: updateError } = await supabase
-        .from('day_assistant_tasks')
+        .from('day_assistant_v2_tasks')
         .update(taskPayload)
         .eq('id', existing.id)
         
@@ -154,9 +177,9 @@ async function syncSingleTaskFromWebhook(userId: string, taskData: any) {
         console.log('✅ [Webhook] Updated task from webhook:', taskData.id)
       }
     } else {
-      // Insert
+      // Insert new task
       const { error: insertError } = await supabase
-        .from('day_assistant_tasks')
+        .from('day_assistant_v2_tasks')
         .insert(taskPayload)
         
       if (insertError) {
@@ -198,35 +221,19 @@ async function handleTaskRemoval(taskData: any, todoistUserId: string) {
     // Remove task for each user
     for (const profile of profiles) {
       console.log(`🗑️ [Webhook] Removing task ${taskData.id} for user ${profile.id}`)
+      
+      // Delete from day_assistant_v2_tasks using todoist_id
       await supabase
-        .from('day_assistant_tasks')
+        .from('day_assistant_v2_tasks')
         .delete()
         .eq('user_id', profile.id)
-        .eq('todoist_task_id', taskData.id)
+        .eq('todoist_id', taskData.id)
     }
     
     console.log('✅ [Webhook] Removed task from webhook:', taskData.id)
   } catch (error) {
     console.error('❌ [Webhook] Error removing task from webhook:', error)
   }
-}
-
-/**
- * Map Todoist priority to Day Assistant priority
- */
-function mapTodoistPriority(task: any): 'now' | 'next' | 'later' {
-  const labels = task.labels || []
-  
-  // Check labels first
-  if (labels.includes('@now')) return 'now'
-  if (labels.includes('@next')) return 'next'
-  if (labels.includes('@later')) return 'later'
-  
-  // Fallback: use Todoist priority
-  if (task.priority === 4) return 'now'
-  if (task.priority >= 2) return 'next'
-  
-  return 'later'
 }
 
 export async function GET() {
