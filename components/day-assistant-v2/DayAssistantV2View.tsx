@@ -662,6 +662,16 @@ export function DayAssistantV2View() {
     return (priority >= 1 && priority <= 4 ? priority : 1) as 1 | 2 | 3 | 4
   }
 
+  // Helper function to map task to AI Insights format
+  const mapTaskForAIInsights = (task: TestDayTask) => ({
+    id: task.id,
+    content: task.title,
+    priority: validatePriority(task.priority),
+    due: task.due_date || undefined,
+    completed: task.completed,
+    completed_at: task.completed_at || undefined
+  })
+
   // Score and sort tasks FIRST using V3 algorithm
   const scoredTasks = useMemo(() => {
     if (!dayPlan) return filteredTasks
@@ -1073,21 +1083,8 @@ export function DayAssistantV2View() {
 
           {/* AI Insights */}
           <AIInsightsPanel 
-            tasks={filteredTasks.map(t => ({
-              id: t.id,
-              content: t.title,
-              priority: validatePriority(t.priority),
-              due: t.due_date || undefined,
-              completed: false
-            }))}
-            completedTasks={tasks.filter(t => t.completed).map(t => ({
-              id: t.id,
-              content: t.title,
-              priority: validatePriority(t.priority),
-              due: t.due_date || undefined,
-              completed: true,
-              completed_at: t.completed_at || undefined
-            }))}
+            tasks={filteredTasks.map(mapTaskForAIInsights)}
+            completedTasks={tasks.filter(t => t.completed).map(mapTaskForAIInsights)}
             className="w-full"
           />
         </div>
