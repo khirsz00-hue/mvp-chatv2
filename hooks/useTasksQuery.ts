@@ -75,7 +75,7 @@ export function useTasksQuery(date: string) {
       const data = await response.json()
       return data.tasks as Task[]
     },
-    staleTime: 10000, // Consider data fresh for 10s
+    staleTime: 30000, // Match refetchInterval - data fresh for 30s
     refetchInterval: 30000, // Auto-refetch every 30s for Todoist sync
     refetchOnWindowFocus: true, // Refetch when user returns to tab
     refetchOnReconnect: true // Refetch when internet reconnects
