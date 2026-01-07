@@ -5,6 +5,11 @@
 
 import { SupabaseClient } from '@supabase/supabase-js'
 
+// Constants for date calculations
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
+const JOURNAL_HISTORY_DAYS = 7
+const UPCOMING_TASKS_DAYS = 7
+
 export interface TaskContext {
   id: string
   title: string
@@ -133,14 +138,14 @@ export async function fetchChatContext(
         .limit(10),
     ])
 
-  // Fetch journal entries (last 7 days)
+  // Fetch journal entries (last N days based on constant)
   const { data: journalEntries } = await supabase
     .from('journal_entries')
     .select('date, energy, motivation, sleep_quality, hours_slept, notes')
     .eq('user_id', userId)
     .gte('date', sevenDaysAgo)
     .order('date', { ascending: false })
-    .limit(7)
+    .limit(JOURNAL_HISTORY_DAYS)
 
   // Calculate journal stats
   const journalStats = {

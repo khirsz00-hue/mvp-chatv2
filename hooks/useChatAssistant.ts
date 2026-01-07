@@ -21,6 +21,55 @@ export interface UseChatAssistantReturn {
   clearMessages: () => void
 }
 
+// Error type constants for better error handling
+enum ChatErrorType {
+  SESSION_EXPIRED = 'SESSION_EXPIRED',
+  RATE_LIMIT = 'RATE_LIMIT',
+  NETWORK = 'NETWORK',
+  UNAUTHORIZED = 'UNAUTHORIZED',
+  UNKNOWN = 'UNKNOWN',
+}
+
+function categorizeError(error: any, response?: Response): ChatErrorType {
+  // Check response status first
+  if (response) {
+    if (response.status === 401) return ChatErrorType.UNAUTHORIZED
+    if (response.status === 429) return ChatErrorType.RATE_LIMIT
+  }
+
+  // Check error message patterns
+  const errorMessage = error?.message?.toLowerCase() || ''
+  
+  if (errorMessage.includes('session') || errorMessage.includes('log in')) {
+    return ChatErrorType.SESSION_EXPIRED
+  }
+  
+  if (errorMessage.includes('rate limit')) {
+    return ChatErrorType.RATE_LIMIT
+  }
+  
+  if (errorMessage.includes('network') || errorMessage.includes('fetch') || errorMessage.includes('connection')) {
+    return ChatErrorType.NETWORK
+  }
+  
+  return ChatErrorType.UNKNOWN
+}
+
+function getErrorMessage(errorType: ChatErrorType): string {
+  switch (errorType) {
+    case ChatErrorType.SESSION_EXPIRED:
+    case ChatErrorType.UNAUTHORIZED:
+      return 'Sesja wygasła. Zaloguj się ponownie.'
+    case ChatErrorType.RATE_LIMIT:
+      return 'Zbyt wiele zapytań. Poczekaj chwilę i spróbuj ponownie.'
+    case ChatErrorType.NETWORK:
+      return 'Problem z połączeniem. Sprawdź internet i spróbuj ponownie.'
+    case ChatErrorType.UNKNOWN:
+    default:
+      return 'Nie udało się wysłać wiadomości. Spróbuj ponownie.'
+  }
+}
+
 export function useChatAssistant(): UseChatAssistantReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -87,16 +136,14 @@ export function useChatAssistant(): UseChatAssistantReturn {
     } catch (err: any) {
       console.error('Error sending message:', err)
       
-      // Sanitize error message for user display
-      let userMessage = 'Nie udało się wysłać wiadomości. Spróbuj ponownie.'
-      
-      if (err.message?.includes('Session expired') || err.message?.includes('log in')) {
-        userMessage = 'Sesja wygasła. Zaloguj się ponownie.'
-      } else if (err.message?.includes('Rate limit')) {
-        userMessage = 'Zbyt wiele zapytań. Poczekaj chwilę i spróbuj ponownie.'
-      } else if (err.message?.includes('network') || err.message?.includes('fetch')) {
-        userMessage = 'Problem z połączeniem. Sprawdź internet i spróbuj ponownie.'
+      // Categorize and sanitize error
+      let response: Response | undefined
+      if (err instanceof Response) {
+        response = err
       }
+      
+      const errorType = categorizeError(err, response)
+      const userMessage = getErrorMessage(errorType)
       
       setError(userMessage)
 
