@@ -10,7 +10,7 @@ import { useState } from 'react'
 import { Clock, Target, Warning, Pencil, CaretDown, ArrowsClockwise } from '@phosphor-icons/react'
 import { WorkMode } from './WorkModeSelector'
 import { toast } from 'sonner'
-import { useQueryClient } from '@tanstack/react-query'
+import { useSWRConfig } from 'swr'
 import { supabase } from '@/lib/supabaseClient'
 
 export interface StatusBarProps {
@@ -49,7 +49,7 @@ export function DayAssistantV2StatusBar({
   const remainingMinutes = totalCapacity - usedMinutes
   const overloadPercent = totalCapacity > 0 ? Math.min(Math.round((usedMinutes / totalCapacity) * 100), 100) : 0
   const isOverloaded = overloadPercent > 80
-  const queryClient = useQueryClient()
+  const { mutate } = useSWRConfig()
   const [isSyncing, setIsSyncing] = useState(false)
 
   const handleKeyDown = (e: React.KeyboardEvent, callback?: () => void) => {
@@ -82,9 +82,9 @@ export function DayAssistantV2StatusBar({
 
       const data = await response.json()
 
-      // Invalidate queries to refetch tasks
+      // Invalidate SWR cache to refetch tasks
       const today = new Date().toISOString().split('T')[0]
-      queryClient.invalidateQueries({ queryKey: ['tasks', today] })
+      mutate(`/api/day-assistant-v2/dayplan?date=${today}`)
 
       toast.success(`✅ Zsynchronizowano ${data.task_count || 0} zadań z Todoist`)
     } catch (error) {

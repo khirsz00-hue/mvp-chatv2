@@ -1,6 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import useSWR from 'swr'
 import { supabase } from '@/lib/supabaseClient'
-import { toast } from 'sonner'
 
 /**
  * Helper function to get session with retry logic
@@ -25,7 +24,7 @@ async function getSessionWithRetry(maxAttempts = MAX_SESSION_RETRY_ATTEMPTS) {
       console.error(`❌ Session error (attempt ${attempts}/${maxAttempts}):`, error)
     }
     
-    // Wait before retrying (true exponential backoff: 100ms, 200ms, 400ms)
+    // Wait before retrying (exponential backoff: 100ms, 200ms, 400ms)
     if (attempts < maxAttempts) {
       await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempts - 1) * 100))
     }
@@ -60,397 +59,53 @@ export interface Subtask {
   position: number
 }
 
+// Fetcher function for SWR
+const fetcher = async (url: string) => {
+  const session = await getSessionWithRetry()
+  
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${session.access_token}`
+    }
+  })
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch tasks')
+  }
+  
+  const data = await response.json()
+  return data
+}
+
 export function useTasksQuery(date: string) {
-  return useQuery({
-    queryKey: ['tasks', date],
-    queryFn: async () => {
-      const session = await getSessionWithRetry()
-
-      const response = await fetch(`/api/day-assistant-v2/dayplan?date=${date}`, {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        }
-      })
-      if (!response.ok) throw new Error('Failed to fetch tasks')
-      const data = await response.json()
-      return data.tasks as Task[]
-    },
-    staleTime: 30000, // Match refetchInterval - data fresh for 30s
-    refetchInterval: 30000, // Auto-refetch every 30s for Todoist sync
-    refetchOnWindowFocus: true, // Refetch when user returns to tab
-    refetchOnReconnect: true // Refetch when internet reconnects
-  })
-}
-
-export function useCompleteTask() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async (taskId: string) => {
-      const session = await getSessionWithRetry()
-      console.log('✅ [useCompleteTask] Session obtained, completing task:', taskId)
-
-      const response = await fetch('/api/day-assistant-v2/complete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({ task_id: taskId })
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to complete task' }))
-        throw new Error(errorData.error || 'Failed to complete task')
-      }
+  const { data, error, isLoading, mutate } = useSWR(
+    `/api/day-assistant-v2/dayplan?date=${date}`,
+    fetcher,
+    {
+      // Auto-refresh every 30 seconds (Todoist sync)
+      refreshInterval: 30000,
       
-      return response.json()
-    },
-    onMutate: async (taskId) => {
-      // Optimistic update - remove completed task from all task queries
-      await queryClient.cancelQueries({ queryKey: ['tasks'] })
+      // Refresh when user returns to tab
+      revalidateOnFocus: true,
       
-      // Get all task query data (could be multiple dates)
-      const queries = queryClient.getQueriesData<Task[]>({ queryKey: ['tasks'] })
-      const previousQueries = queries.map(([queryKey, data]) => ({ queryKey, data }))
+      // Refresh when internet reconnects
+      revalidateOnReconnect: true,
       
-      // Optimistically update all task queries
-      queries.forEach(([queryKey]) => {
-        queryClient.setQueryData(queryKey, (old: Task[] = []) =>
-          old.filter(t => t.id !== taskId)
-        )
-      })
+      // Dedupe requests within 2 seconds
+      dedupingInterval: 2000,
       
-      return { previousQueries }
-    },
-    onError: (err, taskId, context) => {
-      // Rollback on error - restore all queries
-      context?.previousQueries.forEach(({ queryKey, data }) => {
-        queryClient.setQueryData(queryKey, data)
-      })
-      
-      // Show specific error message
-      const errorMessage = err instanceof Error ? err.message : 'Nie udało się ukończyć zadania'
-      toast.error(`❌ ${errorMessage}`)
-      
-      console.error('❌ [useCompleteTask] Error:', err)
-    },
-    onSuccess: (data) => {
-      // Show success message with warning if Todoist sync failed
-      if (data.warning) {
-        toast.warning(`⚠️ ${data.warning}`)
-      } else {
-        toast.success(data.message || '✅ Zadanie ukończone!')
-      }
-      
-      // Invalidate recommendation cache
-      queryClient.invalidateQueries({ queryKey: ['recommendation'] })
-      
-      console.log('✅ [useCompleteTask] Task completed:', data.todoist_synced ? 'with Todoist sync' : 'local only')
+      // Keep previous data while revalidating
+      keepPreviousData: true,
     }
-  })
+  )
+  
+  return {
+    data: data?.tasks as Task[] | undefined,
+    isLoading,
+    error,
+    mutate
+  }
 }
 
-export function useDeleteTask() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async (taskId: string) => {
-      const session = await getSessionWithRetry()
-
-      const response = await fetch(`/api/day-assistant-v2/tasks/${taskId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
-      })
-
-      if (!response.ok) throw new Error('Failed to delete task')
-    },
-    onMutate: async (taskId) => {
-      await queryClient.cancelQueries({ queryKey: ['tasks'] })
-      
-      // Get all task query data
-      const queries = queryClient.getQueriesData<Task[]>({ queryKey: ['tasks'] })
-      const previousQueries = queries.map(([queryKey, data]) => ({ queryKey, data }))
-      
-      // Optimistically remove from all queries
-      queries.forEach(([queryKey]) => {
-        queryClient.setQueryData(queryKey, (old: Task[] = []) =>
-          old.filter(t => t.id !== taskId)
-        )
-      })
-      
-      return { previousQueries, deletedTaskId: taskId }
-    },
-    onError: (err, taskId, context) => {
-      // Rollback on error
-      context?.previousQueries.forEach(({ queryKey, data }) => {
-        queryClient.setQueryData(queryKey, data)
-      })
-      toast.error('Nie udało się usunąć zadania')
-    },
-    onSuccess: (data, taskId) => {
-      toast.success('🗑️ Zadanie usunięte')
-      
-      // CRITICAL: Invalidate recommendation if it mentions deleted task
-      const recommendation = queryClient.getQueryData(['recommendation']) as any
-      if (recommendation?.primary_action?.task_id === taskId) {
-        queryClient.invalidateQueries({ queryKey: ['recommendation'] })
-      }
-    }
-  })
-}
-
-export function useTogglePinTask() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async ({ taskId, pin }: { taskId: string; pin: boolean }) => {
-      const session = await getSessionWithRetry()
-
-      const response = await fetch('/api/day-assistant-v2/pin', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({ task_id: taskId, pin })
-      })
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Failed to pin task' }))
-        throw new Error(error.error || 'Failed to pin task')
-      }
-      return response.json()
-    },
-    onMutate: async ({ taskId, pin }) => {
-      await queryClient.cancelQueries({ queryKey: ['tasks'] })
-      
-      // Get all task query data
-      const queries = queryClient.getQueriesData<Task[]>({ queryKey: ['tasks'] })
-      const previousQueries = queries.map(([queryKey, data]) => ({ queryKey, data }))
-      
-      // Optimistically update all queries
-      queries.forEach(([queryKey]) => {
-        queryClient.setQueryData(queryKey, (old: Task[] = []) =>
-          old.map(t => t.id === taskId ? { ...t, is_must: pin } : t)
-        )
-      })
-      
-      return { previousQueries }
-    },
-    onError: (err: any, vars, context) => {
-      // Rollback on error
-      context?.previousQueries.forEach(({ queryKey, data }) => {
-        queryClient.setQueryData(queryKey, data)
-      })
-      toast.error(err.message || 'Nie udało się zmienić przypięcia')
-    },
-    onSuccess: (data, { pin }) => {
-      toast.success(pin ? '📌 Przypięto jako MUST' : '📌 Odpięto z MUST')
-    }
-  })
-}
-
-export function usePostponeTask() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async ({ taskId, reason }: { taskId: string; reason?: string }) => {
-      const session = await getSessionWithRetry()
-
-      const response = await fetch('/api/day-assistant-v2/postpone', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({ task_id: taskId, reason: reason || 'Nie dziś', reserve_morning: true })
-      })
-
-      if (!response.ok) throw new Error('Failed to postpone task')
-      return response.json()
-    },
-    onMutate: async ({ taskId }) => {
-      await queryClient.cancelQueries({ queryKey: ['tasks'] })
-      
-      // Get all task query data
-      const queries = queryClient.getQueriesData<Task[]>({ queryKey: ['tasks'] })
-      const previousQueries = queries.map(([queryKey, data]) => ({ queryKey, data }))
-      
-      // Optimistically remove from today's list (all queries)
-      queries.forEach(([queryKey]) => {
-        queryClient.setQueryData(queryKey, (old: Task[] = []) =>
-          old.filter(t => t.id !== taskId)
-        )
-      })
-      
-      return { previousQueries }
-    },
-    onError: (err, vars, context) => {
-      // Rollback on error
-      context?.previousQueries.forEach(({ queryKey, data }) => {
-        queryClient.setQueryData(queryKey, data)
-      })
-      toast.error('Nie udało się przenieść zadania')
-    },
-    onSuccess: (data) => {
-      toast.success('📅 Przeniesiono na jutro')
-      queryClient.invalidateQueries({ queryKey: ['recommendation'] })
-    }
-  })
-}
-
-export function useToggleSubtask() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async ({ subtaskId, completed }: { subtaskId: string; completed: boolean }) => {
-      const session = await getSessionWithRetry()
-
-      const response = await fetch('/api/day-assistant-v2/subtasks', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({ subtask_id: subtaskId, completed })
-      })
-
-      if (!response.ok) throw new Error('Failed to toggle subtask')
-      return response.json()
-    },
-    onMutate: async ({ subtaskId, completed }) => {
-      await queryClient.cancelQueries({ queryKey: ['tasks'] })
-      
-      // Get all task query data
-      const queries = queryClient.getQueriesData<Task[]>({ queryKey: ['tasks'] })
-      const previousQueries = queries.map(([queryKey, data]) => ({ queryKey, data }))
-      
-      // Optimistically update subtask in all task lists
-      queries.forEach(([queryKey]) => {
-        queryClient.setQueryData(queryKey, (old: Task[] = []) =>
-          old.map(task => ({
-            ...task,
-            subtasks: task.subtasks?.map(sub =>
-              sub.id === subtaskId ? { ...sub, completed } : sub
-            )
-          }))
-        )
-      })
-      
-      return { previousQueries }
-    },
-    onError: (err, vars, context) => {
-      // Rollback on error
-      context?.previousQueries.forEach(({ queryKey, data }) => {
-        queryClient.setQueryData(queryKey, data)
-      })
-      toast.error('Nie udało się zaktualizować kroku')
-    },
-    onSuccess: (data, { completed }) => {
-      toast.success(completed ? '✅ Krok ukończony' : '↩️ Krok cofnięty')
-    }
-  })
-}
-
-export function useAcceptRecommendation() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async ({ 
-      proposalId, 
-      action, 
-      alternativeIndex, 
-      rejectReason 
-    }: { 
-      proposalId: string
-      action: 'accept_primary' | 'accept_alt' | 'reject'
-      alternativeIndex?: number
-      rejectReason?: string 
-    }) => {
-      const session = await getSessionWithRetry()
-
-      const response = await fetch('/api/day-assistant-v2/proposal', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({ 
-          proposal_id: proposalId, 
-          action, 
-          alternative_index: alternativeIndex,
-          reject_reason: rejectReason
-        })
-      })
-
-      if (!response.ok) throw new Error('Failed to respond to recommendation')
-      return response.json()
-    },
-    onMutate: async ({ proposalId }) => {
-      await queryClient.cancelQueries({ queryKey: ['recommendations'] })
-      
-      const previousRecs = queryClient.getQueryData(['recommendations'])
-      
-      // Optimistically remove processed recommendation
-      queryClient.setQueryData(['recommendations'], (old: any[] = []) =>
-        old.filter(p => p.id !== proposalId)
-      )
-      
-      return { previousRecs }
-    },
-    onError: (err, vars, context) => {
-      queryClient.setQueryData(['recommendations'], context?.previousRecs)
-      toast.error('Nie udało się zaktualizować rekomendacji')
-    },
-    onSuccess: (data, { action, rejectReason }) => {
-      if (action === 'reject' && rejectReason) {
-        toast.info(`Odrzucono: ${rejectReason}`)
-      } else if (action === 'accept_primary') {
-        toast.success('✅ Rekomendacja zaakceptowana')
-      } else {
-        toast.success('✅ Alternatywa zaakceptowana')
-      }
-      // Refresh tasks to reflect recommendation changes
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
-    }
-  })
-}
-
-export function useCreateSubtasks() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async ({ 
-      taskId, 
-      steps 
-    }: { 
-      taskId: string
-      steps: Array<{ content: string; estimated_duration: number; position: number }>
-    }) => {
-      const session = await getSessionWithRetry()
-
-      const response = await fetch('/api/day-assistant-v2/subtasks/bulk', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({ task_id: taskId, steps })
-      })
-
-      if (!response.ok) throw new Error('Failed to create subtasks')
-      return response.json()
-    },
-    onSuccess: (data, { taskId }) => {
-      toast.success('✅ Kroki utworzone!')
-      // Refresh tasks to show new subtasks
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
-    },
-    onError: (err) => {
-      toast.error('Nie udało się utworzyć kroków')
-    }
-  })
-}
+// Export only the types and the query hook
+// All mutation actions are now in useTaskActions.ts

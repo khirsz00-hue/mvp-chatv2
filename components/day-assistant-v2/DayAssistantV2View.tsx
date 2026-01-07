@@ -28,8 +28,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { useTaskTimer } from '@/hooks/useTaskTimer'
 import Button from '@/components/ui/Button'
 import { Plus, CalendarBlank, CaretDown, CaretUp } from '@phosphor-icons/react'
-import { useTasksQuery, useCompleteTask, useDeleteTask, useTogglePinTask, usePostponeTask } from '@/hooks/useTasksQuery'
-import { useQueryClient } from '@tanstack/react-query'
+import { useTasksQuery } from '@/hooks/useTasksQuery'
+import { useTaskActions } from '@/hooks/useTaskActions'
+import { useSWRConfig } from 'swr'
 
 const TOP_TASKS_COUNT = 3
 const isValidTimeFormat = (value: string) => /^\d{2}:\d{2}$/.test(value)
@@ -81,14 +82,11 @@ export function DayAssistantV2View() {
   
   // Custom hooks
   const { activeTimer, startTimer, pauseTimer, resumeTimer, stopTimer, formatTime } = useTaskTimer()
-  const queryClient = useQueryClient()
+  const { mutate: globalMutate } = useSWRConfig()
   
-  // React Query hooks for optimistic updates
+  // SWR hooks for data fetching with optimistic updates
   const { data: queryTasks, isLoading: tasksLoading, error: tasksError } = useTasksQuery(selectedDate)
-  const completeTaskMutation = useCompleteTask()
-  const deleteTaskMutation = useDeleteTask()
-  const togglePinMutation = useTogglePinTask()
-  const postponeTaskMutation = usePostponeTask()
+  const { completeTask, deleteTask, togglePinTask, postponeTask, toggleSubtask } = useTaskActions(selectedDate)
 
   // Load data on mount
   useEffect(() => {
@@ -96,8 +94,8 @@ export function DayAssistantV2View() {
     
     // Listen for task-added events (from FloatingAddButton)
     const handleTaskAdded = () => {
-      // Invalidate React Query cache to refetch tasks
-      queryClient.invalidateQueries({ queryKey: ['tasks', selectedDate] })
+      // Invalidate SWR cache to refetch tasks
+      globalMutate(`/api/day-assistant-v2/dayplan?date=${selectedDate}`)
     }
     window.addEventListener('task-added', handleTaskAdded)
     
@@ -105,7 +103,7 @@ export function DayAssistantV2View() {
       window.removeEventListener('task-added', handleTaskAdded)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate, queryClient])
+  }, [selectedDate, globalMutate])
   
   // Sync React Query tasks with local state
   useEffect(() => {
@@ -267,7 +265,7 @@ export function DayAssistantV2View() {
   const handleCompleteTask = async (taskId: string) => {
     try {
       // Use optimistic mutation - no loadData() call needed!
-      await completeTaskMutation.mutateAsync(taskId)
+      await completeTask(taskId)
       
       // Stop timer if this task was active
       if (activeTimer?.taskId === taskId) {
@@ -285,7 +283,7 @@ export function DayAssistantV2View() {
       const newIsMust = !task?.is_must
       
       // Use optimistic mutation - no loadData() call needed!
-      await togglePinMutation.mutateAsync({ taskId, pin: newIsMust })
+      await togglePinTask(taskId, newIsMust)
     } catch (error) {
       // Error handling is done in the mutation hook
       console.error('Error pinning task:', error)
@@ -295,7 +293,7 @@ export function DayAssistantV2View() {
   const handlePostponeTask = async (taskId: string) => {
     try {
       // Use optimistic mutation - no loadData() call needed!
-      await postponeTaskMutation.mutateAsync({ taskId })
+      await postponeTask(taskId)
     } catch (error) {
       // Error handling is done in the mutation hook
       console.error('Error postponing task:', error)
@@ -305,7 +303,7 @@ export function DayAssistantV2View() {
   const handleDeleteTask = async (taskId: string) => {
     try {
       // Use optimistic mutation - no loadData() call needed!
-      await deleteTaskMutation.mutateAsync(taskId)
+      await deleteTask(taskId)
       
       // Stop timer if this task was active
       if (activeTimer?.taskId === taskId) {
@@ -399,8 +397,8 @@ export function DayAssistantV2View() {
       
       setShowUniversalModal(false)
       setEditingTask(null)
-      // Invalidate React Query cache to refetch tasks
-      queryClient.invalidateQueries({ queryKey: ['tasks', selectedDate] })
+      // Invalidate SWR cache to refetch tasks
+      globalMutate(`/api/day-assistant-v2/dayplan?date=${selectedDate}`)
     } catch (error) {
       console.error('Error saving task:', error)
       toast.error('Błąd podczas zapisywania zadania')
@@ -424,8 +422,8 @@ export function DayAssistantV2View() {
       if (!response.ok) throw new Error('Failed to apply recommendation')
       
       toast.success('✅ Rekomendacja zastosowana')
-      // Invalidate React Query cache to refetch tasks
-      queryClient.invalidateQueries({ queryKey: ['tasks', selectedDate] })
+      // Invalidate SWR cache to refetch tasks
+      globalMutate(`/api/day-assistant-v2/dayplan?date=${selectedDate}`)
     } catch (error) {
       console.error('Error applying recommendation:', error)
       toast.error('Błąd podczas stosowania rekomendacji')
@@ -523,7 +521,7 @@ export function DayAssistantV2View() {
     // Just keep the due date as today - no API call needed for now
     toast.success(`📅 ${task.title} pozostaje na dziś`)
     // Invalidate to refresh
-    queryClient.invalidateQueries({ queryKey: ['tasks', selectedDate] })
+    globalMutate(`/api/day-assistant-v2/dayplan?date=${selectedDate}`)
   }
 
   const handleOverdueAddToday = async (task: TestDayTask) => {
@@ -547,8 +545,8 @@ export function DayAssistantV2View() {
       if (!response.ok) throw new Error('Failed to update task')
       
       toast.success(`📅 ${task.title} dodane na dziś`)
-      // Invalidate React Query cache to refetch tasks
-      queryClient.invalidateQueries({ queryKey: ['tasks', selectedDate] })
+      // Invalidate SWR cache to refetch tasks
+      globalMutate(`/api/day-assistant-v2/dayplan?date=${selectedDate}`)
     } catch (error) {
       console.error('Error updating task date:', error)
       toast.error('Błąd podczas aktualizacji zadania')
@@ -581,8 +579,8 @@ export function DayAssistantV2View() {
       if (!response.ok) throw new Error('Failed to reschedule task')
       
       toast.success(`📅 ${task.title} przeniesione na ${date}`)
-      // Invalidate React Query cache to refetch tasks
-      queryClient.invalidateQueries({ queryKey: ['tasks', selectedDate] })
+      // Invalidate SWR cache to refetch tasks
+      globalMutate(`/api/day-assistant-v2/dayplan?date=${selectedDate}`)
     } catch (error) {
       console.error('Error rescheduling task:', error)
       toast.error('Błąd podczas przesuwania zadania')
