@@ -19,6 +19,8 @@ import { UniversalTaskModal, TaskData } from '@/components/common/UniversalTaskM
 import { TaskContext } from '@/lib/services/contextInferenceService'
 import { toast } from 'sonner'
 import { recalculateDailyTotal } from '@/lib/gamification'
+import { FloatingChatButton } from '@/components/chat/FloatingChatButton'
+import { ChatAssistant } from '@/components/chat/ChatAssistant'
 
 /**
  * SubscriptionWall jest teraz WŁĄCZONY
@@ -39,6 +41,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [isAdmin, setIsAdmin] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [showQuickAdd, setShowQuickAdd] = useState(false)
+  const [showChat, setShowChat] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -116,21 +119,27 @@ export default function MainLayout({ children }: MainLayoutProps) {
     }
   }, [router])
   
-  // Global keyboard shortcut: Shift+Q
+  // Global keyboard shortcuts: Shift+Q and Shift+C
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is typing in input/textarea
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || 
+          target.tagName === 'TEXTAREA' || 
+          target.isContentEditable) {
+        return
+      }
+      
       // Shift+Q to open quick add modal
       if (e.shiftKey && e.key === 'Q') {
-        // Ignore if user is typing in input/textarea
-        const target = e.target as HTMLElement
-        if (target.tagName === 'INPUT' || 
-            target.tagName === 'TEXTAREA' || 
-            target.isContentEditable) {
-          return
-        }
-        
         e.preventDefault()
         setShowQuickAdd(true)
+      }
+      
+      // Shift+C to open chat assistant
+      if (e.shiftKey && e.key === 'C') {
+        e.preventDefault()
+        setShowChat(true)
       }
     }
 
@@ -327,17 +336,26 @@ export default function MainLayout({ children }: MainLayoutProps) {
               {/* Add Task Button - Top */}
               <FloatingAddButton onClick={() => setShowQuickAdd(true)} />
               
+              {/* Chat Assistant Button - Middle */}
+              <FloatingChatButton onClick={() => setShowChat(true)} />
+              
               {/* Voice Ramble Button - Bottom */}
               <VoiceCapture />
             </div>
             
-            {/* Universal Task Modal for Quick Add (Ctrl+K) */}
+            {/* Universal Task Modal for Quick Add (Shift+Q) */}
             <UniversalTaskModal
               open={showQuickAdd}
               onOpenChange={setShowQuickAdd}
               task={null}
               defaultDate={new Date().toISOString().split('T')[0]}
               onSave={handleQuickAdd}
+            />
+            
+            {/* Chat Assistant Modal (Shift+C) */}
+            <ChatAssistant
+              open={showChat}
+              onClose={() => setShowChat(false)}
             />
           </div>
         </SubscriptionWall>
@@ -376,17 +394,26 @@ export default function MainLayout({ children }: MainLayoutProps) {
             {/* Add Task Button - Top */}
             <FloatingAddButton onClick={() => setShowQuickAdd(true)} />
             
+            {/* Chat Assistant Button - Middle */}
+            <FloatingChatButton onClick={() => setShowChat(true)} />
+            
             {/* Voice Ramble Button - Bottom */}
             <VoiceCapture />
           </div>
           
-          {/* Universal Task Modal for Quick Add (Ctrl+K) */}
+          {/* Universal Task Modal for Quick Add (Shift+Q) */}
           <UniversalTaskModal
             open={showQuickAdd}
             onOpenChange={setShowQuickAdd}
             task={null}
             defaultDate={new Date().toISOString().split('T')[0]}
             onSave={handleQuickAdd}
+          />
+          
+          {/* Chat Assistant Modal (Shift+C) */}
+          <ChatAssistant
+            open={showChat}
+            onClose={() => setShowChat(false)}
           />
         </div>
       )}
