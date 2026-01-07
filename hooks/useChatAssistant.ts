@@ -86,13 +86,25 @@ export function useChatAssistant(): UseChatAssistantReturn {
       setMessages((prev) => [...prev, assistantMessage])
     } catch (err: any) {
       console.error('Error sending message:', err)
-      setError(err.message || 'Failed to send message')
+      
+      // Sanitize error message for user display
+      let userMessage = 'Nie udało się wysłać wiadomości. Spróbuj ponownie.'
+      
+      if (err.message?.includes('Session expired') || err.message?.includes('log in')) {
+        userMessage = 'Sesja wygasła. Zaloguj się ponownie.'
+      } else if (err.message?.includes('Rate limit')) {
+        userMessage = 'Zbyt wiele zapytań. Poczekaj chwilę i spróbuj ponownie.'
+      } else if (err.message?.includes('network') || err.message?.includes('fetch')) {
+        userMessage = 'Problem z połączeniem. Sprawdź internet i spróbuj ponownie.'
+      }
+      
+      setError(userMessage)
 
-      // Add error message to chat
+      // Add user-friendly error message to chat
       const errorMessage: ChatMessage = {
         id: `error-${Date.now()}`,
         role: 'assistant',
-        content: `Przepraszam, wystąpił błąd: ${err.message}. Spróbuj ponownie.`,
+        content: `Przepraszam, ${userMessage.toLowerCase()}`,
         timestamp: new Date(),
       }
 

@@ -166,9 +166,9 @@ export function ChatAssistant({ open, onClose }: ChatAssistantProps) {
                 </div>
                 <div className="flex-1 bg-gray-100 rounded-2xl px-4 py-3">
                   <div className="flex gap-1">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0ms]" />
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:150ms]" />
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:300ms]" />
                   </div>
                 </div>
               </div>
@@ -186,13 +186,19 @@ export function ChatAssistant({ open, onClose }: ChatAssistantProps) {
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Zapytaj o zadania, priorytety, wzorce..."
+                aria-label="Wiadomość do AI asystenta"
+                aria-describedby="chat-help-text"
                 className="flex-1 resize-none px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[52px] max-h-32"
                 rows={1}
                 disabled={isLoading}
               />
+              <span id="chat-help-text" className="sr-only">
+                Wpisz pytanie i naciśnij Enter aby wysłać. Shift+Enter dla nowej linii.
+              </span>
               <button
                 onClick={handleSend}
                 disabled={!inputValue.trim() || isLoading}
+                aria-label="Wyślij wiadomość"
                 className={`px-6 py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${
                   inputValue.trim() && !isLoading
                     ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:shadow-lg hover:scale-105'

@@ -74,7 +74,11 @@ export async function fetchChatContext(
   userId: string
 ): Promise<UserContext> {
   const today = new Date().toISOString().split('T')[0]
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
+  const sevenDaysAgo = new Date(Date.now() - SEVEN_DAYS_MS)
+    .toISOString()
+    .split('T')[0]
+  const sevenDaysFromNow = new Date(Date.now() + SEVEN_DAYS_MS)
     .toISOString()
     .split('T')[0]
 
@@ -100,7 +104,7 @@ export async function fetchChatContext(
         )
         .eq('user_id', userId)
         .gt('due_date', today)
-        .lte('due_date', new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+        .lte('due_date', sevenDaysFromNow)
         .eq('completed', false)
         .order('due_date', { ascending: true })
         .limit(10),
