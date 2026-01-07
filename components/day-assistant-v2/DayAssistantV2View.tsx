@@ -24,7 +24,9 @@ import { DecisionLogPanel, Decision } from './DecisionLogPanel'
 import { MorningReviewModal } from './MorningReviewModal'
 import { DayAssistantV2TaskCard } from './DayAssistantV2TaskCard'
 import { RecommendationPanel } from './RecommendationPanel'
+import { AIInsightsPanel } from '@/components/assistant/AIInsightsPanel'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { logDecision } from '@/lib/services/dayAssistantV2Service'
 import { useTaskTimer } from '@/hooks/useTaskTimer'
 import Button from '@/components/ui/Button'
 import { Plus, CalendarBlank, CaretDown, CaretUp } from '@phosphor-icons/react'
@@ -194,6 +196,34 @@ export function DayAssistantV2View() {
   useEffect(() => {
     loadMeetings()
   }, [loadMeetings])
+
+  // Load decisions from database
+  useEffect(() => {
+    const fetchDecisions = async () => {
+      if (!dayPlan?.assistant_id) return
+      
+      try {
+        const { data, error } = await supabase
+          .from('day_assistant_v2_decision_log')
+          .select('id, action, reason, timestamp, context')
+          .eq('assistant_id', dayPlan.assistant_id)
+          .order('timestamp', { ascending: false })
+          .limit(10)
+        
+        if (error) throw error
+        
+        setDecisions(data.map(d => ({
+          id: d.id,
+          text: d.reason || d.action,
+          timestamp: d.timestamp
+        })))
+      } catch (err) {
+        console.error('Failed to fetch decisions:', err)
+      }
+    }
+    
+    fetchDecisions()
+  }, [dayPlan?.assistant_id])
 
   const loadData = async () => {
     try {
@@ -507,14 +537,37 @@ export function DayAssistantV2View() {
     setShowOverdueModal(true)
   }
 
-  const handleLogDecision = (text: string) => {
-    const newDecision: Decision = {
-      id: Date.now().toString(),
-      text,
-      timestamp: new Date().toISOString()
+  const handleLogDecision = async (text: string) => {
+    if (!dayPlan?.assistant_id) return
+    
+    try {
+      // Get user ID
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user?.id) {
+        toast.error('Sesja wygasła - zaloguj się ponownie')
+        return
+      }
+      
+      const entry = await logDecision(
+        user.id,
+        dayPlan.assistant_id,
+        'manual_decision',
+        { reason: text },
+        supabase
+      )
+      
+      if (entry) {
+        setDecisions(prev => [{
+          id: entry.id,
+          text: text,
+          timestamp: entry.timestamp
+        }, ...prev])
+        toast.success('Decyzja zapisana!')
+      }
+    } catch (err) {
+      console.error('Failed to log decision:', err)
+      toast.error('Nie udało się zapisać decyzji')
     }
-    setDecisions(prev => [newDecision, ...prev])
-    toast.success('✅ Decyzja zapisana')
   }
 
   const handleKeepOverdueToday = async (task: TestDayTask) => {
@@ -1068,20 +1121,25 @@ export function DayAssistantV2View() {
             onLogDecision={handleLogDecision}
           />
 
-          {/* AI Recommendations */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold">
-                🤖 AI Insights
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <RecommendationPanel
-                recommendations={recommendations}
-                onApply={handleApplyRecommendation}
-              />
-            </CardContent>
-          </Card>
+          {/* AI Insights */}
+          <AIInsightsPanel 
+            tasks={filteredTasks.map(t => ({
+              id: t.id,
+              content: t.title,
+              priority: validatePriority(t.priority),
+              due: t.due_date || undefined,
+              completed: false
+            }))}
+            completedTasks={tasks.filter(t => t.completed).map(t => ({
+              id: t.id,
+              content: t.title,
+              priority: validatePriority(t.priority),
+              due: t.due_date || undefined,
+              completed: true,
+              completed_at: t.completed_at || undefined
+            }))}
+            className="w-full"
+          />
         </div>
       </div>
 
