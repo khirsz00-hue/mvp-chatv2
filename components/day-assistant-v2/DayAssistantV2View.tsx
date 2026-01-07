@@ -110,7 +110,8 @@ export function DayAssistantV2View() {
   // Sync React Query tasks with local state
   useEffect(() => {
     if (queryTasks) {
-      setTasks(queryTasks)
+      // Cast Task[] to TestDayTask[] - they have compatible structures
+      setTasks(queryTasks as unknown as TestDayTask[])
       setLoading(false)
     }
   }, [queryTasks])
