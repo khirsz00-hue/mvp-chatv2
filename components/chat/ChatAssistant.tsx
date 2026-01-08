@@ -22,6 +22,7 @@ export function ChatAssistant({ open, onClose }: ChatAssistantProps) {
   const [isMinimized, setIsMinimized] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
+  const [lastMessageTime, setLastMessageTime] = useState(0)
   const { streamMessage, isStreaming } = useChatStream()
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -32,6 +33,14 @@ export function ChatAssistant({ open, onClose }: ChatAssistantProps) {
 
   const handleSend = async () => {
     if (!input.trim() || isStreaming) return
+
+    // Rate limiting: min 2s between messages
+    const now = Date.now()
+    if (now - lastMessageTime < 2000) {
+      toast.error('Poczekaj chwilę przed następnym pytaniem')
+      return
+    }
+    setLastMessageTime(now)
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
