@@ -238,6 +238,49 @@ export async function fetchChatContext(
 }
 
 /**
+ * Format context for AI prompt - MINIMAL VERSION for ultra-short responses
+ */
+export function formatMinimalContextForAI(context: UserContext): string {
+  const today = new Date().toISOString().split('T')[0]
+  
+  // Calculate stats
+  const mustTasksToday = context.tasks.today.filter((t) => t.is_must)
+  const totalTimeToday = context.tasks.today.reduce((sum, t) => sum + t.estimate_min, 0)
+  
+  // Get top 10 tasks
+  const topTasks = context.tasks.today.slice(0, 10).map(t => ({
+    title: t.title,
+    time: t.estimate_min,
+    must: t.is_must
+  }))
+  
+  // Compact JSON structure
+  return JSON.stringify({
+    tasks: {
+      today: {
+        total: context.tasks.today.length,
+        must: mustTasksToday.length,
+        totalTime: totalTimeToday,
+        list: topTasks
+      },
+      overdue: context.tasks.overdue.length
+    },
+    journal: {
+      avgEnergy: context.journal.stats.avg_energy || 0,
+      avgSleep: context.journal.stats.avg_hours_slept || 0,
+      lastEntry: context.journal.recent[0] || null
+    },
+    decisions: context.decisions.active.map(d => d.title),
+    patterns: {
+      completionRate: context.patterns.total_tasks_count > 0 
+        ? Math.round((context.patterns.completed_tasks_count / context.patterns.total_tasks_count) * 100) 
+        : 0,
+      avgPostpones: context.patterns.avg_postpone_count
+    }
+  }, null, 2)
+}
+
+/**
  * Format context for AI prompt
  */
 export function formatContextForAI(context: UserContext): string {

@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedSupabaseClient, getAuthenticatedUser } from '@/lib/supabaseAuth'
-import { fetchChatContext, formatContextForAI } from '@/lib/services/chatContextService'
+import { fetchChatContext, formatMinimalContextForAI } from '@/lib/services/chatContextService'
 import OpenAI from 'openai'
 
 // Initialize OpenAI client only if API key is available
@@ -25,44 +25,26 @@ interface ChatRequest {
   conversationHistory?: ChatMessage[]
 }
 
-const SYSTEM_PROMPT = `Jesteś AI asystentem pomagającym użytkownikowi z ADHD w zarządzaniu zadaniami, czasem i decyzjami.
+const SYSTEM_PROMPT = `Jesteś AI asystentem ADHD Buddy. 
 
-TWOJA ROLA:
-- Pomagasz użytkownikowi organizować zadania i priorytety
-- Sugerujesz optymalne podejście do pracy na podstawie energii i obciążenia
-- Analizujesz wzorce zachowań i pomagasz je poprawić
-- Wspierasz w podejmowaniu decyzji
-- Odpowiadasz w języku polskim
-
-ZASADY:
-- Bądź zwięzły ale pomocny
-- Sugeruj konkretne akcje
-- Uwzględniaj cognitive load zadań
-- Priorytetyzuj zadania MUST
-- Dostosowuj odpowiedzi do poziomu energii użytkownika
-- Używaj emotikonów dla lepszej komunikacji 😊
-- Jeśli nie masz danych do odpowiedzi, powiedz to wprost
-
-FORMAT ODPOWIEDZI:
-- Krótkie akapity (2-3 zdania max)
-- Listy punktowe dla przejrzystości
-- Konkretne rekomendacje z czasem (np. "Zacznij od X, zajmie 30 min")
+ZASADY ODPOWIEDZI:
+- Maksymalnie 1-2 zdania
+- Zero pouczeń ("powinieneś", "sugeruję", "warto")
+- Tylko konkretne fakty i liczby
+- Format: "{odpowiedź}. {opcjonalny dodatkowy fakt}."
 
 PRZYKŁADY:
-User: "Co mam dziś zrobić?"
-AI: "Masz 3 zadania MUST na dziś (łącznie 90 minut). Twoja energia z dziennika to 7/10, więc polecam:
-1. Zacznij od [zadanie najważniejsze] - 30 min
-2. Później [zadanie drugie] - 45 min  
-3. Na koniec [zadanie trzecie] - 15 min
+User: "Kiedy najlepszy czas na spotkanie?"
+AI: "Środa 15:00 - wolny slot, energia 8/10."
 
-Zostaw trudne zadania na poranek gdy masz więcej energii! 💪"
+User: "Jakie zadania na dziś?"
+AI: "8 zadań, 210 min. 3 MUST: mvpPost, Faktury, Pavel Lux."
 
-User: "Czy mam czas na nowe zadanie?"
-AI: "Sprawdźmy 🤔
-- Już masz: 4h zaplanowanych zadań
-- Dzień pracy: ~8h
-- Zostało: ~4h
-Tak, masz czas! Ale pamiętaj o przerwach. Ile czasu zajmie nowe zadanie?"`
+User: "Jak spałem?"
+AI: "Ostatnie 7 dni: 6.2h średnio. Najlepiej: sobota (8h)."
+
+NIE TWÓRZ kolejek zadań - to robi Day Assistant V2.
+NIE POUCZAJ jak pracować.`
 
 export async function POST(request: NextRequest) {
   try {
@@ -111,7 +93,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch user context
     const context = await fetchChatContext(supabase, user.id)
-    const contextString = formatContextForAI(context)
+    const contextString = formatMinimalContextForAI(context)
 
     console.log(`✅ [Chat Assistant API] Context fetched:
 - Tasks today: ${context.tasks.today.length}
@@ -129,7 +111,7 @@ export async function POST(request: NextRequest) {
         role: 'system',
         content: `DANE UŻYTKOWNIKA:\n${contextString}`,
       },
-      ...conversationHistory.slice(-10), // Keep last 10 messages for context
+      ...conversationHistory.slice(-6), // Keep last 6 messages (3 pairs) for context
       {
         role: 'user',
         content: message,
@@ -138,34 +120,45 @@ export async function POST(request: NextRequest) {
 
     console.log(`🔍 [Chat Assistant API] Calling OpenAI with ${messages.length} messages`)
 
-    // Call OpenAI
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+    // Call OpenAI with streaming
+    const stream = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
       messages: messages as any,
-      temperature: 0.7,
-      max_tokens: 500,
+      temperature: 0.3,
+      max_tokens: 150,
+      stream: true,
     })
 
-    const assistantMessage = completion.choices[0]?.message?.content
+    console.log(`✅ [Chat Assistant API] Streaming response started`)
 
-    if (!assistantMessage) {
-      console.error('❌ [Chat Assistant API] No response from OpenAI')
-      return NextResponse.json(
-        { error: 'Failed to get response from AI' },
-        { status: 500 }
-      )
-    }
+    // Create SSE (Server-Sent Events) response
+    const encoder = new TextEncoder()
+    const readable = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const chunk of stream) {
+            const text = chunk.choices[0]?.delta?.content
+            if (text) {
+              const data = `data: ${JSON.stringify({ text })}\n\n`
+              controller.enqueue(encoder.encode(data))
+            }
+          }
+          controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+        } catch (err) {
+          console.error('❌ [Chat Assistant API] Streaming error:', err)
+          controller.error(err)
+        } finally {
+          controller.close()
+        }
+      }
+    })
 
-    console.log(`✅ [Chat Assistant API] OpenAI response received (${assistantMessage.length} chars)`)
-
-    return NextResponse.json({
-      message: assistantMessage,
-      context_summary: {
-        tasks_today: context.tasks.today.length,
-        must_tasks: context.tasks.today.filter(t => t.is_must).length,
-        overdue: context.tasks.overdue.length,
-        avg_energy: context.journal.stats.avg_energy,
-      },
+    return new Response(readable, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
+      }
     })
   } catch (error: any) {
     console.error('❌ [Chat Assistant API] Error:', error)
