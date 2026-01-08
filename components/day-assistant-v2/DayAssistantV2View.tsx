@@ -10,7 +10,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { UniversalTaskModal, TaskData } from '@/components/common/UniversalTaskModal'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabaseClient'
-import { TestDayTask, DayPlan, Recommendation, WorkMode } from '@/lib/types/dayAssistantV2'
+import { TestDayTask, DayPlan, WorkMode } from '@/lib/types/dayAssistantV2'
 import { scoreAndSortTasksV3 } from '@/lib/services/dayAssistantV2RecommendationEngine'
 import { calculateAvailableMinutes } from '@/hooks/useTaskQueue'
 import { DayAssistantV2StatusBar } from './DayAssistantV2StatusBar'
@@ -23,8 +23,9 @@ import { TodaysFlowPanel } from './TodaysFlowPanel'
 import { DecisionLogPanel, Decision } from './DecisionLogPanel'
 import { MorningReviewModal } from './MorningReviewModal'
 import { DayAssistantV2TaskCard } from './DayAssistantV2TaskCard'
-import { RecommendationPanel } from './RecommendationPanel'
+import { AIInsightsPanel } from '@/components/assistant/AIInsightsPanel'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { logDecision } from '@/lib/services/dayAssistantV2Service'
 import { useTaskTimer } from '@/hooks/useTaskTimer'
 import Button from '@/components/ui/Button'
 import { Plus, CalendarBlank, CaretDown, CaretUp } from '@phosphor-icons/react'
@@ -49,7 +50,6 @@ export function DayAssistantV2View() {
   const [tasks, setTasks] = useState<TestDayTask[]>([])
   const [dayPlan, setDayPlan] = useState<DayPlan | null>(null)
   const [assistant, setAssistant] = useState<any>(null)
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([])
   const [taskStats, setTaskStats] = useState<TaskStats>({
     completedToday: 0,
     totalToday: 0,
@@ -195,6 +195,34 @@ export function DayAssistantV2View() {
     loadMeetings()
   }, [loadMeetings])
 
+  // Load decisions from database
+  useEffect(() => {
+    const fetchDecisions = async () => {
+      if (!dayPlan?.assistant_id) return
+      
+      try {
+        const { data, error } = await supabase
+          .from('day_assistant_v2_decision_log')
+          .select('id, action, reason, timestamp, context')
+          .eq('assistant_id', dayPlan.assistant_id)
+          .order('timestamp', { ascending: false })
+          .limit(10)
+        
+        if (error) throw error
+        
+        setDecisions(data.map(d => ({
+          id: d.id,
+          text: d.reason || d.action,
+          timestamp: d.timestamp
+        })))
+      } catch (err) {
+        console.error('Failed to fetch decisions:', err)
+      }
+    }
+    
+    fetchDecisions()
+  }, [dayPlan?.assistant_id])
+
   const loadData = async () => {
     try {
       setLoading(true)
@@ -231,34 +259,11 @@ export function DayAssistantV2View() {
         setWorkHoursEnd(data.dayPlan.metadata.work_end_time)
       }
       
-      // Fetch recommendations
-      await fetchRecommendations()
-      
     } catch (error) {
       console.error('Error loading data:', error)
       toast.error('Błąd podczas ładowania danych')
     } finally {
       // Don't set loading false here - React Query handles it
-    }
-  }
-
-  const fetchRecommendations = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
-      
-      const response = await fetch(`/api/day-assistant-v2/recommend?date=${selectedDate}`, {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        }
-      })
-      
-      if (response.ok) {
-        const data = await response.json()
-        setRecommendations(data.recommendations || [])
-      }
-    } catch (error) {
-      console.error('Error fetching recommendations:', error)
     }
   }
 
@@ -405,31 +410,6 @@ export function DayAssistantV2View() {
     }
   }
 
-  const handleApplyRecommendation = async (rec: Recommendation) => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
-      
-      const response = await fetch('/api/day-assistant-v2/apply-recommendation', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ recommendationId: rec.id })
-      })
-      
-      if (!response.ok) throw new Error('Failed to apply recommendation')
-      
-      toast.success('✅ Rekomendacja zastosowana')
-      // Invalidate SWR cache to refetch tasks
-      globalMutate(`/api/day-assistant-v2/dayplan?date=${selectedDate}`)
-    } catch (error) {
-      console.error('Error applying recommendation:', error)
-      toast.error('Błąd podczas stosowania rekomendacji')
-    }
-  }
-
   const handleWorkModeChange = (mode: WorkMode) => {
     setWorkMode(mode)
     toast.success(`Tryb pracy: ${mode}`)
@@ -507,14 +487,37 @@ export function DayAssistantV2View() {
     setShowOverdueModal(true)
   }
 
-  const handleLogDecision = (text: string) => {
-    const newDecision: Decision = {
-      id: Date.now().toString(),
-      text,
-      timestamp: new Date().toISOString()
+  const handleLogDecision = async (text: string) => {
+    if (!dayPlan?.assistant_id) return
+    
+    try {
+      // Get user ID
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user?.id) {
+        toast.error('Sesja wygasła - zaloguj się ponownie')
+        return
+      }
+      
+      const entry = await logDecision(
+        user.id,
+        dayPlan.assistant_id,
+        'manual_decision',
+        { reason: text },
+        supabase
+      )
+      
+      if (entry) {
+        setDecisions(prev => [{
+          id: entry.id,
+          text: text,
+          timestamp: entry.timestamp
+        }, ...prev])
+        toast.success('Decyzja zapisana!')
+      }
+    } catch (err) {
+      console.error('Failed to log decision:', err)
+      toast.error('Nie udało się zapisać decyzji')
     }
-    setDecisions(prev => [newDecision, ...prev])
-    toast.success('✅ Decyzja zapisana')
   }
 
   const handleKeepOverdueToday = async (task: TestDayTask) => {
@@ -658,6 +661,16 @@ export function DayAssistantV2View() {
   const validatePriority = (priority: number): 1 | 2 | 3 | 4 => {
     return (priority >= 1 && priority <= 4 ? priority : 1) as 1 | 2 | 3 | 4
   }
+
+  // Helper function to map task to AI Insights format
+  const mapTaskForAIInsights = (task: TestDayTask) => ({
+    id: task.id,
+    content: task.title,
+    priority: validatePriority(task.priority),
+    due: task.due_date || undefined,
+    completed: task.completed,
+    completed_at: task.completed_at || undefined
+  })
 
   // Score and sort tasks FIRST using V3 algorithm
   const scoredTasks = useMemo(() => {
@@ -1068,20 +1081,12 @@ export function DayAssistantV2View() {
             onLogDecision={handleLogDecision}
           />
 
-          {/* AI Recommendations */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold">
-                🤖 AI Insights
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <RecommendationPanel
-                recommendations={recommendations}
-                onApply={handleApplyRecommendation}
-              />
-            </CardContent>
-          </Card>
+          {/* AI Insights */}
+          <AIInsightsPanel 
+            tasks={filteredTasks.map(mapTaskForAIInsights)}
+            completedTasks={tasks.filter(t => t.completed).map(mapTaskForAIInsights)}
+            className="w-full"
+          />
         </div>
       </div>
 
