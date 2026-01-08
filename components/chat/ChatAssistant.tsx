@@ -101,9 +101,10 @@ export function ChatAssistant({ open, onClose }: ChatAssistantProps) {
   }
 
   return (
-    <div className="fixed bottom-24 right-6 z-50 
-                    w-[400px] h-[600px]
-                    bg-white rounded-2xl shadow-2xl
+    <div className="fixed bottom-0 left-0 right-0 top-0 z-50
+                    md:bottom-24 md:right-6 md:left-auto md:top-auto
+                    md:w-[400px] md:h-[600px]
+                    bg-white md:rounded-2xl shadow-2xl
                     border border-gray-200
                     flex flex-col
                     animate-in fade-in slide-in-from-bottom-4 duration-300">
@@ -111,7 +112,7 @@ export function ChatAssistant({ open, onClose }: ChatAssistantProps) {
       {/* Header */}
       <div className="px-4 py-3 
                       bg-gradient-to-r from-cyan-600 to-blue-600
-                      text-white rounded-t-2xl
+                      text-white md:rounded-t-2xl
                       flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Sparkle size={20} weight="fill" />
@@ -193,7 +194,7 @@ export function ChatAssistant({ open, onClose }: ChatAssistantProps) {
       </div>
 
       {/* Input Area */}
-      <div className="p-3 border-t bg-white rounded-b-2xl">
+      <div className="p-3 border-t bg-white md:rounded-b-2xl">
         <div className="flex gap-2 items-center">
           <input 
             type="text"
