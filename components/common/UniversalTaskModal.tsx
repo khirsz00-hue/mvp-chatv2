@@ -298,6 +298,8 @@ export function UniversalTaskModal({
   }, [isTimerRunning])
   
   // Auto-stop Pomodoro at time limit
+  // Note: Using inline setIsTimerRunning instead of stopPomodoro() to avoid
+  // dependency order issues (stopPomodoro is defined later in the component)
   useEffect(() => {
     if (!isTimerRunning || timeTab !== 'pomodoro') return
     

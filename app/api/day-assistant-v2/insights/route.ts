@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getOpenAIClient } from '@/lib/openai'
 
+// Time period constants
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
+
 export async function GET(req: NextRequest) {
   try {
     const supabase = createClient(
@@ -45,7 +49,7 @@ export async function GET(req: NextRequest) {
       .select('id, title, completed_at, cognitive_load, context_type, estimate_min')
       .eq('user_id', user.id)
       .eq('completed', true)
-      .gte('completed_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+      .gte('completed_at', new Date(Date.now() - THIRTY_DAYS_MS).toISOString())
       .order('completed_at', { ascending: false })
 
     console.log('✅ [Insights API] Found', completedTasks?.length || 0, 'completed tasks')
@@ -56,7 +60,7 @@ export async function GET(req: NextRequest) {
       .select('task_id, action, from_date, to_date, reason, context, timestamp')
       .eq('user_id', user.id)
       .eq('action', 'postpone')
-      .gte('timestamp', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+      .gte('timestamp', new Date(Date.now() - THIRTY_DAYS_MS).toISOString())
       .order('timestamp', { ascending: false })
 
     console.log('⏭️ [Insights API] Found', postpones?.length || 0, 'postpones')
@@ -88,7 +92,7 @@ export async function GET(req: NextRequest) {
       .select('id, title, created_at')
       .eq('user_id', user.id)
       .eq('completed', false)
-      .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+      .gte('created_at', new Date(Date.now() - SEVEN_DAYS_MS).toISOString())
 
     // Calculate statistics
     const stats = {
@@ -117,7 +121,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Count tasks completed in last 7 days
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    const sevenDaysAgo = new Date(Date.now() - SEVEN_DAYS_MS)
     stats.tasksCompletedLast7Days = completedTasks?.filter(t => 
       new Date(t.completed_at) >= sevenDaysAgo
     ).length || 0
@@ -233,7 +237,13 @@ Zwróć JSON:
       response_format: { type: 'json_object' }
     })
 
-    const result = JSON.parse(completion.choices[0].message.content || '{"insights":[]}')
+    let result
+    try {
+      result = JSON.parse(completion.choices[0].message.content || '{"insights":[]}')
+    } catch (parseError) {
+      console.error('❌ [Insights API] Failed to parse OpenAI response:', parseError)
+      result = { insights: [] }
+    }
     
     console.log('✅ [Insights API] Generated', result.insights?.length || 0, 'insights')
 
