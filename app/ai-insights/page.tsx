@@ -3,141 +3,129 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
-import { AIInsightsPanel } from '@/components/assistant/AIInsightsPanel'
 import Card from '@/components/ui/Card'
-import { Sparkle, ArrowLeft } from '@phosphor-icons/react'
+import { Sparkle, ArrowLeft, Warning, CheckCircle, Info } from '@phosphor-icons/react'
 import Button from '@/components/ui/Button'
+import { cn } from '@/lib/utils'
 
-// Constants
-const MAX_ACTIVE_TASKS = 50
-const MAX_COMPLETED_TASKS = 20
-
-interface TodoistTask {
-  id: string
-  content: string
-  priority: number
-  due?: { date: string } | null
-  completed?: boolean
-  completed_at?: string | null
+interface AIInsight {
+  type: 'warning' | 'success' | 'info'
+  title: string
+  description: string
+  data?: Record<string, any>
 }
 
-interface Task {
-  id: string
-  content: string
-  priority: 1 | 2 | 3 | 4
-  due?: { date: string } | string
-  completed?: boolean
-  completed_at?: string
+interface InsightsResponse {
+  insights: AIInsight[]
+  stats: {
+    avgSleepHours: number
+    avgEnergy: number
+    avgMotivation: number
+    avgSleepQuality: number
+    completionRate: number
+    tasksAddedLast7Days: number
+    tasksCompletedLast7Days: number
+  }
+  dataAvailable: {
+    journalEntries: number
+    completedTasks: number
+    postpones: number
+    dayPlans: number
+  }
 }
-
-// Helper to normalize priority
-// Todoist API uses 1-4 priority values. We pass them through as-is.
-const normalizePriority = (priority: number): 1 | 2 | 3 | 4 => {
-  // Clamp to valid range
-  if (priority < 1) return 1
-  if (priority > 4) return 4
-  return priority as 1 | 2 | 3 | 4
-}
-
-// Helper to convert Todoist task to Task format
-const convertToTask = (task: TodoistTask): Task => ({
-  id: task.id,
-  content: task.content,
-  priority: normalizePriority(task.priority),
-  due: task.due?.date || undefined,
-  completed: task.completed,
-  completed_at: task.completed_at || undefined
-})
 
 export default function AIInsightsPage() {
   const router = useRouter()
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [completedTasks, setCompletedTasks] = useState<Task[]>([])
+  const [insights, setInsights] = useState<AIInsight[]>([])
+  const [stats, setStats] = useState<InsightsResponse['stats'] | null>(null)
+  const [dataAvailable, setDataAvailable] = useState<InsightsResponse['dataAvailable'] | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const fetchTasks = async () => {
+    const fetchInsights = async () => {
       try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          router.push('/login')
+          return
+        }
+
         const { data: { session } } = await supabase.auth.getSession()
         if (!session) {
           router.push('/login')
           return
         }
 
-        // Get Todoist token from localStorage
-        const todoistToken = localStorage.getItem('todoist_token')
-        if (!todoistToken) {
-          console.warn('No Todoist token found')
-          setTasks([])
-          setCompletedTasks([])
-          setLoading(false)
-          return
+        const response = await fetch('/api/day-assistant-v2/insights', {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`
+          }
+        })
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch insights')
         }
 
-        // Fetch tasks from Todoist API using POST for security (token in body)
-        // 'all' filter returns active tasks, 'completed' returns completed tasks
-        const [activeResponse, completedResponse] = await Promise.all([
-          fetch('/api/todoist/tasks', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token: todoistToken, filter: 'all' })
-          }),
-          fetch('/api/todoist/tasks', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token: todoistToken, filter: 'completed' })
-          })
-        ])
-
-        if (!activeResponse.ok || !completedResponse.ok) {
-          throw new Error('Failed to fetch tasks')
-        }
-
-        const activeData = await activeResponse.json()
-        const completedData = await completedResponse.json()
-
-        const activeTasks = (activeData.tasks || [])
-          .filter((t: TodoistTask) => !t.completed)
-          .slice(0, MAX_ACTIVE_TASKS)
-          .map(convertToTask)
-
-        const completedTasksList = (completedData.tasks || [])
-          .slice(0, MAX_COMPLETED_TASKS)
-          .map(convertToTask)
-
-        setTasks(activeTasks)
-        setCompletedTasks(completedTasksList)
-      } catch (error) {
-        console.error('Error fetching tasks:', error)
-        // Set empty arrays on error to allow UI to render
-        setTasks([])
-        setCompletedTasks([])
+        const data: InsightsResponse = await response.json()
+        setInsights(data.insights || [])
+        setStats(data.stats)
+        setDataAvailable(data.dataAvailable)
+      } catch (err: any) {
+        console.error('Failed to fetch insights:', err)
+        setError(err.message || 'Nie udało się wygenerować insightów')
       } finally {
         setLoading(false)
       }
     }
 
-    fetchTasks()
+    fetchInsights()
   }, [router])
+
+  const getInsightIcon = (type: AIInsight['type']) => {
+    switch (type) {
+      case 'warning':
+        return <Warning size={24} weight="fill" className="text-orange-600" />
+      case 'success':
+        return <CheckCircle size={24} weight="fill" className="text-green-600" />
+      case 'info':
+        return <Info size={24} weight="fill" className="text-blue-600" />
+    }
+  }
+
+  const getInsightBgColor = (type: AIInsight['type']) => {
+    switch (type) {
+      case 'warning':
+        return 'bg-orange-50 border-orange-200'
+      case 'success':
+        return 'bg-green-50 border-green-200'
+      case 'info':
+        return 'bg-blue-50 border-blue-200'
+    }
+  }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="w-8 h-8 border-4 border-brand-purple border-t-transparent rounded-full animate-spin" />
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-brand-purple border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Analizuję Twoje dane...</p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="container mx-auto px-4 py-8 max-w-5xl">
       {/* Header */}
       <div className="mb-8">
         <Button
           variant="ghost"
+          size="sm"
           onClick={() => router.back()}
           className="mb-4"
         >
-          <ArrowLeft size={20} className="mr-2" />
+          <ArrowLeft size={16} className="mr-2" />
           Powrót
         </Button>
         
@@ -148,72 +136,142 @@ export default function AIInsightsPage() {
           </h1>
         </div>
         <p className="text-gray-600 text-lg">
-          Inteligentne obserwacje i wzorce wykryte w Twoich zadaniach
+          Personalne obserwacje bazujące na Twoich rzeczywistych danych
         </p>
       </div>
 
-      {/* Main Content */}
-      <div className="space-y-6">
-        <Card className="p-6">
-          <div className="mb-4">
-            <h2 className="text-xl font-semibold mb-2">Jak działają AI Insights?</h2>
-            <p className="text-gray-600">
-              AI analizuje Twoje zadania, wzorce pracy i produktywność, aby dostarczyć 
-              wartościowe obserwacje. To pasywne sugestie - nie musisz na nie reagować, 
-              ale mogą pomóc w lepszym zarządzaniu czasem.
+      {/* Info Card */}
+      <Card className="mb-6 bg-purple-50 border-purple-200">
+        <div className="p-6">
+          <h3 className="font-semibold text-purple-900 mb-2 flex items-center gap-2">
+            <Sparkle size={20} weight="fill" />
+            Czym są AI Insights?
+          </h3>
+          <p className="text-purple-800 text-sm mb-3">
+            AI analizuje Twoje dane z dziennika, zadań i wzorców pracy z ostatnich 30 dni, 
+            aby znaleźć korelacje i wzorce, które pomogą Ci lepiej zarządzać czasem i energią.
+          </p>
+          {dataAvailable && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+              <div className="text-center p-2 bg-white rounded-lg">
+                <div className="text-xl font-bold text-purple-700">{dataAvailable.journalEntries}</div>
+                <div className="text-xs text-purple-600">Wpisów dziennika</div>
+              </div>
+              <div className="text-center p-2 bg-white rounded-lg">
+                <div className="text-xl font-bold text-purple-700">{dataAvailable.completedTasks}</div>
+                <div className="text-xs text-purple-600">Ukończonych zadań</div>
+              </div>
+              <div className="text-center p-2 bg-white rounded-lg">
+                <div className="text-xl font-bold text-purple-700">{dataAvailable.postpones}</div>
+                <div className="text-xs text-purple-600">Przełożeń</div>
+              </div>
+              <div className="text-center p-2 bg-white rounded-lg">
+                <div className="text-xl font-bold text-purple-700">{dataAvailable.dayPlans}</div>
+                <div className="text-xs text-purple-600">Dni z planem</div>
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* Error State */}
+      {error && (
+        <Card className="mb-6 bg-red-50 border-red-200">
+          <div className="p-6">
+            <h3 className="font-semibold text-red-900 mb-2">Błąd</h3>
+            <p className="text-red-800 text-sm">{error}</p>
+          </div>
+        </Card>
+      )}
+
+      {/* Insights */}
+      {insights.length === 0 && !error ? (
+        <Card>
+          <div className="p-12 text-center">
+            <Sparkle size={48} className="mx-auto mb-4 text-gray-300" />
+            <h3 className="text-xl font-semibold mb-2">Brak wystarczających danych</h3>
+            <p className="text-gray-500 mb-4">
+              Aby wygenerować insighty, potrzebujesz więcej danych w dzienniku i zadaniach.
+              <br />
+              Prowadź dziennik regularnie przez kilka dni!
             </p>
           </div>
-          
-          <div className="grid md:grid-cols-3 gap-4 text-sm">
-            <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
-              <div className="font-semibold text-orange-900 mb-1">⚠️ Ostrzeżenia</div>
-              <div className="text-orange-700">Przeciążenie, ryzyko wypalenia</div>
-            </div>
-            <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-              <div className="font-semibold text-green-900 mb-1">✅ Sukcesy</div>
-              <div className="text-green-700">Pozytywne wzorce, osiągnięcia</div>
-            </div>
-            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="font-semibold text-blue-900 mb-1">💡 Sugestie</div>
-              <div className="text-blue-700">Optymalizacje, pomysły</div>
+        </Card>
+      ) : (
+        <div className="space-y-4 mb-6">
+          {insights.map((insight, index) => (
+            <Card
+              key={index}
+              className={cn(
+                'border-2 transition-all hover:shadow-lg',
+                getInsightBgColor(insight.type)
+              )}
+            >
+              <div className="p-6">
+                <div className="flex gap-4">
+                  <div className="flex-shrink-0">
+                    {getInsightIcon(insight.type)}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900 text-lg mb-2">
+                      {insight.title}
+                    </h3>
+                    <p className="text-gray-700 mb-3">
+                      {insight.description}
+                    </p>
+                    {insight.data && Object.keys(insight.data).length > 0 && (
+                      <div className="mt-3 p-3 bg-white/50 rounded-lg">
+                        <p className="text-xs font-semibold text-gray-600 mb-1">Szczegóły:</p>
+                        <div className="flex flex-wrap gap-3">
+                          {Object.entries(insight.data).map(([key, value]) => (
+                            <div key={key} className="text-sm">
+                              <span className="text-gray-600">{key}:</span>{' '}
+                              <span className="font-semibold text-gray-900">{value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Stats Summary */}
+      {stats && (
+        <Card>
+          <div className="p-6">
+            <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              📊 Podsumowanie ostatnich 30 dni
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="text-2xl font-bold text-blue-700">{stats.avgSleepHours}h</div>
+                <div className="text-sm text-blue-600">Średni sen</div>
+                <div className="text-xs text-blue-500 mt-1">Jakość: {stats.avgSleepQuality}/10</div>
+              </div>
+              <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
+                <div className="text-2xl font-bold text-green-700">{stats.avgEnergy}/10</div>
+                <div className="text-sm text-green-600">Średnia energia</div>
+              </div>
+              <div className="text-center p-4 bg-purple-50 rounded-lg border border-purple-200">
+                <div className="text-2xl font-bold text-purple-700">{stats.avgMotivation}/10</div>
+                <div className="text-sm text-purple-600">Średnia motywacja</div>
+              </div>
+              <div className="text-center p-4 bg-orange-50 rounded-lg border border-orange-200">
+                <div className="text-2xl font-bold text-orange-700">{stats.completionRate}%</div>
+                <div className="text-sm text-orange-600">Wskaźnik realizacji</div>
+                <div className="text-xs text-orange-500 mt-1">
+                  {stats.tasksCompletedLast7Days}/{stats.tasksAddedLast7Days} zadań (7 dni)
+                </div>
+              </div>
             </div>
           </div>
         </Card>
-
-        {/* AI Insights Panel */}
-        <AIInsightsPanel
-          tasks={tasks}
-          completedTasks={completedTasks}
-          className="shadow-lg"
-        />
-
-        {/* Stats Summary */}
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Podsumowanie</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-brand-purple">{tasks.length}</div>
-              <div className="text-sm text-gray-600">Aktywne zadania</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-green-600">{completedTasks.length}</div>
-              <div className="text-sm text-gray-600">Ukończone (ostatnio)</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-orange-600">
-                {tasks.filter(t => t.priority === 1).length}
-              </div>
-              <div className="text-sm text-gray-600">Priorytet 1</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-blue-600">
-                {tasks.filter(t => t.due).length}
-              </div>
-              <div className="text-sm text-gray-600">Z deadline</div>
-            </div>
-          </div>
-        </Card>
-      </div>
+      )}
     </div>
   )
 }
