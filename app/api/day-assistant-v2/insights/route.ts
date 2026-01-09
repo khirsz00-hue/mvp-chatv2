@@ -94,15 +94,18 @@ export async function GET(req: NextRequest) {
       .eq('completed', false)
       .gte('created_at', new Date(Date.now() - SEVEN_DAYS_MS).toISOString())
 
-    // Calculate statistics
+    // Calculate statistics matching the problem statement requirements
     const stats = {
-      avgSleepHours: 0,
-      avgEnergy: 0,
-      avgMotivation: 0,
-      avgSleepQuality: 0,
-      completionRate: 0,
-      tasksAddedLast7Days: activeTasks?.length || 0,
-      tasksCompletedLast7Days: 0,
+      journal_entries_count: journalEntries?.length || 0,
+      completed_tasks_count: completedTasks?.length || 0,
+      postponements_count: postpones?.length || 0,
+      days_with_plan: dayPlans?.length || 0,
+      avg_energy: 0,
+      avg_motivation: 0,
+      avg_sleep_quality: 0,
+      avg_hours_slept: 0,
+      tasks_added_last_7_days: 0,
+      tasks_completed_last_7_days: 0,
     }
 
     if (journalEntries && journalEntries.length > 0) {
@@ -114,22 +117,26 @@ export async function GET(req: NextRequest) {
         count: acc.count + 1
       }), { sleep: 0, energy: 0, motivation: 0, quality: 0, count: 0 })
 
-      stats.avgSleepHours = Math.round((totals.sleep / totals.count) * 10) / 10
-      stats.avgEnergy = Math.round((totals.energy / totals.count) * 10) / 10
-      stats.avgMotivation = Math.round((totals.motivation / totals.count) * 10) / 10
-      stats.avgSleepQuality = Math.round((totals.quality / totals.count) * 10) / 10
+      stats.avg_hours_slept = Math.round((totals.sleep / totals.count) * 10) / 10
+      stats.avg_energy = Math.round((totals.energy / totals.count) * 10) / 10
+      stats.avg_motivation = Math.round((totals.motivation / totals.count) * 10) / 10
+      stats.avg_sleep_quality = Math.round((totals.quality / totals.count) * 10) / 10
     }
 
     // Count tasks completed in last 7 days
     const sevenDaysAgo = new Date(Date.now() - SEVEN_DAYS_MS)
-    stats.tasksCompletedLast7Days = completedTasks?.filter(t => 
+    stats.tasks_completed_last_7_days = completedTasks?.filter(t => 
       new Date(t.completed_at) >= sevenDaysAgo
     ).length || 0
-
-    // Calculate completion rate
-    if (stats.tasksAddedLast7Days > 0) {
-      stats.completionRate = Math.round((stats.tasksCompletedLast7Days / stats.tasksAddedLast7Days) * 100)
-    }
+    
+    // Count all tasks (active + completed) created in last 7 days for accurate completion rate
+    const { data: allRecentTasks } = await supabase
+      .from('day_assistant_v2_tasks')
+      .select('id, completed')
+      .eq('user_id', user.id)
+      .gte('created_at', new Date(Date.now() - SEVEN_DAYS_MS).toISOString())
+    
+    stats.tasks_added_last_7_days = allRecentTasks?.length || 0
 
     console.log('📊 [Insights API] Statistics:', stats)
 
@@ -166,55 +173,58 @@ export async function GET(req: NextRequest) {
     // Generate insights with OpenAI
     const openai = getOpenAIClient()
     
-    const prompt = `Przeanalizuj RZECZYWISTE dane użytkownika z ostatnich 30 dni i wygeneruj 5 KONKRETNYCH, PERSONALNYCH insightów.
+    const prompt = `Przeanalizuj RZECZYWISTE dane użytkownika z ostatnich 30 dni i wygeneruj 5-7 KONKRETNYCH insightów z FAKTAMI.
 
-DANE Z DZIENNIKA (ostatnie wpisy):
+JOURNAL DATA (ostatnie ${stats.journal_entries_count} wpisów):
 ${analysisData.journalEntries.slice(0, 10).map(e => 
-  `- ${e.date}: energia=${e.energy}/10, motywacja=${e.motivation}/10, sen=${e.sleep_hours}h (jakość=${e.sleep_quality}/10), ukończono=${e.completed} zadań`
+  `- ${e.date}: energy=${e.energy}, motivation=${e.motivation}, sleep=${e.sleep_hours}h (quality=${e.sleep_quality})`
 ).join('\n')}
 
-UKOŃCZONE ZADANIA (ostatnie 14 dni):
-${analysisData.completedTasks.slice(0, 20).map(t => 
-  `- "${t.title}" (${t.date}) - load=${t.cognitive_load}, context=${t.context}`
+TASK COMPLETION PATTERNS:
+- Ukończone zadania ostatnie 30 dni: ${stats.completed_tasks_count}
+- Ostatnie 7 dni: dodano ${stats.tasks_added_last_7_days}, ukończono ${stats.tasks_completed_last_7_days}
+- Context types breakdown: ${JSON.stringify(analysisData.completedTasks.reduce((acc: any, t: any) => { 
+  acc[t.context] = (acc[t.context] || 0) + 1; return acc 
+}, {}))}
+
+POSTPONE PATTERNS:
+${analysisData.postponePatterns.slice(0, 5).map(p => 
+  `- "${p.task_title}": ${p.postpone_count} przełożeń, powód: ${p.reason || 'brak'}`
 ).join('\n')}
 
-WZORCE PRZEŁOŻEŃ:
-${analysisData.postponePatterns.slice(0, 10).map(p => 
-  `- "${p.task_title}" przełożone ${p.postpone_count}x, energia przy postpone: ${p.energy_at_postpone || 'N/A'}`
-).join('\n')}
+FREQUENTLY POSTPONED TASKS:
+${postponedTasks?.filter((t: any) => (t.postpone_count || 0) > 2).slice(0, 5).map((t: any) => 
+  `- "${t.title}": ${t.postpone_count} przełożeń`
+).join('\n') || '- Brak zadań przełożonych wielokrotnie'}
 
-STATYSTYKI:
-- Średni sen: ${stats.avgSleepHours}h (jakość: ${stats.avgSleepQuality}/10)
-- Średnia energia: ${stats.avgEnergy}/10
-- Średnia motywacja: ${stats.avgMotivation}/10
-- Ostatnie 7 dni: ${stats.tasksAddedLast7Days} dodanych, ${stats.tasksCompletedLast7Days} ukończonych (${stats.completionRate}%)
+KORELACJE DO WYKRYCIA:
+1. Sleep hours/quality → task completion rate
+2. Energy (journal) → tasks completed that day  
+3. Motivation trends by day of week
+4. Tasks by context_type and cognitive_load
+5. Postpone patterns (which tasks, when, why)
+6. Plan vs reality (planned vs completed)
 
-ZADANIE:
-Wygeneruj 5 insightów które:
-1. Bazują na FAKTYCZNYCH danych (podaj liczby!)
-2. Pokazują KORELACJE (np. sen → produktywność)
-3. Identyfikują WZORCE (np. zadania przełożone wielokrotnie)
-4. Dają KONKRETNE sugestie akcji
-5. Są PERSONALNE (nie ogólnikowe!)
+ZASADY GENEROWANIA INSIGHTÓW:
+- Każdy insight MUSI mieć konkretne liczby i fakty
+- Format: tytuł + opis z danymi + "details" z raw values
+- Typy: "info" (niebieski), "warning" (pomarańczowy), "success" (zielony)
+- Minimum 5, maksimum 7 insightów
+- Język: polski, bezpośredni, konkretny
 
 Przykłady DOBRYCH insightów:
-✅ "Przy 7.5h+ snu kończysz średnio 6 zadań/dzień, przy <6h tylko 2. Twój sweet spot: 7-8h."
-✅ "Zadanie 'Raport Q4' przełożyłeś 8 razy, zawsze gdy energia<5. Zaplanuj je na dzień z energią>7."
-✅ "W czwartki Twoja motywacja spada do 3/10 (inne dni: 7/10). Masz 70% więcej postpones. Co się dzieje?"
-
-Przykłady ZŁYCH insightów:
-❌ "Przeciążenie zadań" (za ogólne, bez liczb)
-❌ "Dobra organizacja" (bez faktów)
-❌ "Rozważ priorytetyzację" (bez konkretów)
+✅ { "type": "info", "title": "Efektywność przy 7h snu", "description": "Przy 7+ godzinach snu kończysz średnio 6 zadań dziennie. Przy <6h - tylko 2 zadania.", "details": { "avg_tasks_7h_plus": 6, "avg_tasks_under_6h": 2, "avg_energy_7h_plus": 7.2 } }
+✅ { "type": "warning", "title": "Niska jakość snu wpływa na motywację", "description": "Dni z jakością snu <5/10 mają 40% niższą motywację i 3x więcej przełożeń.", "details": { "sleep_quality_threshold": 5, "motivation_drop": "40%", "postpone_increase": "3x" } }
+✅ { "type": "success", "title": "100% ukończonych zadań w ostatnich 7 dniach", "description": "Świetna passa! Ukończyłeś wszystkie ${stats.tasks_completed_last_7_days} zadania z ${stats.tasks_added_last_7_days} dodanych.", "details": { "completion_rate": "100%", "tasks_completed": ${stats.tasks_completed_last_7_days}, "tasks_added": ${stats.tasks_added_last_7_days} } }
 
 Zwróć JSON:
 {
   "insights": [
     {
-      "type": "warning" | "success" | "info",
-      "title": "Krótki tytuł z liczbami",
-      "description": "1-2 zdania z faktami i sugestią akcji",
-      "data": { "metric": "value" }
+      "type": "info" | "warning" | "success",
+      "title": "Krótki tytuł (max 50 znaków)",
+      "description": "Opis z konkretnymi liczbami i faktami (max 150 znaków)", 
+      "details": { "key1": value1, "key2": value2 }
     }
   ]
 }`
@@ -248,14 +258,9 @@ Zwróć JSON:
     console.log('✅ [Insights API] Generated', result.insights?.length || 0, 'insights')
 
     return NextResponse.json({
-      insights: result.insights || [],
       stats,
-      dataAvailable: {
-        journalEntries: journalEntries?.length || 0,
-        completedTasks: completedTasks?.length || 0,
-        postpones: postpones?.length || 0,
-        dayPlans: dayPlans?.length || 0
-      }
+      insights: result.insights || [],
+      generated_at: new Date().toISOString()
     })
 
   } catch (error: any) {
