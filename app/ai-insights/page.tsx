@@ -30,8 +30,8 @@ interface Task {
   completed_at?: string
 }
 
-// Helper to normalize priority (Todoist uses 1-4 where 1=lowest, 4=highest)
-// We keep the same convention: 1=highest, 4=lowest for display
+// Helper to normalize priority
+// Todoist API uses 1-4 priority values. We pass them through as-is.
 const normalizePriority = (priority: number): 1 | 2 | 3 | 4 => {
   // Clamp to valid range
   if (priority < 1) return 1
@@ -75,6 +75,7 @@ export default function AIInsightsPage() {
         }
 
         // Fetch tasks from Todoist API using POST for security (token in body)
+        // 'all' filter returns active tasks, 'completed' returns completed tasks
         const [activeResponse, completedResponse] = await Promise.all([
           fetch('/api/todoist/tasks', {
             method: 'POST',
