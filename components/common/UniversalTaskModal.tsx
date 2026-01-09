@@ -157,6 +157,7 @@ export function UniversalTaskModal({
   const [pomodoroPhase, setPomodoroPhase] = useState<'work' | 'break'>('work')
   const [pomodoroCount, setPomodoroCount] = useState(0)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const pomodoroTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   // Change history
   const [changeHistory, setChangeHistory] = useState<ChangeHistoryItem[]>([])
@@ -308,6 +309,15 @@ export function UniversalTaskModal({
       if (timerRef.current) clearInterval(timerRef.current)
     }
   }, [isTimerRunning, timeTab, pomodoroPhase, stopPomodoro])
+  
+  // Cleanup Pomodoro timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (pomodoroTimeoutRef.current) {
+        clearTimeout(pomodoroTimeoutRef.current)
+      }
+    }
+  }, [])
   
   // Fetch timer sessions from database when task opens
   useEffect(() => {
@@ -638,7 +648,7 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
   const stopPomodoro = useCallback(async () => {
     setIsTimerRunning(false)
     
-    if (elapsedSeconds > 0) {
+    if (elapsedSeconds > 0 && task?.id) {
       const minutes = Math.floor(elapsedSeconds / 60)
       const isComplete = elapsedSeconds >= 25 * 60  // 25 minutes
       
@@ -650,8 +660,8 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
           setPomodoroPhase('break')
           setElapsedSeconds(0)
           toast.success('🎉 Pomodoro ukończone! Czas na przerwę (5 min)')
-          // Auto-start 5 min break
-          setTimeout(() => {
+          // Auto-start 5 min break with cleanup
+          pomodoroTimeoutRef.current = setTimeout(() => {
             setElapsedSeconds(0)
             setIsTimerRunning(true)
           }, 1000)
@@ -662,18 +672,46 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
         }
       }
       
-      // Save completed session
-      const session: TimerSession = {
-        id: Date.now().toString(),
-        duration: minutes,
-        date: new Date().toLocaleString('pl-PL'),
-        sessionType: 'pomodoro'
+      // Save to database
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('Not authenticated')
+        
+        const { data, error } = await supabase
+          .from('time_sessions')
+          .insert({
+            user_id: user.id,
+            task_id: task.id,
+            task_source: 'day_assistant_v2',
+            task_title: task.content,
+            started_at: new Date(Date.now() - elapsedSeconds * 1000).toISOString(),
+            ended_at: new Date().toISOString(),
+            duration_seconds: elapsedSeconds,
+            session_type: 'pomodoro'
+          })
+          .select()
+          .single()
+        
+        if (error) throw error
+        
+        // Add to local state for immediate display
+        const session: TimerSession = {
+          id: data.id,
+          duration: minutes,
+          date: new Date().toLocaleString('pl-PL'),
+          sessionType: 'pomodoro'
+        }
+        setTimerSessions([session, ...timerSessions])
+        
+        toast.success(`✅ Zapisano sesję Pomodoro: ${minutes} min`)
+      } catch (error) {
+        console.error('Failed to save Pomodoro session:', error)
+        toast.error('Nie udało się zapisać sesji Pomodoro')
       }
-      setTimerSessions([session, ...timerSessions])
     }
     
     setElapsedSeconds(0)
-  }, [elapsedSeconds, pomodoroPhase, timerSessions])
+  }, [elapsedSeconds, pomodoroPhase, timerSessions, task])
   
   const handleAddLabel = () => {
     if (!newLabel.trim()) return
@@ -811,7 +849,7 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                     key={time}
                     type="button"
                     onClick={() => setEstimatedMinutes(time)}
-                    className={`px-1 py-1 sm:px-2 sm:py-1.5 text-[10px] sm:text-xs rounded border transition ${
+                    className={`px-1 py-1 sm:px-2 sm:py-1.5 text-xs sm:text-sm rounded border transition ${
                       estimatedMinutes === time
                         ? 'bg-brand-purple text-white border-brand-purple'
                         : 'bg-white border-gray-300 hover:border-brand-purple'
