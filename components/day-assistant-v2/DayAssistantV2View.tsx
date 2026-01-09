@@ -1006,7 +1006,7 @@ export function DayAssistantV2View() {
               >
                 <h3 className="text-base font-bold text-slate-600 flex items-center gap-2">
                   {overflowCollapsed ? <CaretDown size={20} /> : <CaretUp size={20} />}
-                  🍕 Zadania poza godzinami pracy ({overflowTasks.length})
+                  📦 Zadania poza godzinami pracy ({overflowTasks.length})
                 </h3>
               </div>
               <p className="text-xs text-slate-500 mb-4">
