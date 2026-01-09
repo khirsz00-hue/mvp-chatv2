@@ -25,6 +25,9 @@ export interface StatusBarProps {
   selectedProject?: string | null
   projects?: Array<{ id: string; name: string }>
   onProjectChange?: (projectId: string | null) => void
+  // Today's Flow stats
+  completedCount?: number
+  scheduledCount?: number
 }
 
 const MODE_LABELS: Record<WorkMode, string> = {
@@ -44,7 +47,9 @@ export function DayAssistantV2StatusBar({
   onEditMode,
   selectedProject,
   projects = [],
-  onProjectChange
+  onProjectChange,
+  completedCount = 0,
+  scheduledCount = 0
 }: StatusBarProps) {
   const remainingMinutes = totalCapacity - usedMinutes
   const overloadPercent = totalCapacity > 0 ? Math.min(Math.round((usedMinutes / totalCapacity) * 100), 100) : 0
@@ -117,6 +122,21 @@ export function DayAssistantV2StatusBar({
             </p>
           </div>
           <Pencil size={10} className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+        </div>
+
+        {/* Separator - hidden on mobile */}
+        <div className="hidden lg:block h-10 w-px bg-slate-200" />
+
+        {/* TODAY'S FLOW - Simplified */}
+        <div className="flex items-center gap-3 px-3 py-2 flex-shrink-0">
+          <div>
+            <p className="text-[10px] text-slate-400 uppercase font-semibold tracking-wide">
+              Today&apos;s Flow
+            </p>
+            <p className="text-sm font-bold text-slate-800">
+              Ukończone: <span className="text-green-600">{completedCount}</span> / Zaplanowane: <span className="text-blue-600">{scheduledCount}</span>
+            </p>
+          </div>
         </div>
 
         {/* Separator - hidden on mobile */}

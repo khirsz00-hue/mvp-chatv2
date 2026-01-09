@@ -19,7 +19,6 @@ import { WorkHoursModal } from './WorkHoursModal'
 import { WorkModeModal } from './WorkModeModal'
 import { OverdueAlert } from './OverdueAlert'
 import { MeetingsSection } from './MeetingsSection'
-import { TodaysFlowPanel } from './TodaysFlowPanel'
 import { DecisionLogPanel, Decision } from './DecisionLogPanel'
 import { MorningReviewModal } from './MorningReviewModal'
 import { DayAssistantV2TaskCard } from './DayAssistantV2TaskCard'
@@ -803,6 +802,10 @@ export function DayAssistantV2View() {
     .filter(t => t.completed)
     .reduce((sum, t) => sum + (t.estimate_min || 0), 0)
   
+  // Calculate completed and scheduled task counts for Today's Flow
+  const completedTasksCount = tasks.filter(t => t.completed && t.due_date === selectedDate).length
+  const scheduledTasksCount = tasks.filter(t => !t.completed && t.due_date === selectedDate).length
+  
   // Calculate scheduled minutes - all non-completed tasks scheduled for today
   const scheduledMinutes = useMemo(() => {
     const todayTasks = tasks.filter(t => t.due_date === selectedDate && !t.completed)
@@ -869,6 +872,8 @@ export function DayAssistantV2View() {
             selectedProject={selectedProjectId}
             projects={projects}
             onProjectChange={setSelectedProjectId}
+            completedCount={completedTasksCount}
+            scheduledCount={scheduledTasksCount}
           />
         </div>
       </div>
@@ -1001,7 +1006,7 @@ export function DayAssistantV2View() {
               >
                 <h3 className="text-base font-bold text-slate-600 flex items-center gap-2">
                   {overflowCollapsed ? <CaretDown size={20} /> : <CaretUp size={20} />}
-                  📦 Zadania poza godzinami pracy ({overflowTasks.length})
+                  🍕 Zadania poza godzinami pracy ({overflowTasks.length})
                 </h3>
               </div>
               <p className="text-xs text-slate-500 mb-4">
@@ -1030,6 +1035,14 @@ export function DayAssistantV2View() {
             </div>
           )}
 
+          {/* Decision Log - Moved to bottom */}
+          <div className="mb-6">
+            <DecisionLogPanel
+              decisions={decisions}
+              onLogDecision={handleLogDecision}
+            />
+          </div>
+
           {/* Empty State */}
           {filteredTasks.length === 0 && (
             <Card>
@@ -1053,23 +1066,7 @@ export function DayAssistantV2View() {
           )}
         </div>
 
-        {/* Right Sidebar */}
-        <div className="w-full lg:w-80 space-y-4 lg:space-y-6">
-          
-          {/* Today's Flow Panel */}
-          <TodaysFlowPanel
-            completedCount={taskStats.completedToday}
-            presentedCount={0} // Placeholder
-            addedCount={taskStats.addedToday}
-            workTimeMinutes={completedMinutes}
-          />
-
-          {/* Decision Log Panel */}
-          <DecisionLogPanel
-            decisions={decisions}
-            onLogDecision={handleLogDecision}
-          />
-        </div>
+        {/* Right Sidebar - Removed for better space utilization */}
       </div>
 
       {/* Universal Task Modal */}
