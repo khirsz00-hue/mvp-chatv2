@@ -99,7 +99,7 @@ function generatePersonalizedTips(todayTasks: any[], meetings: Meeting[]): strin
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { token } = body
+    const { token: fallbackToken } = body
 
     console.log('🔍 [Recap/Summary] Generating daily summary')
 
@@ -111,9 +111,23 @@ export async function POST(req: Request) {
       console.error('❌ [Recap/Summary] User not authenticated')
       return NextResponse.json({ 
         error: 'Unauthorized',
+        message: 'Musisz być zalogowany',
         textToSpeak: '',
         tips: []
       }, { status: 401 })
+    }
+
+    // Get token from database if not provided
+    let todoistToken = fallbackToken
+    if (!todoistToken) {
+      console.log('🔍 [Recap/Summary] Fetching token from database')
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('todoist_token')
+        .eq('id', user.id)
+        .single()
+      
+      todoistToken = profile?.todoist_token
     }
 
     // Fetch data from both endpoints using the request's base URL
@@ -123,21 +137,36 @@ export async function POST(req: Request) {
       fetch(`${baseUrl}/api/recap/yesterday`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ token: todoistToken }),
         cache: 'no-store'
       }),
       fetch(`${baseUrl}/api/recap/today`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ token: todoistToken }),
         cache: 'no-store'
       })
     ])
 
     if (!yesterdayResponse.ok || !todayResponse.ok) {
-      console.error('❌ [Recap/Summary] Failed to fetch recap data')
+      console.error('❌ [Recap/Summary] Failed to fetch recap data:', {
+        yesterday: yesterdayResponse.status,
+        today: todayResponse.status
+      })
+      
+      // Handle token expiry
+      if (yesterdayResponse.status === 401 || todayResponse.status === 401) {
+        return NextResponse.json({ 
+          error: 'Token expired',
+          message: 'Twój token Todoist wygasł. Połącz się ponownie z Todoist.',
+          textToSpeak: '',
+          tips: []
+        }, { status: 401 })
+      }
+      
       return NextResponse.json({ 
         error: 'Failed to fetch recap data',
+        message: 'Nie można pobrać danych do podsumowania',
         textToSpeak: '',
         tips: []
       }, { status: 500 })

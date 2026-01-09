@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { token } = body
+    const { token: fallbackToken } = body
 
     console.log('🔍 [Recap/Yesterday] Starting request')
 
@@ -24,6 +24,7 @@ export async function POST(req: Request) {
       console.error('❌ [Recap/Yesterday] User not authenticated')
       return NextResponse.json({ 
         error: 'Unauthorized',
+        message: 'Musisz być zalogowany',
         tasks: [],
         stats: { completed: 0, total: 0 }
       }, { status: 401 })
@@ -53,7 +54,8 @@ export async function POST(req: Request) {
     if (dbError) {
       console.error('❌ [Recap/Yesterday] Database error:', dbError)
       return NextResponse.json({ 
-        error: 'Failed to fetch tasks from database',
+        error: 'Database error',
+        message: 'Nie można pobrać zadań z bazy danych',
         tasks: [],
         stats: { completed: 0, total: 0 }
       }, { status: 500 })
@@ -62,42 +64,68 @@ export async function POST(req: Request) {
     const tasks = completedTasks || []
 
     // Fallback: If no tasks in database, try fetching from Todoist as backup
-    if (tasks.length === 0 && token) {
+    if (tasks.length === 0) {
       console.log('⚠️ [Recap/Yesterday] No tasks in database, trying Todoist API as fallback')
-      try {
-        const baseUrl = req.url.split('/api/')[0]
-        const response = await fetch(`${baseUrl}/api/todoist/tasks`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            token, 
-            filter: 'completed',
-            date: yesterdayDate
-          })
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          const todoistTasks = data.tasks || []
-          
-          if (todoistTasks.length > 0) {
-            console.log('✅ [Recap/Yesterday] Found', todoistTasks.length, 'completed tasks from Todoist fallback')
-            
-            // Find the last active task (most recently completed)
-            const lastActiveTask = todoistTasks[todoistTasks.length - 1]
-            
-            return NextResponse.json({
-              tasks: todoistTasks,
-              lastActiveTask,
-              stats: {
-                completed: todoistTasks.length,
-                total: todoistTasks.length
-              }
+      
+      // Get token from database if not provided
+      let todoistToken = fallbackToken
+      if (!todoistToken) {
+        console.log('🔍 [Recap/Yesterday] Fetching token from database')
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('todoist_token')
+          .eq('id', user.id)
+          .single()
+        
+        todoistToken = profile?.todoist_token
+      }
+      
+      if (todoistToken) {
+        try {
+          const baseUrl = req.url.split('/api/')[0]
+          const response = await fetch(`${baseUrl}/api/todoist/tasks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              token: todoistToken, 
+              filter: 'completed',
+              date: yesterdayDate
             })
+          })
+
+          if (response.ok) {
+            const data = await response.json()
+            const todoistTasks = data.tasks || []
+            
+            if (todoistTasks.length > 0) {
+              console.log('✅ [Recap/Yesterday] Found', todoistTasks.length, 'completed tasks from Todoist fallback')
+              
+              // Find the last active task (most recently completed)
+              const lastActiveTask = todoistTasks[todoistTasks.length - 1]
+              
+              return NextResponse.json({
+                tasks: todoistTasks,
+                lastActiveTask,
+                stats: {
+                  completed: todoistTasks.length,
+                  total: todoistTasks.length
+                }
+              })
+            }
+          } else if (response.status === 401) {
+            console.error('❌ [Recap/Yesterday] Todoist token expired')
+            return NextResponse.json({ 
+              error: 'Token expired',
+              message: 'Twój token Todoist wygasł. Połącz się ponownie z Todoist.',
+              tasks: [],
+              stats: { completed: 0, total: 0 }
+            }, { status: 401 })
           }
+        } catch (fallbackError) {
+          console.warn('⚠️ [Recap/Yesterday] Todoist fallback failed:', fallbackError)
         }
-      } catch (fallbackError) {
-        console.warn('⚠️ [Recap/Yesterday] Todoist fallback failed:', fallbackError)
+      } else {
+        console.log('⚠️ [Recap/Yesterday] No Todoist token available for fallback')
       }
     }
 
