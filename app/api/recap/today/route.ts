@@ -3,6 +3,14 @@ import { format } from 'date-fns'
 
 export const dynamic = 'force-dynamic'
 
+interface Task {
+  id: string
+  content: string
+  priority: number
+  due?: { date?: string; datetime?: string } | null
+  completed?: boolean
+}
+
 /**
  * POST /api/recap/today
  * Returns tasks scheduled for today with focus task suggestion
@@ -66,7 +74,7 @@ export async function POST(req: Request) {
     // Focus task: first task in sorted list (highest priority, active tasks already filtered)
     const focusTask = sortedTasks.length > 0 ? sortedTasks[0] : null
 
-    const highPriorityCount = todayTasks.filter(t => t.priority <= 2).length
+    const highPriorityCount = todayTasks.filter((t: Task) => t.priority <= 2).length
 
     console.log('✅ [Recap/Today] Found', todayTasks.length, 'tasks,', highPriorityCount, 'high priority')
 
