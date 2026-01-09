@@ -227,9 +227,12 @@ export async function POST(req: Request) {
 
     // Add one personalized tip to TTS
     if (tips.length > 0) {
-      // Remove emoji from tip for TTS
-      const tipForSpeech = tips[0].replace(/[^\p{L}\p{N}\p{P}\p{Z}]/gu, '').trim()
-      parts.push(tipForSpeech)
+      // Remove emoji and special characters from tip for TTS
+      // Keep letters, numbers, basic punctuation (.,!?), and spaces
+      const tipForSpeech = tips[0].replace(/[^\p{L}\p{N}.,!?\s]/gu, '').trim()
+      if (tipForSpeech) {
+        parts.push(tipForSpeech)
+      }
     }
 
     const textToSpeak = parts.join(' ')

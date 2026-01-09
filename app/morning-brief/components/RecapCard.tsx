@@ -84,27 +84,35 @@ export default function RecapCard({ title, subtitle, tasks, icon, className = ''
           </h4>
           
           {/* Show first meeting */}
-          <div className="bg-blue-50 rounded-lg p-4 mb-2">
-            <p className="text-sm font-medium text-blue-900 mb-1">
-              {format(new Date(meetings[0].start_time), 'HH:mm')} - {meetings[0].title}
-            </p>
-            {meetings[0].duration_minutes && (
-              <p className="text-xs text-blue-700">
-                {meetings[0].duration_minutes} min
-                {meetings[0].location && ` • ${meetings[0].location}`}
+          {meetings[0] && meetings[0].start_time && (
+            <div className="bg-blue-50 rounded-lg p-4 mb-2">
+              <p className="text-sm font-medium text-blue-900 mb-1">
+                {(() => {
+                  try {
+                    return format(new Date(meetings[0].start_time), 'HH:mm')
+                  } catch {
+                    return 'Czas nieznany'
+                  }
+                })()} - {meetings[0].title}
               </p>
-            )}
-            {meetings[0].meeting_link && (
-              <a 
-                href={meetings[0].meeting_link} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-xs text-blue-600 hover:text-blue-800 underline mt-1 inline-block"
-              >
-                Link do spotkania →
-              </a>
-            )}
-          </div>
+              {meetings[0].duration_minutes && (
+                <p className="text-xs text-blue-700">
+                  {meetings[0].duration_minutes} min
+                  {meetings[0].location && ` • ${meetings[0].location}`}
+                </p>
+              )}
+              {meetings[0].meeting_link && (
+                <a 
+                  href={meetings[0].meeting_link} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-600 hover:text-blue-800 underline mt-1 inline-block"
+                >
+                  Link do spotkania →
+                </a>
+              )}
+            </div>
+          )}
           
           {meetings.length > 1 && (
             <p className="text-xs text-gray-500 mt-2">

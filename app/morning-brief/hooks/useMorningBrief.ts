@@ -9,9 +9,13 @@ interface Task {
   due?: { date: string } | null
   completed?: boolean
   completed_at?: string | null
+  /** Cognitive load rating from 1 (easy) to 5 (hard) */
   cognitive_load?: number
+  /** Number of times this task has been postponed */
   postpone_count?: number
+  /** Context type for task clustering (e.g., 'deep', 'admin', 'comms') */
   context_type?: string
+  /** Calculated score for prioritization */
   score?: number
 }
 

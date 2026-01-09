@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { format } from 'date-fns'
 import { createAuthenticatedSupabaseClient, getAuthenticatedUser } from '@/lib/supabaseAuth'
 import { calculateTaskScore } from '@/lib/services/advancedTaskScoring'
+import type { TestDayTask } from '@/lib/types/dayAssistantV2'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,6 +16,18 @@ interface Task {
   postpone_count?: number
   context_type?: string
   score?: number
+}
+
+interface DbTask {
+  id: string
+  title: string
+  description?: string
+  priority: number
+  due_date?: string
+  cognitive_load?: number
+  postpone_count?: number
+  context_type?: string
+  completed: boolean
 }
 
 /**
@@ -111,12 +124,31 @@ export async function POST(req: Request) {
 
     // Calculate advanced scores for each task
     const tasksWithScores = tasks.map(task => {
-      const scoreResult = calculateTaskScore({
-        due_date: task.due_date,
-        priority: task.priority,
+      // Map database task to scoring format with all required fields
+      const taskForScoring: TestDayTask = {
+        id: task.id,
+        user_id: user.id,
+        assistant_id: '',
+        title: task.title,
+        description: task.description || null,
+        due_date: task.due_date || null,
+        priority: task.priority || 4,
         cognitive_load: task.cognitive_load || 3,
-        postpone_count: task.postpone_count || 0
-      } as any)
+        postpone_count: task.postpone_count || 0,
+        completed: false,
+        is_must: false,
+        is_important: (task.priority || 4) <= 2,
+        estimate_min: 30,
+        tags: [],
+        context_type: task.context_type || null,
+        position: 0,
+        auto_moved: false,
+        metadata: {},
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+      
+      const scoreResult = calculateTaskScore(taskForScoring)
 
       return {
         id: task.id,
