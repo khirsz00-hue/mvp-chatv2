@@ -8,14 +8,40 @@ import Card from '@/components/ui/Card'
 import { Sparkle, ArrowLeft } from '@phosphor-icons/react'
 import Button from '@/components/ui/Button'
 
+interface TodoistTask {
+  id: string
+  content: string
+  priority: number
+  due?: { date: string } | null
+  completed?: boolean
+  completed_at?: string | null
+}
+
 interface Task {
   id: string
   content: string
   priority: 1 | 2 | 3 | 4
-  due?: string
+  due?: { date: string } | string
   completed?: boolean
   completed_at?: string
 }
+
+// Helper to normalize priority (Todoist uses 1-4, higher = more important)
+const normalizePriority = (priority: number): 1 | 2 | 3 | 4 => {
+  if (priority < 1) return 4
+  if (priority > 4) return 1
+  return priority as 1 | 2 | 3 | 4
+}
+
+// Helper to convert Todoist task to Task format
+const convertToTask = (task: TodoistTask): Task => ({
+  id: task.id,
+  content: task.content,
+  priority: normalizePriority(task.priority),
+  due: task.due?.date || undefined,
+  completed: task.completed,
+  completed_at: task.completed_at || undefined
+})
 
 export default function AIInsightsPage() {
   const router = useRouter()
@@ -26,34 +52,44 @@ export default function AIInsightsPage() {
   useEffect(() => {
     const fetchTasks = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) {
           router.push('/login')
           return
         }
 
-        // Fetch active tasks
-        const { data: activeTasks } = await supabase
-          .from('tasks')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('completed', false)
-          .order('created_at', { ascending: false })
-          .limit(50)
+        // Fetch tasks from Todoist API
+        const response = await fetch('/api/todoist/tasks', {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`
+          }
+        })
 
-        // Fetch recently completed tasks
-        const { data: completed } = await supabase
-          .from('tasks')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('completed', true)
-          .order('completed_at', { ascending: false })
-          .limit(20)
+        if (!response.ok) {
+          throw new Error('Failed to fetch tasks')
+        }
 
-        setTasks(activeTasks || [])
-        setCompletedTasks(completed || [])
+        const data = await response.json()
+        const allTasks = data.tasks || []
+
+        // Split into active and completed
+        const active = allTasks
+          .filter((t: TodoistTask) => !t.completed)
+          .slice(0, 50)
+          .map(convertToTask)
+
+        const completed = allTasks
+          .filter((t: TodoistTask) => t.completed)
+          .slice(0, 20)
+          .map(convertToTask)
+
+        setTasks(active)
+        setCompletedTasks(completed)
       } catch (error) {
         console.error('Error fetching tasks:', error)
+        // Set empty arrays on error to allow UI to render
+        setTasks([])
+        setCompletedTasks([])
       } finally {
         setLoading(false)
       }
