@@ -286,20 +286,7 @@ export function UniversalTaskModal({
   useEffect(() => {
     if (isTimerRunning) {
       timerRef.current = setInterval(() => {
-        setElapsedSeconds(prev => {
-          const next = prev + 1
-          
-          // Auto-stop Pomodoro at time limit
-          if (timeTab === 'pomodoro') {
-            const limit = pomodoroPhase === 'work' ? 25 * 60 : 5 * 60
-            if (next >= limit) {
-              stopPomodoro()
-              return limit
-            }
-          }
-          
-          return next
-        })
+        setElapsedSeconds(prev => prev + 1)
       }, 1000)
     } else if (timerRef.current) {
       clearInterval(timerRef.current)
@@ -308,7 +295,17 @@ export function UniversalTaskModal({
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
     }
-  }, [isTimerRunning, timeTab, pomodoroPhase, stopPomodoro])
+  }, [isTimerRunning])
+  
+  // Auto-stop Pomodoro at time limit
+  useEffect(() => {
+    if (!isTimerRunning || timeTab !== 'pomodoro') return
+    
+    const limit = pomodoroPhase === 'work' ? 25 * 60 : 5 * 60
+    if (elapsedSeconds >= limit) {
+      stopPomodoro()
+    }
+  }, [elapsedSeconds, isTimerRunning, timeTab, pomodoroPhase, stopPomodoro])
   
   // Cleanup Pomodoro timeout on unmount
   useEffect(() => {
@@ -593,14 +590,14 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
         
         if (error) throw error
         
-        // Add to local state for immediate display
+        // Add to local state for immediate display using functional update
         const session: TimerSession = {
           id: data.id,
           duration: Math.floor(elapsedSeconds / 60),
           date: new Date().toLocaleString('pl-PL'),
           sessionType: 'manual'
         }
-        setTimerSessions([session, ...timerSessions])
+        setTimerSessions(prev => [session, ...prev])
         
         toast.success(`✅ Zapisano sesję: ${session.duration} min`)
       } catch (error) {
@@ -660,7 +657,7 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
           setPomodoroPhase('break')
           setElapsedSeconds(0)
           toast.success('🎉 Pomodoro ukończone! Czas na przerwę (5 min)')
-          // Auto-start 5 min break with cleanup
+          // Auto-start 5 min break after 1 second delay to allow UI update
           pomodoroTimeoutRef.current = setTimeout(() => {
             setElapsedSeconds(0)
             setIsTimerRunning(true)
@@ -694,14 +691,14 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
         
         if (error) throw error
         
-        // Add to local state for immediate display
+        // Add to local state for immediate display using functional update
         const session: TimerSession = {
           id: data.id,
           duration: minutes,
           date: new Date().toLocaleString('pl-PL'),
           sessionType: 'pomodoro'
         }
-        setTimerSessions([session, ...timerSessions])
+        setTimerSessions(prev => [session, ...prev])
         
         toast.success(`✅ Zapisano sesję Pomodoro: ${minutes} min`)
       } catch (error) {
@@ -711,7 +708,7 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
     }
     
     setElapsedSeconds(0)
-  }, [elapsedSeconds, pomodoroPhase, timerSessions, task])
+  }, [elapsedSeconds, pomodoroPhase, task])
   
   const handleAddLabel = () => {
     if (!newLabel.trim()) return
