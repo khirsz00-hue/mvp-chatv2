@@ -36,7 +36,7 @@ interface Project {
   color?:  string
 }
 
-type FilterType = 'today' | 'tomorrow' | 'week' | 'month' | 'overdue' | 'all' | 'completed'
+type FilterType = 'today' | 'tomorrow' | 'week' | 'month' | 'overdue' | 'unscheduled' | 'all' | 'completed'
 type ViewType = 'list' | 'board'
 type SortType = 'date' | 'priority' | 'name'
 type GroupByType = 'none' | 'day' | 'project' | 'priority'
@@ -242,6 +242,11 @@ export function TasksAssistant() {
       const dueStr = typeof task.due === 'string' ? task.due : task.due?.date
       
       if (filterType === 'all') return true
+      
+      // Handle unscheduled filter - show only tasks without due date
+      if (filterType === 'unscheduled') {
+        return !dueStr
+      }
       
       if (! dueStr) {
         console.log('⏭️ Skipping task without due date:', task.content)
@@ -992,6 +997,7 @@ export function TasksAssistant() {
             <TabsTrigger value="week" className="flex-1 min-w-[100px]">Tydzień</TabsTrigger>
             <TabsTrigger value="month" className="flex-1 min-w-[100px]">Miesiąc</TabsTrigger>
             <TabsTrigger value="overdue" className="flex-1 min-w-[140px]">Przeterminowane</TabsTrigger>
+            <TabsTrigger value="unscheduled" className="flex-1 min-w-[140px]">Do zaplanowania</TabsTrigger>
             <TabsTrigger value="completed" className="flex-1 min-w-[120px]">Ukończone</TabsTrigger>
           </TabsList>
         </Tabs>
