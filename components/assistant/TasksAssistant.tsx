@@ -15,6 +15,7 @@ import { SevenDaysBoardView } from './SevenDaysBoardView'
 import { MonthView } from './MonthView'
 import { TaskTimer } from './TaskTimer'
 import { PomodoroTimer } from './PomodoroTimer'
+import { supabase } from '@/lib/supabaseClient'
 
 interface Task {
   id: string
@@ -120,18 +121,35 @@ export function TasksAssistant() {
   
   const fetchProjects = useCallback(async () => {
     try {
-      const res = await fetch(`/api/todoist/projects?token=${token}`)
+      // Get Supabase session
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        console.warn('⚠️ [TasksAssistant] No session available for fetching projects')
+        return
+      }
+      
+      // Use Authorization header with Supabase token
+      const res = await fetch('/api/todoist/projects', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
+      
       if (res.ok) {
         const data = await res.json()
         setProjects(data.projects || data || [])
+        console.log('✅ [TasksAssistant] Fetched projects:', data.projects?.length || 0)
       } else {
+        const errorText = await res.text()
+        console.error('❌ [TasksAssistant] Failed to fetch projects:', res.status, errorText)
         showToast('Nie udało się pobrać projektów z Todoist', 'error')
       }
     } catch (err) {
-      console.error('Error fetching projects:', err)
+      console.error('❌ [TasksAssistant] Error fetching projects:', err)
       showToast('Błąd przy pobieraniu projektów', 'error')
     }
-  }, [token, showToast])
+  }, [showToast])
   
   // Fetch tasks
   useEffect(() => {
@@ -148,9 +166,8 @@ export function TasksAssistant() {
   
   // Fetch projects
   useEffect(() => {
-    if (!token) return
     fetchProjects()
-  }, [token, fetchProjects])
+  }, [fetchProjects])
   
   // Monitor active timer/pomodoro
   useEffect(() => {
