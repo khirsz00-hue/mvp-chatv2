@@ -60,8 +60,11 @@ export function useMorningBrief(token: string | null) {
 
       console.log('🔍 [useMorningBrief] Fetching morning brief data')
 
-      // Fetch summary which includes both yesterday and today data
-      const response = await fetch(`/api/recap/summary?token=${encodeURIComponent(token)}`, {
+      // Fetch summary using POST for security (token in body, not URL)
+      const response = await fetch('/api/recap/summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
         cache: 'no-store'
       })
 

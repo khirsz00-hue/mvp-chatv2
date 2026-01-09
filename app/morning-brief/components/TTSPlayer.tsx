@@ -9,6 +9,9 @@ interface TTSPlayerProps {
   autoPlay?: boolean
 }
 
+// Delay before auto-play to allow page render and avoid race conditions
+const AUTO_PLAY_DELAY_MS = 500
+
 export default function TTSPlayer({ text, autoPlay = false }: TTSPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
@@ -47,11 +50,11 @@ export default function TTSPlayer({ text, autoPlay = false }: TTSPlayerProps) {
 
     utteranceRef.current = utterance
 
-    // Auto-play if enabled
+    // Auto-play if enabled (with delay to allow page to fully render)
     if (autoPlay && text) {
       setTimeout(() => {
         window.speechSynthesis.speak(utterance)
-      }, 500)
+      }, AUTO_PLAY_DELAY_MS)
     }
 
     return () => {

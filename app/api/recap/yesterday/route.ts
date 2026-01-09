@@ -4,13 +4,14 @@ import { startOfDay, endOfDay, subDays } from 'date-fns'
 export const dynamic = 'force-dynamic'
 
 /**
- * GET /api/recap/yesterday
+ * POST /api/recap/yesterday
  * Returns completed tasks from yesterday with statistics
+ * Security: Token is passed in request body, not URL
  */
-export async function GET(req: Request) {
+export async function POST(req: Request) {
   try {
-    const { searchParams } = new URL(req.url)
-    const token = searchParams.get('token')
+    const body = await req.json()
+    const { token } = body
 
     if (!token) {
       return NextResponse.json({ 

@@ -4,13 +4,14 @@ import { format } from 'date-fns'
 export const dynamic = 'force-dynamic'
 
 /**
- * GET /api/recap/today
+ * POST /api/recap/today
  * Returns tasks scheduled for today with focus task suggestion
+ * Security: Token is passed in request body, not URL
  */
-export async function GET(req: Request) {
+export async function POST(req: Request) {
   try {
-    const { searchParams } = new URL(req.url)
-    const token = searchParams.get('token')
+    const body = await req.json()
+    const { token } = body
 
     if (!token) {
       return NextResponse.json({ 
@@ -62,8 +63,8 @@ export async function GET(req: Request) {
       return 0
     })
 
-    // Focus task: highest priority task that's not completed
-    const focusTask = sortedTasks.find(t => !t.completed) || null
+    // Focus task: first task in sorted list (highest priority, active tasks already filtered)
+    const focusTask = sortedTasks.length > 0 ? sortedTasks[0] : null
 
     const highPriorityCount = todayTasks.filter(t => t.priority <= 2).length
 

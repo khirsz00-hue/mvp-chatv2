@@ -3,13 +3,14 @@ import { NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 
 /**
- * GET /api/recap/summary
+ * POST /api/recap/summary
  * Returns a complete summary ready for text-to-speech
+ * Security: Token is passed in request body, not URL
  */
-export async function GET(req: Request) {
+export async function POST(req: Request) {
   try {
-    const { searchParams } = new URL(req.url)
-    const token = searchParams.get('token')
+    const body = await req.json()
+    const { token } = body
 
     if (!token) {
       return NextResponse.json({ 
@@ -24,10 +25,16 @@ export async function GET(req: Request) {
     const baseUrl = req.url.split('/api/')[0]
     
     const [yesterdayResponse, todayResponse] = await Promise.all([
-      fetch(`${baseUrl}/api/recap/yesterday?token=${encodeURIComponent(token)}`, {
+      fetch(`${baseUrl}/api/recap/yesterday`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
         cache: 'no-store'
       }),
-      fetch(`${baseUrl}/api/recap/today?token=${encodeURIComponent(token)}`, {
+      fetch(`${baseUrl}/api/recap/today`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
         cache: 'no-store'
       })
     ])
