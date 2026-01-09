@@ -9,7 +9,7 @@ import { useToast } from '@/components/ui/Toast'
 import { useRouter } from 'next/navigation'
 import Separator from '@/components/ui/Separator'
 
-type LoginMode = 'signin' | 'signup' | 'magic-link' | 'magic-link-sent'
+type LoginMode = 'signin' | 'signup' | 'magic-link' | 'magic-link-sent' | 'forgot-password' | 'reset-sent'
 
 export default function LoginPage() {
   const [mode, setMode] = useState<LoginMode>('signin')
@@ -163,6 +163,33 @@ export default function LoginPage() {
     }
   }
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
+      if (!baseUrl) {
+        throw new Error('NEXT_PUBLIC_SITE_URL is not configured')
+      }
+
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${baseUrl}/auth/reset-password`,
+      })
+
+      if (error) throw error
+
+      console.log('[Login] ✓ Password reset email sent')
+      setMode('reset-sent')
+      showToast('Link do resetowania hasła został wysłany! Sprawdź swoją skrzynkę email.', 'success')
+    } catch (error: any) {
+      console.error('[Login] ✗ Password reset failed:', error)
+      showToast(error.message || 'Wystąpił błąd podczas wysyłania linku resetującego', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
@@ -175,10 +202,67 @@ export default function LoginPage() {
             {mode === 'signup' && 'Utwórz nowe konto'}
             {mode === 'magic-link' && 'Zaloguj się za pomocą magic link'}
             {mode === 'magic-link-sent' && 'Sprawdź swoją skrzynkę email'}
+            {mode === 'forgot-password' && 'Zresetuj swoje hasło'}
+            {mode === 'reset-sent' && 'Link do resetowania został wysłany'}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {mode === 'magic-link-sent' ? (
+          {mode === 'reset-sent' ? (
+            <div className="text-center space-y-4">
+              <p className="text-muted-foreground">
+                Wysłaliśmy link do resetowania hasła na adres <strong>{email}</strong>
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Link jest ważny przez 60 minut. Kliknij go, aby ustawić nowe hasło.
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => setMode('forgot-password')}
+                className="w-full"
+              >
+                Wyślij ponownie
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setMode('signin')}
+                className="w-full"
+              >
+                ← Powrót do logowania
+              </Button>
+            </div>
+          ) : mode === 'forgot-password' ? (
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium mb-2">
+                  Adres email
+                </label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="twoj@email.pl"
+                  required
+                  disabled={loading}
+                />
+              </div>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={loading || !email}
+              >
+                {loading ? 'Wysyłanie...' : 'Wyślij link resetujący'}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setMode('signin')}
+                className="w-full"
+              >
+                ← Powrót do logowania
+              </Button>
+            </form>
+          ) : mode === 'magic-link-sent' ? (
             <div className="text-center space-y-4">
               <p className="text-muted-foreground">
                 Wysłaliśmy link do logowania na adres <strong>{email}</strong>
@@ -288,9 +372,21 @@ export default function LoginPage() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="password" className="block text-sm font-medium mb-2">
-                    Hasło
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label htmlFor="password" className="block text-sm font-medium">
+                      Hasło
+                    </label>
+                    {mode === 'signin' && (
+                      <button
+                        type="button"
+                        onClick={() => setMode('forgot-password')}
+                        className="text-xs text-brand-purple hover:underline"
+                        disabled={loading}
+                      >
+                        Nie pamiętasz hasła?
+                      </button>
+                    )}
+                  </div>
                   <Input
                     id="password"
                     type="password"
