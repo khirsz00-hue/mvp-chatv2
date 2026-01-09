@@ -27,16 +27,36 @@ export default function Home() {
         window.history.replaceState({}, document.title, url.pathname + url.search)
       } else if (error) {
         console.error('❌ OAuth error:', error)
+        const errorDetails = params.get('details')
         
         if (error === 'not_authenticated') {
           showToast('Musisz być zalogowany, aby połączyć Todoist', 'error')
         } else if (error === 'todoist_connection_failed') {
-          showToast('Nie udało się połączyć z Todoist', 'error')
+          let message = 'Nie udało się połączyć z Todoist'
+          
+          // Add more specific error message if available
+          if (errorDetails) {
+            console.error('❌ Error details:', errorDetails)
+            
+            // Provide user-friendly messages based on error details
+            if (errorDetails.includes('401') || errorDetails.includes('Token')) {
+              message = 'Nie udało się połączyć z Todoist. Spróbuj ponownie.'
+            } else if (errorDetails.includes('404')) {
+              message = 'Nie udało się pobrać danych z Todoist. Spróbuj ponownie.'
+            } else if (errorDetails.includes('Network') || errorDetails.includes('fetch')) {
+              message = 'Problem z połączeniem. Sprawdź internet i spróbuj ponownie.'
+            } else {
+              message = `Nie udało się połączyć z Todoist. Spróbuj ponownie.`
+            }
+          }
+          
+          showToast(message, 'error')
         }
         
         // Clean URL
         const url = new URL(window.location.href)
         url.searchParams.delete('error')
+        url.searchParams.delete('details')
         window.history.replaceState({}, document.title, url.pathname + url.search)
       }
 
