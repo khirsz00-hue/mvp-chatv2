@@ -131,7 +131,7 @@ export function TasksAssistant() {
       console.error('Error fetching projects:', err)
       showToast('Błąd przy pobieraniu projektów', 'error')
     }
-  }, [token])
+  }, [token, showToast])
   
   // Fetch tasks
   useEffect(() => {
