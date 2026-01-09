@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/Dialog'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -307,7 +307,7 @@ export function UniversalTaskModal({
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
     }
-  }, [isTimerRunning, timeTab, pomodoroPhase])
+  }, [isTimerRunning, timeTab, pomodoroPhase, stopPomodoro])
   
   // Fetch timer sessions from database when task opens
   useEffect(() => {
@@ -635,7 +635,7 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
     }
   }
   
-  const stopPomodoro = async () => {
+  const stopPomodoro = useCallback(async () => {
     setIsTimerRunning(false)
     
     if (elapsedSeconds > 0) {
@@ -673,7 +673,7 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
     }
     
     setElapsedSeconds(0)
-  }
+  }, [elapsedSeconds, pomodoroPhase, timerSessions])
   
   const handleAddLabel = () => {
     if (!newLabel.trim()) return
