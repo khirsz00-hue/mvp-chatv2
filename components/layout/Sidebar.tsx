@@ -29,7 +29,7 @@ const assistants: Assistant[] = [
 
 // Separate navigation links that go to external routes
 const externalLinks = [
-  { icon: Sparkle, label: 'AI Insights', color: 'text-purple-500', href: '/ai-insights' }
+  { id: 'ai-insights', icon: Sparkle, label: 'AI Insights', color: 'text-purple-500', href: '/ai-insights' }
 ]
 
 interface SidebarProps {
@@ -86,7 +86,7 @@ export default function Sidebar({ activeView, onNavigate, isAdmin, isMobileMenuO
             
             return (
               <button
-                key={link.href}
+                key={link.id}
                 onClick={() => router.push(link.href)}
                 className={cn(
                   'w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all',

@@ -26,10 +26,12 @@ interface Task {
   completed_at?: string
 }
 
-// Helper to normalize priority (Todoist uses 1-4, higher = more important)
+// Helper to normalize priority (Todoist uses 1-4 where 1=lowest, 4=highest)
+// We keep the same convention: 1=highest, 4=lowest for display
 const normalizePriority = (priority: number): 1 | 2 | 3 | 4 => {
-  if (priority < 1) return 4
-  if (priority > 4) return 1
+  // Clamp to valid range
+  if (priority < 1) return 1
+  if (priority > 4) return 4
   return priority as 1 | 2 | 3 | 4
 }
 
@@ -58,33 +60,40 @@ export default function AIInsightsPage() {
           return
         }
 
-        // Fetch tasks from Todoist API
-        const response = await fetch('/api/todoist/tasks', {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`
-          }
-        })
+        // Get Todoist token from localStorage
+        const todoistToken = localStorage.getItem('todoist_token')
+        if (!todoistToken) {
+          console.warn('No Todoist token found')
+          setTasks([])
+          setCompletedTasks([])
+          setLoading(false)
+          return
+        }
 
-        if (!response.ok) {
+        // Fetch tasks from Todoist API
+        const [activeResponse, completedResponse] = await Promise.all([
+          fetch(`/api/todoist/tasks?token=${todoistToken}&filter=all`),
+          fetch(`/api/todoist/tasks?token=${todoistToken}&filter=completed`)
+        ])
+
+        if (!activeResponse.ok || !completedResponse.ok) {
           throw new Error('Failed to fetch tasks')
         }
 
-        const data = await response.json()
-        const allTasks = data.tasks || []
+        const activeData = await activeResponse.json()
+        const completedData = await completedResponse.json()
 
-        // Split into active and completed
-        const active = allTasks
+        const activeTasks = (activeData.tasks || [])
           .filter((t: TodoistTask) => !t.completed)
           .slice(0, 50)
           .map(convertToTask)
 
-        const completed = allTasks
-          .filter((t: TodoistTask) => t.completed)
+        const completedTasksList = (completedData.tasks || [])
           .slice(0, 20)
           .map(convertToTask)
 
-        setTasks(active)
-        setCompletedTasks(completed)
+        setTasks(activeTasks)
+        setCompletedTasks(completedTasksList)
       } catch (error) {
         console.error('Error fetching tasks:', error)
         // Set empty arrays on error to allow UI to render
