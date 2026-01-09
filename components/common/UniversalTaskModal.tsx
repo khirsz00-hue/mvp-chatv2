@@ -28,6 +28,8 @@ import {
 } from '@phosphor-icons/react'
 import { format, addDays } from 'date-fns'
 import { CollapsibleSection } from './CollapsibleSection'
+import { supabase } from '@/lib/supabaseClient'
+import { toast } from 'sonner'
 
 /* =======================
    TYPES
@@ -96,6 +98,7 @@ interface TimerSession {
   id: string
   duration: number
   date: string
+  sessionType?: string
 }
 
 /* =======================
@@ -151,6 +154,8 @@ export function UniversalTaskModal({
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [isTimerRunning, setIsTimerRunning] = useState(false)
   const [timerSessions, setTimerSessions] = useState<TimerSession[]>([])
+  const [pomodoroPhase, setPomodoroPhase] = useState<'work' | 'break'>('work')
+  const [pomodoroCount, setPomodoroCount] = useState(0)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   
   // Change history
@@ -175,17 +180,24 @@ export function UniversalTaskModal({
     const fetchData = async () => {
       setLoading(true)
       try {
-        // Fetch projects with proper auth
-        if (token) {
+        // Fetch projects from Supabase auth session
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
           const projectsRes = await fetch('/api/todoist/projects', {
             headers: {
-              'Authorization': `Bearer ${token}`
+              'Authorization': `Bearer ${session.access_token}`
             }
           })
+          
           if (projectsRes.ok) {
             const data = await projectsRes.json()
+            console.log('📁 Loaded projects:', data)
             setProjects(data.projects || data || [])
+          } else {
+            console.error('Failed to fetch projects:', projectsRes.status, await projectsRes.text())
           }
+        } else {
+          console.warn('No session available for fetching projects')
         }
         
         // Fetch labels
@@ -273,7 +285,20 @@ export function UniversalTaskModal({
   useEffect(() => {
     if (isTimerRunning) {
       timerRef.current = setInterval(() => {
-        setElapsedSeconds(prev => prev + 1)
+        setElapsedSeconds(prev => {
+          const next = prev + 1
+          
+          // Auto-stop Pomodoro at time limit
+          if (timeTab === 'pomodoro') {
+            const limit = pomodoroPhase === 'work' ? 25 * 60 : 5 * 60
+            if (next >= limit) {
+              stopPomodoro()
+              return limit
+            }
+          }
+          
+          return next
+        })
       }, 1000)
     } else if (timerRef.current) {
       clearInterval(timerRef.current)
@@ -282,7 +307,26 @@ export function UniversalTaskModal({
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
     }
-  }, [isTimerRunning])
+  }, [isTimerRunning, timeTab, pomodoroPhase])
+  
+  // Fetch timer sessions from database when task opens
+  useEffect(() => {
+    if (!open || !task?.id) return
+    
+    const fetchTimerSessions = async () => {
+      try {
+        const response = await fetch(`/api/tasks/${task.id}/time-sessions`)
+        if (response.ok) {
+          const data = await response.json()
+          setTimerSessions(data.sessions || [])
+        }
+      } catch (error) {
+        console.error('Failed to fetch timer sessions:', error)
+      }
+    }
+    
+    fetchTimerSessions()
+  }, [open, task?.id])
   
   // Auto-save and change tracking for edit mode
   useEffect(() => {
@@ -513,24 +557,122 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
     setIsTimerRunning(false)
   }
   
-  const stopTimer = () => {
+  const stopTimer = async () => {
     setIsTimerRunning(false)
     
-    if (elapsedSeconds > 0) {
-      const session: TimerSession = {
-        id: Date.now().toString(),
-        duration: Math.floor(elapsedSeconds / 60),
-        date: new Date().toLocaleString('pl-PL')
+    if (elapsedSeconds > 0 && task?.id) {
+      try {
+        // Save to database via supabase
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('Not authenticated')
+        
+        const { data, error } = await supabase
+          .from('time_sessions')
+          .insert({
+            user_id: user.id,
+            task_id: task.id,
+            task_source: 'day_assistant_v2',
+            task_title: task.content,
+            started_at: new Date(Date.now() - elapsedSeconds * 1000).toISOString(),
+            ended_at: new Date().toISOString(),
+            duration_seconds: elapsedSeconds,
+            session_type: 'manual'
+          })
+          .select()
+          .single()
+        
+        if (error) throw error
+        
+        // Add to local state for immediate display
+        const session: TimerSession = {
+          id: data.id,
+          duration: Math.floor(elapsedSeconds / 60),
+          date: new Date().toLocaleString('pl-PL'),
+          sessionType: 'manual'
+        }
+        setTimerSessions([session, ...timerSessions])
+        
+        toast.success(`✅ Zapisano sesję: ${session.duration} min`)
+      } catch (error) {
+        console.error('Failed to save timer session:', error)
+        toast.error('Nie udało się zapisać sesji')
       }
-      setTimerSessions([session, ...timerSessions])
     }
     
     setElapsedSeconds(0)
   }
   
-  const startPomodoro = () => {
-    // TODO: Implement Pomodoro timer
-    alert('Pomodoro timer will be implemented')
+  const startPomodoro = async () => {
+    if (!task?.id) return
+    
+    try {
+      // Set 25 minutes for work phase
+      setElapsedSeconds(0)
+      setPomodoroPhase('work')
+      setTimeTab('pomodoro')
+      setIsTimerRunning(true)
+      
+      // Save to database
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Not authenticated')
+      
+      await supabase
+        .from('time_sessions')
+        .insert({
+          user_id: user.id,
+          task_id: task.id,
+          task_source: 'day_assistant_v2',
+          task_title: task.content,
+          started_at: new Date().toISOString(),
+          session_type: 'pomodoro',
+          metadata: { phase: 'work', count: pomodoroCount + 1 }
+        })
+      
+      toast.success('🍅 Pomodoro rozpoczęty - 25 minut pracy!')
+    } catch (error) {
+      console.error('Failed to start pomodoro:', error)
+      toast.error('Nie udało się uruchomić Pomodoro')
+    }
+  }
+  
+  const stopPomodoro = async () => {
+    setIsTimerRunning(false)
+    
+    if (elapsedSeconds > 0) {
+      const minutes = Math.floor(elapsedSeconds / 60)
+      const isComplete = elapsedSeconds >= 25 * 60  // 25 minutes
+      
+      if (isComplete) {
+        setPomodoroCount(prev => prev + 1)
+        
+        // Switch to break
+        if (pomodoroPhase === 'work') {
+          setPomodoroPhase('break')
+          setElapsedSeconds(0)
+          toast.success('🎉 Pomodoro ukończone! Czas na przerwę (5 min)')
+          // Auto-start 5 min break
+          setTimeout(() => {
+            setElapsedSeconds(0)
+            setIsTimerRunning(true)
+          }, 1000)
+        } else {
+          // Break complete
+          setPomodoroPhase('work')
+          toast.success('✅ Przerwa zakończona! Gotowy na kolejne Pomodoro?')
+        }
+      }
+      
+      // Save completed session
+      const session: TimerSession = {
+        id: Date.now().toString(),
+        duration: minutes,
+        date: new Date().toLocaleString('pl-PL'),
+        sessionType: 'pomodoro'
+      }
+      setTimerSessions([session, ...timerSessions])
+    }
+    
+    setElapsedSeconds(0)
   }
   
   const handleAddLabel = () => {
@@ -617,7 +759,7 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
-        className="sm:max-w-2xl max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-[95vw] sm:max-w-xl md:max-w-2xl max-h-[95vh] sm:max-h-[90vh] p-3 sm:p-6 overflow-y-auto"
         aria-labelledby="universal-task-modal-title"
       >
         <DialogHeader>
@@ -627,10 +769,10 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
           {/* Title Input */}
           <div>
-            <label className="text-sm font-medium mb-1 block">
+            <label className="text-xs sm:text-sm font-medium mb-1 block">
               Tytuł zadania <span className="text-red-500">*</span>
             </label>
             <input
@@ -639,37 +781,37 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
               onChange={(e) => setContent(e.target.value)}
               placeholder="Co chcesz zrobić?"
               autoFocus
-              className="w-full px-4 py-3 rounded-lg border-2 border-gray-200 focus:border-brand-purple focus:outline-none"
+              className="w-full px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base rounded-lg border-2 border-gray-200 focus:border-brand-purple focus:outline-none"
             />
           </div>
 
           {/* Description */}
           <div>
-            <label className="text-sm font-medium mb-1 block">Opis (opcjonalny)</label>
+            <label className="text-xs sm:text-sm font-medium mb-1 block">Opis (opcjonalny)</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Dodatkowe szczegóły..."
-              rows={3}
-              className="w-full px-4 py-3 rounded-lg border-2 border-gray-200 focus:border-brand-purple focus:outline-none resize-none"
+              rows={2}
+              className="w-full px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base rounded-lg border-2 border-gray-200 focus:border-brand-purple focus:outline-none resize-none"
             />
           </div>
 
-          {/* Grid Layout for 2 columns on desktop */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Grid Layout - stack on mobile */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             {/* Estimated Time */}
             <div>
-              <label className="text-sm font-medium mb-2 block flex items-center gap-2">
-                <Clock size={18} />
+              <label className="text-xs sm:text-sm font-medium mb-2 block flex items-center gap-2">
+                <Clock size={16} className="sm:w-[18px] sm:h-[18px]" />
                 Estymat czasu:
               </label>
-              <div className="grid grid-cols-4 gap-2 mb-2">
+              <div className="grid grid-cols-4 gap-1 sm:gap-2 mb-2">
                 {[5, 15, 25, 30, 45, 60, 90, 120].map(time => (
                   <button
                     key={time}
                     type="button"
                     onClick={() => setEstimatedMinutes(time)}
-                    className={`px-2 py-1.5 text-xs rounded border transition ${
+                    className={`px-1 py-1 sm:px-2 sm:py-1.5 text-[10px] sm:text-xs rounded border transition ${
                       estimatedMinutes === time
                         ? 'bg-brand-purple text-white border-brand-purple'
                         : 'bg-white border-gray-300 hover:border-brand-purple'
@@ -1020,17 +1162,68 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                 )}
 
                 {timeTab === 'pomodoro' && (
-                  <div className="text-center py-4">
-                    <Button 
-                      type="button"
-                      onClick={startPomodoro}
-                      className="bg-gradient-to-r from-red-500 to-orange-500"
-                    >
-                      🍅 Start Pomodoro (25min)
-                    </Button>
-                    <p className="text-xs text-gray-500 mt-2">
-                      25 minut pracy + 5 minut przerwy
-                    </p>
+                  <div>
+                    <div className="text-center mb-4">
+                      <div className="text-4xl font-mono font-bold text-red-600 mb-2">
+                        {formatTime(elapsedSeconds)}
+                      </div>
+                      <p className="text-sm text-gray-600">
+                        {pomodoroPhase === 'work' 
+                          ? `🍅 Faza pracy (${25 - Math.floor(elapsedSeconds / 60)} min pozostało)` 
+                          : `☕ Przerwa (${5 - Math.floor(elapsedSeconds / 60)} min pozostało)`}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Ukończone Pomodoro dziś: {pomodoroCount}
+                      </p>
+                    </div>
+                    
+                    <div className="flex gap-2 justify-center">
+                      {!isTimerRunning ? (
+                        <Button 
+                          type="button"
+                          onClick={startPomodoro}
+                          className="bg-gradient-to-r from-red-500 to-orange-500 gap-2"
+                        >
+                          <Play size={16} weight="fill" />
+                          Start Pomodoro (25min)
+                        </Button>
+                      ) : (
+                        <>
+                          <Button 
+                            type="button"
+                            onClick={() => setIsTimerRunning(false)}
+                            size="sm"
+                            variant="ghost"
+                            className="gap-1 border"
+                          >
+                            <Pause size={16} weight="fill" /> Pause
+                          </Button>
+                          <Button 
+                            type="button"
+                            onClick={stopPomodoro}
+                            size="sm"
+                            variant="ghost"
+                            className="gap-1 border border-red-500 text-red-600"
+                          >
+                            <Stop size={16} weight="fill" /> Stop
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                    
+                    {/* Progress bar */}
+                    <div className="mt-4">
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className={`h-2 rounded-full transition-all ${
+                            pomodoroPhase === 'work' ? 'bg-red-500' : 'bg-green-500'
+                          }`}
+                          style={{ 
+                            width: `${(elapsedSeconds / (pomodoroPhase === 'work' ? 25 * 60 : 5 * 60)) * 100}%` 
+                          }}
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
               </CollapsibleSection>
@@ -1072,17 +1265,18 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
           </div>
 
           {/* Submit Buttons with improved layout */}
-          <DialogFooter className="flex justify-between pt-4 border-t">
-            <div className="flex gap-2">
+          <DialogFooter className="flex flex-col sm:flex-row justify-between pt-3 sm:pt-4 border-t gap-2 sm:gap-0">
+            <div className="flex gap-2 justify-center sm:justify-start">
               {isEditMode && onDelete && (
                 <Button
                   type="button"
                   variant="ghost"
                   onClick={handleDelete}
+                  size="sm"
                   className="text-red-600 hover:bg-red-50 gap-2"
                 >
-                  <Trash size={18} />
-                  Usuń
+                  <Trash size={16} />
+                  <span className="hidden sm:inline">Usuń</span>
                 </Button>
               )}
               {isEditMode && onComplete && (
@@ -1090,34 +1284,40 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                   type="button"
                   variant="ghost"
                   onClick={handleComplete}
+                  size="sm"
                   className="text-green-600 hover:bg-green-50 gap-2"
                 >
-                  <CheckCircle size={18} />
-                  Ukończ
+                  <CheckCircle size={16} />
+                  <span className="hidden sm:inline">Ukończ</span>
                 </Button>
               )}
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 w-full sm:w-auto">
               <Button
                 type="button"
                 variant="ghost"
                 onClick={() => onOpenChange(false)}
+                className="flex-1 sm:flex-none"
+                size="sm"
               >
                 Anuluj
               </Button>
               <Button
                 type="submit"
                 disabled={!content.trim() || saving}
-                className="bg-gradient-to-r from-brand-purple to-brand-pink gap-2"
+                className="bg-gradient-to-r from-brand-purple to-brand-pink gap-2 flex-1 sm:flex-none"
+                size="sm"
               >
                 {saving ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Zapisywanie...
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span className="text-xs sm:text-sm">Zapisywanie...</span>
                   </>
                 ) : (
-                  isEditMode ? 'Zapisz zmiany' : 'Utwórz zadanie'
+                  <span className="text-xs sm:text-sm">
+                    {isEditMode ? 'Zapisz' : 'Utwórz'}
+                  </span>
                 )}
               </Button>
             </div>
