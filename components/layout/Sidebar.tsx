@@ -1,6 +1,7 @@
 'use client'
 
-import { ListChecks, CalendarBlank, Notebook, Brain, HandHeart, GearSix, Sun, Users, CalendarCheck } from '@phosphor-icons/react'
+import { useRouter } from 'next/navigation'
+import { ListChecks, CalendarBlank, Notebook, Brain, HandHeart, GearSix, Sun, Users, CalendarCheck, Sparkle } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 
 // Updated assistant IDs - removed old 'day-assistant' v1, keeping only v2
@@ -12,6 +13,7 @@ interface Assistant {
   label: string
   color: string
   adminOnly?: boolean
+  href?: string  // Optional external route
 }
 
 const assistants: Assistant[] = [
@@ -25,6 +27,11 @@ const assistants: Assistant[] = [
   { id: 'admin', icon: GearSix, label: 'Panel Admina', color: 'text-red-500', adminOnly: true },
 ]
 
+// Separate navigation links that go to external routes
+const externalLinks = [
+  { id: 'ai-insights', icon: Sparkle, label: 'AI Insights', color: 'text-purple-500', href: '/ai-insights' }
+]
+
 interface SidebarProps {
   activeView: AssistantId
   onNavigate: (view: AssistantId) => void
@@ -33,6 +40,8 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ activeView, onNavigate, isAdmin, isMobileMenuOpen }: SidebarProps) {
+  const router = useRouter()
+  
   return (
     <aside className={cn(
       "w-64 min-h-screen bg-white/50 backdrop-blur-sm border-r border-white/20 p-4 transition-transform duration-300 ease-in-out",
@@ -69,6 +78,29 @@ export default function Sidebar({ activeView, onNavigate, isAdmin, isMobileMenuO
             </button>
           )
         })}
+        
+        {/* External navigation links */}
+        <div className="border-t border-gray-200 mt-4 pt-4">
+          {externalLinks.map((link) => {
+            const Icon = link.icon
+            
+            return (
+              <button
+                key={link.id}
+                onClick={() => router.push(link.href)}
+                className={cn(
+                  'w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all',
+                  'hover:bg-white/10'
+                )}
+              >
+                <Icon size={24} className={link.color} weight="regular" />
+                <span className="font-medium">
+                  {link.label}
+                </span>
+              </button>
+            )
+          })}
+        </div>
       </nav>
     </aside>
   )
