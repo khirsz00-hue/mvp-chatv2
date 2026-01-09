@@ -9,6 +9,24 @@ interface Task {
   due?: { date: string } | null
   completed?: boolean
   completed_at?: string | null
+  /** Cognitive load rating from 1 (easy) to 5 (hard) */
+  cognitive_load?: number
+  /** Number of times this task has been postponed */
+  postpone_count?: number
+  /** Context type for task clustering (e.g., 'deep', 'admin', 'comms') */
+  context_type?: string
+  /** Calculated score for prioritization */
+  score?: number
+}
+
+interface Meeting {
+  id: string
+  title: string
+  start_time: string
+  end_time: string
+  duration_minutes: number
+  location?: string
+  meeting_link?: string
 }
 
 interface YesterdayData {
@@ -33,12 +51,16 @@ interface SummaryData {
   textToSpeak: string
   yesterdayData: YesterdayData
   todayData: TodayData
+  meetings?: Meeting[]
+  tips?: string[]
 }
 
 interface MorningBriefData {
   yesterday: YesterdayData
   today: TodayData
   summary: string
+  meetings: Meeting[]
+  tips: string[]
 }
 
 export function useMorningBrief(token: string | null) {
@@ -77,7 +99,9 @@ export function useMorningBrief(token: string | null) {
       setData({
         yesterday: summaryData.yesterdayData,
         today: summaryData.todayData,
-        summary: summaryData.textToSpeak
+        summary: summaryData.textToSpeak,
+        meetings: summaryData.meetings || [],
+        tips: summaryData.tips || []
       })
 
       // Store the date of this fetch
@@ -90,7 +114,9 @@ export function useMorningBrief(token: string | null) {
         localStorage.setItem('morning_brief_data', JSON.stringify({
           yesterday: summaryData.yesterdayData,
           today: summaryData.todayData,
-          summary: summaryData.textToSpeak
+          summary: summaryData.textToSpeak,
+          meetings: summaryData.meetings || [],
+          tips: summaryData.tips || []
         }))
       } catch (e) {
         console.warn('⚠️ Failed to cache morning brief data', e)
