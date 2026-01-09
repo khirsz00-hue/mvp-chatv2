@@ -24,8 +24,9 @@ export async function GET(req: Request) {
     const todayDate = format(new Date(), 'yyyy-MM-dd')
     console.log('🔍 [Recap/Today] Fetching tasks for date:', todayDate)
 
-    // Fetch today's tasks
-    const response = await fetch('/api/todoist/tasks', {
+    // Fetch today's tasks using POST method
+    const baseUrl = req.url.split('/api/')[0] // Get the base URL from request
+    const response = await fetch(`${baseUrl}/api/todoist/tasks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 

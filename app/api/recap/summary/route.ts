@@ -20,8 +20,8 @@ export async function GET(req: Request) {
 
     console.log('🔍 [Recap/Summary] Generating daily summary')
 
-    // Fetch data from both endpoints
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    // Fetch data from both endpoints using the request's base URL
+    const baseUrl = req.url.split('/api/')[0]
     
     const [yesterdayResponse, todayResponse] = await Promise.all([
       fetch(`${baseUrl}/api/recap/yesterday?token=${encodeURIComponent(token)}`, {
