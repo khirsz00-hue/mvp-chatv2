@@ -8,6 +8,10 @@ import Card from '@/components/ui/Card'
 import { Sparkle, ArrowLeft } from '@phosphor-icons/react'
 import Button from '@/components/ui/Button'
 
+// Constants
+const MAX_ACTIVE_TASKS = 50
+const MAX_COMPLETED_TASKS = 20
+
 interface TodoistTask {
   id: string
   content: string
@@ -70,10 +74,18 @@ export default function AIInsightsPage() {
           return
         }
 
-        // Fetch tasks from Todoist API
+        // Fetch tasks from Todoist API using POST for security (token in body)
         const [activeResponse, completedResponse] = await Promise.all([
-          fetch(`/api/todoist/tasks?token=${todoistToken}&filter=all`),
-          fetch(`/api/todoist/tasks?token=${todoistToken}&filter=completed`)
+          fetch('/api/todoist/tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: todoistToken, filter: 'all' })
+          }),
+          fetch('/api/todoist/tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: todoistToken, filter: 'completed' })
+          })
         ])
 
         if (!activeResponse.ok || !completedResponse.ok) {
@@ -85,11 +97,11 @@ export default function AIInsightsPage() {
 
         const activeTasks = (activeData.tasks || [])
           .filter((t: TodoistTask) => !t.completed)
-          .slice(0, 50)
+          .slice(0, MAX_ACTIVE_TASKS)
           .map(convertToTask)
 
         const completedTasksList = (completedData.tasks || [])
-          .slice(0, 20)
+          .slice(0, MAX_COMPLETED_TASKS)
           .map(convertToTask)
 
         setTasks(activeTasks)
