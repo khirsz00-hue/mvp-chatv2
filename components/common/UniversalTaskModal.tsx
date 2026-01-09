@@ -303,9 +303,10 @@ export function UniversalTaskModal({
     
     const limit = pomodoroPhase === 'work' ? 25 * 60 : 5 * 60
     if (elapsedSeconds >= limit) {
-      stopPomodoro()
+      // Stop inline to avoid dependency issue
+      setIsTimerRunning(false)
     }
-  }, [elapsedSeconds, isTimerRunning, timeTab, pomodoroPhase, stopPomodoro])
+  }, [elapsedSeconds, isTimerRunning, timeTab, pomodoroPhase])
   
   // Cleanup Pomodoro timeout on unmount
   useEffect(() => {
