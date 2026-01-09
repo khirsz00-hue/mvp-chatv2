@@ -1,7 +1,8 @@
 'use client'
 
 import Card from '@/components/ui/Card'
-import { CheckCircle, Clock } from '@phosphor-icons/react'
+import { CheckCircle, Clock, CalendarCheck } from '@phosphor-icons/react'
+import { format } from 'date-fns'
 
 interface Task {
   id: string
@@ -11,15 +12,26 @@ interface Task {
   completed?: boolean
 }
 
+interface Meeting {
+  id: string
+  title: string
+  start_time: string
+  end_time: string
+  duration_minutes: number
+  location?: string
+  meeting_link?: string
+}
+
 interface RecapCardProps {
   title: string
   subtitle?: string
   tasks: Task[]
   icon: 'yesterday' | 'today'
   className?: string
+  meetings?: Meeting[]
 }
 
-export default function RecapCard({ title, subtitle, tasks, icon, className = '' }: RecapCardProps) {
+export default function RecapCard({ title, subtitle, tasks, icon, className = '', meetings }: RecapCardProps) {
   const Icon = icon === 'yesterday' ? CheckCircle : Clock
 
   return (
@@ -61,6 +73,45 @@ export default function RecapCard({ title, subtitle, tasks, icon, className = ''
             </li>
           ))}
         </ul>
+      )}
+
+      {/* Meetings Section - only show for today */}
+      {icon === 'today' && meetings && meetings.length > 0 && (
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <CalendarCheck size={18} weight="fill" className="text-blue-600" />
+            Spotkania dziś ({meetings.length})
+          </h4>
+          
+          {/* Show first meeting */}
+          <div className="bg-blue-50 rounded-lg p-4 mb-2">
+            <p className="text-sm font-medium text-blue-900 mb-1">
+              {format(new Date(meetings[0].start_time), 'HH:mm')} - {meetings[0].title}
+            </p>
+            {meetings[0].duration_minutes && (
+              <p className="text-xs text-blue-700">
+                {meetings[0].duration_minutes} min
+                {meetings[0].location && ` • ${meetings[0].location}`}
+              </p>
+            )}
+            {meetings[0].meeting_link && (
+              <a 
+                href={meetings[0].meeting_link} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-xs text-blue-600 hover:text-blue-800 underline mt-1 inline-block"
+              >
+                Link do spotkania →
+              </a>
+            )}
+          </div>
+          
+          {meetings.length > 1 && (
+            <p className="text-xs text-gray-500 mt-2">
+              + {meetings.length - 1} {meetings.length === 2 ? 'spotkanie więcej' : 'spotkań więcej'}
+            </p>
+          )}
+        </div>
       )}
     </Card>
   )

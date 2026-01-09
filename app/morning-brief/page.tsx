@@ -200,20 +200,22 @@ export default function MorningBriefPage() {
           } do zrobienia`}
           tasks={data.today.tasks}
           icon="today"
+          meetings={data.meetings}
         />
 
-        {/* Helpful Tips for ADHD */}
-        <Card className="p-6 bg-blue-50 border-blue-200">
-          <h3 className="font-bold text-blue-900 mb-3 flex items-center gap-2">
-            💡 Wskazówki na dziś
-          </h3>
-          <ul className="space-y-2 text-sm text-blue-800">
-            <li>• Zacznij od najprostszego zadania, aby nabrać rozpędu</li>
-            <li>• Użyj timera (technika Pomodoro) - 25 minut pracy, 5 minut przerwy</li>
-            <li>• Jeśli czujesz się przytłoczony, podziel zadanie na mniejsze kroki</li>
-            <li>• Pamiętaj o przerwach - twój mózg potrzebuje odpoczynku</li>
-          </ul>
-        </Card>
+        {/* Personalized Tips for ADHD */}
+        {data.tips && data.tips.length > 0 && (
+          <Card className="p-6 bg-blue-50 border-blue-200">
+            <h3 className="font-bold text-blue-900 mb-3 flex items-center gap-2">
+              💡 Wskazówki na dziś
+            </h3>
+            <ul className="space-y-2 text-sm text-blue-800">
+              {data.tips.map((tip, index) => (
+                <li key={index}>• {tip}</li>
+              ))}
+            </ul>
+          </Card>
+        )}
       </div>
     </div>
   )
