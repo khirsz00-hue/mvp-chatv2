@@ -14,53 +14,62 @@ interface Meeting {
 }
 
 /**
- * Generate personalized tips based on user's tasks and meetings
+ * Generate personalized tips based on user's tasks, meetings, and yesterday's performance
  */
-function generatePersonalizedTips(todayTasks: any[], meetings: Meeting[]): string[] {
+function generatePersonalizedTips(
+  todayTasks: any[], 
+  meetings: Meeting[], 
+  yesterdayStats: { completed: number; total: number }
+): string[] {
   const tips: string[] = []
   
-  // Tip 1: Based on task count
+  // Tip 1: Based on yesterday's performance
+  if (yesterdayStats.completed >= 5) {
+    tips.push('🔥 Wczoraj ukończyłeś ' + yesterdayStats.completed + ' zadań! Kontynuuj momentum.')
+  } else if (yesterdayStats.completed > 0 && yesterdayStats.completed < 5) {
+    tips.push('👍 Każdy ukończony task to sukces. Dziś spróbuj zrobić jeszcze jeden więcej!')
+  } else if (yesterdayStats.completed === 0 && todayTasks.length > 0) {
+    tips.push('🌱 Nowy dzień, nowa szansa. Zacznij od czegoś małego.')
+  }
+  
+  // Tip 2: Based on meetings vs focus time
+  if (meetings.length > 3) {
+    tips.push('📅 Dużo spotkań dziś - zarezerwuj 15 min przerwy między nimi.')
+  } else if (meetings.length === 0 && todayTasks.length > 0) {
+    tips.push('🧠 Brak spotkań = idealny czas na deep work.')
+  }
+  
+  // Tip 3: Based on priorities
+  const highPriorityCount = todayTasks.filter(t => t.priority <= 2).length
+  if (highPriorityCount > 0) {
+    tips.push(`⚡ ${highPriorityCount} ${highPriorityCount === 1 ? 'zadanie' : 'zadań'} high-priority - zacznij od nich przed 12:00.`)
+  }
+  
+  // Tip 4: Based on cognitive load
+  const hardTasks = todayTasks.filter(t => (t.cognitive_load || 3) >= 4)
+  if (hardTasks.length > 0) {
+    tips.push('🧠 Trudne zadania rób rano, gdy masz najwięcej energii.')
+  } else if (todayTasks.length > 0) {
+    const avgCognitiveLoad = todayTasks.reduce((sum, t) => sum + (t.cognitive_load || 3), 0) / todayTasks.length
+    if (avgCognitiveLoad < 2.5) {
+      tips.push('⚡ Lekkie zadania dzisiaj - możesz zrobić więcej niż myślisz!')
+    }
+  }
+  
+  // Tip 5: Based on postpone count
+  const postponedTasks = todayTasks.filter(t => (t.postpone_count || 0) >= 3)
+  if (postponedTasks.length > 0) {
+    tips.push(`⚠️ ${postponedTasks.length} ${postponedTasks.length === 1 ? 'zadanie' : 'zadań'} przekładanych 3+ razy - wybierz jedno i zrób dziś!`)
+  }
+  
+  // Tip 6: Based on task count
   if (todayTasks.length > 8) {
     tips.push("📋 Masz dziś dużo zadań. Może warto kilka przenieść na jutro?")
   } else if (todayTasks.length <= 3 && todayTasks.length > 0) {
     tips.push("✨ Spokojny dzień! Idealny moment na trudniejsze zadania.")
   }
   
-  // Tip 2: Based on priorities
-  const highPriorityCount = todayTasks.filter(t => t.priority <= 2).length
-  if (highPriorityCount >= 5) {
-    tips.push("🔥 Dużo ważnych zadań - pamiętaj o przerwach!")
-  } else if (highPriorityCount === 1) {
-    tips.push("🎯 Masz jedno ważne zadanie - zacznij od niego!")
-  }
-  
-  // Tip 3: Based on cognitive load
-  if (todayTasks.length > 0) {
-    const avgCognitiveLoad = todayTasks.reduce((sum, t) => sum + (t.cognitive_load || 3), 0) / todayTasks.length
-    if (avgCognitiveLoad > 3.5) {
-      tips.push("🧠 Trudne zadania dzisiaj - zacznij od najłatwiejszego dla rozpędu")
-    } else if (avgCognitiveLoad < 2.5) {
-      tips.push("⚡ Lekkie zadania dzisiaj - możesz zrobić więcej niż myślisz!")
-    }
-  }
-  
-  // Tip 4: Based on meetings
-  if (meetings.length > 0) {
-    const meetingMinutes = meetings.reduce((sum, m) => sum + (m.duration_minutes || 0), 0)
-    const availableHours = Math.floor((480 - meetingMinutes) / 60) // 8h - meetings
-    const availableMinutes = (480 - meetingMinutes) % 60
-    
-    if (availableHours > 0 || availableMinutes > 0) {
-      const timeStr = availableHours > 0 
-        ? `${availableHours}h${availableMinutes > 0 ? ` ${availableMinutes}min` : ''}`
-        : `${availableMinutes}min`
-      tips.push(`📅 ${meetings.length} ${meetings.length === 1 ? 'spotkanie' : meetings.length < 5 ? 'spotkania' : 'spotkań'} dziś (${meetingMinutes}min). Zostaje Ci ~${timeStr} na zadania.`)
-    } else {
-      tips.push(`📅 Uwaga! ${meetings.length} ${meetings.length === 1 ? 'spotkanie' : 'spotkań'} zajmuje cały dzień - może trzeba przełożyć zadania?`)
-    }
-  }
-  
-  // Tip 5: Based on context clustering
+  // Tip 7: Based on context clustering
   if (todayTasks.length >= 4) {
     const contexts = todayTasks.map(t => t.context_type).filter(Boolean)
     if (contexts.length >= 4) {
@@ -89,7 +98,7 @@ function generatePersonalizedTips(todayTasks: any[], meetings: Meeting[]): strin
     tips.push("💪 Świetnie! Zaczynamy nowy dzień!")
   }
   
-  return tips.slice(0, 4) // Max 4 tips
+  return tips.slice(0, 3) // Max 3 tips (as per requirements)
 }
 
 /**
@@ -133,16 +142,28 @@ export async function POST(req: Request) {
     // Fetch data from both endpoints using the request's base URL
     const baseUrl = req.url.split('/api/')[0]
     
+    // Get auth session to pass to sub-endpoints
+    const { data: { session } } = await supabase.auth.getSession()
+    const authHeader = session?.access_token ? `Bearer ${session.access_token}` : undefined
+    
+    const headers: HeadersInit = { 
+      'Content-Type': 'application/json'
+    }
+    
+    if (authHeader) {
+      headers['Authorization'] = authHeader
+    }
+    
     const [yesterdayResponse, todayResponse] = await Promise.all([
       fetch(`${baseUrl}/api/recap/yesterday`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ token: todoistToken }),
         cache: 'no-store'
       }),
       fetch(`${baseUrl}/api/recap/today`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ token: todoistToken }),
         cache: 'no-store'
       })
@@ -203,8 +224,8 @@ export async function POST(req: Request) {
       // Continue without meetings - graceful degradation
     }
 
-    // Generate personalized tips
-    const tips = generatePersonalizedTips(todayData.tasks || [], meetings)
+    // Generate personalized tips with yesterday's performance data
+    const tips = generatePersonalizedTips(todayData.tasks || [], meetings, yesterdayData.stats)
 
     // Build the text for speech
     const parts = ['Dzień dobry!']
@@ -247,7 +268,9 @@ export async function POST(req: Request) {
         todayData.stats.total < 5 ? 'zadania' : 'zadań'
       }.`)
 
-      if (todayData.focusTask) {
+      if (todayData.focusTask && todayData.focusReason) {
+        parts.push(`Sugeruję zacząć od: ${todayData.focusTask.content}. ${todayData.focusReason}.`)
+      } else if (todayData.focusTask) {
         parts.push(`Sugeruję zacząć od: ${todayData.focusTask.content}.`)
       }
     } else {

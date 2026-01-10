@@ -167,6 +167,11 @@ export default function MorningBriefPage() {
                 <p className="text-amber-800 font-medium text-xl">
                   {data.today.focusTask.content}
                 </p>
+                {data.focusReason && (
+                  <p className="text-sm text-amber-700 mt-2 italic">
+                    💡 {data.focusReason}
+                  </p>
+                )}
                 {data.today.focusTask.due?.date && (
                   <p className="text-sm text-amber-700 mt-2">
                     Termin: {data.today.focusTask.due.date}

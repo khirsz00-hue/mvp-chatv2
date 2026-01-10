@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { supabase } from '@/lib/supabaseClient'
 
 interface Task {
   id: string
@@ -41,6 +42,7 @@ interface YesterdayData {
 interface TodayData {
   tasks: Task[]
   focusTask: Task | null
+  focusReason?: string | null
   stats: {
     total: number
     highPriority: number
@@ -61,6 +63,7 @@ interface MorningBriefData {
   summary: string
   meetings: Meeting[]
   tips: string[]
+  focusReason?: string | null
 }
 
 export function useMorningBrief(token: string | null) {
@@ -70,22 +73,28 @@ export function useMorningBrief(token: string | null) {
   const [lastFetchDate, setLastFetchDate] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
-    if (!token) {
-      setError('No Todoist token available')
-      setLoading(false)
-      return
-    }
-
     try {
       setLoading(true)
       setError(null)
 
       console.log('🔍 [useMorningBrief] Fetching morning brief data')
 
+      // Get auth session
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        setError('Not authenticated')
+        setLoading(false)
+        return
+      }
+
       // Fetch summary using POST for security (token in body, not URL)
       const response = await fetch('/api/recap/summary', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
         body: JSON.stringify({ token }),
         cache: 'no-store'
       })
@@ -101,7 +110,8 @@ export function useMorningBrief(token: string | null) {
         today: summaryData.todayData,
         summary: summaryData.textToSpeak,
         meetings: summaryData.meetings || [],
-        tips: summaryData.tips || []
+        tips: summaryData.tips || [],
+        focusReason: summaryData.todayData.focusReason || null
       })
 
       // Store the date of this fetch
@@ -116,7 +126,8 @@ export function useMorningBrief(token: string | null) {
           today: summaryData.todayData,
           summary: summaryData.textToSpeak,
           meetings: summaryData.meetings || [],
-          tips: summaryData.tips || []
+          tips: summaryData.tips || [],
+          focusReason: summaryData.todayData.focusReason || null
         }))
       } catch (e) {
         console.warn('⚠️ Failed to cache morning brief data', e)
@@ -136,11 +147,6 @@ export function useMorningBrief(token: string | null) {
   }, [fetchData])
 
   useEffect(() => {
-    if (!token) {
-      setLoading(false)
-      return
-    }
-
     // Check if we have cached data for today
     try {
       const cachedDate = localStorage.getItem('morning_brief_date')
@@ -162,7 +168,7 @@ export function useMorningBrief(token: string | null) {
 
     // Fetch fresh data
     fetchData()
-  }, [token, fetchData])
+  }, [fetchData])
 
   return {
     data,
