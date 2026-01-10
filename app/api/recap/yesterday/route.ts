@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     console.log('🔍 [Recap/Yesterday] Starting request')
 
     // Create authenticated Supabase client
-    const supabase = await createAuthenticatedSupabaseClient()
+    const supabase = await createAuthenticatedSupabaseClient(req)
     const user = await getAuthenticatedUser(supabase)
 
     if (!user) {
