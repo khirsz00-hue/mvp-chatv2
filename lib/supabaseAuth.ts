@@ -6,6 +6,7 @@
  */
 
 import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -13,9 +14,37 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  * Creates an authenticated Supabase client for API routes
  * Uses cookies to maintain user session and respects RLS policies
  * 
+ * @param request - Optional Request object to check Authorization header (for server-to-server calls)
  * @returns Promise<SupabaseClient> - Authenticated Supabase client
  */
-export async function createAuthenticatedSupabaseClient(): Promise<SupabaseClient> {
+export async function createAuthenticatedSupabaseClient(
+  request?: Request
+): Promise<SupabaseClient> {
+  // 1. Try Authorization header first (server-to-server calls)
+  if (request) {
+    const authHeader = request.headers.get('authorization')
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.replace('Bearer ', '')
+      
+      // Create client with explicit access token
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          global: {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        }
+      )
+      
+      console.log('[Auth] ✓ Using Authorization header for authentication')
+      return supabase
+    }
+  }
+  
+  // 2. Fallback to cookies (browser-to-server calls)
   const cookieStore = await cookies()
   const allCookies = cookieStore.getAll()
   
