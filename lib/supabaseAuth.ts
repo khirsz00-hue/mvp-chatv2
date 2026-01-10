@@ -39,7 +39,7 @@ export async function createAuthenticatedSupabaseClient(
         }
       )
       
-      console.log('[Auth] ✓ Using Authorization header for authentication')
+      console.log('[Auth] ✓ Using Authorization header for server-to-server auth')
       return supabase
     }
   }
