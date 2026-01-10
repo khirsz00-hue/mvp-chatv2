@@ -1007,17 +1007,21 @@ export function TasksAssistant() {
       
       {/* Filters */}
       {view === 'list' && (
-        <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterType)}>
-          <TabsList className="flex flex-wrap w-full max-w-3xl justify-start gap-1">
-            <TabsTrigger value="today" className="flex-1 min-w-[100px]">Dziś</TabsTrigger>
-            <TabsTrigger value="tomorrow" className="flex-1 min-w-[100px]">Jutro</TabsTrigger>
-            <TabsTrigger value="week" className="flex-1 min-w-[100px]">Tydzień</TabsTrigger>
-            <TabsTrigger value="month" className="flex-1 min-w-[100px]">Miesiąc</TabsTrigger>
-            <TabsTrigger value="overdue" className="flex-1 min-w-[140px]">Przeterminowane</TabsTrigger>
-            <TabsTrigger value="unscheduled" className="flex-1 min-w-[140px]">Do zaplanowania</TabsTrigger>
-            <TabsTrigger value="completed" className="flex-1 min-w-[120px]">Ukończone</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="mb-6">
+          <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterType)}>
+            <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-400 pb-2">
+              <TabsList className="inline-flex w-auto min-w-full lg:w-full justify-start gap-1">
+                <TabsTrigger value="today" className="flex-shrink-0 px-4">Dziś</TabsTrigger>
+                <TabsTrigger value="tomorrow" className="flex-shrink-0 px-4">Jutro</TabsTrigger>
+                <TabsTrigger value="week" className="flex-shrink-0 px-4">Tydzień</TabsTrigger>
+                <TabsTrigger value="month" className="flex-shrink-0 px-4">Miesiąc</TabsTrigger>
+                <TabsTrigger value="overdue" className="flex-shrink-0 px-4">Przeterminowane</TabsTrigger>
+                <TabsTrigger value="unscheduled" className="flex-shrink-0 px-4">Do zaplanowania</TabsTrigger>
+                <TabsTrigger value="completed" className="flex-shrink-0 px-4">Ukończone</TabsTrigger>
+              </TabsList>
+            </div>
+          </Tabs>
+        </div>
       )}
       
       {/* Bulk Actions Bar */}
