@@ -6,6 +6,31 @@ import type { TestDayTask } from '@/lib/types/dayAssistantV2'
 
 export const dynamic = 'force-dynamic'
 
+/**
+ * Get a human-readable explanation for why a task is the focus task
+ * Based on the score breakdown
+ */
+function getFocusReason(breakdown: any): string {
+  if (!breakdown) return 'Najlepiej dopasowane do Twojego harmonogramu'
+  
+  const { deadline, priority, postpone } = breakdown
+  
+  // Check each factor in order of importance
+  if (deadline >= 100) {
+    return 'Overdue lub najbliższy deadline'
+  } else if (deadline >= 60) {
+    return 'Deadline dzisiaj'
+  } else if (priority >= 30) {
+    return 'Najwyższy priorytet (P1 lub P2)'
+  } else if (postpone >= 15) {
+    return 'Często przekładane - czas to zrobić'
+  } else if (deadline >= 30) {
+    return 'Deadline jutro'
+  } else {
+    return 'Najlepiej dopasowane do Twojej energii'
+  }
+}
+
 interface Task {
   id: string
   content: string
@@ -199,17 +224,19 @@ export async function POST(req: Request) {
 
     // Focus task: task with highest score
     const focusTask = sortedTasks.length > 0 ? sortedTasks[0] : null
+    const focusReason = focusTask ? getFocusReason(focusTask.scoreBreakdown) : null
 
     const highPriorityCount = tasks.filter((t: any) => t.priority <= 2).length
 
     console.log('✅ [Recap/Today] Found', tasks.length, 'tasks,', highPriorityCount, 'high priority')
     if (focusTask) {
-      console.log('🎯 [Recap/Today] Focus task:', focusTask.content, 'with score:', focusTask.score)
+      console.log('🎯 [Recap/Today] Focus task:', focusTask.content, 'with score:', focusTask.score, '- Reason:', focusReason)
     }
 
     return NextResponse.json({
       tasks: sortedTasks,
       focusTask,
+      focusReason,
       stats: {
         total: tasks.length,
         highPriority: highPriorityCount
