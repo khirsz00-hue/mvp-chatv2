@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAuthenticatedSupabaseClient, getAuthenticatedUser } from '@/lib/supabaseAuth'
+import { getYesterdayTasks, getTodayTasks, getMeetingsForDate } from '@/lib/services/recapService'
 
 export const dynamic = 'force-dynamic'
 
@@ -139,44 +140,21 @@ export async function POST(req: Request) {
       todoistToken = profile?.todoist_token
     }
 
-    // Fetch data from both endpoints using the request's base URL
-    const baseUrl = req.url.split('/api/')[0]
+    // Use service layer - direct function calls with shared Supabase client
+    // This avoids server-to-server fetch() issues where cookies aren't passed
+    let yesterdayData, todayData
     
-    // Get auth session to pass to sub-endpoints
-    const { data: { session } } = await supabase.auth.getSession()
-    const authHeader = session?.access_token ? `Bearer ${session.access_token}` : undefined
-    
-    const headers: HeadersInit = { 
-      'Content-Type': 'application/json'
-    }
-    
-    if (authHeader) {
-      headers['Authorization'] = authHeader
-    }
-    
-    const [yesterdayResponse, todayResponse] = await Promise.all([
-      fetch(`${baseUrl}/api/recap/yesterday`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ token: todoistToken }),
-        cache: 'no-store'
-      }),
-      fetch(`${baseUrl}/api/recap/today`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ token: todoistToken }),
-        cache: 'no-store'
-      })
-    ])
-
-    if (!yesterdayResponse.ok || !todayResponse.ok) {
-      console.error('❌ [Recap/Summary] Failed to fetch recap data:', {
-        yesterday: yesterdayResponse.status,
-        today: todayResponse.status
-      })
+    try {
+      // Fetch data in parallel using service functions
+      [yesterdayData, todayData] = await Promise.all([
+        getYesterdayTasks(supabase, user.id, todoistToken),
+        getTodayTasks(supabase, user.id, todoistToken)
+      ])
+    } catch (serviceError: any) {
+      console.error('❌ [Recap/Summary] Service error:', serviceError)
       
       // Handle token expiry
-      if (yesterdayResponse.status === 401 || todayResponse.status === 401) {
+      if (serviceError.message === 'Token expired') {
         return NextResponse.json({ 
           error: 'Token expired',
           message: 'Twój token Todoist wygasł. Połącz się ponownie z Todoist.',
@@ -193,36 +171,9 @@ export async function POST(req: Request) {
       }, { status: 500 })
     }
 
-    const yesterdayData = await yesterdayResponse.json()
-    const todayData = await todayResponse.json()
-
-    // Fetch meetings from day-assistant-v2
-    let meetings: Meeting[] = []
-    try {
-      const todayDate = new Date().toISOString().split('T')[0]
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (session) {
-        const meetingsResponse = await fetch(`${baseUrl}/api/day-assistant-v2/meetings?date=${todayDate}`, {
-          headers: { 
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json'
-          },
-          cache: 'no-store'
-        })
-
-        if (meetingsResponse.ok) {
-          const meetingsData = await meetingsResponse.json()
-          meetings = meetingsData.meetings || []
-          console.log('✅ [Recap/Summary] Found', meetings.length, 'meetings')
-        } else {
-          console.warn('⚠️ [Recap/Summary] Failed to fetch meetings:', meetingsResponse.status)
-        }
-      }
-    } catch (meetingsError) {
-      console.warn('⚠️ [Recap/Summary] Failed to fetch meetings:', meetingsError)
-      // Continue without meetings - graceful degradation
-    }
+    // Fetch meetings using service layer
+    const todayDate = new Date().toISOString().split('T')[0]
+    const meetings: Meeting[] = await getMeetingsForDate(supabase, user.id, todayDate)
 
     // Generate personalized tips with yesterday's performance data
     const tips = generatePersonalizedTips(todayData.tasks || [], meetings, yesterdayData.stats)
