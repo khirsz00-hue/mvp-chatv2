@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
-import { CalendarBlank, CheckCircle, Trash, DotsThree, Circle, CheckSquare, ChatCircle, Brain, Timer as TimerIcon, Stop } from '@phosphor-icons/react'
+import { CalendarBlank, CheckCircle, Trash, DotsThree, Circle, CheckSquare, ChatCircle, Brain, Timer as TimerIcon, Stop, Lightning } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { format, parseISO } from 'date-fns'
 import { pl } from 'date-fns/locale'
@@ -411,18 +411,18 @@ export function TaskCard({
           <Button 
             size="sm" 
             variant="ghost"
-            onClick={handleChatClick}
-            title="Czat"
+            onClick={handleBreakdownClick}
+            title="Doprecyzuj"
             className="p-2 h-auto"
           >
-            <ChatCircle size={18} weight="bold" className="text-blue-600" />
+            <Lightning size={18} weight="bold" className="text-amber-600" />
           </Button>
           
           <Button 
             size="sm" 
             variant="ghost"
-            onClick={handleBreakdownClick}
-            title="Doprecyzuj"
+            onClick={handleChatClick}
+            title="Czat AI"
             className="p-2 h-auto"
           >
             <Brain size={18} weight="bold" className="text-purple-600" />
@@ -493,25 +493,25 @@ export function TaskCard({
               <button
                 onClick={(e) => {
                   e.stopPropagation()
-                  handleChatClick(e)
-                  setShowMobileMenu(false)
-                }}
-                className="w-full px-4 py-2.5 text-left hover:bg-gray-50 flex items-center gap-3 text-sm transition-colors"
-              >
-                <ChatCircle size={18} weight="bold" className="text-blue-600" />
-                <span>Czat</span>
-              </button>
-              
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
                   handleBreakdownClick(e)
                   setShowMobileMenu(false)
                 }}
                 className="w-full px-4 py-2.5 text-left hover:bg-gray-50 flex items-center gap-3 text-sm transition-colors"
               >
-                <Brain size={18} weight="bold" className="text-purple-600" />
+                <Lightning size={18} weight="bold" className="text-amber-600" />
                 <span>Doprecyzuj</span>
+              </button>
+              
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleChatClick(e)
+                  setShowMobileMenu(false)
+                }}
+                className="w-full px-4 py-2.5 text-left hover:bg-gray-50 flex items-center gap-3 text-sm transition-colors"
+              >
+                <Brain size={18} weight="bold" className="text-purple-600" />
+                <span>Czat AI</span>
               </button>
               
               <button
