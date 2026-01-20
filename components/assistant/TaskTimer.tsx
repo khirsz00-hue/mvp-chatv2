@@ -137,7 +137,7 @@ export function TaskTimer({ onClose }: TaskTimerProps) {
     })
   }
   
-  const stopTimer = () => {
+  const stopTimer = async () => {
     if (timerState.taskId && timerState.taskTitle && timerState.startTime) {
       // Calculate actual elapsed time
       let actualElapsed = timerState.elapsedSeconds
@@ -148,7 +148,35 @@ export function TaskTimer({ onClose }: TaskTimerProps) {
       
       // Only save if there's actual elapsed time
       if (actualElapsed > 0) {
-        // Save session to history
+        // Save to database via Supabase
+        try {
+          const { supabase } = await import('@/lib/supabaseClient')
+          const { data: { user } } = await supabase.auth.getUser()
+          
+          if (user) {
+            const startedAt = new Date(timerState.startTime).toISOString()
+            const endedAt = new Date().toISOString()
+            
+            await supabase
+              .from('time_sessions')
+              .insert({
+                user_id: user.id,
+                task_id: timerState.taskId,
+                task_source: 'assistant_tasks',
+                task_title: timerState.taskTitle,
+                started_at: startedAt,
+                ended_at: endedAt,
+                duration_seconds: actualElapsed,
+                session_type: 'manual'
+              })
+            
+            console.log('✅ Timer session saved to database')
+          }
+        } catch (error) {
+          console.error('❌ Failed to save timer session to database:', error)
+        }
+        
+        // Also save to localStorage as backup
         const sessions: TimerSession[] = JSON.parse(localStorage.getItem('timerSessions') || '[]')
         const newSession: TimerSession = {
           taskId: timerState.taskId,

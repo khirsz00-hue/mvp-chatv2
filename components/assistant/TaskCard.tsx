@@ -11,6 +11,7 @@ import { pl } from 'date-fns/locale'
 import { useTaskTimer } from './TaskTimer'
 import { TaskChatModal } from './TaskChatModal'
 import { AITaskBreakdownModal } from './AITaskBreakdownModal'
+import { HelpMeModal } from '@/components/day-assistant-v2/HelpMeModal'
 import { useToast } from '@/components/ui/Toast'
 
 interface Subtask {
@@ -61,6 +62,7 @@ export function TaskCard({
   const [hasActiveTimer, setHasActiveTimer] = useState(false)
   const [showChatModal, setShowChatModal] = useState(false)
   const [showBreakdownModal, setShowBreakdownModal] = useState(false)
+  const [showHelpModal, setShowHelpModal] = useState(false)
   const [showAITooltip, setShowAITooltip] = useState(false)
   const [aiUnderstanding, setAiUnderstanding] = useState<string>('')
   const [showMobileMenu, setShowMobileMenu] = useState(false)
@@ -194,7 +196,7 @@ export function TaskCard({
   
   const handleChatClick = (e: React.MouseEvent) => {
     e.stopPropagation()
-    setShowChatModal(true)
+    setShowHelpModal(true)
   }
   
   const handleBreakdownClick = (e: React.MouseEvent) => {
@@ -257,9 +259,18 @@ export function TaskCard({
   const handleDueDateChange = async (value: string) => {
     if (!value) return
     
+    console.log('📅 Date changed:', { taskId: task.id, newDate: value })
+    
     if (onMove) {
       try {
         await onMove(task.id, value)
+        showToast('Zadanie przeniesione', 'success')
+      } catch (error) {
+        console.error('Failed to move task:', error)
+        showToast('Nie udało się przenieść zadania', 'error')
+      }
+    } else {
+      console.warn('⚠️ onMove callback not provided')
       } catch (err) {
         console.error('Error changing due date:', err)
       }
@@ -579,10 +590,14 @@ export function TaskCard({
       </div>
 
       {/* Modals */}
-      <TaskChatModal
-        open={showChatModal}
-        onClose={() => setShowChatModal(false)}
-        task={task}
+      <HelpMeModal
+        open={showHelpModal}
+        onClose={() => setShowHelpModal(false)}
+        task={{ id: task.id, title: task.content, description: task.description }}
+        onSuccess={() => {
+          // Refresh tasks after subtasks created
+          window.location.reload()
+        }}
       />
       
       <AITaskBreakdownModal
