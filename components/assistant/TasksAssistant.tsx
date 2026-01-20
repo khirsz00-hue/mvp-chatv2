@@ -1162,6 +1162,7 @@ export function TasksAssistant() {
                           setUniversalModalTask(t)
                           setShowUniversalModal(true)
                         }}
+                        onMove={handleMove}
                         selectable={selectedTaskIds.size > 0}
                         selected={selectedTaskIds.has(task.id)}
                         onToggleSelection={toggleTaskSelection}
