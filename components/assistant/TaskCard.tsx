@@ -251,11 +251,21 @@ export function TaskCard({
     }
   }
 
-  const handleDueDateChange = (value: string) => {
+  const handleDueDateChange = async (value: string) => {
     if (!value) return
     
+    console.log('📅 Date changed:', { taskId: task.id, newDate: value })
+    
     if (onMove) {
-      onMove(task.id, value)
+      try {
+        await onMove(task.id, value)
+        showToast('Zadanie przeniesione', 'success')
+      } catch (error) {
+        console.error('Failed to move task:', error)
+        showToast('Nie udało się przenieść zadania', 'error')
+      }
+    } else {
+      console.warn('⚠️ onMove callback not provided')
     }
   }
   

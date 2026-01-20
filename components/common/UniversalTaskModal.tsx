@@ -274,13 +274,41 @@ export function UniversalTaskModal({
       return
     }
     
-    const timeout = setTimeout(() => {
-      // Simple AI understanding for now
-      setAiUnderstanding(`Zrozumiałem: "${content}"`)
-    }, 1000)
+    const timeout = setTimeout(async () => {
+      try {
+        setLoadingAI(true)
+        
+        const prompt = `Zadanie: ${content}
+${description ? `Opis: ${description}` : ''}
+
+W 1-2 zwięzłych zdaniach wyjaśnij jak rozumiesz to zadanie. Bądź konkretny i pomocny.`
+        
+        const response = await fetch('/api/ai/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [{ role: 'user', content: prompt }]
+          })
+        })
+        
+        if (!response.ok) {
+          console.error('Failed to generate AI understanding:', response.status)
+          setAiUnderstanding('')
+          return
+        }
+        
+        const data = await response.json()
+        setAiUnderstanding(data.response || '')
+      } catch (error) {
+        console.error('Error generating AI understanding:', error)
+        setAiUnderstanding('')
+      } finally {
+        setLoadingAI(false)
+      }
+    }, 2000) // Wait 2 seconds for user to finish typing
     
     return () => clearTimeout(timeout)
-  }, [content])
+  }, [content, description])
   
   // Timer effect
   useEffect(() => {
