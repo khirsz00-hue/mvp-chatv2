@@ -170,11 +170,11 @@ export function HelpMeModal({ task, open, onClose, onSuccess }: Props) {
 
             <div>
               <Label htmlFor="blockers">
-                3. Czy są jakieś blokery/zależności? (opcjonalnie)
+                3. Co Cię blokuje?
               </Label>
               <Textarea
                 id="blockers"
-                placeholder="Co może Cię zablokować lub od czego zależy to zadanie..."
+                placeholder="Co może Cię blokować lub od czego zależy to zadanie..."
                 value={blockers}
                 onChange={(e) => setBlockers(e.target.value)}
                 rows={2}
