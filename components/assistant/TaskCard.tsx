@@ -212,7 +212,7 @@ export function TaskCard({
       // Create each subtask via Todoist API
       const token = localStorage.getItem('todoist_token')
       for (const subtask of subtasks) {
-        await fetch('/api/todoist/tasks', {
+        const res = await fetch('/api/todoist/tasks', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -225,6 +225,11 @@ export function TaskCard({
             duration_unit: subtask.duration_unit || 'minute'
           })
         })
+        
+        if (!res.ok) {
+          const errorText = await res.text()
+          throw new Error(`Failed to create subtask: ${errorText}`)
+        }
       }
       
       showToast(`Utworzono ${subtasks.length} podzadań!`, 'success')
@@ -249,11 +254,15 @@ export function TaskCard({
     }
   }
 
-  const handleDueDateChange = (value: string) => {
+  const handleDueDateChange = async (value: string) => {
     if (!value) return
     
     if (onMove) {
-      onMove(task.id, value)
+      try {
+        await onMove(task.id, value)
+      } catch (err) {
+        console.error('Error changing due date:', err)
+      }
     }
   }
   
@@ -377,10 +386,14 @@ export function TaskCard({
               <div className="relative">
                 <Badge 
                   variant="outline" 
-                  className="gap-1 text-xs cursor-help border-purple-300 bg-purple-50 text-purple-700"
+                  className="gap-1 text-xs cursor-pointer border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors"
                   onMouseEnter={() => setShowAITooltip(true)}
                   onMouseLeave={() => setShowAITooltip(false)}
-                  title="Jak AI rozumie zadanie"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onDetails(task)
+                  }}
+                  title="Kliknij aby zobaczyć pełną analizę AI"
                 >
                   <Brain size={12} weight="fill" />
                   AI
@@ -396,7 +409,7 @@ export function TaskCard({
                       {task.description?.substring(0, DESCRIPTION_PREVIEW_LENGTH)}{task.description && task.description.length > DESCRIPTION_PREVIEW_LENGTH ? '...' : ''}
                     </div>
                     <div className="text-xs text-purple-200 mt-2">
-                      💡 Kliknij na zadanie aby zobaczyć pełną analizę AI
+                      💡 Kliknij na badge aby zobaczyć pełną analizę AI
                     </div>
                   </div>
                 )}

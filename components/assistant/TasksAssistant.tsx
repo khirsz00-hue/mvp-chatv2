@@ -732,14 +732,22 @@ export function TasksAssistant() {
     setBulkActionLoading(true)
     const count = selectedTaskIds.size
     
-    // Execute all complete operations (individual toasts will show for any errors)
-    for (const taskId of selectedTaskIds) {
-      await handleComplete(taskId)
+    try {
+      // Execute all complete operations (individual toasts will show for any errors)
+      for (const taskId of selectedTaskIds) {
+        try {
+          await handleComplete(taskId)
+        } catch (err) {
+          console.error(`Error completing task ${taskId}:`, err)
+          // Continue with other tasks even if one fails
+        }
+      }
+      
+      showToast(`Przetworzono ${count} zadań`, 'success')
+    } finally {
+      setBulkActionLoading(false)
+      setSelectedTaskIds(new Set())
     }
-    
-    setBulkActionLoading(false)
-    setSelectedTaskIds(new Set())
-    showToast(`Przetworzono ${count} zadań`, 'success')
   }
   
   const handleBulkDelete = async () => {
@@ -751,14 +759,22 @@ export function TasksAssistant() {
     setBulkActionLoading(true)
     const count = selectedTaskIds.size
     
-    // Execute all delete operations (individual toasts will show for any errors)
-    for (const taskId of selectedTaskIds) {
-      await handleDelete(taskId)
+    try {
+      // Execute all delete operations (individual toasts will show for any errors)
+      for (const taskId of selectedTaskIds) {
+        try {
+          await handleDelete(taskId)
+        } catch (err) {
+          console.error(`Error deleting task ${taskId}:`, err)
+          // Continue with other tasks even if one fails
+        }
+      }
+      
+      showToast(`Przetworzono ${count} zadań`, 'success')
+    } finally {
+      setBulkActionLoading(false)
+      setSelectedTaskIds(new Set())
     }
-    
-    setBulkActionLoading(false)
-    setSelectedTaskIds(new Set())
-    showToast(`Przetworzono ${count} zadań`, 'success')
   }
   
   const handleBulkMove = async (newDate: string) => {
@@ -767,18 +783,22 @@ export function TasksAssistant() {
     setBulkActionLoading(true)
     const count = selectedTaskIds.size
     
-    // Execute all move operations (individual toasts will show for any errors)
-    for (const taskId of selectedTaskIds) {
-      try {
-        await handleMove(taskId, newDate)
-      } catch (err) {
-        console.error(`Error moving task ${taskId}:`, err)
+    try {
+      // Execute all move operations (individual toasts will show for any errors)
+      for (const taskId of selectedTaskIds) {
+        try {
+          await handleMove(taskId, newDate)
+        } catch (err) {
+          console.error(`Error moving task ${taskId}:`, err)
+          // Continue with other tasks even if one fails
+        }
       }
+      
+      showToast(`Przetworzono ${count} zadań`, 'success')
+    } finally {
+      setBulkActionLoading(false)
+      setSelectedTaskIds(new Set())
     }
-    
-    setBulkActionLoading(false)
-    setSelectedTaskIds(new Set())
-    showToast(`Przetworzono ${count} zadań`, 'success')
   }
   
   // OAuth Connection Screen
@@ -1158,6 +1178,7 @@ export function TasksAssistant() {
                         task={task}
                         onComplete={handleComplete}
                         onDelete={handleDelete}
+                        onMove={handleMove}
                         onDetails={(t) => {
                           setUniversalModalTask(t)
                           setShowUniversalModal(true)
