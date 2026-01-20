@@ -11,6 +11,7 @@ import { pl } from 'date-fns/locale'
 import { useTaskTimer } from './TaskTimer'
 import { TaskChatModal } from './TaskChatModal'
 import { AITaskBreakdownModal } from './AITaskBreakdownModal'
+import { HelpMeModal } from '@/components/day-assistant-v2/HelpMeModal'
 import { useToast } from '@/components/ui/Toast'
 
 interface Subtask {
@@ -61,6 +62,7 @@ export function TaskCard({
   const [hasActiveTimer, setHasActiveTimer] = useState(false)
   const [showChatModal, setShowChatModal] = useState(false)
   const [showBreakdownModal, setShowBreakdownModal] = useState(false)
+  const [showHelpModal, setShowHelpModal] = useState(false)
   const [showAITooltip, setShowAITooltip] = useState(false)
   const [aiUnderstanding, setAiUnderstanding] = useState<string>('')
   const [showMobileMenu, setShowMobileMenu] = useState(false)
@@ -194,7 +196,7 @@ export function TaskCard({
   
   const handleChatClick = (e: React.MouseEvent) => {
     e.stopPropagation()
-    setShowChatModal(true)
+    setShowHelpModal(true)
   }
   
   const handleBreakdownClick = (e: React.MouseEvent) => {
@@ -566,10 +568,14 @@ export function TaskCard({
       </div>
 
       {/* Modals */}
-      <TaskChatModal
-        open={showChatModal}
-        onClose={() => setShowChatModal(false)}
-        task={task}
+      <HelpMeModal
+        open={showHelpModal}
+        onClose={() => setShowHelpModal(false)}
+        task={{ id: task.id, title: task.content, description: task.description }}
+        onSuccess={() => {
+          // Refresh tasks after subtasks created
+          window.location.reload()
+        }}
       />
       
       <AITaskBreakdownModal

@@ -88,15 +88,20 @@ export function TasksAssistant() {
   const fetchTasks = useCallback(async () => {
     setLoading(true)
     try {
-      console.log('🔍 Fetching tasks with token:', token ?  'EXISTS' : 'MISSING')
+      console.log('🔍 Fetching tasks with token:', token ? 'EXISTS' : 'MISSING')
       
-      const res = await fetch(`/api/todoist/tasks?token=${token}`)
+      // Use POST to pass filter parameter
+      const res = await fetch('/api/todoist/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, filter })
+      })
       
       console.log('📡 Response status:', res.status)
       
       if (!res.ok) throw new Error('Failed to fetch tasks')
       
-      const data = await res. json()
+      const data = await res.json()
       console.log('📦 Raw data from API:', data)
       
       const fetchedTasks = data.tasks || data || []
@@ -117,7 +122,7 @@ export function TasksAssistant() {
     } finally {
       setLoading(false)
     }
-  }, [token])
+  }, [token, filter])
   
   const fetchProjects = useCallback(async () => {
     try {
@@ -234,7 +239,7 @@ export function TasksAssistant() {
     console.log('🔍 FILTER DEBUG:', {
       totalTasks: tasks.length,
       filterType,
-      tasks:  tasks.map(t => ({
+      tasks: tasks.map(t => ({
         id: t.id,
         content: t.content,
         due: t.due,
@@ -242,15 +247,16 @@ export function TasksAssistant() {
       }))
     })
     
+    // If filter is 'completed', tasks are already filtered by API
+    // Just return them as-is
+    if (filterType === 'completed') {
+      return tasks
+    }
+    
     const now = startOfDay(new Date())
     
     const filtered = tasks.filter(task => {
-      // Show only completed tasks when filter is 'completed'
-      if (filterType === 'completed') {
-        return task.completed === true
-      }
-      
-      // Skip completed tasks for other filters
+      // Skip completed tasks for non-completed filters
       if (task.completed) {
         console.log('⏭️ Skipping completed task:', task.content)
         return false
@@ -265,7 +271,7 @@ export function TasksAssistant() {
         return !dueStr
       }
       
-      if (! dueStr) {
+      if (!dueStr) {
         console.log('⏭️ Skipping task without due date:', task.content)
         return false
       }
@@ -274,7 +280,7 @@ export function TasksAssistant() {
         const dueDate = startOfDay(parseISO(dueStr))
         
         console.log('📅 Checking task:', {
-          content:  task.content,
+          content: task.content,
           dueStr,
           dueDate,
           now,
@@ -290,17 +296,17 @@ export function TasksAssistant() {
             const isTomorrow = isSameDay(dueDate, addDays(now, 1))
             console.log('  → isTomorrow:', isTomorrow)
             return isTomorrow
-          case 'week':  
-            const isInWeek = isWithinInterval(dueDate, { 
-              start:  now, 
-              end: addDays(now, 6) 
+          case 'week':
+            const isInWeek = isWithinInterval(dueDate, {
+              start: now,
+              end: addDays(now, 6)
             })
-            console. log('  → isInWeek:', isInWeek)
+            console.log('  → isInWeek:', isInWeek)
             return isInWeek
-          case 'month':  
-            const isInMonth = isWithinInterval(dueDate, { 
-              start: now, 
-              end: addDays(now, 29) 
+          case 'month':
+            const isInMonth = isWithinInterval(dueDate, {
+              start: now,
+              end: addDays(now, 29)
             })
             console.log('  → isInMonth:', isInMonth)
             return isInMonth
@@ -317,7 +323,7 @@ export function TasksAssistant() {
       }
     })
     
-    console.log('✅ Filtered tasks result:', filtered. length, filtered)
+    console.log('✅ Filtered tasks result:', filtered.length, filtered)
     return filtered
   }
   
@@ -890,17 +896,6 @@ export function TasksAssistant() {
           </div>
           
           <div className="flex items-center gap-3">
-            <Button 
-              onClick={() => setShowPomodoro(true)} 
-              variant="outline"
-              className="gap-2 hover:scale-105 transition-transform"
-              title="Pomodoro Timer"
-              size="lg"
-            >
-              <span className="text-xl">🍅</span>
-              <span className="hidden sm:inline">Pomodoro</span>
-            </Button>
-            
             <Button 
               onClick={() => {
                 setUniversalModalTask(null)
