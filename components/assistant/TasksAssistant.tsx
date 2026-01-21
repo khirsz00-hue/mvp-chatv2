@@ -1435,7 +1435,7 @@ export function TasksAssistant() {
             description: '',
             project_id: key === 'all' ? undefined : key,
             priority: 4,
-            due: grouping === 'day' ? key : undefined
+            due: boardGrouping === 'day' ? key : undefined
           } as Task)
           setShowUniversalModal(true)
         }}
