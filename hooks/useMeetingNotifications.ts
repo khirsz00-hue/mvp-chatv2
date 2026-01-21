@@ -33,6 +33,7 @@ interface NotificationSettings {
 }
 
 interface UpcomingNotification {
+  id: string
   meetingId: string
   title: string
   start_time: string
@@ -146,6 +147,7 @@ export function useMeetingNotifications(
           // Show in-app banner
           if (settings.inAppBanner) {
             setUpcomingNotification({
+              id: meeting.id,
               meetingId: meeting.id,
               title: meeting.title,
               start_time: meeting.start_time,
