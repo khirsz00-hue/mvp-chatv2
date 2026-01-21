@@ -5,6 +5,8 @@ import Button from '@/components/ui/Button'
 import { Card, CardContent } from '@/components/ui/Card'
 import { format, differenceInMinutes } from 'date-fns'
 import { VideoCamera, MapPin, ArrowSquareOut, Users, Clock } from '@phosphor-icons/react'
+import { MeetingEmptyState } from './MeetingEmptyState'
+import { MeetingDetailsModal } from './MeetingDetailsModal'
 
 interface Attendee {
   email?: string
@@ -69,23 +71,9 @@ export function MeetingsSection({ meetings, onRefresh }: MeetingsSectionProps) {
   // No meetings case
   if (sortedMeetings.length === 0) {
     return (
-      <Card className="mb-6 bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200 rounded-xl">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600 font-medium">
-              📅 Brak spotkań dziś
-            </span>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={handleRefresh}
-              disabled={refreshing}
-            >
-              {refreshing ? '⏳' : '🔄'} Odśwież
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="mb-6">
+        <MeetingEmptyState />
+      </div>
     )
   }
 
@@ -246,6 +234,7 @@ function useCountdown(startTime: string, endTime: string) {
 
 // Large featured card for first meeting
 function LargeMeetingCard({ meeting }: { meeting: Meeting }) {
+  const [showModal, setShowModal] = useState(false)
   const isAllDay = meeting.metadata?.isAllDay
   
   // Use countdown hook to trigger re-renders every minute
@@ -258,7 +247,11 @@ function LargeMeetingCard({ meeting }: { meeting: Meeting }) {
   const progress = countdownInfo.progress
 
   return (
-    <div className="bg-gradient-to-r from-blue-50 to-white p-5 rounded-xl border border-blue-100 shadow-sm hover:shadow-md transition-shadow group cursor-pointer">
+    <>
+      <div 
+        className="bg-gradient-to-r from-blue-50 to-white p-5 rounded-xl border border-blue-100 shadow-sm hover:shadow-md transition-shadow group cursor-pointer"
+        onClick={() => setShowModal(true)}
+      >
       <div className="flex items-start gap-4">
         {/* Lewa sekcja - Czas */}
         <div className="flex-shrink-0 w-16 text-center">
@@ -359,12 +352,24 @@ function LargeMeetingCard({ meeting }: { meeting: Meeting }) {
           )}
         </div>
       </div>
-    </div>
+      {/* Modal */}
+      {showModal && (
+        <MeetingDetailsModal
+          meeting={{
+            ...meeting,
+            type: meeting.metadata?.isAllDay ? 'in-office' : 'online',
+            date: new Date(meeting.start_time).toISOString().split('T')[0]
+          } as any}
+          onClose={() => setShowModal(false)}
+        />
+      )}
+    </>
   )
 }
 
 // Compact card for remaining meetings
 function CompactMeetingCard({ meeting }: { meeting: Meeting }) {
+  const [showModal, setShowModal] = useState(false)
   const isAllDay = meeting.metadata?.isAllDay
   
   // Use countdown hook to trigger re-renders every minute
@@ -375,7 +380,11 @@ function CompactMeetingCard({ meeting }: { meeting: Meeting }) {
   const isActive = countdownInfo.isActive
 
   return (
-    <div className={`bg-white p-3 rounded-lg border hover:border-blue-200 transition-all group cursor-pointer ${getBorderColor(meeting)}`}>
+    <>
+      <div 
+        className={`bg-white p-3 rounded-lg border hover:border-blue-200 transition-all group cursor-pointer ${getBorderColor(meeting)}`}
+        onClick={() => setShowModal(true)}
+      >
       <div className="flex items-center gap-3">
         {/* Czas */}
         <div className="flex-shrink-0 text-center">
@@ -425,6 +434,17 @@ function CompactMeetingCard({ meeting }: { meeting: Meeting }) {
           </button>
         )}
       </div>
-    </div>
+      {/* Modal */}
+      {showModal && (
+        <MeetingDetailsModal
+          meeting={{
+            ...meeting,
+            type: meeting.metadata?.isAllDay ? 'in-office' : 'online',
+            date: new Date(meeting.start_time).toISOString().split('T')[0]
+          } as any}
+          onClose={() => setShowModal(false)}
+        />
+      )}
+    </>
   )
 }
