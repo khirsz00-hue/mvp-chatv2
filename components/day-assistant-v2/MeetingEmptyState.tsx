@@ -11,13 +11,15 @@
 
 'use client'
 
+import { Coffee, Brain, ArrowSquareOut } from '@phosphor-icons/react'
+
 export function MeetingEmptyState() {
   return (
     <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-dashed border-indigo-200 rounded-xl p-8 text-center">
       <div className="flex flex-col items-center gap-3">
         {/* Coffee mug icon in circle */}
         <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-md">
-          <i className="fa-solid fa-mug-hot text-4xl text-indigo-400"></i>
+          <Coffee size={48} weight="fill" className="text-indigo-400" />
         </div>
         
         {/* Main message */}
@@ -32,7 +34,7 @@ export function MeetingEmptyState() {
         
         {/* Deep Work badge */}
         <div className="inline-flex items-center gap-2 text-xs text-indigo-600 bg-white px-3 py-1.5 rounded-full border border-indigo-200 shadow-sm">
-          <i className="fa-solid fa-brain"></i>
+          <Brain size={16} weight="fill" />
           <span className="font-semibold">Tryb Deep Work dostępny</span>
         </div>
         
@@ -41,7 +43,7 @@ export function MeetingEmptyState() {
           onClick={() => window.open('https://calendar.google.com', '_blank')}
           className="mt-2 text-xs text-indigo-600 hover:text-indigo-700 hover:underline flex items-center gap-1 transition-colors"
         >
-          <i className="fa-solid fa-external-link"></i>
+          <ArrowSquareOut size={14} weight="bold" />
           Zobacz pełny kalendarz
         </button>
       </div>

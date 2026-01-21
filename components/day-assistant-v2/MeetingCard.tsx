@@ -105,7 +105,7 @@ export function MeetingCard({ meeting }: MeetingCardProps) {
           </div>
 
           {/* Chevron icon - indicates clickability */}
-          <i className="fa-solid fa-chevron-right text-slate-300 group-hover:text-indigo-400 transition-colors"></i>
+          <i className="fa-solid fa-chevron-right text-slate-300 group-hover:text-indigo-400 transition-colors" style={{ fontSize: '12px' }}></i>
         </div>
       </div>
 

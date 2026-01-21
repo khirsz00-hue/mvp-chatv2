@@ -24,6 +24,8 @@ interface Meeting {
   duration_minutes: number
   location?: string
   meeting_link?: string
+  type?: 'on-site' | 'online' | 'in-office'
+  date?: string
   metadata?: {
     description?: string | null
     attendees?: Attendee[]
@@ -119,6 +121,22 @@ export function MeetingsSection({ meetings, onRefresh }: MeetingsSectionProps) {
 // Helper functions
 function formatTime(timeString: string): string {
   return format(new Date(timeString), 'HH:mm')
+}
+
+function getMeetingType(meeting: Meeting): 'on-site' | 'online' | 'in-office' {
+  // If type is explicitly set, use it
+  if (meeting.type) return meeting.type
+  
+  // Otherwise infer from other properties
+  if (meeting.metadata?.hasVideoCall || meeting.meeting_link?.includes('meet.google.com') || meeting.meeting_link?.includes('zoom.us')) {
+    return 'online'
+  }
+  
+  if (meeting.location && !meeting.location.includes('http')) {
+    return 'on-site'
+  }
+  
+  return 'in-office'
 }
 
 function formatCountdown(minutes: number): string {
@@ -358,7 +376,7 @@ function LargeMeetingCard({ meeting }: { meeting: Meeting }) {
         <MeetingDetailsModal
           meeting={{
             ...meeting,
-            type: meeting.metadata?.isAllDay ? 'in-office' : 'online',
+            type: getMeetingType(meeting),
             date: new Date(meeting.start_time).toISOString().split('T')[0]
           } as any}
           onClose={() => setShowModal(false)}
@@ -441,7 +459,7 @@ function CompactMeetingCard({ meeting }: { meeting: Meeting }) {
         <MeetingDetailsModal
           meeting={{
             ...meeting,
-            type: meeting.metadata?.isAllDay ? 'in-office' : 'online',
+            type: getMeetingType(meeting),
             date: new Date(meeting.start_time).toISOString().split('T')[0]
           } as any}
           onClose={() => setShowModal(false)}
