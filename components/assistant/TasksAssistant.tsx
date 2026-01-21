@@ -5,7 +5,7 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Card from '@/components/ui/Card'
 import { useToast } from '@/components/ui/Toast'
-import { Plus, List, Kanban, CalendarBlank, Calendar, CheckSquare, Trash, Funnel, SlidersHorizontal } from '@phosphor-icons/react'
+import { Plus, List, Kanban, CalendarBlank, Calendar, CheckSquare, Trash, Funnel, SlidersHorizontal, SortAscending } from '@phosphor-icons/react'
 import { startOfDay, addDays, parseISO, isSameDay, isBefore, isWithinInterval, format } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { UniversalTaskModal, TaskData } from '@/components/common/UniversalTaskModal'
@@ -16,6 +16,7 @@ import { TaskTimer } from './TaskTimer'
 import { PomodoroTimer } from './PomodoroTimer'
 import { supabase } from '@/lib/supabaseClient'
 import Dialog, { DialogContent } from '@/components/ui/Dialog'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 
 interface Task {
   id: string
