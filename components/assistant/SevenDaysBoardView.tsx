@@ -655,13 +655,6 @@ function MiniTaskCard({
     4: 'border-l-gray-300 bg-white'
   }
 
-  const priorityDots = {
-    1: 'bg-red-500',
-    2: 'bg-orange-500',
-    3: 'bg-blue-500',
-    4: 'bg-gray-400'
-  }
-
   const handleComplete = async (e: React.MouseEvent) => {
     e.stopPropagation()
     if (!onComplete) return
@@ -722,9 +715,6 @@ function MiniTaskCard({
               <DotsNine size={14} weight="bold" className="text-gray-400" />
             </button>
           )}
-          
-          {/* Priority indicator dot */}
-          <div className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', priorityDots[task.priority])} />
           
           {/* Content */}
           <div className="flex-1 min-w-0">
