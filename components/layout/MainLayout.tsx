@@ -149,15 +149,18 @@ export default function MainLayout({ children }: MainLayoutProps) {
   
   // Block scroll when mobile menu is open
   useEffect(() => {
+    // Store original overflow value
+    const originalOverflow = document.body.style.overflow
+    
     if (isMobileMenuOpen) {
       document.body.style.overflow = 'hidden'
     } else {
-      document.body.style.overflow = 'unset'
+      document.body.style.overflow = originalOverflow
     }
     
-    // Cleanup
+    // Cleanup - restore original overflow
     return () => {
-      document.body.style.overflow = 'unset'
+      document.body.style.overflow = originalOverflow
     }
   }, [isMobileMenuOpen])
   
