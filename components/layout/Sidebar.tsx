@@ -38,7 +38,7 @@ interface SidebarProps {
   onNavigate: (view: AssistantId) => void
   isAdmin?: boolean
   isMobileMenuOpen?: boolean
-  onClose?: () => void  // NOWY PROP
+  onClose?: () => void  // NEW PROP
 }
 
 export default function Sidebar({ activeView, onNavigate, isAdmin, isMobileMenuOpen, onClose }: SidebarProps) {
@@ -50,7 +50,7 @@ export default function Sidebar({ activeView, onNavigate, isAdmin, isMobileMenuO
       "lg:translate-x-0", // Always visible on large screens
       "fixed lg:relative top-0 left-0", // Fixed on mobile, relative on desktop
       "z-50 lg:z-auto",
-      "overflow-y-auto", // Umożliwia scroll jeśli sidebar jest dłuższy niż ekran
+      "overflow-y-auto", // Enable scroll if sidebar is taller than screen
       isMobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0" // Slide in/out on mobile
     )}>
       <nav className="space-y-2">
@@ -93,7 +93,7 @@ export default function Sidebar({ activeView, onNavigate, isAdmin, isMobileMenuO
                 key={link.id}
                 onClick={() => {
                   router.push(link.href)
-                  onClose?.() // Zamknij sidebar na mobile
+                  onClose?.() // Close sidebar on mobile
                 }}
                 className={cn(
                   'w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all',

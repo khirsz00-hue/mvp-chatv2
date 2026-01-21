@@ -147,7 +147,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
   
-  // Blokuj scroll gdy mobile menu otwarty
+  // Block scroll when mobile menu is open
   useEffect(() => {
     if (isMobileMenuOpen) {
       document.body.style.overflow = 'hidden'
