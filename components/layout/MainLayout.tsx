@@ -147,6 +147,20 @@ export default function MainLayout({ children }: MainLayoutProps) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
   
+  // Blokuj scroll gdy mobile menu otwarty
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = 'unset'
+    }
+    
+    // Cleanup
+    return () => {
+      document.body.style.overflow = 'unset'
+    }
+  }, [isMobileMenuOpen])
+  
   const handleQuickAdd = async (taskData: TaskData) => {
     try {
       // Get fresh session token
@@ -313,7 +327,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               {/* Mobile overlay */}
               {isMobileMenuOpen && (
                 <div 
-                  className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+                  className="fixed inset-0 bg-black/60 z-40 lg:hidden transition-opacity duration-300"
                   onClick={() => setIsMobileMenuOpen(false)}
                   aria-hidden="true"
                 />
@@ -324,15 +338,16 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 onNavigate={handleNavigate} 
                 isAdmin={isAdmin}
                 isMobileMenuOpen={isMobileMenuOpen}
+                onClose={() => setIsMobileMenuOpen(false)}
               />
-              <main className="flex-1 p-6">
+              <main className="flex-1 p-4 sm:p-6">
                 {children || renderAssistant()}
               </main>
             </div>
             
             {/* 🎮 GAMIFICATION: Voice Capture Button */}
             {/* Floating Action Buttons - Stacked vertically */}
-            <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
+            <div className="fixed bottom-6 right-6 z-30 lg:z-50 flex flex-col gap-3">
               {/* Add Task Button - Top */}
               <FloatingAddButton onClick={() => setShowQuickAdd(true)} />
               
@@ -371,7 +386,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             {/* Mobile overlay */}
             {isMobileMenuOpen && (
               <div 
-                className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+                className="fixed inset-0 bg-black/60 z-40 lg:hidden transition-opacity duration-300"
                 onClick={() => setIsMobileMenuOpen(false)}
                 aria-hidden="true"
               />
@@ -382,15 +397,16 @@ export default function MainLayout({ children }: MainLayoutProps) {
               onNavigate={handleNavigate} 
               isAdmin={isAdmin}
               isMobileMenuOpen={isMobileMenuOpen}
+              onClose={() => setIsMobileMenuOpen(false)}
             />
-            <main className="flex-1 p-6">
+            <main className="flex-1 p-4 sm:p-6">
               {children || renderAssistant()}
             </main>
           </div>
           
           {/* 🎮 GAMIFICATION: Voice Capture Button */}
           {/* Floating Action Buttons - Stacked vertically */}
-          <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
+          <div className="fixed bottom-6 right-6 z-30 lg:z-50 flex flex-col gap-3">
             {/* Add Task Button - Top */}
             <FloatingAddButton onClick={() => setShowQuickAdd(true)} />
             

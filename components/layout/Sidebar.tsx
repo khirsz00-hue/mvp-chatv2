@@ -38,16 +38,19 @@ interface SidebarProps {
   onNavigate: (view: AssistantId) => void
   isAdmin?: boolean
   isMobileMenuOpen?: boolean
+  onClose?: () => void  // NOWY PROP
 }
 
-export default function Sidebar({ activeView, onNavigate, isAdmin, isMobileMenuOpen }: SidebarProps) {
+export default function Sidebar({ activeView, onNavigate, isAdmin, isMobileMenuOpen, onClose }: SidebarProps) {
   const router = useRouter()
   
   return (
     <aside className={cn(
-      "w-64 min-h-screen bg-white/50 backdrop-blur-sm border-r border-white/20 p-4 transition-transform duration-300 ease-in-out",
+      "w-64 h-screen bg-white/95 backdrop-blur-md border-r border-white/20 p-4 transition-transform duration-300 ease-in-out",
       "lg:translate-x-0", // Always visible on large screens
-      "fixed lg:relative z-50 lg:z-auto", // Fixed on mobile, relative on desktop
+      "fixed lg:relative top-0 left-0", // Fixed on mobile, relative on desktop
+      "z-50 lg:z-auto",
+      "overflow-y-auto", // Umożliwia scroll jeśli sidebar jest dłuższy niż ekran
       isMobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0" // Slide in/out on mobile
     )}>
       <nav className="space-y-2">
@@ -88,7 +91,10 @@ export default function Sidebar({ activeView, onNavigate, isAdmin, isMobileMenuO
             return (
               <button
                 key={link.id}
-                onClick={() => router.push(link.href)}
+                onClick={() => {
+                  router.push(link.href)
+                  onClose?.() // Zamknij sidebar na mobile
+                }}
                 className={cn(
                   'w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all',
                   'hover:bg-white/10'
