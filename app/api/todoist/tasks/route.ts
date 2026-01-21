@@ -108,6 +108,7 @@ async function fetchAndFilterTasks(token: any, filter: string, date?: string) {
       const effectiveFilter = filter === 'overdue' ? 'scheduled' : filter
       // unify due source: Todoist may return object with .date or a string
       const dueStr = t?.due?.date || t?.due || null
+      if (effectiveFilter === 'unscheduled') return !dueStr
       if (effectiveFilter === 'scheduled' && !dueStr) return true
       if (!dueStr) return effectiveFilter === 'all'
 
