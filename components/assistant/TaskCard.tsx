@@ -196,6 +196,11 @@ export function TaskCard({
   
   const handleChatClick = (e: React.MouseEvent) => {
     e.stopPropagation()
+    setShowChatModal(true)
+  }
+  
+  const handleHelpClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
     setShowHelpModal(true)
   }
   
@@ -442,11 +447,21 @@ export function TaskCard({
           <Button 
             size="sm" 
             variant="ghost"
+            onClick={handleHelpClick}
+            title="Pomoc AI"
+            className="p-2 h-auto"
+          >
+            <Brain size={18} weight="bold" className="text-purple-600" />
+          </Button>
+          
+          <Button 
+            size="sm" 
+            variant="ghost"
             onClick={handleChatClick}
             title="Czat AI"
             className="p-2 h-auto"
           >
-            <Brain size={18} weight="bold" className="text-purple-600" />
+            <ChatCircle size={18} weight="bold" className="text-blue-600" />
           </Button>
           
           <Button 
@@ -526,12 +541,24 @@ export function TaskCard({
               <button
                 onClick={(e) => {
                   e.stopPropagation()
-                  handleChatClick(e)
+                  handleHelpClick(e)
                   setShowMobileMenu(false)
                 }}
                 className="w-full px-4 py-2.5 text-left hover:bg-gray-50 flex items-center gap-3 text-sm transition-colors"
               >
                 <Brain size={18} weight="bold" className="text-purple-600" />
+                <span>Pomoc AI</span>
+              </button>
+              
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleChatClick(e)
+                  setShowMobileMenu(false)
+                }}
+                className="w-full px-4 py-2.5 text-left hover:bg-gray-50 flex items-center gap-3 text-sm transition-colors"
+              >
+                <ChatCircle size={18} weight="bold" className="text-blue-600" />
                 <span>Czat AI</span>
               </button>
               
@@ -602,6 +629,12 @@ export function TaskCard({
         onClose={() => setShowBreakdownModal(false)}
         task={task}
         onCreateSubtasks={handleCreateSubtasks}
+      />
+      
+      <TaskChatModal
+        open={showChatModal}
+        onClose={() => setShowChatModal(false)}
+        task={task}
       />
     </Card>
   )
