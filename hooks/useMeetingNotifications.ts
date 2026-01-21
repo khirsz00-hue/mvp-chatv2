@@ -32,12 +32,14 @@ interface NotificationSettings {
   inAppBanner: boolean
 }
 
+type MeetingType = 'on-site' | 'online' | 'in-office'
+
 interface UpcomingNotification {
   id: string
   meetingId: string
   title: string
   start_time: string
-  type: string
+  type: MeetingType
   location?: string
   minutesUntil: number
 }
@@ -146,15 +148,15 @@ export function useMeetingNotifications(
           
           // Show in-app banner
           if (settings.inAppBanner) {
-            setUpcomingNotification({
-              id: meeting.id,
-              meetingId: meeting.id,
-              title: meeting.title,
-              start_time: meeting.start_time,
-              type: meeting.type,
-              location: meeting.location,
-              minutesUntil
-            })
+              setUpcomingNotification({
+                id: meeting.id,
+                meetingId: meeting.id,
+                title: meeting.title,
+                start_time: meeting.start_time,
+                type: meeting.type as MeetingType,
+                location: meeting.location,
+                minutesUntil
+              })
           }
           
           // Play sound
