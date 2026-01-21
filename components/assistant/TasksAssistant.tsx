@@ -1338,17 +1338,13 @@ export function TasksAssistant() {
         ) : view === 'board' ? (
           <SevenDaysBoardView 
             tasks={activeTasks}
+            grouping={boardGrouping}
             onMove={handleMove}
             onComplete={handleComplete}
             onDelete={handleDelete}
             onDetails={(t) => {
               setUniversalModalTask(t)
               setShowUniversalModal(true)
-            }}
-            onAddForDate={(date) => {
-              setUniversalModalTask(null)
-              setShowUniversalModal(true)
-              // TODO: Pre-fill date in UniversalTaskModal
             }}
           />
         ) : null}
