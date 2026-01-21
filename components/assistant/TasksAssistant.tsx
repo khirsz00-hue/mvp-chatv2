@@ -86,6 +86,7 @@ export function TasksAssistant() {
   const [completedSearch, setCompletedSearch] = useState('')
   const [sortBy, setSortBy] = useState<SortType>('date')
   const [groupBy, setGroupBy] = useState<GroupByType>('none')
+  const [selectedProject, setSelectedProject] = useState<string>('all')
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
   const [showUniversalModal, setShowUniversalModal] = useState(false)
   const [universalModalTask, setUniversalModalTask] = useState<Task | null>(null)
