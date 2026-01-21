@@ -1,24 +1,29 @@
 'use client'
 
 import * as React from 'react'
-import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { cn } from '@/lib/utils'
 
-interface SheetProps extends DialogPrimitive.DialogProps {
+interface SheetProps {
   side?: 'left' | 'right' | 'bottom'
   className?: string
   contentClassName?: string
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 export function Sheet({ children, ...props }: SheetProps) {
   return (
-    <DialogPrimitive.Root {...props}>
+    <div {...props}>
       {children}
-    </DialogPrimitive.Root>
+    </div>
   )
 }
 
-export const SheetTrigger = DialogPrimitive.Trigger
+export const SheetTrigger = ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => (
+  <button onClick={onClick}>
+    {children}
+  </button>
+)
 
 export function SheetContent({
   side = 'right',
@@ -26,25 +31,22 @@ export function SheetContent({
   contentClassName,
   children,
   ...props
-}: DialogPrimitive.DialogContentProps & { side?: 'left' | 'right' | 'bottom'; contentClassName?: string }) {
+}: { side?: 'left' | 'right' | 'bottom'; contentClassName?: string } & React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/30 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=open]:fade-in" />
-      <DialogPrimitive.Content
-        {...props}
-        className={cn(
-          'fixed z-50 flex flex-col bg-white shadow-xl',
-          side === 'right' && 'top-0 right-0 h-full w-full sm:max-w-md animate-in slide-in-from-right',
-          side === 'left' && 'top-0 left-0 h-full w-full sm:max-w-md animate-in slide-in-from-left',
-          side === 'bottom' && 'left-0 right-0 bottom-0 w-full rounded-t-2xl animate-in slide-in-from-bottom',
-          className
-        )}
-      >
-        <div className={cn('flex-1 overflow-auto', contentClassName)}>
-          {children}
-        </div>
-      </DialogPrimitive.Content>
-    </DialogPrimitive.Portal>
+    <div
+      {...props}
+      className={cn(
+        'fixed inset-0 z-50 flex flex-col bg-white shadow-xl',
+        side === 'right' && 'top-0 right-0 h-full w-full sm:max-w-md',
+        side === 'left' && 'top-0 left-0 h-full w-full sm:max-w-md',
+        side === 'bottom' && 'left-0 right-0 bottom-0 w-full rounded-t-2xl',
+        className
+      )}
+    >
+      <div className={cn('flex-1 overflow-auto', contentClassName)}>
+        {children}
+      </div>
+    </div>
   )
 }
 
@@ -65,4 +67,8 @@ export function SheetHeader({ title, onClose }: { title: string; onClose?: () =>
   )
 }
 
-export const SheetClose = DialogPrimitive.Close
+export const SheetClose = ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => (
+  <button onClick={onClick} className="text-gray-500 hover:text-gray-700 text-sm font-medium">
+    {children}
+  </button>
+)
