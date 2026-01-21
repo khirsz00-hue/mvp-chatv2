@@ -19,11 +19,10 @@ import { WorkHoursModal } from './WorkHoursModal'
 import { WorkModeModal } from './WorkModeModal'
 import { OverdueAlert } from './OverdueAlert'
 import { MeetingsSection } from './MeetingsSection'
-import { DecisionLogPanel, Decision } from './DecisionLogPanel'
+// Decision Log removed from UI
 import { MorningReviewModal } from './MorningReviewModal'
 import { DayAssistantV2TaskCard } from './DayAssistantV2TaskCard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
-import { logDecision } from '@/lib/services/dayAssistantV2Service'
 import { useTaskTimer } from '@/hooks/useTaskTimer'
 import Button from '@/components/ui/Button'
 import { Plus, CalendarBlank, CaretDown, CaretUp } from '@phosphor-icons/react'
@@ -70,7 +69,6 @@ export function DayAssistantV2View() {
   const [workHoursEnd, setWorkHoursEnd] = useState('17:00')
   const [queueCollapsed, setQueueCollapsed] = useState(true)
   const [overflowCollapsed, setOverflowCollapsed] = useState(true)
-  const [decisions, setDecisions] = useState<Decision[]>([])
   const [meetings, setMeetings] = useState<any[]>([])
   const [showOverdueModal, setShowOverdueModal] = useState(false)
   const overdueRef = useRef<HTMLDivElement>(null)
@@ -211,33 +209,6 @@ export function DayAssistantV2View() {
   }, [loadMeetings])
 
   // Load decisions from database
-  useEffect(() => {
-    const fetchDecisions = async () => {
-      if (!dayPlan?.assistant_id) return
-      
-      try {
-        const { data, error } = await supabase
-          .from('day_assistant_v2_decision_log')
-          .select('id, action, reason, timestamp, context')
-          .eq('assistant_id', dayPlan.assistant_id)
-          .order('timestamp', { ascending: false })
-          .limit(10)
-        
-        if (error) throw error
-        
-        setDecisions(data.map(d => ({
-          id: d.id,
-          text: d.reason || d.action,
-          timestamp: d.timestamp
-        })))
-      } catch (err) {
-        console.error('Failed to fetch decisions:', err)
-      }
-    }
-    
-    fetchDecisions()
-  }, [dayPlan?.assistant_id])
-
   const loadData = async () => {
     try {
       setLoading(true)
@@ -500,39 +471,6 @@ export function DayAssistantV2View() {
   const handleReviewOverdue = () => {
     // Open modal instead of scrolling
     setShowOverdueModal(true)
-  }
-
-  const handleLogDecision = async (text: string) => {
-    if (!dayPlan?.assistant_id) return
-    
-    try {
-      // Get user ID
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user?.id) {
-        toast.error('Sesja wygasła - zaloguj się ponownie')
-        return
-      }
-      
-      const entry = await logDecision(
-        user.id,
-        dayPlan.assistant_id,
-        'manual_decision',
-        { reason: text },
-        supabase
-      )
-      
-      if (entry) {
-        setDecisions(prev => [{
-          id: entry.id,
-          text: text,
-          timestamp: entry.timestamp
-        }, ...prev])
-        toast.success('Decyzja zapisana!')
-      }
-    } catch (err) {
-      console.error('Failed to log decision:', err)
-      toast.error('Nie udało się zapisać decyzji')
-    }
   }
 
   const handleKeepOverdueToday = async (task: TestDayTask) => {
@@ -1056,14 +994,6 @@ export function DayAssistantV2View() {
               )}
             </div>
           )}
-
-          {/* Decision Log - Moved to bottom */}
-          <div className="mb-6">
-            <DecisionLogPanel
-              decisions={decisions}
-              onLogDecision={handleLogDecision}
-            />
-          </div>
 
           {/* Empty State */}
           {filteredTasks.length === 0 && (
