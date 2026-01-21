@@ -5,7 +5,7 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Card from '@/components/ui/Card'
 import { useToast } from '@/components/ui/Toast'
-import { Plus, List, Kanban, CalendarBlank, Calendar, CheckSquare, Trash, Funnel, SlidersHorizontal } from '@phosphor-icons/react'
+import { Plus, List, Kanban, CalendarBlank, Calendar, CheckSquare, Trash, Funnel, SlidersHorizontal, SortAscending } from '@phosphor-icons/react'
 import { startOfDay, addDays, parseISO, isSameDay, isBefore, isWithinInterval, format } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { UniversalTaskModal, TaskData } from '@/components/common/UniversalTaskModal'
@@ -16,6 +16,7 @@ import { TaskTimer } from './TaskTimer'
 import { PomodoroTimer } from './PomodoroTimer'
 import { supabase } from '@/lib/supabaseClient'
 import Dialog, { DialogContent } from '@/components/ui/Dialog'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 
 interface Task {
   id: string
@@ -85,6 +86,7 @@ export function TasksAssistant() {
   const [completedSearch, setCompletedSearch] = useState('')
   const [sortBy, setSortBy] = useState<SortType>('date')
   const [groupBy, setGroupBy] = useState<GroupByType>('none')
+  const [selectedProject, setSelectedProject] = useState<string>('all')
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
   const [showUniversalModal, setShowUniversalModal] = useState(false)
   const [universalModalTask, setUniversalModalTask] = useState<Task | null>(null)
@@ -1336,17 +1338,13 @@ export function TasksAssistant() {
         ) : view === 'board' ? (
           <SevenDaysBoardView 
             tasks={activeTasks}
+            grouping={boardGrouping}
             onMove={handleMove}
             onComplete={handleComplete}
             onDelete={handleDelete}
             onDetails={(t) => {
               setUniversalModalTask(t)
               setShowUniversalModal(true)
-            }}
-            onAddForDate={(date) => {
-              setUniversalModalTask(null)
-              setShowUniversalModal(true)
-              // TODO: Pre-fill date in UniversalTaskModal
             }}
           />
         ) : null}
