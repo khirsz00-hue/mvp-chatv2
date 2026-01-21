@@ -1206,7 +1206,6 @@ export function TasksAssistant() {
                         task={task}
                         onComplete={handleComplete}
                         onDelete={handleDelete}
-                        onMove={handleMove}
                         onDetails={(t) => {
                           setUniversalModalTask(t)
                           setShowUniversalModal(true)
