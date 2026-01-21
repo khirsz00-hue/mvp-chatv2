@@ -9,6 +9,7 @@ interface SheetProps {
   contentClassName?: string
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  children?: React.ReactNode
 }
 
 export function Sheet({ children, ...props }: SheetProps) {
