@@ -711,37 +711,16 @@ export function DayAssistantV2View() {
       t.due_date === selectedDate
     )
     
-    // Calculate capacity using available minutes (considers if work hours have ended)
-    // This returns 0 if current time is after work end time
-    const capacityMinutes = calculateAvailableMinutes(workHoursEnd, 0)
+    // Calculate capacity using FULL work hours (not remaining time from now)
+    // This gives us the total capacity for the day (e.g., 9:00-17:00 = 8h = 480min)
+    const capacityMinutes = calculateWorkHours(workHoursStart, workHoursEnd) * 60
     
-    // If no capacity available (work hours ended), move all today tasks to overflow
-    if (capacityMinutes <= 0) {
-      console.log('⚠️ [DayAssistantV2] No capacity available - work hours have ended')
-      
-      // All today tasks go to overflow
-      sections.overflowTasks.push(...todayNonMustTasks)
-      
-      // Tasks without due date or future dates also go to overflow
-      const futureTasks = scoredTasks.filter(t =>
-        !t.completed &&
-        !t.is_must &&
-        !(t.due_date && t.due_date < selectedDate) &&
-        (!t.due_date || t.due_date > selectedDate)
-      )
-      sections.overflowTasks.push(...futureTasks)
-      
-      console.log('📊 [DayAssistantV2] Final sections (after work hours):', {
-        must: sections.mustTasks.length,
-        top3: 0,
-        queue: 0,
-        overflow: sections.overflowTasks.length,
-        overdue: sections.overdueTasks.length,
-        remainingCapacity: 0
-      })
-      
-      return sections
-    }
+    console.log('📊 [Capacity Calc]', {
+      workHours: `${workHoursStart} - ${workHoursEnd}`,
+      totalMinutes: capacityMinutes,
+      tasksForToday: todayNonMustTasks.length,
+      todayTasksTime: todayNonMustTasks.reduce((sum, t) => sum + (t.estimate_min || 0), 0)
+    })
     
     // Top 3 purely by scoring (first 3 tasks for today, when capacity is available)
     sections.top3Tasks = todayNonMustTasks.slice(0, TOP_TASKS_COUNT)
@@ -757,8 +736,10 @@ export function DayAssistantV2View() {
       total: capacityMinutes,
       mustUsed: mustMinutes,
       top3Used: top3Minutes,
+      subtotal: mustMinutes + top3Minutes,
       remaining: remainingCapacity,
-      todayTasksCount: todayNonMustTasks.length
+      todayTasksCount: todayNonMustTasks.length,
+      remainingTasksCount: remainingTodayTasks.length
     })
     
     // Allocate remaining tasks to Queue or Overflow based on remaining capacity
@@ -784,17 +765,26 @@ export function DayAssistantV2View() {
     )
     sections.overflowTasks.push(...futureTasks)
     
-    console.log('📊 [DayAssistantV2] Final sections:', {
+    // Final summary logging
+    const totalUsedMinutes = [...sections.mustTasks, ...sections.top3Tasks, ...sections.queueTasks]
+      .reduce((sum, t) => sum + (t.estimate_min || 0), 0)
+    const overflowMinutes = sections.overflowTasks
+      .reduce((sum, t) => sum + (t.estimate_min || 0), 0)
+    
+    console.log('✅ [buildSmartQueue] Final split:', {
       must: sections.mustTasks.length,
       top3: sections.top3Tasks.length,
       queue: sections.queueTasks.length,
       overflow: sections.overflowTasks.length,
       overdue: sections.overdueTasks.length,
-      remainingCapacity: remainingCapacity
+      usedTime: totalUsedMinutes,
+      overflowTime: overflowMinutes,
+      capacity: capacityMinutes,
+      remainingCapacity: capacityMinutes - totalUsedMinutes
     })
     
     return sections
-  }, [scoredTasks, selectedDate, workHoursEnd])
+  }, [scoredTasks, selectedDate, workHoursStart, workHoursEnd])
 
   // Calculate time stats
   const totalEstimatedMinutes = tasks.reduce((sum, t) => sum + (t.estimate_min || 0), 0)
@@ -851,7 +841,6 @@ export function DayAssistantV2View() {
               isPaused={activeTimer.isPaused || false}
               onPause={pauseTimer}
               onResume={resumeTimer}
-              onComplete={() => handleCompleteTask(activeTimer.taskId)}
               onStop={stopTimer}
             />
           </div>

@@ -7,7 +7,7 @@
 'use client'
 
 import { TestDayTask } from '@/lib/types/dayAssistantV2'
-import { Pause, Check, X, Play } from '@phosphor-icons/react'
+import { Pause, X, Play } from '@phosphor-icons/react'
 
 interface FocusBarProps {
   task: TestDayTask | null
@@ -15,7 +15,6 @@ interface FocusBarProps {
   isPaused: boolean
   onPause: () => void
   onResume: () => void
-  onComplete: () => void
   onStop: () => void
 }
 
@@ -25,7 +24,6 @@ export function DayAssistantV2FocusBar({
   isPaused,
   onPause, 
   onResume,
-  onComplete, 
   onStop 
 }: FocusBarProps) {
   if (!task) return null
@@ -98,15 +96,6 @@ export function DayAssistantV2FocusBar({
               <Play size={14} weight="fill" />
             </button>
           )}
-          
-          <button
-            onClick={onComplete}
-            className="w-8 h-8 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-md shadow-emerald-900/50 transition-all flex items-center justify-center"
-            title="Complete"
-            aria-label="Mark as complete"
-          >
-            <Check size={14} weight="bold" />
-          </button>
           
           <button
             onClick={onStop}
