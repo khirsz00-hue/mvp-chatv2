@@ -371,7 +371,7 @@ export function SevenDaysBoardView({
             {days.map(day => (
               <div 
                 key={day.id} 
-                className="w-[78vw] xs:w-[70vw] sm:w-72 md:w-80 lg:w-80 xl:w-80 flex-shrink-0 snap-start"
+                className="w-[78vw] sm:w-[70vw] md:w-72 lg:w-80 xl:w-80 flex-shrink-0 snap-start"
               >
                 <DayColumnComponent
                   day={day}

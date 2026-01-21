@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Card from '@/components/ui/Card'
@@ -85,7 +85,7 @@ export function TasksAssistant() {
   
   const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
 
-  const smartViews = [
+  const smartViews = useMemo(() => ([
     {
       label: '🔥 Dziś + priorytet',
       desc: 'Najważniejsze na dziś',
@@ -126,7 +126,7 @@ export function TasksAssistant() {
         setGroupBy('none')
       }
     }
-  ]
+  ]), [])
   
   const fetchTasks = useCallback(async () => {
     setLoading(true)
@@ -1106,7 +1106,12 @@ export function TasksAssistant() {
                
                <div className="flex gap-2 w-full sm:w-auto">
                  <select
-                   onChange={(e) => smartViews[Number(e.target.value)]?.apply()}
+                   onChange={(e) => {
+                     const idx = Number(e.target.value)
+                     if (!Number.isNaN(idx) && smartViews[idx]) {
+                       smartViews[idx].apply()
+                     }
+                   }}
                    className="flex-1 sm:flex-none px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-purple"
                    defaultValue=""
                  >
