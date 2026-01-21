@@ -84,6 +84,49 @@ export function TasksAssistant() {
   const [activeTimerInfo, setActiveTimerInfo] = useState<{ taskId: string; taskTitle: string; isActive: boolean; elapsedSeconds?: number; startTime?: number } | null>(null)
   
   const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
+
+  const smartViews = [
+    {
+      label: '🔥 Dziś + priorytet',
+      desc: 'Najważniejsze na dziś',
+      apply: () => {
+        setView('list')
+        setFilter('today')
+        setSortBy('priority')
+        setGroupBy('priority')
+      }
+    },
+    {
+      label: '📅 Tydzień wg dnia',
+      desc: 'Plan na kolejne dni',
+      apply: () => {
+        setView('list')
+        setFilter('week')
+        setSortBy('date')
+        setGroupBy('day')
+      }
+    },
+    {
+      label: '🚀 Do zaplanowania',
+      desc: 'Zadania bez daty',
+      apply: () => {
+        setView('list')
+        setFilter('unscheduled')
+        setSortBy('name')
+        setGroupBy('project')
+      }
+    },
+    {
+      label: '✅ Ukończone',
+      desc: 'Szybki przegląd',
+      apply: () => {
+        setView('list')
+        setFilter('completed')
+        setSortBy('date')
+        setGroupBy('none')
+      }
+    }
+  ]
   
   const fetchTasks = useCallback(async () => {
     setLoading(true)
@@ -1050,26 +1093,36 @@ export function TasksAssistant() {
             
             <div className="h-8 w-px bg-gray-300 hidden lg:block" />
             
-             {/* Task count & active filters summary */}
-             <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2">
-               <Badge variant="secondary" className="text-sm px-2 py-1 font-semibold whitespace-nowrap">
-                 {sortedTasks.length} {sortedTasks.length === 1 ? 'zadanie' : 'zadań'}
-               </Badge>
-               <div className="hidden lg:flex text-xs text-gray-600 gap-2">
-                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white border border-gray-200">
-                   🔍 Widok: {view === 'board' ? 'Tablica' : 'Lista'}
+             {/* Task count & smart filters CTA */}
+             <div className="flex flex-col sm:flex-row sm:items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2 w-full sm:w-auto">
+               <div className="flex items-center gap-2">
+                 <Badge variant="secondary" className="text-sm px-2 py-1 font-semibold whitespace-nowrap">
+                   {sortedTasks.length} {sortedTasks.length === 1 ? 'zadanie' : 'zadań'}
+                 </Badge>
+                 <span className="hidden lg:inline text-xs text-gray-600">
+                   Widok: {view === 'board' ? 'Tablica' : 'Lista'} · Sort: {sortLabel} · {activeProjectLabel}
                  </span>
-                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white border border-gray-200">
-                   ↕️ Sort: {sortLabel}
-                 </span>
-                 {view === 'list' && (
-                   <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white border border-gray-200">
-                     🧩 Grupuj: {groupBy === 'none' ? 'Brak' : groupBy === 'day' ? 'Dzień' : groupBy === 'project' ? 'Projekt' : 'Priorytet'}
-                   </span>
-                 )}
-                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white border border-gray-200">
-                   📁 {activeProjectLabel}
-                 </span>
+               </div>
+               
+               <div className="flex gap-2 w-full sm:w-auto">
+                 <select
+                   onChange={(e) => smartViews[Number(e.target.value)]?.apply()}
+                   className="flex-1 sm:flex-none px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-purple"
+                   defaultValue=""
+                 >
+                   <option value="" disabled>⚡ Szybkie widoki</option>
+                   {smartViews.map((v, idx) => (
+                     <option key={v.label} value={idx}>{v.label} — {v.desc}</option>
+                   ))}
+                 </select>
+                 
+                 <button
+                   className="sm:hidden px-3 py-2 text-sm font-semibold bg-gradient-to-r from-brand-purple to-brand-pink text-white rounded-lg shadow hover:opacity-90"
+                   onClick={() => setView(view === 'board' ? 'list' : 'board')}
+                   aria-label="Przełącz widok"
+                 >
+                   {view === 'board' ? 'Lista' : 'Tablica'}
+                 </button>
                </div>
              </div>
           </div>

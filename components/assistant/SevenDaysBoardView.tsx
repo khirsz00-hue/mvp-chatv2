@@ -293,7 +293,7 @@ export function SevenDaysBoardView({
       onDragEnd={handleDragEnd}
     >
       {/* Header with date range and navigation */}
-      <div className="flex items-center justify-between mb-4 px-2">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 px-2">
         <div className="flex items-center gap-3">
           <Button
             size="sm"
