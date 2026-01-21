@@ -30,6 +30,8 @@ import { Plus, CalendarBlank, CaretDown, CaretUp } from '@phosphor-icons/react'
 import { useTasksQuery } from '@/hooks/useTasksQuery'
 import { useTaskActions } from '@/hooks/useTaskActions'
 import { useSWRConfig } from 'swr'
+import { useMeetingNotifications } from '@/hooks/useMeetingNotifications'
+import { MeetingNotificationBanner } from './MeetingNotificationBanner'
 
 const TOP_TASKS_COUNT = 3
 const isValidTimeFormat = (value: string) => /^\d{2}:\d{2}$/.test(value)
@@ -78,6 +80,15 @@ export function DayAssistantV2View() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [loadingProjects, setLoadingProjects] = useState(false)
   
+  // Notification settings state
+  const [notificationSettings, setNotificationSettings] = useState({
+    enabled: true,
+    defaultReminderTimes: [30, 15, 5], // 30 min, 15 min, 5 min before
+    soundEnabled: true,
+    browserNotifications: true,
+    inAppBanner: true
+  })
+  
   // Custom hooks
   const { activeTimer, startTimer, pauseTimer, resumeTimer, stopTimer, formatTime } = useTaskTimer()
   const { mutate: globalMutate } = useSWRConfig()
@@ -85,6 +96,12 @@ export function DayAssistantV2View() {
   // SWR hooks for data fetching with optimistic updates
   const { data: queryTasks, isLoading: tasksLoading, error: tasksError } = useTasksQuery(selectedDate)
   const { completeTask, deleteTask, togglePinTask, postponeTask, toggleSubtask } = useTaskActions(selectedDate)
+  
+  // Meeting notification hook
+  const { upcomingNotification, dismissNotification } = useMeetingNotifications(
+    meetings,
+    notificationSettings
+  )
 
   // Load data on mount
   useEffect(() => {
@@ -841,6 +858,22 @@ export function DayAssistantV2View() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50">
+      {/* Meeting Notification Banner - HIGHEST Z-INDEX */}
+      {upcomingNotification && (
+        <MeetingNotificationBanner
+          meeting={upcomingNotification}
+          onDismiss={dismissNotification}
+          onJoin={() => {
+            // Open meeting link
+            const meeting = meetings.find(m => m.id === upcomingNotification.meetingId)
+            if (meeting?.meeting_link || meeting?.location) {
+              window.open(meeting.meeting_link || meeting.location, '_blank')
+            }
+            dismissNotification()
+          }}
+        />
+      )}
+      
       {/* Focus Bar - shows ABOVE status bar when timer is active */}
       {activeTimer && (
         <div className="sticky top-0 z-50 bg-gradient-to-br from-purple-50 via-white to-pink-50 pt-6">
