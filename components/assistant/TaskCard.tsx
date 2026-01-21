@@ -4,13 +4,12 @@ import { useState, useEffect, useRef } from 'react'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
-import { CalendarBlank, CheckCircle, Trash, DotsThree, Circle, CheckSquare, ChatCircle, Brain, Timer as TimerIcon, Stop, Lightning } from '@phosphor-icons/react'
+import { CalendarBlank, CheckCircle, Trash, DotsThree, Circle, CheckSquare, ChatCircle, Brain, Timer as TimerIcon, Stop } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { format, parseISO } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { useTaskTimer } from './TaskTimer'
 import { TaskChatModal } from './TaskChatModal'
-import { AITaskBreakdownModal } from './AITaskBreakdownModal'
 import { HelpMeModal } from '@/components/day-assistant-v2/HelpMeModal'
 import { useToast } from '@/components/ui/Toast'
 
@@ -61,7 +60,6 @@ export function TaskCard({
   const [deleting, setDeleting] = useState(false)
   const [hasActiveTimer, setHasActiveTimer] = useState(false)
   const [showChatModal, setShowChatModal] = useState(false)
-  const [showBreakdownModal, setShowBreakdownModal] = useState(false)
   const [showHelpModal, setShowHelpModal] = useState(false)
   const [showAITooltip, setShowAITooltip] = useState(false)
   const [aiUnderstanding, setAiUnderstanding] = useState<string>('')
@@ -202,48 +200,6 @@ export function TaskCard({
   const handleHelpClick = (e: React.MouseEvent) => {
     e.stopPropagation()
     setShowHelpModal(true)
-  }
-  
-  const handleBreakdownClick = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    setShowBreakdownModal(true)
-  }
-  
-  const handleCreateSubtasks = async (subtasks: Array<{
-    content: string
-    description?: string
-    duration?: number
-    duration_unit?: string
-  }>) => {
-    try {
-      // Create each subtask via Todoist API
-      const token = localStorage.getItem('todoist_token')
-      for (const subtask of subtasks) {
-        const res = await fetch('/api/todoist/tasks', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            content: subtask.content,
-            description: subtask.description,
-            project_id: task.project_id,
-            parent_id: task.id,
-            priority: task.priority,
-            duration: subtask.duration,
-            duration_unit: subtask.duration_unit || 'minute'
-          })
-        })
-        
-        if (!res.ok) {
-          const errorText = await res.text()
-          throw new Error(`Failed to create subtask: ${errorText}`)
-        }
-      }
-      
-      showToast(`Utworzono ${subtasks.length} podzadań!`, 'success')
-    } catch (err) {
-      console.error('Error creating subtasks:', err)
-      showToast('Nie udało się utworzyć podzadań', 'error')
-    }
   }
   
   const dueStr = typeof task.due === 'string' ? task.due : task.due?.date
@@ -437,16 +393,6 @@ export function TaskCard({
           <Button 
             size="sm" 
             variant="ghost"
-            onClick={handleBreakdownClick}
-            title="Doprecyzuj"
-            className="p-2 h-auto"
-          >
-            <Lightning size={18} weight="bold" className="text-amber-600" />
-          </Button>
-          
-          <Button 
-            size="sm" 
-            variant="ghost"
             onClick={handleHelpClick}
             title="Pomoc AI"
             className="p-2 h-auto"
@@ -526,18 +472,6 @@ export function TaskCard({
                 marginBottom: mobileMenuPosition === 'top' ? '4px' : undefined,
               }}
             >
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleBreakdownClick(e)
-                  setShowMobileMenu(false)
-                }}
-                className="w-full px-4 py-2.5 text-left hover:bg-gray-50 flex items-center gap-3 text-sm transition-colors"
-              >
-                <Lightning size={18} weight="bold" className="text-amber-600" />
-                <span>Doprecyzuj</span>
-              </button>
-              
               <button
                 onClick={(e) => {
                   e.stopPropagation()
@@ -622,13 +556,6 @@ export function TaskCard({
           // Refresh tasks after subtasks created
           window.location.reload()
         }}
-      />
-      
-      <AITaskBreakdownModal
-        open={showBreakdownModal}
-        onClose={() => setShowBreakdownModal(false)}
-        task={task}
-        onCreateSubtasks={handleCreateSubtasks}
       />
       
       <TaskChatModal
