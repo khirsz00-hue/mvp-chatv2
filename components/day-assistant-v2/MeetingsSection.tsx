@@ -252,7 +252,7 @@ function LargeMeetingCard({ meeting }: { meeting: Meeting }) {
         className="bg-gradient-to-r from-blue-50 to-white p-5 rounded-xl border border-blue-100 shadow-sm hover:shadow-md transition-shadow group cursor-pointer"
         onClick={() => setShowModal(true)}
       >
-      <div className="flex items-start gap-4">
+        <div className="flex items-start gap-4">
         {/* Lewa sekcja - Czas */}
         <div className="flex-shrink-0 w-16 text-center">
           {isAllDay ? (
@@ -352,6 +352,7 @@ function LargeMeetingCard({ meeting }: { meeting: Meeting }) {
           )}
         </div>
       </div>
+      </div>
       {/* Modal */}
       {showModal && (
         <MeetingDetailsModal
@@ -433,6 +434,7 @@ function CompactMeetingCard({ meeting }: { meeting: Meeting }) {
             <ArrowSquareOut size={12} weight="bold" />
           </button>
         )}
+      </div>
       </div>
       {/* Modal */}
       {showModal && (
