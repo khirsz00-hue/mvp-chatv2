@@ -271,9 +271,6 @@ export function TaskCard({
       }
     } else {
       console.warn('⚠️ onMove callback not provided')
-      } catch (err) {
-        console.error('Error changing due date:', err)
-      }
     }
   }
   
