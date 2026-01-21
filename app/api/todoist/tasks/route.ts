@@ -4,7 +4,13 @@ import { startOfDay, endOfDay, addDays, isWithinInterval, parseISO, isBefore } f
 export const dynamic = 'force-dynamic'
 
 // Shared function to process tasks with filtering
-async function fetchAndFilterTasks(token: any, filter: string, date?: string) {
+async function fetchAndFilterTasks(
+  token: any,
+  filter: string,
+  date?: string,
+  completedRange: 'recent' | 'all' = 'recent',
+  searchTerm?: string
+) {
   // Better token validation - return empty array for invalid tokens
   if (!token || typeof token !== 'string' || token.trim() === '') {
     return []
@@ -44,10 +50,36 @@ async function fetchAndFilterTasks(token: any, filter: string, date?: string) {
       const data = await res.json()
       const completedTasks = data.items || []
       const targetDate = date ? parseISO(date) : null
+      const now = new Date()
+      const sevenDaysAgo = startOfDay(addDays(now, -6))
+      const search = searchTerm ? searchTerm.toLowerCase() : ''
       
-      const filteredCompleted = completedTasks.filter(
-        (t: any) => t.completed_at && (!targetDate || isCompletedOnDate(t.completed_at, targetDate))
-      )
+      const filteredCompleted = completedTasks.filter((t: any) => {
+        if (!t.completed_at) return false
+        
+        // Date filtering
+        if (targetDate) {
+          return isCompletedOnDate(t.completed_at, targetDate)
+        }
+        if (completedRange === 'recent') {
+          try {
+            const completedDate = parseISO(t.completed_at)
+            return isWithinInterval(completedDate, {
+              start: sevenDaysAgo,
+              end: endOfDay(now),
+            })
+          } catch {
+            return false
+          }
+        }
+
+        // completedRange === 'all'
+        return true
+      }).filter((t: any) => {
+        if (!search) return true
+        const haystack = `${t.content || ''} ${t.description || ''}`.toLowerCase()
+        return haystack.includes(search)
+      })
       
       // Map completed tasks to match the expected format
       const simplified = filteredCompleted.map((t: any) => ({
@@ -164,9 +196,15 @@ async function fetchAndFilterTasks(token: any, filter: string, date?: string) {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { token, filter = 'all', date } = body
+    const { token, filter = 'all', date, completedRange = 'recent', search } = body
 
-    const tasks = await fetchAndFilterTasks(token, filter.toLowerCase(), date)
+    const tasks = await fetchAndFilterTasks(
+      token,
+      filter.toLowerCase(),
+      date,
+      completedRange,
+      search
+    )
     return NextResponse.json({ tasks })
   } catch (error: any) {
     console.error('❌ Błąd w /api/todoist/tasks POST:', error)
@@ -180,7 +218,10 @@ export async function GET(req: Request) {
   const token = searchParams.get('token') || ''
   const filter = (searchParams.get('filter') || 'all').toLowerCase()
   const date = searchParams.get('date') || undefined
+  const completedRangeParam = searchParams.get('range') as 'recent' | 'all' | null
+  const search = searchParams.get('q') || undefined
+  const completedRange = completedRangeParam === 'all' ? 'all' : 'recent'
 
-  const tasks = await fetchAndFilterTasks(token, filter, date)
+  const tasks = await fetchAndFilterTasks(token, filter, date, completedRange, search)
   return NextResponse.json({ tasks })
 }
