@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Card from '@/components/ui/Card'
@@ -87,6 +87,49 @@ export function TasksAssistant() {
   const [activeTimerInfo, setActiveTimerInfo] = useState<{ taskId: string; taskTitle: string; isActive: boolean; elapsedSeconds?: number; startTime?: number } | null>(null)
   
   const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
+
+  const smartViews = useMemo(() => ([
+    {
+      label: '🔥 Dziś + priorytet',
+      desc: 'Najważniejsze na dziś',
+      apply: () => {
+        setView('list')
+        setFilter('today')
+        setSortBy('priority')
+        setGroupBy('priority')
+      }
+    },
+    {
+      label: '📅 Tydzień wg dnia',
+      desc: 'Plan na kolejne dni',
+      apply: () => {
+        setView('list')
+        setFilter('week')
+        setSortBy('date')
+        setGroupBy('day')
+      }
+    },
+    {
+      label: '🚀 Do zaplanowania',
+      desc: 'Zadania bez daty',
+      apply: () => {
+        setView('list')
+        setFilter('unscheduled')
+        setSortBy('name')
+        setGroupBy('project')
+      }
+    },
+    {
+      label: '✅ Ukończone',
+      desc: 'Szybki przegląd',
+      apply: () => {
+        setView('list')
+        setFilter('completed')
+        setSortBy('date')
+        setGroupBy('none')
+      }
+    }
+  ]), [])
   
   const fetchTasks = useCallback(async () => {
     setLoading(true)
@@ -638,6 +681,11 @@ export function TasksAssistant() {
       throw err
     }
   }
+
+  const sortLabel = sortBy === 'date' ? 'Data' : sortBy === 'priority' ? 'Priorytet' : 'Nazwa'
+  const activeProjectLabel = selectedProject === 'all' 
+    ? 'Wszystkie projekty' 
+    : projects.find(p => p.id === selectedProject)?.name || 'Projekt'
   
   const handleDuplicate = async (task: Task) => {
     try {
@@ -1003,55 +1051,88 @@ export function TasksAssistant() {
             <div className="h-8 w-px bg-gray-300 hidden lg:block" />
             
             {/* Filters */}
-            <div className="flex items-center gap-3 flex-wrap flex-1">
-              <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-                <SortAscending size={20} className="text-gray-500 hidden sm:inline" />
-                <select 
-                  value={sortBy} 
-                  onChange={(e) => setSortBy(e.target.value as SortType)}
-                  className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-sm font-medium hover:border-gray-300 transition-colors"
-                >
-                  <option value="date">📅 Sortuj: Data</option>
-                  <option value="priority">🚩 Sortuj: Priorytet</option>
-                  <option value="name">🔤 Sortuj: Nazwa</option>
-                </select>
-              </div>
-              
-              {view === 'list' && (
-                <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-                  <select 
-                    value={groupBy} 
-                    onChange={(e) => setGroupBy(e.target.value as GroupByType)}
-                    className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-sm font-medium hover:border-gray-300 transition-colors"
-                  >
-                    <option value="none">📋 Grupuj: Brak</option>
-                    <option value="day">📅 Grupuj: Dzień</option>
-                    <option value="project">📁 Grupuj: Projekt</option>
-                    <option value="priority">🚩 Grupuj: Priorytet</option>
-                  </select>
-                </div>
-              )}
-              
-              <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-                <select 
-                  value={selectedProject} 
-                  onChange={(e) => setSelectedProject(e.target.value)}
-                  className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-sm font-medium hover:border-gray-300 transition-colors"
-                >
-                  <option value="all">📁 Wszystkie projekty</option>
-                  {projects.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
+              <div className="flex items-center gap-3 flex-wrap flex-1">
+               <div className="flex items-center gap-2 flex-1 min-w-[200px] lg:min-w-[240px]">
+                 <SortAscending size={20} className="text-gray-500 hidden sm:inline" />
+                 <select 
+                   value={sortBy} 
+                   onChange={(e) => setSortBy(e.target.value as SortType)}
+                   className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-sm font-medium hover:border-gray-300 transition-colors"
+                 >
+                   <option value="date">📅 Sortuj: Data</option>
+                   <option value="priority">🚩 Sortuj: Priorytet</option>
+                   <option value="name">🔤 Sortuj: Nazwa</option>
+                 </select>
+               </div>
+               
+               {view === 'list' && (
+                 <div className="flex items-center gap-2 flex-1 min-w-[200px] lg:min-w-[240px]">
+                   <select 
+                     value={groupBy} 
+                     onChange={(e) => setGroupBy(e.target.value as GroupByType)}
+                     className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-sm font-medium hover:border-gray-300 transition-colors"
+                   >
+                     <option value="none">📋 Grupuj: Brak</option>
+                     <option value="day">📅 Grupuj: Dzień</option>
+                     <option value="project">📁 Grupuj: Projekt</option>
+                     <option value="priority">🚩 Grupuj: Priorytet</option>
+                   </select>
+                 </div>
+               )}
+               
+               <div className="flex items-center gap-2 flex-1 min-w-[200px] lg:min-w-[240px]">
+                 <select 
+                   value={selectedProject} 
+                   onChange={(e) => setSelectedProject(e.target.value)}
+                   className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-sm font-medium hover:border-gray-300 transition-colors"
+                 >
+                   <option value="all">📁 Wszystkie projekty</option>
+                   {projects.map(p => (
+                     <option key={p.id} value={p.id}>{p.name}</option>
+                   ))}
+                 </select>
+               </div>
+             </div>
             
             <div className="h-8 w-px bg-gray-300 hidden lg:block" />
             
-            {/* Task count badge */}
-            <Badge variant="secondary" className="text-sm px-4 py-2 font-semibold whitespace-nowrap">
-              {sortedTasks.length} {sortedTasks.length === 1 ? 'zadanie' : 'zadań'}
-            </Badge>
+             {/* Task count & smart filters CTA */}
+             <div className="flex flex-col sm:flex-row sm:items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2 w-full sm:w-auto">
+               <div className="flex items-center gap-2">
+                 <Badge variant="secondary" className="text-sm px-2 py-1 font-semibold whitespace-nowrap">
+                   {sortedTasks.length} {sortedTasks.length === 1 ? 'zadanie' : 'zadań'}
+                 </Badge>
+                 <span className="hidden lg:inline text-xs text-gray-600">
+                   Widok: {view === 'board' ? 'Tablica' : 'Lista'} · Sort: {sortLabel} · {activeProjectLabel}
+                 </span>
+               </div>
+               
+               <div className="flex gap-2 w-full sm:w-auto">
+                 <select
+                   onChange={(e) => {
+                     const idx = Number(e.target.value)
+                     if (!Number.isNaN(idx) && smartViews[idx]) {
+                       smartViews[idx].apply()
+                     }
+                   }}
+                   className="flex-1 sm:flex-none px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-purple"
+                   defaultValue=""
+                 >
+                   <option value="" disabled>⚡ Szybkie widoki</option>
+                   {smartViews.map((v, idx) => (
+                     <option key={v.label} value={idx}>{v.label} — {v.desc}</option>
+                   ))}
+                 </select>
+                 
+                 <button
+                   className="sm:hidden px-3 py-2 text-sm font-semibold bg-gradient-to-r from-brand-purple to-brand-pink text-white rounded-lg shadow hover:opacity-90"
+                   onClick={() => setView(view === 'board' ? 'list' : 'board')}
+                   aria-label="Przełącz widok"
+                 >
+                   {view === 'board' ? 'Lista' : 'Tablica'}
+                 </button>
+               </div>
+             </div>
           </div>
         </div>
       </div>
