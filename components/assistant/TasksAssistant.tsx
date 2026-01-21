@@ -4,9 +4,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Card from '@/components/ui/Card'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs'
 import { useToast } from '@/components/ui/Toast'
-import { Plus, List, Kanban, CalendarBlank, Calendar, SortAscending, Timer as TimerIcon, CheckSquare, Trash, ArrowRight } from '@phosphor-icons/react'
+import { Plus, List, Kanban, CalendarBlank, Calendar, CheckSquare, Trash, Funnel, SlidersHorizontal } from '@phosphor-icons/react'
 import { startOfDay, addDays, parseISO, isSameDay, isBefore, isWithinInterval, format } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { UniversalTaskModal, TaskData } from '@/components/common/UniversalTaskModal'
@@ -16,6 +15,7 @@ import { MonthView } from './MonthView'
 import { TaskTimer } from './TaskTimer'
 import { PomodoroTimer } from './PomodoroTimer'
 import { supabase } from '@/lib/supabaseClient'
+import Dialog, { DialogContent } from '@/components/ui/Dialog'
 
 interface Task {
   id: string
@@ -37,9 +37,16 @@ interface Project {
   color?:  string
 }
 
+type ViewType = 'list' | 'board'
+type BoardGrouping = 'day' | 'status' | 'priority' | 'project'
+type FiltersState = {
+  projectIds?: string[]
+  status?: string[]
+  priority?: (1 | 2 | 3 | 4)[]
+  dateRange?: { from?: string; to?: string }
+}
 type FilterType = 'today' | 'tomorrow' | 'week' | 'month' | 'overdue' | 'unscheduled' | 'all' | 'completed'
 type CompletedRange = 'recent' | 'all'
-type ViewType = 'list' | 'board'
 type SortType = 'date' | 'priority' | 'name'
 type GroupByType = 'none' | 'day' | 'project' | 'priority'
 
@@ -71,14 +78,14 @@ export function TasksAssistant() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(false)
   const [view, setView] = useState<ViewType>('list')
-  // Default filter: 'today' shows only tasks with due date = today
-  // Change to 'all' to include tasks without due dates by default
-  const [filter, setFilter] = useState<FilterType>('today')
-  const [sortBy, setSortBy] = useState<SortType>('date')
-  const [groupBy, setGroupBy] = useState<GroupByType>('none')
-  const [selectedProject, setSelectedProject] = useState<string>('all')
+  const [boardGrouping, setBoardGrouping] = useState<BoardGrouping>('day')
+  const [filters, setFilters] = useState<FiltersState>({})
+  const [filter, setFilter] = useState<FilterType>('all')
   const [completedRange, setCompletedRange] = useState<CompletedRange>('recent')
   const [completedSearch, setCompletedSearch] = useState('')
+  const [sortBy, setSortBy] = useState<SortType>('date')
+  const [groupBy, setGroupBy] = useState<GroupByType>('none')
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
   const [showUniversalModal, setShowUniversalModal] = useState(false)
   const [universalModalTask, setUniversalModalTask] = useState<Task | null>(null)
   const [showPomodoro, setShowPomodoro] = useState(false)
