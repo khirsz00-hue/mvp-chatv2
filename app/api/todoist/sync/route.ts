@@ -211,17 +211,17 @@ async function mapTodoistToDayAssistantTask(
     }
   }
 
-  // Convert priority to number for consistent type handling
-  // Default to 1 (lowest priority) if priority is undefined, null, or invalid
-  // Todoist priorities: 1 (lowest) to 4 (highest/P1)
-  const priority = Number(task.priority) || 1
+  // Convert from Todoist format (4=P1, 3=P2, 2=P3, 1=P4) to app format (1=P1, 2=P2, 3=P3, 4=P4)
+  // Using formula: App Priority = 5 - Todoist Priority
+  const todoistPriority = Number(task.priority) || 1
+  const priority = 5 - todoistPriority
 
   // Determine is_must: Only user can pin via UI (manual action)
   // Priority P1 should NOT auto-pin as MUST
   const isMust = false
 
-  // Determine is_important: priority >= 3
-  const isImportant = priority >= 3
+  // Determine is_important: P1 and P2 (priority <= 2) in app format
+  const isImportant = priority <= 2
 
   // Derive cognitive load from labels (C1, C2, C3).
   // Default to cognitive load 2 if missing, then clamp to the 1-5 scale used internally.
