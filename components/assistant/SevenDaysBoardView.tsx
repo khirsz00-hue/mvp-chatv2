@@ -23,13 +23,17 @@ interface Task {
   created_at?: string
 }
 
+type BoardGrouping = 'day' | 'status' | 'priority' | 'project'
+
 interface SevenDaysBoardViewProps {
   tasks: Task[]
-  onMove: (taskId: string, newDate: string) => Promise<void>
+  grouping: BoardGrouping
+  projects?: { id: string; name: string }[]
+  onMove: (taskId: string, newValue: string, grouping: BoardGrouping) => Promise<void>
   onComplete: (taskId: string) => Promise<void>
   onDelete: (taskId: string) => Promise<void>
   onDetails: (task: Task) => void
-  onAddForDate?: (date: string) => void
+  onAddForKey?: (key: string) => void
 }
 
 interface DayColumn {
@@ -43,11 +47,13 @@ interface DayColumn {
 
 export function SevenDaysBoardView({
   tasks,
+  grouping,
+  projects,
   onMove,
   onComplete,
   onDelete,
   onDetails,
-  onAddForDate
+  onAddForKey
 }:  SevenDaysBoardViewProps) {
   const [startDate, setStartDate] = useState(startOfDay(new Date()))
   const [activeTask, setActiveTask] = useState<Task | null>(null)
@@ -74,10 +80,11 @@ export function SevenDaysBoardView({
     const today = startOfDay(new Date())
     setStartDate(today)
     
-    // Scroll to today's column
+    // Scroll to today's column (only for day grouping)
+    if (grouping !== 'day') return
     setTimeout(() => {
       if (scrollContainerRef.current) {
-        const todayIndex = days.findIndex(d => isSameDay(d.date, today))
+        const todayIndex = days.findIndex(d => d.id === format(today, 'yyyy-MM-dd'))
         if (todayIndex >= 0) {
           const columnWidth = scrollContainerRef.current.scrollWidth / days.length
           scrollContainerRef.current.scrollTo({ 
@@ -89,37 +96,90 @@ export function SevenDaysBoardView({
     }, 100)
   }
 
-  // Generate 7 days columns from startDate
-  const days: DayColumn[] = Array.from({ length: 7 }, (_, i) => {
-    const date = addDays(startDate, i)
-    const dateStr = format(date, 'yyyy-MM-dd')
-    
-    return {
-      id: dateStr,
-      date,
-      dateStr,
-      label: format(date, 'EEEE', { locale: pl }),
-      shortLabel: format(date, 'EEE', { locale: pl }),
-      tasks: tasks.filter(task => {
-        const taskDueStr = typeof task.due === 'string' ? task.due : task.due?.date
-        if (!taskDueStr) return false
+  const days: DayColumn[] = grouping === 'day'
+    ? Array.from({ length: 7 }, (_, i) => {
+        const date = addDays(startDate, i)
+        const dateStr = format(date, 'yyyy-MM-dd')
         
-        try {
-          const taskDate = startOfDay(parseISO(taskDueStr))
-          return isSameDay(taskDate, date)
-        } catch {
-          return false
+        return {
+          id: dateStr,
+          date,
+          dateStr,
+          label: format(date, 'EEEE', { locale: pl }),
+          shortLabel: format(date, 'EEE', { locale: pl }),
+          tasks: tasks.filter(task => {
+            const taskDueStr = typeof task.due === 'string' ? task.due : task.due?.date
+            if (!taskDueStr) return false
+            
+            try {
+              const taskDate = startOfDay(parseISO(taskDueStr))
+              return isSameDay(taskDate, date)
+            } catch {
+              return false
+            }
+          })
         }
       })
-    }
-  })
+    : []
+
+  const statusColumns = grouping === 'status'
+    ? [
+        { id: 'todo', label: 'Do zrobienia' },
+        { id: 'in_progress', label: 'W toku' },
+        { id: 'done', label: 'Zrobione' }
+      ].map(col => ({
+        id: col.id,
+        date: new Date(),
+        dateStr: col.id,
+        label: col.label,
+        shortLabel: col.label,
+        tasks: tasks.filter(t => (t as any).status === col.id)
+      }))
+    : []
+
+  const priorityColumns = grouping === 'priority'
+    ? [
+        { id: '1', label: 'P1' },
+        { id: '2', label: 'P2' },
+        { id: '3', label: 'P3' },
+        { id: '4', label: 'P4' }
+      ].map(col => ({
+        id: col.id,
+        date: new Date(),
+        dateStr: col.id,
+        label: col.label,
+        shortLabel: col.label,
+        tasks: tasks.filter(t => String(t.priority) === col.id)
+      }))
+    : []
+
+  const projectColumns = grouping === 'project'
+    ? (projects || []).map(p => ({
+        id: p.id || 'none',
+        date: new Date(),
+        dateStr: p.id || 'none',
+        label: p.name || 'Bez projektu',
+        shortLabel: p.name || 'Bez projektu',
+        tasks: tasks.filter(t => (t.project_id || 'none') === (p.id || 'none'))
+      }))
+    : []
+
+  const columns: DayColumn[] =
+    grouping === 'day'
+      ? days
+      : grouping === 'status'
+        ? statusColumns
+        : grouping === 'priority'
+          ? priorityColumns
+          : projectColumns
 
   // Date range label for header
-  const dateRangeLabel = `${format(startDate, 'd MMM', { locale: pl })} - ${format(addDays(startDate, 6), 'd MMM yyyy', { locale: pl })}`
+  const dateRangeLabel = grouping === 'day'
+    ? `${format(startDate, 'd MMM', { locale: pl })} - ${format(addDays(startDate, 6), 'd MMM yyyy', { locale: pl })}`
+    : undefined
   
-  // Check if current view contains today
   const today = startOfDay(new Date())
-  const isCurrentWeek = isSameWeek(startDate, today, { locale: pl })
+  const isCurrentWeek = grouping === 'day' ? isSameWeek(startDate, today, { locale: pl }) : false
 
   const handleDragStart = (event: DragStartEvent) => {
     const taskId = event.active.id as string
@@ -221,21 +281,27 @@ export function SevenDaysBoardView({
     if (!over) return
     
     const taskId = active.id as string
-    const newDateStr = over.id as string
+    const newKey = over.id as string
     
-    // Check if dropped on a valid day column
-    const targetDay = days.find(d => d.id === newDateStr)
-    if (!targetDay) return
+    const targetColumn = columns.find(d => d.id === newKey)
+    if (!targetColumn) return
     
-    // Don't move if already in this column
     const task = tasks.find(t => t.id === taskId)
-    const currentDueStr = task?.due ? (typeof task.due === 'string' ? task.due : task.due.date) : null
-    if (currentDueStr === newDateStr) return
+    if (!task) return
+    const currentKey =
+      grouping === 'day'
+        ? (task.due ? (typeof task.due === 'string' ? task.due : task.due.date) : '')
+        : grouping === 'status'
+          ? (task as any).status || ''
+          : grouping === 'priority'
+            ? String(task.priority)
+            : task.project_id || 'none'
+    if (currentKey === newKey) return
     
     setMovingTaskId(taskId)
     
     try {
-      await onMove(taskId, newDateStr)
+      await onMove(taskId, newKey, grouping)
     } catch (err) {
       console.error('Error moving task:', err)
     } finally {
@@ -253,15 +319,15 @@ export function SevenDaysBoardView({
   }, [])
 
   const scrollLeft = () => {
-    if (scrollContainerRef.current) {
-      const columnWidth = scrollContainerRef.current.scrollWidth / days.length
+    if (scrollContainerRef.current && columns.length > 0) {
+      const columnWidth = scrollContainerRef.current.scrollWidth / columns.length
       scrollContainerRef.current.scrollBy({ left: -columnWidth, behavior: 'smooth' })
     }
   }
 
   const scrollRight = () => {
-    if (scrollContainerRef.current) {
-      const columnWidth = scrollContainerRef.current.scrollWidth / days.length
+    if (scrollContainerRef.current && columns.length > 0) {
+      const columnWidth = scrollContainerRef.current.scrollWidth / columns.length
       scrollContainerRef.current.scrollBy({ left: columnWidth, behavior: 'smooth' })
     }
   }
@@ -293,43 +359,45 @@ export function SevenDaysBoardView({
       onDragEnd={handleDragEnd}
     >
       {/* Header with date range and navigation */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 px-2">
-        <div className="flex items-center gap-3">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={goToPreviousWeek}
-            className="gap-1"
-          >
-            <CaretLeft size={16} weight="bold" />
-          </Button>
+      {grouping === 'day' && (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 px-2 sticky top-0 bg-white z-10 pb-2">
+          <div className="flex items-center gap-3">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={goToPreviousWeek}
+              className="gap-1"
+            >
+              <CaretLeft size={16} weight="bold" />
+            </Button>
+            
+            <h3 className="text-lg font-bold text-gray-800 min-w-[200px] text-center">
+              {dateRangeLabel}
+            </h3>
+            
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={goToNextWeek}
+              className="gap-1"
+            >
+              <CaretRight size={16} weight="bold" />
+            </Button>
+          </div>
           
-          <h3 className="text-lg font-bold text-gray-800 min-w-[200px] text-center">
-            {dateRangeLabel}
-          </h3>
-          
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={goToNextWeek}
-            className="gap-1"
-          >
-            <CaretRight size={16} weight="bold" />
-          </Button>
+          {!isCurrentWeek && (
+            <Button
+              size="sm"
+              variant="default"
+              onClick={goToToday}
+              className="gap-1.5 bg-gradient-to-r from-brand-purple to-brand-pink hover:opacity-90 text-white font-semibold"
+            >
+              <CalendarBlank size={16} weight="bold" />
+              Dzisiaj
+            </Button>
+          )}
         </div>
-        
-        {!isCurrentWeek && (
-          <Button
-            size="sm"
-            variant="default"
-            onClick={goToToday}
-            className="gap-1.5 bg-gradient-to-r from-brand-purple to-brand-pink hover:opacity-90 text-white font-semibold"
-          >
-            <CalendarBlank size={16} weight="bold" />
-            Dzisiaj
-          </Button>
-        )}
-      </div>
+      )}
 
       {/* Carousel container with navigation arrows */}
         <div className="relative pb-4 w-full overflow-x-hidden">
@@ -363,12 +431,12 @@ export function SevenDaysBoardView({
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
-          className="overflow-x-auto scrollbar-hide snap-x snap-mandatory w-full"
+          className="overflow-x-auto scrollbar-hide snap-x snap-mandatory w-full h-[calc(100vh-220px)]"
           style={{ scrollBehavior: 'smooth' }}
         >
           {/* Single row flex layout for carousel behavior */}
           <div className="flex gap-3 w-max px-1 sm:px-2 pb-1">
-            {days.map(day => (
+            {columns.map(day => (
               <div 
                 key={day.id} 
                 className="w-[78vw] sm:w-[70vw] md:w-72 lg:w-80 xl:w-80 flex-shrink-0 snap-start"
@@ -378,7 +446,7 @@ export function SevenDaysBoardView({
                   onComplete={onComplete}
                   onDelete={onDelete}
                   onDetails={onDetails}
-                  onAddForDate={onAddForDate}
+                  onAddForKey={onAddForKey}
                   movingTaskId={movingTaskId}
                   isDraggingGlobal={isDragging}
                 />
@@ -407,7 +475,7 @@ function DayColumnComponent({
   onComplete,
   onDelete,
   onDetails,
-  onAddForDate,
+  onAddForKey,
   movingTaskId,
   isDraggingGlobal
 }: {
@@ -415,7 +483,7 @@ function DayColumnComponent({
   onComplete: (id: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
   onDetails: (task: Task) => void
-  onAddForDate?: (date: string) => void
+  onAddForKey?: (key: string) => void
   movingTaskId: string | null
   isDraggingGlobal: boolean
 }) {
@@ -488,12 +556,12 @@ function DayColumnComponent({
       </SortableContext>
 
       {/* Add Task Button */}
-      {onAddForDate && (
+      {onAddForKey && (
         <div className="p-2 border-t bg-gray-50/50">
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => onAddForDate(day.dateStr)}
+            onClick={() => onAddForKey(day.id)}
             className="w-full gap-1.5 text-gray-600 hover:text-brand-purple hover:bg-brand-purple/5 font-medium text-xs py-1.5"
           >
             <Plus size={16} weight="bold" />
