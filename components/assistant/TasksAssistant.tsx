@@ -38,6 +38,7 @@ interface Project {
 }
 
 type FilterType = 'today' | 'tomorrow' | 'week' | 'month' | 'overdue' | 'unscheduled' | 'all' | 'completed'
+type CompletedRange = 'recent' | 'all'
 type ViewType = 'list' | 'board'
 type SortType = 'date' | 'priority' | 'name'
 type GroupByType = 'none' | 'day' | 'project' | 'priority'
@@ -76,6 +77,8 @@ export function TasksAssistant() {
   const [sortBy, setSortBy] = useState<SortType>('date')
   const [groupBy, setGroupBy] = useState<GroupByType>('none')
   const [selectedProject, setSelectedProject] = useState<string>('all')
+  const [completedRange, setCompletedRange] = useState<CompletedRange>('recent')
+  const [completedSearch, setCompletedSearch] = useState('')
   const [showUniversalModal, setShowUniversalModal] = useState(false)
   const [universalModalTask, setUniversalModalTask] = useState<Task | null>(null)
   const [showPomodoro, setShowPomodoro] = useState(false)
@@ -94,7 +97,7 @@ export function TasksAssistant() {
       const res = await fetch('/api/todoist/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, filter })
+        body: JSON.stringify({ token, filter, completedRange, search: completedSearch || undefined })
       })
       
       console.log('📡 Response status:', res.status)
@@ -122,7 +125,7 @@ export function TasksAssistant() {
     } finally {
       setLoading(false)
     }
-  }, [token, filter])
+  }, [token, filter, completedRange, completedSearch])
   
   const fetchProjects = useCallback(async () => {
     try {
@@ -1069,6 +1072,27 @@ export function TasksAssistant() {
               </TabsList>
             </div>
           </Tabs>
+          
+          {filter === 'completed' && (
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+              <select
+                value={completedRange}
+                onChange={(e) => setCompletedRange(e.target.value as CompletedRange)}
+                className="w-full sm:w-[220px] px-4 py-2 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-sm font-medium hover:border-gray-300 transition-colors"
+              >
+                <option value="recent">Ukończone (ostatnie 7 dni)</option>
+                <option value="all">Ukończone (wszystkie)</option>
+              </select>
+              
+              <input
+                type="text"
+                value={completedSearch}
+                onChange={(e) => setCompletedSearch(e.target.value)}
+                placeholder="Szukaj ukończonych zadań..."
+                className="w-full sm:flex-1 px-4 py-2 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-sm"
+              />
+            </div>
+          )}
         </div>
       )}
       
