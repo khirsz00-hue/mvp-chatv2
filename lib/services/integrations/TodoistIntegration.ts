@@ -126,11 +126,40 @@ export class TodoistIntegration extends BaseTaskIntegration {
   }
   
   /**
-   * Fetch tasks from Todoist
-   * Phase 1: Placeholder, Phase 2: Use existing /api/todoist/tasks endpoint
+   * Fetch tasks from Todoist API
+   * Phase 2A: Full implementation using Todoist REST API v2
    */
   async fetchTasks(userId: string): Promise<any[]> {
-    return []
+    const token = await getTodoistToken(userId)
+    
+    if (!token) {
+      console.warn('[TodoistIntegration] No token found for user')
+      return []
+    }
+    
+    try {
+      const response = await fetch('https://api.todoist.com/rest/v2/tasks', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        cache: 'no-store'
+      })
+      
+      if (!response.ok) {
+        throw new Error(`Todoist API error: ${response.status}`)
+      }
+      
+      const tasks = await response.json()
+      console.log(`[TodoistIntegration] Fetched ${tasks.length} tasks`)
+      
+      return tasks
+      
+    } catch (error) {
+      console.error('[TodoistIntegration] Error fetching tasks:', error)
+      throw error
+    }
   }
   
   /**
