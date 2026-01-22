@@ -1239,7 +1239,7 @@ export function TasksAssistant() {
             <div className="h-8 w-px bg-gray-300 hidden lg:block" />
             
             {/* Filters / controls */}
-            <div className="hidden sm:flex items-center gap-3 flex-wrap flex-1">
+            <div className="hidden md:flex items-center gap-3 flex-wrap flex-1">
               <div className="flex items-center gap-2 flex-1 min-w-[200px] lg:min-w-[240px]">
                 <SortAscending size={20} className="text-gray-500 hidden sm:inline" />
                 <select 
@@ -1282,87 +1282,6 @@ export function TasksAssistant() {
               </div>
             </div>
             
-            {/* Mobile compact controls */}
-            <div className="sm:hidden flex items-center gap-2 w-full">
-              <button
-                className={`flex-1 px-3 py-2 rounded-lg border ${mobileControl === 'sort' ? 'border-brand-purple bg-brand-purple/10' : 'border-gray-200'}`}
-                onClick={() => setMobileControl(mobileControl === 'sort' ? null : 'sort')}
-                aria-label="Sortowanie"
-              >
-                <div className="flex items-center justify-center gap-2 text-sm font-semibold text-gray-700">
-                  <SortAscending size={18} />
-                  Sortuj
-                </div>
-              </button>
-              {view === 'list' && (
-                <button
-                  className={`flex-1 px-3 py-2 rounded-lg border ${mobileControl === 'group' ? 'border-brand-purple bg-brand-purple/10' : 'border-gray-200'}`}
-                  onClick={() => setMobileControl(mobileControl === 'group' ? null : 'group')}
-                  aria-label="Grupowanie"
-                >
-                  <div className="flex items-center justify-center gap-2 text-sm font-semibold text-gray-700">
-                    <Funnel size={18} />
-                    Grupuj
-                  </div>
-                </button>
-              )}
-              <button
-                className={`flex-1 px-3 py-2 rounded-lg border ${mobileControl === 'project' ? 'border-brand-purple bg-brand-purple/10' : 'border-gray-200'}`}
-                onClick={() => setMobileControl(mobileControl === 'project' ? null : 'project')}
-                aria-label="Projekt"
-              >
-                <div className="flex items-center justify-center gap-2 text-sm font-semibold text-gray-700">
-                  <SlidersHorizontal size={18} />
-                  Projekt
-                </div>
-              </button>
-            </div>
-            
-            {/* Mobile dropdown panels */}
-            {mobileControl === 'sort' && (
-              <div className="sm:hidden w-full mt-2">
-                <select 
-                  value={sortBy} 
-                  onChange={(e) => setSortBy(e.target.value as SortType)}
-                  className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-sm font-medium hover:border-gray-300 transition-colors"
-                >
-                  <option value="date">📅 Sortuj: Data</option>
-                  <option value="priority">🚩 Sortuj: Priorytet</option>
-                  <option value="name">🔤 Sortuj: Nazwa</option>
-                </select>
-              </div>
-            )}
-            
-            {mobileControl === 'group' && view === 'list' && (
-              <div className="sm:hidden w-full mt-2">
-                <select 
-                  value={groupBy} 
-                  onChange={(e) => setGroupBy(e.target.value as GroupByType)}
-                  className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-sm font-medium hover:border-gray-300 transition-colors"
-                >
-                  <option value="none">📋 Grupuj: Brak</option>
-                  <option value="day">📅 Grupuj: Dzień</option>
-                  <option value="project">📁 Grupuj: Projekt</option>
-                  <option value="priority">🚩 Grupuj: Priorytet</option>
-                </select>
-              </div>
-            )}
-            
-            {mobileControl === 'project' && (
-              <div className="sm:hidden w-full mt-2">
-                <select 
-                  value={selectedProject} 
-                  onChange={(e) => setSelectedProject(e.target.value)}
-                  className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-sm font-medium hover:border-gray-300 transition-colors"
-                >
-                  <option value="all">📁 Wszystkie projekty</option>
-                  {projects.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-            
             <div className="h-8 w-px bg-gray-300 hidden lg:block" />
             
              {/* Task count & smart filters CTA */}
@@ -1376,7 +1295,7 @@ export function TasksAssistant() {
                  </span>
                </div>
                
-               <div className="flex gap-2 w-full sm:w-auto">
+               <div className="hidden md:flex gap-2 w-auto">
                  <select
                    onChange={(e) => {
                      const idx = Number(e.target.value)
@@ -1409,7 +1328,7 @@ export function TasksAssistant() {
       {/* Filters */}
       {view === 'list' && (
         <div className="mb-6">
-          <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterType)}>
+          <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterType)} className="hidden md:block">
             <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-400 pb-2">
               <TabsList className="inline-flex w-auto min-w-full lg:w-full justify-start gap-1">
                 <TabsTrigger value="today" className="flex-shrink-0 px-4">Dziś</TabsTrigger>
