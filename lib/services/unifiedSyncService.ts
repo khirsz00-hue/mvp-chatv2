@@ -26,10 +26,12 @@ interface UnifiedSyncResult {
 }
 
 export class UnifiedSyncService {
-  private supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  private getSupabaseClient() {
+    return createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+  }
   
   /**
    * Główna metoda sync - synchronizuje wszystkie enabled integrations
@@ -132,13 +134,15 @@ export class UnifiedSyncService {
   ): Promise<SyncResult> {
     console.log(`[UnifiedSync] Syncing ${integration.name}...`)
     
+    const supabase = this.getSupabaseClient()
+    
     try {
       // 1. Pobierz taski z zewnętrznego źródła
       const externalTasks = await integration.fetchTasks(userId)
       console.log(`[UnifiedSync] Fetched ${externalTasks.length} tasks from ${integration.name}`)
       
       // 2. Pobierz istniejące taski z tego źródła z bazy
-      const { data: existingTasks } = await this.supabase
+      const { data: existingTasks } = await supabase
         .from('day_assistant_v2_tasks')
         .select('*')
         .eq('user_id', userId)
@@ -254,6 +258,8 @@ export class UnifiedSyncService {
     existingTask: any,
     externalTask: UnifiedTask
   ): Promise<boolean> {
+    const supabase = this.getSupabaseClient()
+    
     // Local pending changes mają priorytet
     if (existingTask.sync_status === 'pending') {
       console.log(`[UnifiedSync] Skipping update - local changes pending for task ${existingTask.id}`)
@@ -271,7 +277,7 @@ export class UnifiedSyncService {
       console.log(`[UnifiedSync] Conflict detected for task ${existingTask.id} - marking as conflict`)
       
       // Oznacz jako conflict (user będzie musiał wybrać)
-      await this.supabase
+      await supabase
         .from('day_assistant_v2_tasks')
         .update({ sync_status: 'conflict' })
         .eq('id', existingTask.id)
@@ -287,7 +293,8 @@ export class UnifiedSyncService {
    * Utwórz nowy task w bazie
    */
   private async createTask(task: UnifiedTask): Promise<void> {
-    const { error } = await this.supabase
+    const supabase = this.getSupabaseClient()
+    const { error } = await supabase
       .from('day_assistant_v2_tasks')
       .insert({
         ...task,
@@ -302,7 +309,8 @@ export class UnifiedSyncService {
    * Zaktualizuj istniejący task
    */
   private async updateTask(taskId: string, updates: Partial<UnifiedTask>): Promise<void> {
-    const { error } = await this.supabase
+    const supabase = this.getSupabaseClient()
+    const { error } = await supabase
       .from('day_assistant_v2_tasks')
       .update({
         ...updates,
@@ -319,7 +327,8 @@ export class UnifiedSyncService {
    * Usuń task z bazy
    */
   private async deleteTask(taskId: string): Promise<void> {
-    const { error } = await this.supabase
+    const supabase = this.getSupabaseClient()
+    const { error } = await supabase
       .from('day_assistant_v2_tasks')
       .delete()
       .eq('id', taskId)
@@ -334,8 +343,9 @@ export class UnifiedSyncService {
     userId: string,
     result: UnifiedSyncResult
   ): Promise<void> {
+    const supabase = this.getSupabaseClient()
     // Użyj istniejącej tabeli sync_metadata
-    await this.supabase
+    await supabase
       .from('sync_metadata')
       .upsert({
         user_id: userId,
