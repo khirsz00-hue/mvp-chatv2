@@ -288,7 +288,7 @@ export function TaskCard({
         
         {/* Content */}
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-sm sm:text-base break-words group-hover:text-brand-purple transition-colors">
+          <h3 className="font-medium text-sm sm:text-base line-clamp-2 md:line-clamp-1 break-words group-hover:text-brand-purple transition-colors">
             {task.content}
           </h3>
           
