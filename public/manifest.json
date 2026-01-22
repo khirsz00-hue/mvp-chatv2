@@ -1,0 +1,11 @@
+{
+  "name": "AI Assistants PRO",
+  "short_name": "AI Assistants",
+  "description": "SaaS platforma z modułowymi asystentami (Todoist + Six Hats)",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#8B5CF6",
+  "background_color": "#ffffff",
+  "start_url": "/",
+  "scope": "/"
+}

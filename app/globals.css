@@ -13,6 +13,22 @@ html, body, #__next {
 
 body {
   @apply bg-gray-50 text-gray-800 antialiased font-sans;
+  /* Prevent pull-to-refresh on mobile */
+  overscroll-behavior-y: none;
+  overscroll-behavior-x: none;
+  -webkit-overflow-scrolling: touch;
+  /* iOS safe areas */
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Prevent accidental zoom on form inputs - applied to interactive elements only */
+input, textarea, select, button {
+  touch-action: manipulation;
+}
+
+/* Remove tap highlight on mobile - applied to interactive elements only */
+a, button {
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* === Design System: Focus Ring Utilities === */
@@ -181,6 +197,9 @@ body {
   --overdue-warning: #F59E0B;  /* Orange - 1-3 days */
   --overdue-bg: #FEF2F2;       /* Light red background */
   --overdue-border: #FCA5A5;   /* Red border */
+  
+  /* Mobile Bottom Bar Height */
+  --mobile-bottom-bar-height: 72px;
 }
 
 /* Pulse animation for overdue badge */
@@ -213,4 +232,21 @@ body {
 
 .animate-slideDown {
   animation: slideDown 0.3s ease-out;
+}
+
+/* Mobile Bottom Bar - Safe Area Support */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Bottom bar height constant for consistency */
+.mobile-bottom-bar-spacing {
+  padding-bottom: calc(var(--mobile-bottom-bar-height) + env(safe-area-inset-bottom, 0px));
+}
+
+/* Ensure content is scrollable behind bottom bar on mobile */
+@media (max-width: 767px) {
+  main {
+    padding-bottom: calc(var(--mobile-bottom-bar-height) + env(safe-area-inset-bottom, 0px));
+  }
 }

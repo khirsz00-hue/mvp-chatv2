@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import { ListChecks, CalendarBlank, Notebook, Brain, HandHeart, GearSix, Sun, Users, CalendarCheck, Sparkle, SunHorizon } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 
@@ -43,14 +44,30 @@ interface SidebarProps {
 
 export default function Sidebar({ activeView, onNavigate, isAdmin, isMobileMenuOpen, onClose }: SidebarProps) {
   const router = useRouter()
+  const [isCollapsed, setIsCollapsed] = useState(false)
+
+  // Auto-collapse on tablet breakpoint (768px - 1023px)
+  useEffect(() => {
+    const handleResize = () => {
+      if (typeof window !== 'undefined') {
+        const width = window.innerWidth
+        setIsCollapsed(width >= 768 && width < 1024)
+      }
+    }
+    
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
   
   return (
     <aside className={cn(
-      "w-64 h-screen bg-white/95 backdrop-blur-md border-r border-white/20 p-4 transition-transform duration-300 ease-in-out",
+      "h-screen bg-white/95 backdrop-blur-md border-r border-white/20 p-4 transition-all duration-300 ease-in-out",
       "lg:translate-x-0", // Always visible on large screens
       "fixed lg:relative top-0 left-0", // Fixed on mobile, relative on desktop
       "z-50 lg:z-auto",
       "overflow-y-auto", // Enable scroll if sidebar is taller than screen
+      isCollapsed ? "w-16" : "w-64",
       isMobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0" // Slide in/out on mobile
     )}>
       <nav className="space-y-2">
@@ -69,16 +86,20 @@ export default function Sidebar({ activeView, onNavigate, isAdmin, isMobileMenuO
               key={assistant.id}
               onClick={() => onNavigate(assistant.id)}
               className={cn(
-                'w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all',
+                'w-full flex items-center gap-3 rounded-xl transition-all',
                 'hover:bg-white/10',
+                isCollapsed ? 'px-3 py-3 justify-center' : 'px-4 py-3',
                 isActive && 'bg-gradient-to-r from-brand-purple/10 to-brand-pink/10 border border-brand-purple/20',
                 isFirstAdminItem && 'border-t border-gray-200 mt-4 pt-6'
               )}
+              title={isCollapsed ? assistant.label : undefined}
             >
               <Icon size={24} className={assistant.color} weight={isActive ? 'fill' : 'regular'} />
-              <span className={cn('font-medium', isActive && 'text-brand-purple')}>
-                {assistant.label}
-              </span>
+              {!isCollapsed && (
+                <span className={cn('font-medium', isActive && 'text-brand-purple')}>
+                  {assistant.label}
+                </span>
+              )}
             </button>
           )
         })}
@@ -96,14 +117,18 @@ export default function Sidebar({ activeView, onNavigate, isAdmin, isMobileMenuO
                   onClose?.() // Close sidebar on mobile
                 }}
                 className={cn(
-                  'w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all',
-                  'hover:bg-white/10'
+                  'w-full flex items-center gap-3 rounded-xl transition-all',
+                  'hover:bg-white/10',
+                  isCollapsed ? 'px-3 py-3 justify-center' : 'px-4 py-3'
                 )}
+                title={isCollapsed ? link.label : undefined}
               >
                 <Icon size={24} className={link.color} weight="regular" />
-                <span className="font-medium">
-                  {link.label}
-                </span>
+                {!isCollapsed && (
+                  <span className="font-medium">
+                    {link.label}
+                  </span>
+                )}
               </button>
             )
           })}
