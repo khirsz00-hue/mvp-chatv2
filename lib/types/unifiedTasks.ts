@@ -14,6 +14,11 @@ export type SyncStatus = 'synced' | 'pending' | 'conflict' | 'error'
 /**
  * Unified Task Type
  * Extends TestDayTask with source tracking and sync metadata
+ * 
+ * Note: While TestDayTask has optional unified fields for backward compatibility
+ * with existing database records, UnifiedTask requires these fields because it's
+ * used in contexts where we're actively working with the unified system (e.g.,
+ * mapping from external sources or creating new tasks).
  */
 export interface UnifiedTask extends TestDayTask {
   source: TaskSource

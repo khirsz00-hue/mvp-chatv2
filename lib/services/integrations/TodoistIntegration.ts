@@ -55,7 +55,7 @@ export class TodoistIntegration extends BaseTaskIntegration {
       
       // New unified fields
       source: 'todoist' as TaskSource,
-      external_id: todoistTask.id,
+      external_id: String(todoistTask.id),
       external_metadata: {
         project_id: todoistTask.project_id,
         labels: todoistTask.labels,
