@@ -937,7 +937,7 @@ export function TasksAssistant() {
   }
   
   return (
-    <div className="space-y-6 pb-24 md:pb-6">{/* Extra bottom padding on mobile for fixed bottom bar */}
+    <div className="space-y-6 mobile-bottom-bar-spacing md:pb-6">{/* Extra bottom padding on mobile for fixed bottom bar */}
       {/* Active Timer Bar */}
       {activeTimerInfo && activeTimerInfo.isActive && (
         <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-xl p-4 shadow-lg">

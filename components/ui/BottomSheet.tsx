@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, PanInfo } from 'framer-motion'
 import { X } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 
@@ -17,7 +17,7 @@ export function BottomSheet({ isOpen, onClose, title, children, className }: Bot
   const [isDragging, setIsDragging] = React.useState(false)
   const [dragY, setDragY] = React.useState(0)
 
-  const handleDragEnd = (event: any, info: any) => {
+  const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     setIsDragging(false)
     setDragY(0)
     // Close if dragged down more than 100px
