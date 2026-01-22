@@ -6,7 +6,7 @@ interface TodoistUpdatePayload {
   priority?: number
   project_id?: string
   labels?: string[]
-  due_string?: string
+  due_date?: string | null  // ✅ Changed from due_string
 }
 
 export async function POST(req: Request) {
@@ -27,14 +27,29 @@ export async function POST(req: Request) {
     if (updates.project_id !== undefined) updatePayload.project_id = updates.project_id
     if (updates.labels !== undefined) updatePayload.labels = updates.labels
     
-    // Handle due date - convert to string format if it's an object
+    // ✅ FIX: Handle due date - use due_date (YYYY-MM-DD format only)
     if (updates.due !== undefined) {
-      if (typeof updates.due === 'string') {
-        updatePayload.due_string = updates.due
+      if (updates.due === null) {
+        // Remove due date
+        updatePayload.due_date = null
+      } else if (typeof updates.due === 'string') {
+        // Validate format YYYY-MM-DD
+        if (/^\d{4}-\d{2}-\d{2}$/.test(updates.due)) {
+          updatePayload.due_date = updates.due
+        } else {
+          console.warn('⚠️ [Todoist Update] Invalid due date format:', updates.due)
+        }
       } else if (updates.due && typeof updates.due === 'object' && updates.due.date) {
-        updatePayload.due_string = updates.due.date
+        // Extract date from object
+        if (/^\d{4}-\d{2}-\d{2}$/.test(updates.due.date)) {
+          updatePayload.due_date = updates.due.date
+        } else {
+          console.warn('⚠️ [Todoist Update] Invalid due date format in object:', updates.due.date)
+        }
       }
     }
+
+    console.log('📝 [Todoist Update] Payload:', JSON.stringify(updatePayload))
 
     const res = await fetch(`https://api.todoist.com/rest/v2/tasks/${id}`, {
       method: 'POST',
@@ -48,10 +63,12 @@ export async function POST(req: Request) {
     if (!res.ok) {
       const errorText = await res.text()
       console.error('❌ Błąd Todoist UPDATE:', errorText)
+      console.error('❌ Failed payload was:', JSON.stringify(updatePayload))
       return NextResponse.json({ error: 'Nie udało się zaktualizować zadania' }, { status: res.status })
     }
 
     const updatedTask = await res.json()
+    console.log('✅ [Todoist Update] Success:', updatedTask.id)
 
     return NextResponse.json({ success: true, task: updatedTask })
   } catch (err: any) {
