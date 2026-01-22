@@ -135,6 +135,13 @@ export interface TestDayTask {
   updated_at: string
   // Optional subtasks (populated when fetching with subtasks)
   subtasks?: TestDaySubtask[]
+  
+  // Unified system fields (Phase 1 - optional for backward compatibility)
+  source?: 'local' | 'todoist' | 'asana'
+  external_id?: string | null
+  external_metadata?: Record<string, any>
+  last_synced_at?: string | null
+  sync_status?: 'synced' | 'pending' | 'conflict' | 'error'
 }
 
 // Subtask

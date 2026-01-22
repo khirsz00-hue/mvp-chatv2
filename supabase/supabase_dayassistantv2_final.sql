@@ -41,6 +41,12 @@ CREATE TABLE IF NOT EXISTS day_assistant_v2_tasks (
   auto_moved BOOLEAN DEFAULT FALSE,
   metadata JSONB DEFAULT '{}',
   synced_at TIMESTAMPTZ,
+  -- Unified task system fields (Phase 1)
+  source TEXT DEFAULT 'local' CHECK (source IN ('local', 'todoist', 'asana')),
+  external_id TEXT,
+  external_metadata JSONB DEFAULT '{}',
+  last_synced_at TIMESTAMPTZ,
+  sync_status TEXT DEFAULT 'synced' CHECK (sync_status IN ('synced', 'pending', 'conflict', 'error')),
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -140,6 +146,10 @@ CREATE INDEX IF NOT EXISTS idx_v2_tasks_todoist_id ON day_assistant_v2_tasks(tod
 CREATE UNIQUE INDEX IF NOT EXISTS idx_v2_tasks_user_assistant_todoist
   ON day_assistant_v2_tasks(user_id, assistant_id, todoist_id)
   WHERE todoist_id IS NOT NULL;
+-- Unified system indexes (Phase 1)
+CREATE INDEX IF NOT EXISTS idx_tasks_external_id ON day_assistant_v2_tasks(external_id) WHERE external_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_tasks_source ON day_assistant_v2_tasks(source);
+CREATE INDEX IF NOT EXISTS idx_tasks_sync_status ON day_assistant_v2_tasks(sync_status) WHERE sync_status != 'synced';
 CREATE INDEX IF NOT EXISTS idx_sync_metadata_user ON sync_metadata(user_id);
 CREATE INDEX IF NOT EXISTS idx_sync_metadata_type ON sync_metadata(sync_type);
 
