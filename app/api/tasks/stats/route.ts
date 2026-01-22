@@ -4,10 +4,27 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseServer } from '@/lib/supabaseServer'
+import { createClient } from '@supabase/supabase-js'
 import { getTasks, getOrCreateDayAssistantV2 } from '@/lib/services/dayAssistantV2Service'
 
 export const dynamic = 'force-dynamic'
+
+/**
+ * Helper function to create authenticated Supabase client from request
+ */
+function createAuthenticatedClient(request: NextRequest) {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      global: {
+        headers: {
+          Authorization: request.headers.get('Authorization') || ''
+        }
+      }
+    }
+  )
+}
 
 /**
  * GET /api/tasks/stats - Get task statistics
@@ -17,7 +34,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest) {
   try {
     // Get authenticated user
-    const supabase = supabaseServer
+    const supabase = createAuthenticatedClient(request)
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {

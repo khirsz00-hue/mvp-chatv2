@@ -5,12 +5,29 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseServer } from '@/lib/supabaseServer'
+import { createClient } from '@supabase/supabase-js'
 import { getTasks, createTask, updateTask } from '@/lib/services/dayAssistantV2Service'
 import { getOrCreateDayAssistantV2 } from '@/lib/services/dayAssistantV2Service'
 import { enqueueSyncJob } from '@/lib/services/syncQueue'
 
 export const dynamic = 'force-dynamic'
+
+/**
+ * Helper function to create authenticated Supabase client from request
+ */
+function createAuthenticatedClient(request: NextRequest) {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      global: {
+        headers: {
+          Authorization: request.headers.get('Authorization') || ''
+        }
+      }
+    }
+  )
+}
 
 /**
  * GET /api/tasks - Fetch tasks from unified database
@@ -22,7 +39,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest) {
   try {
     // Get authenticated user
-    const supabase = supabaseServer
+    const supabase = createAuthenticatedClient(request)
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
@@ -102,7 +119,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // Get authenticated user
-    const supabase = supabaseServer
+    const supabase = createAuthenticatedClient(request)
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
@@ -214,7 +231,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     // Get authenticated user
-    const supabase = supabaseServer
+    const supabase = createAuthenticatedClient(request)
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
@@ -292,7 +309,7 @@ export async function PATCH(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     // Get authenticated user
-    const supabase = supabaseServer
+    const supabase = createAuthenticatedClient(request)
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
