@@ -174,21 +174,6 @@ a, button {
   background: #9ca3af;
 }
 
-/* Line clamp utilities for text truncation */
-.line-clamp-1 {
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.line-clamp-2 {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
 /* Drag and Drop Animations */
 @keyframes vibrate {
   0%, 100% { transform: rotate(-1deg) scale(1.05); }
