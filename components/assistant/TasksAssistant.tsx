@@ -100,6 +100,9 @@ export function TasksAssistant() {
   // Mobile bottom sheet states
   const [mobileBottomSheet, setMobileBottomSheet] = useState<'filter' | 'group' | 'sort' | 'project' | 'quick' | null>(null)
   
+  // Feature flag for unified task API (Phase 2B)
+  const USE_UNIFIED_API = process.env.NEXT_PUBLIC_USE_UNIFIED_TASKS === 'true'
+  
   const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
 
   const smartViews = useMemo(() => ([
@@ -148,8 +151,53 @@ export function TasksAssistant() {
   const fetchTasks = useCallback(async () => {
     setLoading(true)
     try {
-      console.log('🔍 Fetching tasks with token:', token ? 'EXISTS' : 'MISSING')
+      console.log('🔍 Fetching tasks with token:', token ? 'EXISTS' : 'MISSING', 'USE_UNIFIED_API:', USE_UNIFIED_API)
       
+      // If unified API is enabled, try that first
+      if (USE_UNIFIED_API) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session) {
+            const res = await fetch(`/api/tasks?source=all&includeCompleted=${filter === 'completed'}`, {
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`
+              }
+            })
+            
+            if (res.ok) {
+              const data = await res.json()
+              console.log('📦 Unified API data:', data)
+              const fetchedTasks = data.tasks || []
+              
+              // Map tasks to expected format
+              const mapped = fetchedTasks.map((t: any) => ({
+                id: t.id,
+                content: t.title,
+                description: t.description,
+                priority: t.priority,
+                due: t.due_date,
+                _dueYmd: t.due_date,
+                completed: t.completed,
+                created_at: t.created_at,
+                project_id: t.project_id,
+                labels: t.tags || [],
+                duration: t.estimate_min
+              }))
+              
+              console.log('✅ Unified API - Mapped tasks:', mapped)
+              setTasks(mapped)
+              setLoading(false)
+              return
+            }
+          }
+          
+          console.warn('⚠️ Unified API failed or no session, falling back to Todoist API')
+        } catch (unifiedError) {
+          console.error('❌ Unified API error, falling back to Todoist API:', unifiedError)
+        }
+      }
+      
+      // Original Todoist API (backward compatibility)
       // Use POST to pass filter parameter
       const res = await fetch('/api/todoist/tasks', {
         method: 'POST',
@@ -182,7 +230,7 @@ export function TasksAssistant() {
     } finally {
       setLoading(false)
     }
-  }, [token, filter, completedRange, completedSearch])
+  }, [token, filter, completedRange, completedSearch, USE_UNIFIED_API])
   
   const fetchProjects = useCallback(async () => {
     try {
@@ -218,7 +266,10 @@ export function TasksAssistant() {
   
   // Fetch tasks
   useEffect(() => {
-    if (! token) return
+    // In unified API mode without token, always fetch local tasks
+    // In legacy mode, require token
+    if (!token && !USE_UNIFIED_API) return
+    
     fetchTasks()
     
     // Poll every 45 seconds
@@ -227,7 +278,7 @@ export function TasksAssistant() {
     }, 45000)
     
     return () => clearInterval(interval)
-  }, [token, fetchTasks])
+  }, [token, fetchTasks, USE_UNIFIED_API])
   
   // Fetch projects
   useEffect(() => {
@@ -511,6 +562,87 @@ export function TasksAssistant() {
     try {
       console.log('➕ Creating task:', taskData)
       
+      // If unified API is enabled, try that first
+      if (USE_UNIFIED_API) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session) {
+            const source = token ? 'todoist' : 'local'
+            const sync_to_external = !!token
+            
+            const res = await fetch('/api/tasks', {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+              },
+              body: JSON.stringify({
+                title: taskData.content,
+                description: taskData.description,
+                priority: taskData.priority || 3,
+                due_date: taskData.due_date,
+                estimate_min: taskData.duration || 30,
+                source: source,
+                sync_to_external: sync_to_external,
+                project_id: taskData.project_id,
+                labels: taskData.labels || []
+              })
+            })
+            
+            if (res.ok) {
+              const data = await res.json()
+              const newTask = data.task
+              
+              console.log('✅ Task created via unified API:', newTask)
+              
+              // Map to expected format
+              const mappedTask = {
+                id: newTask.id,
+                content: newTask.title,
+                description: newTask.description,
+                priority: newTask.priority,
+                due: newTask.due_date,
+                _dueYmd: newTask.due_date,
+                completed: newTask.completed,
+                created_at: newTask.created_at,
+                project_id: taskData.project_id,
+                labels: taskData.labels || [],
+                duration: newTask.estimate_min
+              }
+              
+              setTasks(prev => [mappedTask, ...prev])
+              
+              if (data.sync_queued) {
+                showToast('Zadanie zostało utworzone. Synchronizacja w tle...', 'success')
+              } else {
+                showToast('Zadanie zostało utworzone', 'success')
+              }
+              
+              // Track analytics
+              trackTaskAnalytics({
+                task_id: newTask.id,
+                task_title: newTask.title,
+                task_project: taskData.project_id || null,
+                task_labels: taskData.labels || [],
+                priority: taskData.priority || 4,
+                estimated_duration: taskData.duration || null,
+                due_date: taskData.due_date || null,
+                action_type: 'created'
+              })
+              
+              // Refresh tasks to get updated list
+              setTimeout(() => fetchTasks(), 500)
+              return
+            }
+            
+            console.warn('⚠️ Unified API failed, falling back to Todoist API')
+          }
+        } catch (unifiedError) {
+          console.error('❌ Unified API error, falling back to Todoist API:', unifiedError)
+        }
+      }
+      
+      // Original Todoist API (backward compatibility)
       const res = await fetch('/api/todoist/add', {
         method: 'POST',
         headers: { 
@@ -906,7 +1038,7 @@ export function TasksAssistant() {
   }
   
   // OAuth Connection Screen
-  if (! token) {
+  if (!token && !USE_UNIFIED_API) {
     const handleOAuthConnect = () => {
       // Redirect to our API endpoint which handles OAuth properly
       window.location.href = '/api/todoist/auth'
@@ -931,6 +1063,48 @@ export function TasksAssistant() {
             <Plus size={20} />
             Połącz z Todoist
           </Button>
+        </Card>
+      </div>
+    )
+  }
+  
+  // Unified API mode - Show optional Todoist connection
+  if (!token && USE_UNIFIED_API) {
+    const handleOAuthConnect = () => {
+      // Redirect to our API endpoint which handles OAuth properly
+      window.location.href = '/api/todoist/auth'
+    }
+    
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold">Zarządzanie Zadaniami</h1>
+        <Card className="p-8 text-center space-y-4">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-brand-purple/10 to-brand-pink/10 flex items-center justify-center mb-4">
+            <CalendarBlank size={32} className="text-brand-purple" />
+          </div>
+          <h2 className="text-xl font-semibold">Twoje Zadania</h2>
+          <p className="text-gray-600 max-w-md mx-auto">
+            Zarządzaj swoimi zadaniami lokalnie. Możesz opcjonalnie połączyć Todoist dla synchronizacji.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center items-center mt-4">
+            <Button 
+              onClick={() => setShowUniversalModal(true)}
+              className="gap-2"
+              size="lg"
+            >
+              <Plus size={20} />
+              Dodaj zadanie
+            </Button>
+            <Button 
+              onClick={handleOAuthConnect}
+              variant="outline"
+              className="gap-2"
+              size="lg"
+            >
+              <CalendarBlank size={20} />
+              Połącz Todoist (opcjonalnie)
+            </Button>
+          </div>
         </Card>
       </div>
     )
