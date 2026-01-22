@@ -1295,7 +1295,7 @@ export function TasksAssistant() {
                  </span>
                </div>
                
-               <div className="hidden md:flex gap-2 w-full sm:w-auto">
+               <div className="hidden md:flex gap-2 w-auto">
                  <select
                    onChange={(e) => {
                      const idx = Number(e.target.value)
