@@ -11,8 +11,8 @@ import { createClient } from '@supabase/supabase-js'
 interface UnifiedSyncOptions {
   userId: string
   assistantId: string
-  sources?: TaskSource[] // jeśli nie podano, sync wszystkich enabled
-  force?: boolean // ignoruj cache
+  sources?: TaskSource[] // if not specified, sync all enabled sources
+  force?: boolean // ignore cache
 }
 
 interface UnifiedSyncResult {
@@ -34,7 +34,7 @@ export class UnifiedSyncService {
   }
   
   /**
-   * Główna metoda sync - synchronizuje wszystkie enabled integrations
+   * Main sync method - synchronizes all enabled integrations
    */
   async syncAll(options: UnifiedSyncOptions): Promise<UnifiedSyncResult> {
     const startTime = Date.now()
@@ -49,10 +49,10 @@ export class UnifiedSyncService {
     }
     
     try {
-      // 1. Pobierz enabled integrations dla usera
+      // 1. Get enabled integrations for user
       const enabledIntegrations = await integrationRegistry.getEnabledForUser(options.userId)
       
-      // 2. Filtruj jeśli user podał konkretne sources
+      // 2. Filter if user specified specific sources
       const integrationsToSync = options.sources 
         ? enabledIntegrations.filter(i => options.sources!.includes(i.name as TaskSource))
         : enabledIntegrations
@@ -60,7 +60,7 @@ export class UnifiedSyncService {
       console.log(`[UnifiedSync] Syncing ${integrationsToSync.length} sources:`, 
         integrationsToSync.map(i => i.name))
       
-      // 3. Sync każdej integracji równolegle (dla performance)
+      // 3. Sync each integration in parallel (for performance)
       const syncPromises = integrationsToSync.map(integration => 
         this.syncIntegration(integration, options.userId, options.assistantId)
           .catch(error => ({
@@ -75,10 +75,10 @@ export class UnifiedSyncService {
       
       const results = await Promise.all(syncPromises)
       
-      // 4. Agreguj wyniki
+      // 4. Aggregate results
       for (const syncResult of results) {
         if ('source' in syncResult) {
-          // To jest error result
+          // This is an error result
           result.errors.push({
             source: syncResult.source,
             error: syncResult.errors[0]?.error || 'Unknown error'
@@ -125,7 +125,7 @@ export class UnifiedSyncService {
   }
   
   /**
-   * Sync pojedynczej integracji (Todoist, Asana, etc)
+   * Sync single integration (Todoist, Asana, etc)
    */
   private async syncIntegration(
     integration: any,
@@ -137,11 +137,11 @@ export class UnifiedSyncService {
     const supabase = this.getSupabaseClient()
     
     try {
-      // 1. Pobierz taski z zewnętrznego źródła
+      // 1. Fetch tasks from external source
       const externalTasks = await integration.fetchTasks(userId)
       console.log(`[UnifiedSync] Fetched ${externalTasks.length} tasks from ${integration.name}`)
       
-      // 2. Pobierz istniejące taski z tego źródła z bazy
+      // 2. Fetch existing tasks from this source in database
       const { data: existingTasks } = await supabase
         .from('day_assistant_v2_tasks')
         .select('*')
@@ -160,18 +160,18 @@ export class UnifiedSyncService {
       let deleted = 0
       const errors: Array<{task_id?: string, error: string}> = []
       
-      // 3. Upsert tasków z zewnętrznego źródła
+      // 3. Upsert tasks from external source
       for (const externalTask of externalTasks) {
         try {
           const mappedTask = integration.mapToInternal(externalTask, userId, assistantId)
           const existingTask = existingTasksMap.get(mappedTask.external_id!)
           
           if (existingTask) {
-            // UPDATE: sprawdź czy są zmiany
+            // UPDATE: check if there are changes
             const hasChanges = this.detectChanges(existingTask, mappedTask)
             
             if (hasChanges) {
-              // Conflict resolution: zewnętrzne źródło wygrywa UNLESS local changes są nowsze
+              // Conflict resolution: external source wins UNLESS local changes are newer
               const shouldUpdate = await this.resolveConflict(existingTask, mappedTask)
               
               if (shouldUpdate) {
@@ -180,11 +180,11 @@ export class UnifiedSyncService {
               }
             }
             
-            // Usuń z mapy (zostały taski które trzeba usunąć)
+            // Remove from map (remaining tasks need to be deleted)
             existingTasksMap.delete(mappedTask.external_id!)
             
           } else {
-            // CREATE: nowy task z zewnętrznego źródła
+            // CREATE: new task from external source
             await this.createTask(mappedTask)
             created++
           }
@@ -198,8 +198,8 @@ export class UnifiedSyncService {
         }
       }
       
-      // 4. DELETE: taski które istnieją lokalnie ale nie w zewnętrznym źródle
-      // (zostały usunięte w Todoist/Asana)
+      // 4. DELETE: tasks that exist locally but not in external source
+      // (were deleted in Todoist/Asana)
       for (const [externalId, task] of existingTasksMap) {
         try {
           await this.deleteTask(task.id)
@@ -234,10 +234,10 @@ export class UnifiedSyncService {
   }
   
   /**
-   * Wykrywa czy są zmiany między taskami
+   * Detects if there are changes between tasks
    */
   private detectChanges(existing: any, updated: UnifiedTask): boolean {
-    // Porównaj kluczowe pola
+    // Compare key fields
     return (
       existing.title !== updated.title ||
       existing.description !== updated.description ||
@@ -250,9 +250,9 @@ export class UnifiedSyncService {
   
   /**
    * Conflict Resolution Strategy:
-   * - Jeśli local task ma sync_status='pending', to local changes wygrywają
-   * - Jeśli local task był modyfikowany później niż last_synced_at, local wygrywa
-   * - W przeciwnym wypadku external wygrywa
+   * - If local task has sync_status='pending', local changes win
+   * - If local task was modified later than last_synced_at, local wins
+   * - Otherwise external wins
    */
   private async resolveConflict(
     existingTask: any,
@@ -260,23 +260,23 @@ export class UnifiedSyncService {
   ): Promise<boolean> {
     const supabase = this.getSupabaseClient()
     
-    // Local pending changes mają priorytet
+    // Local pending changes have priority
     if (existingTask.sync_status === 'pending') {
       console.log(`[UnifiedSync] Skipping update - local changes pending for task ${existingTask.id}`)
       return false
     }
     
-    // Sprawdź timestamps
+    // Check timestamps
     const localUpdatedAt = new Date(existingTask.updated_at).getTime()
     const lastSyncedAt = existingTask.last_synced_at 
       ? new Date(existingTask.last_synced_at).getTime()
       : 0
     
-    // Local changes nowsze niż ostatni sync = conflict
+    // Local changes newer than last sync = conflict
     if (localUpdatedAt > lastSyncedAt) {
       console.log(`[UnifiedSync] Conflict detected for task ${existingTask.id} - marking as conflict`)
       
-      // Oznacz jako conflict (user będzie musiał wybrać)
+      // Mark as conflict (user will need to choose)
       await supabase
         .from('day_assistant_v2_tasks')
         .update({ sync_status: 'conflict' })
@@ -285,12 +285,12 @@ export class UnifiedSyncService {
       return false
     }
     
-    // External wygrywa
+    // External wins
     return true
   }
   
   /**
-   * Utwórz nowy task w bazie
+   * Create new task in database
    */
   private async createTask(task: UnifiedTask): Promise<void> {
     const supabase = this.getSupabaseClient()
@@ -306,7 +306,7 @@ export class UnifiedSyncService {
   }
   
   /**
-   * Zaktualizuj istniejący task
+   * Update existing task
    */
   private async updateTask(taskId: string, updates: Partial<UnifiedTask>): Promise<void> {
     const supabase = this.getSupabaseClient()
@@ -324,7 +324,7 @@ export class UnifiedSyncService {
   }
   
   /**
-   * Usuń task z bazy
+   * Delete task from database
    */
   private async deleteTask(taskId: string): Promise<void> {
     const supabase = this.getSupabaseClient()
@@ -337,14 +337,14 @@ export class UnifiedSyncService {
   }
   
   /**
-   * Zapisz metadata o synchronizacji
+   * Save sync metadata
    */
   private async updateSyncMetadata(
     userId: string,
     result: UnifiedSyncResult
   ): Promise<void> {
     const supabase = this.getSupabaseClient()
-    // Użyj istniejącej tabeli sync_metadata
+    // Use existing sync_metadata table
     await supabase
       .from('sync_metadata')
       .upsert({

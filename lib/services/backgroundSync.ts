@@ -1,6 +1,6 @@
 /**
  * Background Sync Service
- * Phase 2A: Synchronizuje w tle co X sekund, ale nie blokuje UI
+ * Phase 2A: Synchronizes in background every X seconds without blocking UI
  */
 
 let syncInterval: NodeJS.Timeout | null = null
