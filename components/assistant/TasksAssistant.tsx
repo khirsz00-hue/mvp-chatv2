@@ -1181,13 +1181,14 @@ export function TasksAssistant() {
         {/* Title Section */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-pink bg-clip-text text-transparent">
+            <h1 className="text-xl md:text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-pink bg-clip-text text-transparent">
               Zarządzanie Zadaniami
             </h1>
-            <p className="text-gray-600 mt-2 text-lg">Organizuj swoje zadania efektywnie</p>
+            <p className="text-sm md:text-lg text-gray-600 mt-1 md:mt-2">Organizuj swoje zadania efektywnie</p>
           </div>
           
-          <div className="flex items-center gap-3">
+          {/* HIDE button on mobile - FAB is available */}
+          <div className="hidden md:flex items-center gap-3">
             <Button 
               onClick={() => {
                 setUniversalModalTask(null)
@@ -1238,7 +1239,7 @@ export function TasksAssistant() {
             
             <div className="h-8 w-px bg-gray-300 hidden lg:block" />
             
-            {/* Filters / controls */}
+            {/* Filters / controls - HIDE ON MOBILE, show from md (≥768px) */}
             <div className="hidden md:flex items-center gap-3 flex-wrap flex-1">
               <div className="flex items-center gap-2 flex-1 min-w-[200px] lg:min-w-[240px]">
                 <SortAscending size={20} className="text-gray-500 hidden sm:inline" />
@@ -1284,8 +1285,8 @@ export function TasksAssistant() {
             
             <div className="h-8 w-px bg-gray-300 hidden lg:block" />
             
-             {/* Task count & smart filters CTA */}
-             <div className="flex flex-col sm:flex-row sm:items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2 w-full sm:w-auto">
+             {/* Task count & smart filters CTA - Desktop only */}
+             <div className="hidden md:flex flex-col md:flex-row md:items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2 w-full md:w-auto">
                <div className="flex items-center gap-2">
                  <Badge variant="secondary" className="text-sm px-2 py-1 font-semibold whitespace-nowrap">
                    {sortedTasks.length} {sortedTasks.length === 1 ? 'zadanie' : 'zadań'}
@@ -1325,10 +1326,10 @@ export function TasksAssistant() {
         </div>
       </div>
       
-      {/* Filters */}
+      {/* Filters - Desktop only */}
       {view === 'list' && (
-        <div className="mb-6">
-          <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterType)} className="hidden md:block">
+        <div className="mb-6 hidden md:block">
+          <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterType)}>
             <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-400 pb-2">
               <TabsList className="inline-flex w-auto min-w-full lg:w-full justify-start gap-1">
                 <TabsTrigger value="today" className="flex-shrink-0 px-4">Dziś</TabsTrigger>
