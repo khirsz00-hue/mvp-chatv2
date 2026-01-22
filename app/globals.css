@@ -237,3 +237,15 @@ body {
 .animate-slideDown {
   animation: slideDown 0.3s ease-out;
 }
+
+/* Mobile Bottom Bar - Safe Area Support */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Ensure content is scrollable behind bottom bar on mobile */
+@media (max-width: 767px) {
+  main {
+    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  }
+}

@@ -5,7 +5,7 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Card from '@/components/ui/Card'
 import { useToast } from '@/components/ui/Toast'
-import { Plus, List, Kanban, CalendarBlank, Calendar, CheckSquare, Trash, Funnel, SlidersHorizontal, SortAscending } from '@phosphor-icons/react'
+import { Plus, List, Kanban, CalendarBlank, Calendar, CheckSquare, Trash, Funnel, SlidersHorizontal, SortAscending, FolderOpen, Lightning } from '@phosphor-icons/react'
 import { startOfDay, addDays, parseISO, isSameDay, isBefore, isWithinInterval, format } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { UniversalTaskModal, TaskData } from '@/components/common/UniversalTaskModal'
@@ -17,6 +17,7 @@ import { PomodoroTimer } from './PomodoroTimer'
 import { supabase } from '@/lib/supabaseClient'
 import Dialog, { DialogContent } from '@/components/ui/Dialog'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs'
+import { BottomSheet } from '@/components/ui/BottomSheet'
 
 interface Task {
   id: string
@@ -95,6 +96,9 @@ export function TasksAssistant() {
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
   const [bulkActionLoading, setBulkActionLoading] = useState(false)
   const [activeTimerInfo, setActiveTimerInfo] = useState<{ taskId: string; taskTitle: string; isActive: boolean; elapsedSeconds?: number; startTime?: number } | null>(null)
+  
+  // Mobile bottom sheet states
+  const [mobileBottomSheet, setMobileBottomSheet] = useState<'filter' | 'group' | 'sort' | 'project' | 'quick' | null>(null)
   
   const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
 
@@ -933,7 +937,7 @@ export function TasksAssistant() {
   }
   
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24 md:pb-6">{/* Extra bottom padding on mobile for fixed bottom bar */}
       {/* Active Timer Bar */}
       {activeTimerInfo && activeTimerInfo.isActive && (
         <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-xl p-4 shadow-lg">
@@ -1465,6 +1469,221 @@ export function TasksAssistant() {
       
       {/* Task Timer (floating widget) */}
       <TaskTimer />
+      
+      {/* Mobile Bottom Bar (only on mobile < 768px) */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-lg"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        <div className="flex items-center justify-around px-2 py-3">
+          <button
+            onClick={() => setMobileBottomSheet('filter')}
+            className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-all min-w-[44px] min-h-[44px]"
+            aria-label="Filtry"
+          >
+            <Funnel size={20} weight="bold" className="text-brand-purple" />
+            <span className="text-xs font-medium text-gray-700">Filtr</span>
+          </button>
+          
+          {view === 'list' && (
+            <button
+              onClick={() => setMobileBottomSheet('group')}
+              className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-all min-w-[44px] min-h-[44px]"
+              aria-label="Grupowanie"
+            >
+              <SlidersHorizontal size={20} weight="bold" className="text-brand-purple" />
+              <span className="text-xs font-medium text-gray-700">Grupuj</span>
+            </button>
+          )}
+          
+          <button
+            onClick={() => setMobileBottomSheet('sort')}
+            className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-all min-w-[44px] min-h-[44px]"
+            aria-label="Sortowanie"
+          >
+            <SortAscending size={20} weight="bold" className="text-brand-purple" />
+            <span className="text-xs font-medium text-gray-700">Sort</span>
+          </button>
+          
+          <button
+            onClick={() => setMobileBottomSheet('project')}
+            className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-all min-w-[44px] min-h-[44px]"
+            aria-label="Projekty"
+          >
+            <FolderOpen size={20} weight="bold" className="text-brand-purple" />
+            <span className="text-xs font-medium text-gray-700">Projekt</span>
+          </button>
+          
+          <button
+            onClick={() => setMobileBottomSheet('quick')}
+            className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-all min-w-[44px] min-h-[44px]"
+            aria-label="Szybkie widoki"
+          >
+            <Lightning size={20} weight="bold" className="text-brand-purple" />
+            <span className="text-xs font-medium text-gray-700">Szybkie</span>
+          </button>
+        </div>
+      </div>
+      
+      {/* Mobile Bottom Sheets */}
+      <BottomSheet
+        isOpen={mobileBottomSheet === 'filter'}
+        onClose={() => setMobileBottomSheet(null)}
+        title="Filtry"
+      >
+        <div className="space-y-2">
+          {[
+            { value: 'today', label: 'Dziś', icon: '📅' },
+            { value: 'tomorrow', label: 'Jutro', icon: '📆' },
+            { value: 'week', label: 'Tydzień', icon: '📅' },
+            { value: 'month', label: 'Miesiąc', icon: '📅' },
+            { value: 'overdue', label: 'Przeterminowane', icon: '⚠️' },
+            { value: 'unscheduled', label: 'Do zaplanowania', icon: '📋' },
+            { value: 'completed', label: 'Ukończone', icon: '✅' }
+          ].map(({ value, label, icon }) => (
+            <button
+              key={value}
+              onClick={() => {
+                setFilter(value as FilterType)
+                setMobileBottomSheet(null)
+              }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all min-h-[44px] ${
+                filter === value
+                  ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-md'
+                  : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <span className="text-xl">{icon}</span>
+              <span className="font-medium">{label}</span>
+            </button>
+          ))}
+        </div>
+      </BottomSheet>
+      
+      <BottomSheet
+        isOpen={mobileBottomSheet === 'group'}
+        onClose={() => setMobileBottomSheet(null)}
+        title="Grupowanie"
+      >
+        <div className="space-y-2">
+          {[
+            { value: 'none', label: 'Brak', icon: '📋' },
+            { value: 'day', label: 'Dzień', icon: '📅' },
+            { value: 'project', label: 'Projekt', icon: '📁' },
+            { value: 'priority', label: 'Priorytet', icon: '🚩' }
+          ].map(({ value, label, icon }) => (
+            <button
+              key={value}
+              onClick={() => {
+                setGroupBy(value as GroupByType)
+                setMobileBottomSheet(null)
+              }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all min-h-[44px] ${
+                groupBy === value
+                  ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-md'
+                  : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <span className="text-xl">{icon}</span>
+              <span className="font-medium">{label}</span>
+            </button>
+          ))}
+        </div>
+      </BottomSheet>
+      
+      <BottomSheet
+        isOpen={mobileBottomSheet === 'sort'}
+        onClose={() => setMobileBottomSheet(null)}
+        title="Sortowanie"
+      >
+        <div className="space-y-2">
+          {[
+            { value: 'date', label: 'Data', icon: '📅' },
+            { value: 'priority', label: 'Priorytet', icon: '🚩' },
+            { value: 'name', label: 'Nazwa', icon: '🔤' }
+          ].map(({ value, label, icon }) => (
+            <button
+              key={value}
+              onClick={() => {
+                setSortBy(value as SortType)
+                setMobileBottomSheet(null)
+              }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all min-h-[44px] ${
+                sortBy === value
+                  ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-md'
+                  : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <span className="text-xl">{icon}</span>
+              <span className="font-medium">{label}</span>
+            </button>
+          ))}
+        </div>
+      </BottomSheet>
+      
+      <BottomSheet
+        isOpen={mobileBottomSheet === 'project'}
+        onClose={() => setMobileBottomSheet(null)}
+        title="Projekty"
+      >
+        <div className="space-y-2">
+          <button
+            onClick={() => {
+              setSelectedProject('all')
+              setMobileBottomSheet(null)
+            }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all min-h-[44px] ${
+              selectedProject === 'all'
+                ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-md'
+                : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            <span className="text-xl">📁</span>
+            <span className="font-medium">Wszystkie projekty</span>
+          </button>
+          {projects.map((project) => (
+            <button
+              key={project.id}
+              onClick={() => {
+                setSelectedProject(project.id)
+                setMobileBottomSheet(null)
+              }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all min-h-[44px] ${
+                selectedProject === project.id
+                  ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-md'
+                  : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <div 
+                className="w-3 h-3 rounded-full" 
+                style={{ backgroundColor: project.color || '#8B5CF6' }}
+              />
+              <span className="font-medium">{project.name}</span>
+            </button>
+          ))}
+        </div>
+      </BottomSheet>
+      
+      <BottomSheet
+        isOpen={mobileBottomSheet === 'quick'}
+        onClose={() => setMobileBottomSheet(null)}
+        title="Szybkie widoki"
+      >
+        <div className="space-y-2">
+          {smartViews.map((smartView, idx) => (
+            <button
+              key={idx}
+              onClick={() => {
+                smartView.apply()
+                setMobileBottomSheet(null)
+              }}
+              className="w-full flex flex-col items-start gap-1 px-4 py-3 rounded-xl transition-all min-h-[44px] bg-gray-50 text-gray-700 hover:bg-gray-100 active:bg-gray-200"
+            >
+              <span className="font-medium">{smartView.label}</span>
+              <span className="text-xs text-gray-500">{smartView.desc}</span>
+            </button>
+          ))}
+        </div>
+      </BottomSheet>
     </div>
   )
 }
