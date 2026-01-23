@@ -289,12 +289,18 @@ export function TasksAssistant() {
   useEffect(() => {
     if (!token) return
     
+    // Sync interval constant (2 minutes)
+    const SYNC_INTERVAL_MS = 2 * 60 * 1000
+    let isActive = true  // Flag to prevent operations after unmount
+    
     const triggerSync = async () => {
+      if (!isActive) return  // Skip if component unmounted
+      
       try {
         console.log('🔄 [TasksAssistant] Auto-syncing with Todoist...')
         
         const { data: { session } } = await supabase.auth.getSession()
-        if (!session) return
+        if (!session || !isActive) return
         
         const response = await fetch('/api/todoist/sync', {
           method: 'POST',
@@ -304,15 +310,21 @@ export function TasksAssistant() {
           }
         })
         
+        if (!isActive) return  // Check again before proceeding
+        
         if (response.ok) {
           console.log('✅ [TasksAssistant] Todoist sync completed')
           // Refresh tasks after sync
-          await fetchTasks()
+          if (isActive) {
+            await fetchTasks()
+          }
         } else {
           console.warn('⚠️ [TasksAssistant] Todoist sync failed:', response.status)
         }
       } catch (error) {
-        console.error('❌ [TasksAssistant] Sync error:', error)
+        if (isActive) {
+          console.error('❌ [TasksAssistant] Sync error:', error)
+        }
       }
     }
     
@@ -320,9 +332,12 @@ export function TasksAssistant() {
     triggerSync()
     
     // Sync every 2 minutes
-    const syncInterval = setInterval(triggerSync, 120000)
+    const syncInterval = setInterval(triggerSync, SYNC_INTERVAL_MS)
     
-    return () => clearInterval(syncInterval)
+    return () => {
+      isActive = false
+      clearInterval(syncInterval)
+    }
   }, [token, fetchTasks])
   
   // Monitor active timer/pomodoro
