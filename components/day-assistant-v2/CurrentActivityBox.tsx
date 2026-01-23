@@ -102,7 +102,7 @@ export function CurrentActivityBox({
           focusModeActive ? "z-[90] shadow-2xl" : "z-10",
           applyShake && "focus-reminder-shake"
         )}>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex-1">
               <p className="text-sm text-purple-600 font-semibold">🎯 Aktualnie zajmujesz się:</p>
               <h3 className="text-lg font-bold mt-1">{taskTitle || 'Zadanie'}</h3>
@@ -126,7 +126,7 @@ export function CurrentActivityBox({
             </div>
             
             {/* Controls */}
-            <div className="ml-4 flex gap-2">
+            <div className="flex flex-wrap gap-2 md:justify-end">
               {activeTimer.isPaused ? (
                 <Button size="sm" onClick={onResume}>
                   <Play size={16} className="mr-1" weight="fill" /> Wznów
