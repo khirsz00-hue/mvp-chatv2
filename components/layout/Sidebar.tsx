@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { ListChecks, CalendarBlank, Notebook, Brain, HandHeart, GearSix, Sun, Users, CalendarCheck, Sparkle, SunHorizon } from '@phosphor-icons/react'
+import { ListChecks, CalendarBlank, Notebook, Brain, HandHeart, GearSix, Sun, Users, CalendarCheck, Sparkle, SunHorizon, UserCircle } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 
 // Updated assistant IDs - removed old 'day-assistant' v1, keeping only v2
@@ -30,6 +30,7 @@ const assistants: Assistant[] = [
 
 // Separate navigation links that go to external routes
 const externalLinks = [
+  { id: 'account-settings', icon: UserCircle, label: 'Ustawienia konta', color: 'text-gray-700', href: '/profile' },
   { id: 'ai-insights', icon: Sparkle, label: 'AI Insights', color: 'text-purple-500', href: '/ai-insights' },
   { id: 'morning-brief', icon: SunHorizon, label: 'Poranny Brief', color: 'text-amber-500', href: '/morning-brief' }
 ]
