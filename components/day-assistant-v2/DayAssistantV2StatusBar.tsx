@@ -269,7 +269,7 @@ export function DayAssistantV2StatusBar({
                 htmlFor="project-filter"
                 className="text-[9px] text-slate-400 uppercase font-semibold tracking-wide leading-none mb-0.5"
               >
-                Context
+                Kontekst
               </label>
               <select
                 id="project-filter"
@@ -278,7 +278,7 @@ export function DayAssistantV2StatusBar({
                 aria-label="Filter by project"
                 className="text-xs font-medium bg-transparent border-0 p-0 pr-4 focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer text-slate-800 hover:text-indigo-600 transition-colors rounded min-h-[20px]"
               >
-                <option value="">All projects</option>
+                <option value="">Wszystkie projekty</option>
                 {projects.map(project => (
                   <option key={project.id} value={project.id}>
                     {project.name}

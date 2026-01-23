@@ -478,13 +478,14 @@ export function calculateTaskScoreV3(
   }
   
   // 7. Short task bonus (Standard mode or Quick Wins mode)
-  if ((context.workMode === 'standard' || context.workMode === 'quick_wins') && task.estimate_min <= 40) {
+  if (context.workMode === 'quick_wins' && task.estimate_min < 20) {
+    // Quick wins mode: extra bonus for very short tasks
+    score += 15
+    reasoning.push(`⚡ Quick Win (${task.estimate_min}min): +15`)
+  } else if (context.workMode === 'standard' && task.estimate_min <= 40) {
+    // Standard mode: small bonus for reasonably short tasks
     score += 5
     reasoning.push(`⏱ Krótkie zadanie (${task.estimate_min}min): +5`)
-  } else if (context.workMode === 'quick_wins' && task.estimate_min < 20) {
-    // Extra bonus for quick wins mode on very short tasks
-    score += 10
-    reasoning.push(`⚡ Quick Win (${task.estimate_min}min): +10`)
   } else {
     reasoning.push(`⏱ Czas ${task.estimate_min}min: +0`)
   }
