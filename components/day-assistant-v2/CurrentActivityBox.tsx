@@ -5,12 +5,15 @@
 
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { TimerState } from '@/hooks/useTaskTimer'
 import Button from '@/components/ui/Button'
 import { Pause, Play, CheckCircle, XCircle } from '@phosphor-icons/react'
 import { FocusMode } from './FocusMode'
 import { cn } from '@/lib/utils'
+
+// Shake duration: 1.5 seconds
+const SHAKE_DURATION_MS = 1500
 
 interface CurrentActivityBoxProps {
   activeTimer: TimerState | null
@@ -37,11 +40,29 @@ export function CurrentActivityBox({
 }: CurrentActivityBoxProps) {
   const [focusModeActive, setFocusModeActive] = useState(false)
   const [applyShake, setApplyShake] = useState(false)
+  const shakeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Callback for shake reminder from FocusMode
   const handleShakeReminder = useCallback(() => {
     setApplyShake(true)
-    setTimeout(() => setApplyShake(false), 1500) // Shake for 1.5s
+    // Clear any existing timeout
+    if (shakeTimeoutRef.current) {
+      clearTimeout(shakeTimeoutRef.current)
+    }
+    // Set new timeout to clear shake
+    shakeTimeoutRef.current = setTimeout(() => {
+      setApplyShake(false)
+      shakeTimeoutRef.current = null
+    }, SHAKE_DURATION_MS)
+  }, [])
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (shakeTimeoutRef.current) {
+        clearTimeout(shakeTimeoutRef.current)
+      }
+    }
   }, [])
 
   if (!activeTimer && !breakActive) {

@@ -10,6 +10,9 @@ import { Eye, EyeSlash } from '@phosphor-icons/react'
 import Button from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 
+// Reminder interval: 5 minutes
+const REMINDER_INTERVAL_MS = 5 * 60 * 1000
+
 interface FocusModeProps {
   isActive: boolean
   onToggle: () => void
@@ -24,7 +27,7 @@ export function FocusMode({ isActive, onToggle, onShakeReminder, taskTitle }: Fo
 
     const reminderInterval = setInterval(() => {
       onShakeReminder()
-    }, 5 * 60 * 1000) // Every 5 minutes
+    }, REMINDER_INTERVAL_MS)
 
     return () => clearInterval(reminderInterval)
   }, [isActive, onShakeReminder])

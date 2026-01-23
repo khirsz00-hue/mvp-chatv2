@@ -253,6 +253,11 @@ a, button {
 
 /* === Focus Mode: Gentle Shake Animation === */
 /* Subtle shake animation for focus mode reminders every 5 minutes */
+:root {
+  --shake-duration: 0.5s;
+  --shake-iterations: 3;
+}
+
 @keyframes gentle-shake {
   0%, 100% { transform: translateX(0); }
   10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
@@ -260,5 +265,5 @@ a, button {
 }
 
 .focus-reminder-shake {
-  animation: gentle-shake 0.5s ease-in-out 3;
+  animation: gentle-shake var(--shake-duration) ease-in-out var(--shake-iterations);
 }
