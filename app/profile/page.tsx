@@ -147,6 +147,21 @@ export default function ProfilePage() {
     }
   }
 
+  const handleToggleJournalGuard = (checked: boolean) => {
+    try {
+      localStorage.setItem('journal_guard_disabled', checked ? 'true' : 'false')
+      setJournalGuardDisabled(checked)
+      showToast(
+        checked
+          ? 'Wymaganie dziennika na start dnia wyłączone'
+          : 'Wymaganie dziennika na start dnia włączone',
+        'success'
+      )
+    } catch {
+      showToast('Nie udało się zapisać ustawienia', 'error')
+    }
+  }
+
   const handleDisconnectTodoist = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
