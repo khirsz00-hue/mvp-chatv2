@@ -8,6 +8,7 @@ import { TestDayTask } from '@/lib/types/dayAssistantV2'
 
 export interface TimerState {
   taskId: string
+  taskTitle: string
   startedAt: Date
   estimatedMinutes: number
   elapsedSeconds: number
@@ -57,6 +58,7 @@ export function useTaskTimer(): UseTaskTimerResult {
 
     const newTimer: TimerState = {
       taskId: task.id,
+      taskTitle: task.title,
       startedAt: new Date(),
       estimatedMinutes: task.estimate_min,
       elapsedSeconds: 0,
@@ -88,13 +90,32 @@ export function useTaskTimer(): UseTaskTimerResult {
   }, [])
 
   // Stop timer
-  const stopTimer = useCallback(() => {
+  const stopTimer = useCallback(async () => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current)
       intervalRef.current = null
     }
+    
+    // Save session if there was an active timer
+    if (activeTimer && activeTimer.elapsedSeconds > 0) {
+      try {
+        const { saveTimeSession } = await import('@/lib/services/timeTrackingService')
+        await saveTimeSession({
+          task_id: activeTimer.taskId,
+          task_title: activeTimer.taskTitle,
+          started_at: activeTimer.startedAt.toISOString(),
+          ended_at: new Date().toISOString(),
+          duration_seconds: activeTimer.elapsedSeconds,
+          session_type: 'focus',
+          task_source: 'day_assistant_v2'
+        })
+      } catch (error) {
+        console.error('Failed to save timer session:', error)
+      }
+    }
+    
     setActiveTimer(null)
-  }, [])
+  }, [activeTimer])
 
   // Cleanup on unmount
   useEffect(() => {
