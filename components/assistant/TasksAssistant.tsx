@@ -5,7 +5,7 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Card from '@/components/ui/Card'
 import { useToast } from '@/components/ui/Toast'
-import { Plus, List, Kanban, CalendarBlank, Calendar, CheckSquare, Trash, Funnel, SlidersHorizontal, SortAscending, FolderOpen, Lightning } from '@phosphor-icons/react'
+import { Plus, List, Kanban, CalendarBlank, Calendar, CheckSquare, Trash, Funnel, SlidersHorizontal, SortAscending, FolderOpen, Lightning, DotsThree } from '@phosphor-icons/react'
 import { startOfDay, addDays, parseISO, isSameDay, isBefore, isWithinInterval, format } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { UniversalTaskModal, TaskData } from '@/components/common/UniversalTaskModal'
@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabaseClient'
 import Dialog, { DialogContent } from '@/components/ui/Dialog'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { BottomSheet } from '@/components/ui/BottomSheet'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/DropdownMenu'
 
 interface Task {
   id: string
@@ -1264,142 +1265,130 @@ export function TasksAssistant() {
           </div>
         </div>
         
-        {/* Control Bar */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
-          <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-            {/* View switcher */}
+        {/* Control Bar - Compact Desktop Layout */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 mb-4">
+          <div className="flex items-center justify-between gap-3">
+            {/* Left: View switcher */}
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-700 hidden sm:inline">Widok:</span>
-              <div className="inline-flex rounded-xl border-2 border-gray-200 p-1 bg-gray-50 flex-wrap">
+              <div className="inline-flex rounded-lg border border-gray-200 p-0.5 bg-gray-50">
                 <button 
                   onClick={() => setView('list')}
-                  className={`px-3 py-2 rounded-lg transition-all flex items-center gap-2 font-medium text-sm ${
+                  className={`px-2.5 py-1.5 rounded-md transition-all flex items-center gap-1.5 font-medium text-sm ${
                     view === 'list' 
-                      ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-md' 
+                      ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-sm' 
                       : 'text-gray-600 hover:bg-white hover:shadow-sm'
                   }`}
                   title="Widok listy"
                 >
-                  <List size={18} weight="bold" />
-                  <span className="hidden sm:inline">Lista</span>
+                  <List size={16} weight="bold" />
+                  <span className="hidden md:inline">Lista</span>
                 </button>
                 <button 
                   onClick={() => setView('board')}
-                  className={`px-3 py-2 rounded-lg transition-all flex items-center gap-2 font-medium text-sm ${
+                  className={`px-2.5 py-1.5 rounded-md transition-all flex items-center gap-1.5 font-medium text-sm ${
                     view === 'board' 
-                      ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-md' 
+                      ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-sm' 
                       : 'text-gray-600 hover:bg-white hover:shadow-sm'
                   }`}
                   title="Widok tablicy"
                 >
-                  <Kanban size={18} weight="bold" />
-                  <span className="hidden sm:inline">Tablica</span>
+                  <Kanban size={16} weight="bold" />
+                  <span className="hidden md:inline">Tablica</span>
                 </button>
               </div>
             </div>
             
-            <div className="h-8 w-px bg-gray-300 hidden lg:block" />
-            
-            {/* Filters / controls - HIDE ON MOBILE, show from md (≥768px) */}
-            <div className="hidden md:flex items-center gap-3 flex-wrap flex-1">
-              <div className="flex items-center gap-2 flex-1 min-w-[200px] lg:min-w-[240px]">
-                <SortAscending size={20} className="text-gray-500 hidden sm:inline" />
-                <select 
-                  value={sortBy} 
-                  onChange={(e) => setSortBy(e.target.value as SortType)}
-                  className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-sm font-medium hover:border-gray-300 transition-colors"
-                >
-                  <option value="date">📅 Sortuj: Data</option>
-                  <option value="priority">🚩 Sortuj: Priorytet</option>
-                  <option value="name">🔤 Sortuj: Nazwa</option>
-                </select>
-              </div>
+            {/* Middle: Compact filters - Desktop only (≥768px) */}
+            <div className="hidden md:flex items-center gap-2 flex-1 justify-center">
+              <select 
+                value={sortBy} 
+                onChange={(e) => setSortBy(e.target.value as SortType)}
+                className="px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-brand-purple transition-colors min-w-[120px] max-w-[180px]"
+              >
+                <option value="date">📅 Data</option>
+                <option value="priority">🚩 Priorytet</option>
+                <option value="name">🔤 Nazwa</option>
+              </select>
               
               {view === 'list' && (
-                <div className="flex items-center gap-2 flex-1 min-w-[200px] lg:min-w-[240px]">
-                  <select 
-                    value={groupBy} 
-                    onChange={(e) => setGroupBy(e.target.value as GroupByType)}
-                    className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-sm font-medium hover:border-gray-300 transition-colors"
-                  >
-                    <option value="none">📋 Grupuj: Brak</option>
-                    <option value="day">📅 Grupuj: Dzień</option>
-                    <option value="project">📁 Grupuj: Projekt</option>
-                    <option value="priority">🚩 Grupuj: Priorytet</option>
-                  </select>
-                </div>
+                <select 
+                  value={groupBy} 
+                  onChange={(e) => setGroupBy(e.target.value as GroupByType)}
+                  className="px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-brand-purple transition-colors min-w-[120px] max-w-[180px]"
+                >
+                  <option value="none">📋 Brak</option>
+                  <option value="day">📅 Dzień</option>
+                  <option value="project">📁 Projekt</option>
+                  <option value="priority">🚩 Priorytet</option>
+                </select>
               )}
               
-              <div className="flex items-center gap-2 flex-1 min-w-[200px] lg:min-w-[240px]">
-                <select 
-                  value={selectedProject} 
-                  onChange={(e) => setSelectedProject(e.target.value)}
-                  className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-sm font-medium hover:border-gray-300 transition-colors"
-                >
-                  <option value="all">📁 Wszystkie projekty</option>
-                  {projects.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-              </div>
+              <select 
+                value={selectedProject} 
+                onChange={(e) => setSelectedProject(e.target.value)}
+                className="px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-brand-purple transition-colors min-w-[120px] max-w-[180px]"
+              >
+                <option value="all">📁 Projekty</option>
+                {projects.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
             </div>
             
-            <div className="h-8 w-px bg-gray-300 hidden lg:block" />
-            
-             {/* Task count & smart filters CTA - Desktop only */}
-             <div className="hidden md:flex flex-col md:flex-row md:items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2 w-full md:w-auto">
-               <div className="flex items-center gap-2">
-                 <Badge variant="secondary" className="text-sm px-2 py-1 font-semibold whitespace-nowrap">
-                   {sortedTasks.length} {sortedTasks.length === 1 ? 'zadanie' : 'zadań'}
-                 </Badge>
-                 <span className="hidden lg:inline text-xs text-gray-600">
-                   Widok: {view === 'board' ? 'Tablica' : 'Lista'} · Sort: {sortLabel} · {activeProjectLabel}
-                 </span>
-               </div>
-               
-               <div className="hidden md:flex gap-2 w-auto">
-                 <select
-                   onChange={(e) => {
-                     const idx = Number(e.target.value)
-                     if (!Number.isNaN(idx) && smartViews[idx]) {
-                       smartViews[idx].apply()
-                     }
-                   }}
-                   className="flex-1 sm:flex-none px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-purple"
-                   defaultValue=""
-                 >
-                   <option value="" disabled>⚡ Szybkie widoki</option>
-                   {smartViews.map((v, idx) => (
-                     <option key={v.label} value={idx}>{v.label} — {v.desc}</option>
-                   ))}
-                 </select>
-                 
-                 <button
-                   className="sm:hidden px-3 py-2 text-sm font-semibold bg-gradient-to-r from-brand-purple to-brand-pink text-white rounded-lg shadow hover:opacity-90"
-                   onClick={() => setView(view === 'board' ? 'list' : 'board')}
-                   aria-label="Przełącz widok"
-                 >
-                   {view === 'board' ? 'Lista' : 'Tablica'}
-                 </button>
-               </div>
-             </div>
+            {/* Right: Task count badge */}
+            <div className="hidden md:block">
+              <Badge variant="secondary" className="text-xs px-2 py-1 font-semibold whitespace-nowrap">
+                {sortedTasks.length} {sortedTasks.length === 1 ? 'zadanie' : 'zadań'}
+              </Badge>
+            </div>
           </div>
         </div>
       </div>
       
       {/* Filters - Desktop only */}
       {view === 'list' && (
-        <div className="mb-6 hidden md:block">
+        <div className="mb-4 hidden md:block">
           <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterType)}>
             <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-400 pb-2">
-              <TabsList className="inline-flex w-auto min-w-full lg:w-full justify-start gap-1">
-                <TabsTrigger value="today" className="flex-shrink-0 px-4">Dziś</TabsTrigger>
-                <TabsTrigger value="tomorrow" className="flex-shrink-0 px-4">Jutro</TabsTrigger>
-                <TabsTrigger value="week" className="flex-shrink-0 px-4">Tydzień</TabsTrigger>
-                <TabsTrigger value="month" className="flex-shrink-0 px-4">Miesiąc</TabsTrigger>
-                <TabsTrigger value="overdue" className="flex-shrink-0 px-4">Przeterminowane</TabsTrigger>
-                <TabsTrigger value="unscheduled" className="flex-shrink-0 px-4">Do zaplanowania</TabsTrigger>
-                <TabsTrigger value="completed" className="flex-shrink-0 px-4">Ukończone</TabsTrigger>
+              <TabsList className="inline-flex w-auto min-w-full lg:w-full justify-start gap-1 h-9">
+                <TabsTrigger value="today" className="flex-shrink-0 text-xs px-3">Dziś</TabsTrigger>
+                <TabsTrigger value="tomorrow" className="flex-shrink-0 text-xs px-3">Jutro</TabsTrigger>
+                <TabsTrigger value="week" className="flex-shrink-0 text-xs px-3">Tydzień</TabsTrigger>
+                <TabsTrigger value="month" className="flex-shrink-0 text-xs px-3">Miesiąc</TabsTrigger>
+                <TabsTrigger value="overdue" className="flex-shrink-0 text-xs px-3">Przeterminowane</TabsTrigger>
+                
+                {/* Dropdown for more filters and smart views */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button 
+                      className="flex-shrink-0 px-2 text-xs inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium transition-colors hover:bg-gray-100 h-9 border border-transparent data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm"
+                      aria-label="Więcej opcji filtrowania"
+                    >
+                      <DotsThree size={16} weight="bold" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Filtry specjalne</DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => setFilter('unscheduled')}>
+                      Do zaplanowania
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setFilter('completed')}>
+                      Ukończone
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setFilter('all')}>
+                      Wszystkie
+                    </DropdownMenuItem>
+                    
+                    <DropdownMenuSeparator />
+                    
+                    <DropdownMenuLabel>⚡ Szybkie widoki</DropdownMenuLabel>
+                    {smartViews.map((smartView, idx) => (
+                      <DropdownMenuItem key={idx} onClick={() => smartView.apply()}>
+                        {smartView.label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </TabsList>
             </div>
           </Tabs>
@@ -1409,7 +1398,7 @@ export function TasksAssistant() {
               <select
                 value={completedRange}
                 onChange={(e) => setCompletedRange(e.target.value as CompletedRange)}
-                className="w-full sm:w-[220px] px-4 py-2 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-sm font-medium hover:border-gray-300 transition-colors"
+                className="w-full sm:w-[220px] px-3 py-1.5 border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-brand-purple text-sm font-medium hover:border-gray-300 transition-colors"
               >
                 <option value="recent">Ukończone (ostatnie 7 dni)</option>
                 <option value="all">Ukończone (wszystkie)</option>
@@ -1420,94 +1409,92 @@ export function TasksAssistant() {
                 value={completedSearch}
                 onChange={(e) => setCompletedSearch(e.target.value)}
                 placeholder="Szukaj ukończonych zadań..."
-                className="w-full sm:flex-1 px-4 py-2 border-2 border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent text-sm"
+                className="w-full sm:flex-1 px-3 py-1.5 border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-brand-purple text-sm"
               />
             </div>
           )}
         </div>
       )}
       
-      {/* Bulk Actions Bar */}
-      {view === 'list' && sortedTasks.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                checked={selectedTaskIds.size === sortedTasks.length && sortedTasks.length > 0}
-                onChange={toggleAllTasksSelection}
-                className="w-4 h-4 text-brand-purple border-gray-300 rounded focus:ring-brand-purple cursor-pointer"
-                title="Zaznacz"
-              />
-              <span className="text-sm font-medium text-gray-700">
-                {selectedTaskIds.size > 0 ? `Zaznaczono ${selectedTaskIds.size}` : 'Zaznacz'}
-              </span>
-            </div>
-            
-            {selectedTaskIds.size > 0 && (
-              <>
-                <div className="h-6 w-px bg-gray-300 hidden sm:block" />
+      {/* Bulk Actions Bar - Only show when tasks are selected */}
+      {view === 'list' && selectedTaskIds.size > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 mb-3">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <span className="text-sm text-blue-900 font-medium">
+              {selectedTaskIds.size} zaznaczonych
+            </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleBulkComplete}
+                disabled={bulkActionLoading}
+                className="gap-2 h-8 text-xs"
+              >
+                <CheckSquare size={14} weight="bold" />
+                Ukończ
+              </Button>
+              
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleBulkDelete}
+                disabled={bulkActionLoading}
+                className="gap-2 text-red-600 hover:bg-red-50 h-8 text-xs"
+              >
+                <Trash size={14} weight="bold" />
+                Usuń
+              </Button>
+              
+              <div className="flex items-center gap-2">
+                <select
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      handleBulkMove(e.target.value)
+                      e.target.value = ''
+                    }
+                  }}
+                  disabled={bulkActionLoading}
+                  className="text-xs px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-brand-purple h-8"
+                >
+                  <option value="">Przenieś...</option>
+                  <option value={format(new Date(), 'yyyy-MM-dd')}>Dziś</option>
+                  <option value={format(addDays(new Date(), 1), 'yyyy-MM-dd')}>Jutro</option>
+                  <option value={format(addDays(new Date(), 3), 'yyyy-MM-dd')}>Za 3 dni</option>
+                  <option value={format(addDays(new Date(), 7), 'yyyy-MM-dd')}>Za tydzień</option>
+                </select>
                 
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleBulkComplete}
-                    disabled={bulkActionLoading}
-                    className="gap-2"
-                  >
-                    <CheckSquare size={16} weight="bold" />
-                    Ukończ
-                  </Button>
-                  
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleBulkDelete}
-                    disabled={bulkActionLoading}
-                    className="gap-2 text-red-600 hover:bg-red-50"
-                  >
-                    <Trash size={16} weight="bold" />
-                    Usuń
-                  </Button>
-                  
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm text-gray-600">Przenieś na:</span>
-                    <select
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          handleBulkMove(e.target.value)
-                          e.target.value = ''
-                        }
-                      }}
-                      disabled={bulkActionLoading}
-                      className="text-sm px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-purple"
-                    >
-                      <option value="">Szybki wybór...</option>
-                      <option value={format(new Date(), 'yyyy-MM-dd')}>Dziś</option>
-                      <option value={format(addDays(new Date(), 1), 'yyyy-MM-dd')}>Jutro</option>
-                      <option value={format(addDays(new Date(), 3), 'yyyy-MM-dd')}>Za 3 dni</option>
-                      <option value={format(addDays(new Date(), 7), 'yyyy-MM-dd')}>Za tydzień</option>
-                    </select>
-                    
-                    <span className="text-sm text-gray-600">lub</span>
-                    
-                    <input
-                      type="date"
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          handleBulkMove(e.target.value)
-                          e.target.value = ''
-                        }
-                      }}
-                      disabled={bulkActionLoading}
-                      className="text-sm px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-purple"
-                      placeholder="Wybierz datę"
-                    />
-                  </div>
-                </div>
-              </>
-            )}
+                <input
+                  type="date"
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      handleBulkMove(e.target.value)
+                      e.target.value = ''
+                    }
+                  }}
+                  disabled={bulkActionLoading}
+                  className="text-xs px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-brand-purple h-8"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Checkbox for selecting all - Only show when there are tasks and nothing selected yet */}
+      {view === 'list' && sortedTasks.length > 0 && selectedTaskIds.size === 0 && (
+        <div className="bg-white rounded-lg border border-gray-200 px-3 py-2 mb-3">
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              checked={selectedTaskIds.size === sortedTasks.length && sortedTasks.length > 0}
+              onChange={toggleAllTasksSelection}
+              className="w-4 h-4 text-brand-purple border-gray-300 rounded focus:ring-brand-purple cursor-pointer"
+              title="Zaznacz wszystkie"
+            />
+            <span className="text-sm font-medium text-gray-700">
+              Zaznacz wszystkie
+            </span>
           </div>
         </div>
       )}
