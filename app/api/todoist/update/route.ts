@@ -6,6 +6,7 @@ interface TodoistUpdatePayload {
   priority?: number
   project_id?: string
   labels?: string[]
+  due_string?: string
   due_date?: string | null  // ✅ Only due_date is accepted for updates (YYYY-MM-DD)
 }
 
@@ -27,11 +28,12 @@ export async function POST(req: Request) {
     if (updates.project_id !== undefined) updatePayload.project_id = updates.project_id
     if (updates.labels !== undefined) updatePayload.labels = updates.labels
     
+    // ✅ FIX: Handle due date - use due_string for setting and clearing
     // ✅ POPRAWKA: Handle due date properly - use due_date (not due_string) for updates
     if (updates.due !== undefined) {
       if (updates.due === null) {
-        // Remove due date
-        updatePayload.due_date = null
+        // Remove due date - Todoist API requires "no date" string
+        updatePayload.due_string = "no date"
       } else if (typeof updates.due === 'string') {
         // Validate format YYYY-MM-DD
         if (/^\d{4}-\d{2}-\d{2}$/.test(updates.due)) {
