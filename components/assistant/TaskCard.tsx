@@ -336,7 +336,6 @@ export function TaskCard({
                 <Badge 
                   variant="outline" 
                   className="gap-1 text-xs cursor-pointer" 
-                  onClick={openDatePicker}
                   onPointerDown={openDatePicker}
                 >
                   <CalendarBlank size={12} className="md:hidden" />
