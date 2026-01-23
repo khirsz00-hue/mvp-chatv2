@@ -131,8 +131,9 @@ export function DayAssistantV2StatusBar({
             className="flex items-center gap-1 px-2 py-1 hover:bg-slate-50 rounded transition-all min-h-[44px]"
             onClick={onEditMode}
             onKeyDown={(e) => handleKeyDown(e, onEditMode)}
+            aria-label={`Tryb pracy: ${MODE_LABELS[workMode]}`}
           >
-            <span className="text-sm">🎯</span>
+            <span className="text-sm" aria-hidden="true">🎯</span>
           </button>
 
           {/* Sync */}
