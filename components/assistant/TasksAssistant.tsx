@@ -1130,48 +1130,6 @@ export function TasksAssistant() {
     )
   }
   
-  // Unified API mode - Show optional Todoist connection
-  if (!token && USE_UNIFIED_API) {
-    const handleOAuthConnect = () => {
-      // Redirect to our API endpoint which handles OAuth properly
-      window.location.href = '/api/todoist/auth'
-    }
-    
-    return (
-      <div className="space-y-6">
-        <h1 className="text-3xl font-bold">Zarządzanie Zadaniami</h1>
-        <Card className="p-8 text-center space-y-4">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-brand-purple/10 to-brand-pink/10 flex items-center justify-center mb-4">
-            <CalendarBlank size={32} className="text-brand-purple" />
-          </div>
-          <h2 className="text-xl font-semibold">Twoje Zadania</h2>
-          <p className="text-gray-600 max-w-md mx-auto">
-            Zarządzaj swoimi zadaniami lokalnie. Możesz opcjonalnie połączyć Todoist dla synchronizacji.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center items-center mt-4">
-            <Button 
-              onClick={() => setShowUniversalModal(true)}
-              className="gap-2"
-              size="lg"
-            >
-              <Plus size={20} />
-              Dodaj zadanie
-            </Button>
-            <Button 
-              onClick={handleOAuthConnect}
-              variant="outline"
-              className="gap-2"
-              size="lg"
-            >
-              <CalendarBlank size={20} />
-              Połącz Todoist (opcjonalnie)
-            </Button>
-          </div>
-        </Card>
-      </div>
-    )
-  }
-  
   return (
     <div className="space-y-6 mobile-bottom-bar-spacing md:pb-6">{/* Extra bottom padding on mobile for fixed bottom bar */}
       {/* Active Timer Bar */}
