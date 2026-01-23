@@ -22,6 +22,7 @@ import { MeetingsSection } from './MeetingsSection'
 // Decision Log removed from UI
 import { MorningReviewModal } from './MorningReviewModal'
 import { DayAssistantV2TaskCard } from './DayAssistantV2TaskCard'
+import { HelpMeModal } from './HelpMeModal'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { useTaskTimer } from '@/hooks/useTaskTimer'
 import Button from '@/components/ui/Button'
@@ -63,6 +64,8 @@ export function DayAssistantV2View() {
   const [workMode, setWorkMode] = useState<WorkMode>('standard')
   const [showUniversalModal, setShowUniversalModal] = useState(false)
   const [editingTask, setEditingTask] = useState<TestDayTask | null>(null)
+  const [showHelpModal, setShowHelpModal] = useState(false)
+  const [helpTask, setHelpTask] = useState<TestDayTask | null>(null)
   const [showWorkModeModal, setShowWorkModeModal] = useState(false)
   const [showWorkHoursModal, setShowWorkHoursModal] = useState(false)
   const [workHoursStart, setWorkHoursStart] = useState('09:00')
@@ -315,8 +318,11 @@ export function DayAssistantV2View() {
   }
 
   const handleHelp = async (taskId: string) => {
-    // Open "Help me" modal or decompose task
-    toast.info('Funkcja "Pomoc" w przygotowaniu')
+    const task = tasks.find(t => t.id === taskId)
+    if (task) {
+      setHelpTask(task)
+      setShowHelpModal(true)
+    }
   }
 
   const handleOpenDetails = (taskId: string) => {
@@ -1041,6 +1047,27 @@ export function DayAssistantV2View() {
         defaultDate={selectedDate}
         onSave={handleTaskSave}
       />
+
+      {/* Help Me Modal */}
+      {helpTask && (
+        <HelpMeModal
+          open={showHelpModal}
+          onClose={() => {
+            setShowHelpModal(false)
+            setHelpTask(null)
+          }}
+          task={{
+            id: helpTask.id,
+            title: helpTask.title,
+            description: helpTask.description
+          }}
+          onSuccess={() => {
+            // Reload tasks to show new subtasks
+            loadData()
+            toast.success('✅ Kroki utworzone pomyślnie!')
+          }}
+        />
+      )}
 
       {/* Work Hours Modal */}
       <WorkHoursModal
