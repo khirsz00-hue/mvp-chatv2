@@ -7,6 +7,7 @@ interface TodoistUpdatePayload {
   project_id?: string
   labels?: string[]
   due_string?: string
+  due_date?: string | null  // ✅ Only due_date is accepted for updates (YYYY-MM-DD)
 }
 
 export async function POST(req: Request) {
@@ -28,6 +29,7 @@ export async function POST(req: Request) {
     if (updates.labels !== undefined) updatePayload.labels = updates.labels
     
     // ✅ FIX: Handle due date - use due_string for setting and clearing
+    // ✅ POPRAWKA: Handle due date properly - use due_date (not due_string) for updates
     if (updates.due !== undefined) {
       if (updates.due === null) {
         // Remove due date - Todoist API requires "no date" string
@@ -35,21 +37,21 @@ export async function POST(req: Request) {
       } else if (typeof updates.due === 'string') {
         // Validate format YYYY-MM-DD
         if (/^\d{4}-\d{2}-\d{2}$/.test(updates.due)) {
-          updatePayload.due_string = updates.due
+          updatePayload.due_date = updates.due
         } else {
           console.warn('⚠️ [Todoist Update] Invalid due date format:', updates.due)
         }
       } else if (updates.due && typeof updates.due === 'object' && updates.due.date) {
         // Extract date from object
         if (/^\d{4}-\d{2}-\d{2}$/.test(updates.due.date)) {
-          updatePayload.due_string = updates.due.date
+          updatePayload.due_date = updates.due.date
         } else {
-          console.warn('⚠️ [Todoist Update] Invalid due date format in object:', updates.due.date)
+          console.warn('⚠️ [Todoist Update] Invalid due date format:', updates.due.date)
         }
       }
     }
 
-    console.log('📝 [Todoist Update] Payload:', JSON.stringify(updatePayload))
+    console.log('📝 [Todoist Update] Sending payload:', JSON.stringify(updatePayload))
 
     const res = await fetch(`https://api.todoist.com/rest/v2/tasks/${id}`, {
       method: 'POST',
@@ -62,8 +64,8 @@ export async function POST(req: Request) {
 
     if (!res.ok) {
       const errorText = await res.text()
-      console.error('❌ Błąd Todoist UPDATE:', errorText)
-      console.error('❌ Failed payload was:', JSON.stringify(updatePayload))
+      console.error('❌ [Todoist Update] API error:', errorText)
+      console.error('❌ [Todoist Update] Failed payload:', JSON.stringify(updatePayload))
       return NextResponse.json({ error: 'Nie udało się zaktualizować zadania' }, { status: res.status })
     }
 
@@ -72,7 +74,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, task: updatedTask })
   } catch (err: any) {
-    console.error('❌ UPDATE error:', err)
+    console.error('❌ [Todoist Update] Error:', err)
     return NextResponse.json({ error: err.message || 'Błąd serwera' }, { status: 500 })
   }
 }
