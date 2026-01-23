@@ -828,7 +828,7 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
-        className="w-full max-w-[95vw] sm:max-w-xl md:max-w-2xl max-h-[85vh] sm:max-h-[90vh] p-3 sm:p-6 overflow-y-auto pb-20 sm:pb-6"
+        className="w-full max-w-[92vw] sm:max-w-xl md:max-w-2xl max-h-[75vh] sm:max-h-[82vh] md:max-h-[85vh] p-3 sm:p-5 overflow-y-auto pb-20 sm:pb-6"
         aria-labelledby="universal-task-modal-title"
       >
         <DialogHeader>
