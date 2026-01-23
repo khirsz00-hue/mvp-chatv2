@@ -34,8 +34,8 @@ const Badge = React.forwardRef<HTMLDivElement, BadgeProps>(
           if (!isActivateKey) return
           e.preventDefault()
           if (props.onClick) props.onClick(e)
-          if (props.onPointerDown) props.onPointerDown(e as unknown as React.PointerEvent<HTMLDivElement>)
-          if (props.onKeyDown && props.onKeyDown !== e.currentTarget.onkeydown) props.onKeyDown(e)
+          if (props.onPointerDown) props.onPointerDown(e as unknown as React.SyntheticEvent<HTMLDivElement>)
+          if (props.onKeyDown) props.onKeyDown(e)
         }}
         {...props}
       />
