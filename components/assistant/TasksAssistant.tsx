@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Card from '@/components/ui/Card'
@@ -52,6 +52,9 @@ type CompletedRange = 'recent' | 'all'
 type SortType = 'date' | 'priority' | 'name'
 type GroupByType = 'none' | 'day' | 'project' | 'priority'
 
+// Todoist sync interval (2 minutes)
+const TODOIST_SYNC_INTERVAL_MS = 2 * 60 * 1000
+
 /**
  * Formats elapsed time in seconds to HH:MM:SS format
  * @param seconds - Total elapsed seconds
@@ -82,7 +85,7 @@ export function TasksAssistant() {
   const [view, setView] = useState<ViewType>('list')
   const [boardGrouping, setBoardGrouping] = useState<BoardGrouping>('day')
   const [filters, setFilters] = useState<FiltersState>({})
-  const [filter, setFilter] = useState<FilterType>('all')
+  const [filter, setFilter] = useState<FilterType>('today')  // ✅ Default to "Dziś"
   const [completedRange, setCompletedRange] = useState<CompletedRange>('recent')
   const [completedSearch, setCompletedSearch] = useState('')
   const [sortBy, setSortBy] = useState<SortType>('date')
@@ -102,6 +105,9 @@ export function TasksAssistant() {
   
   // Feature flag for unified task API (Phase 2B)
   const USE_UNIFIED_API = process.env.NEXT_PUBLIC_USE_UNIFIED_TASKS === 'true'
+  
+  // Ref for cleanup in auto-sync effect
+  const syncCleanupRef = useRef(true)
   
   const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
 
@@ -264,26 +270,81 @@ export function TasksAssistant() {
     }
   }, [showToast])
   
-  // Fetch tasks
+  // Fetch tasks initially
   useEffect(() => {
     // In unified API mode without token, always fetch local tasks
     // In legacy mode, require token
     if (!token && !USE_UNIFIED_API) return
     
+    // Initial fetch on mount
     fetchTasks()
     
-    // Poll every 45 seconds
-    const interval = setInterval(() => {
-      fetchTasks()
-    }, 45000)
-    
-    return () => clearInterval(interval)
+    // Note: Periodic fetching is handled by the auto-sync effect below for Todoist users
+    // For non-Todoist users, we poll every 45 seconds
+    if (!token) {
+      const interval = setInterval(() => {
+        fetchTasks()
+      }, 45000)
+      
+      return () => clearInterval(interval)
+    }
   }, [token, fetchTasks, USE_UNIFIED_API])
   
   // Fetch projects
   useEffect(() => {
     fetchProjects()
   }, [fetchProjects])
+  
+  // Auto-sync with Todoist on mount and periodically
+  useEffect(() => {
+    if (!token) return
+    
+    const triggerSync = async () => {
+      if (!syncCleanupRef.current) return  // Skip if component unmounted
+      
+      try {
+        console.log('🔄 [TasksAssistant] Auto-syncing with Todoist...')
+        
+        const { data } = await supabase.auth.getSession()
+        if (!data?.session || !syncCleanupRef.current) return
+        
+        const response = await fetch('/api/todoist/sync', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${data.session.access_token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        if (!syncCleanupRef.current) return  // Check again before proceeding
+        
+        if (response.ok) {
+          console.log('✅ [TasksAssistant] Todoist sync completed')
+          // Refresh tasks after sync
+          if (syncCleanupRef.current) {
+            await fetchTasks()
+          }
+        } else {
+          console.warn('⚠️ [TasksAssistant] Todoist sync failed:', response.status)
+        }
+      } catch (error) {
+        if (syncCleanupRef.current) {
+          console.error('❌ [TasksAssistant] Sync error:', error)
+        }
+      }
+    }
+    
+    // Sync on mount
+    triggerSync()
+    
+    // Sync every 2 minutes
+    const syncInterval = setInterval(triggerSync, TODOIST_SYNC_INTERVAL_MS)
+    
+    return () => {
+      syncCleanupRef.current = false
+      clearInterval(syncInterval)
+    }
+  }, [token, fetchTasks])
   
   // Monitor active timer/pomodoro
   useEffect(() => {
