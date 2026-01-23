@@ -183,7 +183,7 @@ export function DayAssistantV2StatusBar({
               id="project-filter-mobile"
               value={selectedProject || ''}
               onChange={(e) => onProjectChange(e.target.value || null)}
-              aria-label="Filter by project"
+              aria-label="Filtruj według projektu"
               className="w-full text-xs font-medium bg-slate-50 border border-slate-200 rounded px-2 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer min-h-[44px]"
             >
               <option value="">Wszystkie projekty</option>
@@ -275,7 +275,7 @@ export function DayAssistantV2StatusBar({
                 id="project-filter"
                 value={selectedProject || ''}
                 onChange={(e) => onProjectChange(e.target.value || null)}
-                aria-label="Filter by project"
+                aria-label="Filtruj według projektu"
                 className="text-xs font-medium bg-transparent border-0 p-0 pr-4 focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer text-slate-800 hover:text-indigo-600 transition-colors rounded min-h-[20px]"
               >
                 <option value="">Wszystkie projekty</option>
@@ -297,7 +297,7 @@ export function DayAssistantV2StatusBar({
           onClick={handleSync}
           disabled={isSyncing}
           className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-slate-50 transition-all flex-shrink-0 text-slate-600 hover:text-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
-          title="Sync with Todoist"
+          title="Synchronizuj z Todoist"
         >
           <ArrowsClockwise 
             size={14} 
