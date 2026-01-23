@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Card from '@/components/ui/Card'
@@ -51,6 +51,9 @@ type FilterType = 'today' | 'tomorrow' | 'week' | 'month' | 'overdue' | 'unsched
 type CompletedRange = 'recent' | 'all'
 type SortType = 'date' | 'priority' | 'name'
 type GroupByType = 'none' | 'day' | 'project' | 'priority'
+
+// Todoist sync interval (2 minutes)
+const TODOIST_SYNC_INTERVAL_MS = 2 * 60 * 1000
 
 /**
  * Formats elapsed time in seconds to HH:MM:SS format
@@ -289,40 +292,38 @@ export function TasksAssistant() {
   useEffect(() => {
     if (!token) return
     
-    // Sync interval constant (2 minutes)
-    const SYNC_INTERVAL_MS = 2 * 60 * 1000
-    let isActive = true  // Flag to prevent operations after unmount
+    const isActiveRef = { current: true }  // Flag to prevent operations after unmount
     
     const triggerSync = async () => {
-      if (!isActive) return  // Skip if component unmounted
+      if (!isActiveRef.current) return  // Skip if component unmounted
       
       try {
         console.log('🔄 [TasksAssistant] Auto-syncing with Todoist...')
         
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session || !isActive) return
+        const { data } = await supabase.auth.getSession()
+        if (!data?.session || !isActiveRef.current) return
         
         const response = await fetch('/api/todoist/sync', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${session.access_token}`,
+            'Authorization': `Bearer ${data.session.access_token}`,
             'Content-Type': 'application/json'
           }
         })
         
-        if (!isActive) return  // Check again before proceeding
+        if (!isActiveRef.current) return  // Check again before proceeding
         
         if (response.ok) {
           console.log('✅ [TasksAssistant] Todoist sync completed')
           // Refresh tasks after sync
-          if (isActive) {
+          if (isActiveRef.current) {
             await fetchTasks()
           }
         } else {
           console.warn('⚠️ [TasksAssistant] Todoist sync failed:', response.status)
         }
       } catch (error) {
-        if (isActive) {
+        if (isActiveRef.current) {
           console.error('❌ [TasksAssistant] Sync error:', error)
         }
       }
@@ -332,10 +333,10 @@ export function TasksAssistant() {
     triggerSync()
     
     // Sync every 2 minutes
-    const syncInterval = setInterval(triggerSync, SYNC_INTERVAL_MS)
+    const syncInterval = setInterval(triggerSync, TODOIST_SYNC_INTERVAL_MS)
     
     return () => {
-      isActive = false
+      isActiveRef.current = false
       clearInterval(syncInterval)
     }
   }, [token, fetchTasks])
