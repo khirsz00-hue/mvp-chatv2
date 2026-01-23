@@ -87,8 +87,8 @@ export function WorkModeModal({
                 `}
               >
                 <div className="flex items-start justify-between mb-2">
-                  <div className="min-w-0 flex-1">
-                    <h3 className="text-base md:text-lg font-bold text-gray-900 truncate">
+                  <div className="min-w-0 flex-1 pr-2">
+                    <h3 className="text-base md:text-lg font-bold text-gray-900 break-words">
                       {mode.name}
                     </h3>
                     <p className="text-xs md:text-sm text-gray-600 mt-0.5">{mode.description}</p>

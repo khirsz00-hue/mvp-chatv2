@@ -34,6 +34,9 @@ import { useMeetingNotifications } from '@/hooks/useMeetingNotifications'
 import { MeetingNotificationBanner } from './MeetingNotificationBanner'
 
 const TOP_TASKS_COUNT = 3
+const QUICK_WIN_DURATION_MAX = 20  // Quick wins mode: tasks under 20 minutes
+const LOW_FOCUS_MAX_COGNITIVE_LOAD = 2  // Low focus mode: cognitive load <= 2
+const HYPERFOCUS_MIN_COGNITIVE_LOAD = 4  // Hyperfocus mode: cognitive load >= 4
 const isValidTimeFormat = (value: string) => /^\d{2}:\d{2}$/.test(value)
 
 interface TaskStats {
@@ -607,11 +610,11 @@ export function DayAssistantV2View() {
     
     // Filter by work mode
     if (workMode === 'low_focus') {
-      return task.cognitive_load <= 2
+      return task.cognitive_load <= LOW_FOCUS_MAX_COGNITIVE_LOAD
     } else if (workMode === 'hyperfocus') {
-      return task.cognitive_load >= 4
+      return task.cognitive_load >= HYPERFOCUS_MIN_COGNITIVE_LOAD
     } else if (workMode === 'quick_wins') {
-      return task.estimate_min < 20
+      return task.estimate_min < QUICK_WIN_DURATION_MAX
     }
     return true // standard mode shows all
   })

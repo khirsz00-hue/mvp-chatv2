@@ -111,6 +111,7 @@ export function DayAssistantV2StatusBar({
             className="flex items-center gap-1 px-2 py-1 hover:bg-slate-50 rounded transition-all min-w-0 min-h-[44px]"
             onClick={onEditWorkHours}
             onKeyDown={(e) => handleKeyDown(e, onEditWorkHours)}
+            aria-label={`Godziny pracy od ${workHoursStart} do ${workHoursEnd}`}
           >
             <span className="text-sm">🕐</span>
             <span className="text-xs font-semibold text-slate-700 whitespace-nowrap">
@@ -119,8 +120,8 @@ export function DayAssistantV2StatusBar({
           </button>
 
           {/* Today's Flow */}
-          <div className="flex items-center gap-1 px-2 py-1 min-w-0">
-            <span className="text-xs font-semibold text-slate-700 whitespace-nowrap">
+          <div className="flex items-center gap-1 px-2 py-1 min-w-0" aria-label={`Ukończone zadania: ${completedCount}, zaplanowane: ${scheduledCount}`}>
+            <span className="text-xs font-semibold text-slate-700 whitespace-nowrap" aria-hidden="true">
               ✅ {completedCount} / 📋 {scheduledCount}
             </span>
           </div>

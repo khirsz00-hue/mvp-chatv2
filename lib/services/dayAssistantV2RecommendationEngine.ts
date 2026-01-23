@@ -48,6 +48,8 @@ const DEFAULT_FOCUS = 3
 const DEFAULT_COGNITIVE_LOAD = 2
 const LOW_FOCUS_MAX_COGNITIVE_LOAD = 2  // Low focus mode shows tasks with cognitive load ≤ 2
 const HYPERFOCUS_MIN_COGNITIVE_LOAD = 4  // Hyperfocus mode shows tasks with cognitive load ≥ 4
+const QUICK_WIN_DURATION_MAX = 20  // Quick wins: tasks under 20 minutes
+const SHORT_TASK_DURATION_MAX = 40  // Short tasks: tasks under 40 minutes
 const QUICK_WIN_BONUS = 15  // Bonus points for quick win tasks (< 20 minutes)
 const SHORT_TASK_BONUS = 5  // Bonus points for reasonably short tasks (< 40 minutes in standard mode)
 
@@ -480,11 +482,11 @@ export function calculateTaskScoreV3(
   }
   
   // 7. Short task bonus (Standard mode or Quick Wins mode)
-  if (context.workMode === 'quick_wins' && task.estimate_min < 20) {
+  if (context.workMode === 'quick_wins' && task.estimate_min < QUICK_WIN_DURATION_MAX) {
     // Quick wins mode: extra bonus for very short tasks
     score += QUICK_WIN_BONUS
     reasoning.push(`⚡ Quick Win (${task.estimate_min}min): +${QUICK_WIN_BONUS}`)
-  } else if (context.workMode === 'standard' && task.estimate_min <= 40) {
+  } else if (context.workMode === 'standard' && task.estimate_min <= SHORT_TASK_DURATION_MAX) {
     // Standard mode: small bonus for reasonably short tasks
     score += SHORT_TASK_BONUS
     reasoning.push(`⏱ Krótkie zadanie (${task.estimate_min}min): +${SHORT_TASK_BONUS}`)
@@ -535,7 +537,7 @@ export function scoreAndSortTasksV3(
     filteredTasks = filteredTasks.filter(t => (t.cognitive_load || DEFAULT_COGNITIVE_LOAD) >= HYPERFOCUS_MIN_COGNITIVE_LOAD)
   } else if (workMode === 'quick_wins') {
     // Quick wins mode: short tasks only (< 20 minutes)
-    filteredTasks = filteredTasks.filter(t => (t.estimate_min || 0) < 20)
+    filteredTasks = filteredTasks.filter(t => (t.estimate_min || 0) < QUICK_WIN_DURATION_MAX)
   }
   // Standard mode: no filtering by cognitive load or duration
   
