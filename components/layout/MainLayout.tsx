@@ -327,8 +327,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const handleNavigate = (view: AssistantId) => {
     if (journalRequired && view !== 'journal') {
       toast.error('Zapisz dzisiejszy wpis w dzienniku, aby przejść dalej')
-      setActiveView('journal')
-      return
     }
     setActiveView(view)
     setIsMobileMenuOpen(false) // Close mobile menu after navigation
