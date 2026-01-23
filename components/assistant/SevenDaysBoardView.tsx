@@ -406,7 +406,7 @@ export function SevenDaysBoardView({
             onClick={scrollLeft}
             disabled={!canScrollLeft}
             className={cn(
-              'flex absolute left-2 sm:left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 items-center justify-center bg-white rounded-full shadow-lg border-2 border-gray-200 transition-all hover:shadow-xl hover:scale-110',
+              'flex absolute left-2 sm:left-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 sm:w-10 sm:h-10 items-center justify-center bg-white/95 backdrop-blur-sm rounded-full shadow-xl border-2 border-gray-200 transition-all hover:shadow-xl hover:scale-110',
               !canScrollLeft && 'opacity-0 pointer-events-none'
             )}
             aria-label="Scroll left"
@@ -419,7 +419,7 @@ export function SevenDaysBoardView({
             onClick={scrollRight}
             disabled={!canScrollRight}
             className={cn(
-              'flex absolute right-2 sm:right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 items-center justify-center bg-white rounded-full shadow-lg border-2 border-gray-200 transition-all hover:shadow-xl hover:scale-110',
+              'flex absolute right-2 sm:right-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 sm:w-10 sm:h-10 items-center justify-center bg-white/95 backdrop-blur-sm rounded-full shadow-xl border-2 border-gray-200 transition-all hover:shadow-xl hover:scale-110',
               !canScrollRight && 'opacity-0 pointer-events-none'
             )}
             aria-label="Scroll right"
@@ -439,7 +439,7 @@ export function SevenDaysBoardView({
             {columns.map(day => (
               <div 
                 key={day.id} 
-                className="w-[78vw] sm:w-[70vw] md:w-72 lg:w-80 xl:w-80 flex-shrink-0 snap-start"
+                className="w-[85vw] sm:w-[45vw] md:w-[32vw] lg:w-80 xl:w-96 flex-shrink-0 snap-start"
               >
                 <DayColumnComponent
                   day={day}
