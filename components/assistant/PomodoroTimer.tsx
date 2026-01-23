@@ -98,7 +98,7 @@ export function PomodoroTimer({ open, onOpenChange, taskId, taskTitle }: Pomodor
     }
   }, [taskId, taskTitle])
   
-  const handlePhaseComplete = useCallback((currentState: PomodoroState) => {
+  const handlePhaseComplete = useCallback(async (currentState: PomodoroState) => {
     // Play notification sound
     playNotification()
     
@@ -124,12 +124,10 @@ export function PomodoroTimer({ open, onOpenChange, taskId, taskTitle }: Pomodor
     if (currentState.phase === 'work') {
       newCycleCount++
       
-      // Save completed work session to history
+      // Save completed work session to history using unified service
       if (currentState.taskId) {
         try {
-          const sessions = JSON.parse(localStorage.getItem('pomodoroSessions') || '[]')
-          // Use actual elapsed time if workSessionStartTime is tracked, otherwise fall back to WORK_DURATION
-          // Note: Fallback is used for sessions that started before this tracking was added
+          const { saveTimeSession } = await import('@/lib/services/timeTrackingService')
           const actualDuration = currentState.workSessionStartTime 
             ? Math.floor((Date.now() - currentState.workSessionStartTime) / 1000)
             : WORK_DURATION
@@ -137,15 +135,15 @@ export function PomodoroTimer({ open, onOpenChange, taskId, taskTitle }: Pomodor
             ? new Date(currentState.workSessionStartTime).toISOString()
             : new Date(Date.now() - (actualDuration * 1000)).toISOString()
           
-          sessions.push({
-            taskId: currentState.taskId,
-            taskTitle: currentState.taskTitle,
-            startTime,
-            endTime: new Date().toISOString(),
-            durationSeconds: actualDuration,
-            phase: 'work'
+          await saveTimeSession({
+            task_id: currentState.taskId,
+            task_title: currentState.taskTitle || '',
+            started_at: startTime,
+            ended_at: new Date().toISOString(),
+            duration_seconds: actualDuration,
+            session_type: 'pomodoro',
+            task_source: 'assistant_tasks'
           })
-          localStorage.setItem('pomodoroSessions', JSON.stringify(sessions))
         } catch (err) {
           console.error('Error saving pomodoro session:', err)
         }
