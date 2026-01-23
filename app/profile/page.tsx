@@ -8,7 +8,8 @@ import Badge from '@/components/ui/Badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs'
 import { useToast } from '@/components/ui/Toast'
 import { useRouter } from 'next/navigation'
-import { User, Notebook, Sparkle, CreditCard, Link as LinkIcon, CheckCircle, XCircle, LockKey } from '@phosphor-icons/react'
+import { User, Notebook, Sparkle, CreditCard, Link as LinkIcon, CheckCircle, XCircle, LockKey, GearSix } from '@phosphor-icons/react'
+import { Checkbox } from '@/components/ui/checkbox'
 import Input from '@/components/ui/Input'
 import { MIN_PASSWORD_LENGTH, AUTH_PROVIDER_NAMES, type AuthProvider } from '@/lib/authConstants'
 import { format } from 'date-fns'
@@ -34,17 +35,16 @@ interface JournalEntry {
   created_at: string
 }
 
-  interface AIInsight {
-    id: string
-    insight_type: string
-    title: string
-    content: string
-    created_at: string
-  }
-
-  const [journalGuardDisabled, setJournalGuardDisabled] = useState(false)
+interface AIInsight {
+  id: string
+  insight_type: string
+  title: string
+  content: string
+  created_at: string
+}
 
 export default function ProfilePage() {
+  const [journalGuardDisabled, setJournalGuardDisabled] = useState(false)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([])
   const [insights, setInsights] = useState<AIInsight[]>([])
