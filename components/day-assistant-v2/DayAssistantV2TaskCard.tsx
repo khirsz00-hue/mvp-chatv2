@@ -3,7 +3,7 @@
  * Part of Day Assistant V2 Complete Overhaul
  */
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { TestDayTask, TestDaySubtask } from '@/lib/types/dayAssistantV2'
 import { Play, DotsThreeVertical, Tag, Brain, Calendar } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
@@ -65,14 +65,7 @@ export function DayAssistantV2TaskCard({
   const priorityBorderColor = getPriorityBorderColor(task.priority)
   const [firstSubtask, setFirstSubtask] = useState<TestDaySubtask | null>(null)
 
-  // Fetch first subtask for full-size cards (not compact or overflow)
-  useEffect(() => {
-    if (!isCompact && !isOverflow) {
-      fetchFirstSubtask()
-    }
-  }, [task.id, isCompact, isOverflow])
-
-  const fetchFirstSubtask = async () => {
+  const fetchFirstSubtask = useCallback(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
@@ -94,7 +87,14 @@ export function DayAssistantV2TaskCard({
     } catch (error) {
       console.error('[TaskCard] Error fetching subtasks:', error)
     }
-  }
+  }, [task.id])
+
+  // Fetch first subtask for full-size cards (not compact or overflow)
+  useEffect(() => {
+    if (!isCompact && !isOverflow) {
+      fetchFirstSubtask()
+    }
+  }, [task.id, isCompact, isOverflow, fetchFirstSubtask])
 
   // Overflow tasks have special styling
   if (isOverflow) {
