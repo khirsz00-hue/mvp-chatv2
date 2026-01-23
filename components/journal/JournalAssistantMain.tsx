@@ -381,6 +381,15 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
 
       await saveEntry(entryData)
       showToast('Wpis zapisany', 'success')
+
+      // Zapisz znacznik ukończenia dzisiejszego wpisu i powiadom layout
+      try {
+        const today = new Date().toISOString().split('T')[0]
+        localStorage.setItem(`journal_completed_${today}`, 'true')
+        window.dispatchEvent(new CustomEvent('journal-saved'))
+      } catch {
+        // ignore storage errors
+      }
     } catch (error: any) {
       console.error('Error saving entry:', error)
       showToast('Błąd zapisywania wpisu', 'error')

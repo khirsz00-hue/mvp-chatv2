@@ -34,13 +34,15 @@ interface JournalEntry {
   created_at: string
 }
 
-interface AIInsight {
-  id: string
-  insight_type: string
-  title: string
-  content: string
-  created_at: string
-}
+  interface AIInsight {
+    id: string
+    insight_type: string
+    title: string
+    content: string
+    created_at: string
+  }
+
+  const [journalGuardDisabled, setJournalGuardDisabled] = useState(false)
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
@@ -103,6 +105,13 @@ export default function ProfilePage() {
 
       if (insightsData) {
         setInsights(insightsData)
+      }
+
+      // Load local preference for disabling journal guard
+      try {
+        setJournalGuardDisabled(localStorage.getItem('journal_guard_disabled') === 'true')
+      } catch {
+        setJournalGuardDisabled(false)
       }
     } catch (error) {
       console.error('Error loading data:', error)
@@ -307,6 +316,10 @@ export default function ProfilePage() {
               <Notebook size={20} className="mr-2" />
               Wpisy z dziennika ({journalEntries.length})
             </TabsTrigger>
+            <TabsTrigger value="settings">
+              <GearSix size={20} className="mr-2" />
+              Ustawienia
+            </TabsTrigger>
             <TabsTrigger value="insights">
               <Sparkle size={20} className="mr-2" />
               Wnioski AI ({insights.length})
@@ -349,6 +362,35 @@ export default function ProfilePage() {
                     ))}
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="settings">
+            <Card>
+              <CardHeader>
+                <CardTitle>Ustawienia dziennika</CardTitle>
+                <CardDescription>
+                  Kontroluj zachowanie dziennika podczas startu dnia
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-semibold">Wymagaj uruchomienia dziennika codziennie</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Jeśli włączone, aplikacja otwiera dziennik na start dnia i blokuje nawigację dopóki nie zapiszesz wpisu.
+                    </p>
+                  </div>
+                  <Checkbox
+                    checked={journalGuardDisabled}
+                    onCheckedChange={handleToggleJournalGuard}
+                    aria-label="Wyłącz wymaganie dziennika na start"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Odznacz, aby przywrócić automatyczne otwieranie dziennika na początku dnia.
+                </p>
               </CardContent>
             </Card>
           </TabsContent>
@@ -627,3 +669,17 @@ export default function ProfilePage() {
     </div>
   )
 }
+  const handleToggleJournalGuard = (checked: boolean) => {
+    try {
+      localStorage.setItem('journal_guard_disabled', checked ? 'true' : 'false')
+      setJournalGuardDisabled(checked)
+      showToast(
+        checked
+          ? 'Wymaganie dziennika na start dnia wyłączone'
+          : 'Wymaganie dziennika na start dnia włączone',
+        'success'
+      )
+    } catch {
+      showToast('Nie udało się zapisać ustawienia', 'error')
+    }
+  }
