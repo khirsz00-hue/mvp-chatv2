@@ -50,6 +50,31 @@ export async function POST(req: Request) {
         }
       }
     }
+    
+    // ✅ FIX: Handle due_string if passed directly (convert YYYY-MM-DD to due_date)
+    // Todoist API requires due_date for date-only format, due_string for natural language
+    if (updates.due_string !== undefined) {
+      if (typeof updates.due_string === 'string') {
+        // Check if it's in YYYY-MM-DD format - should use due_date instead
+        if (/^\d{4}-\d{2}-\d{2}$/.test(updates.due_string)) {
+          console.warn('⚠️ [Todoist Update] Converting due_string with date format to due_date:', updates.due_string)
+          updatePayload.due_date = updates.due_string
+          // Remove due_string to avoid sending both
+          delete updatePayload.due_string
+        } else {
+          // Natural language string like "today", "tomorrow", "no date"
+          updatePayload.due_string = updates.due_string
+        }
+      }
+    }
+    
+    // Validate that we have at least one field to update
+    if (Object.keys(updatePayload).length === 0) {
+      console.error('❌ [Todoist Update] No valid update fields provided')
+      return NextResponse.json({ 
+        error: 'No valid update fields provided. Please specify at least one field to update.' 
+      }, { status: 400 })
+    }
 
     console.log('📝 [Todoist Update] Sending payload:', JSON.stringify(updatePayload))
 
@@ -66,7 +91,26 @@ export async function POST(req: Request) {
       const errorText = await res.text()
       console.error('❌ [Todoist Update] API error:', errorText)
       console.error('❌ [Todoist Update] Failed payload:', JSON.stringify(updatePayload))
-      return NextResponse.json({ error: 'Nie udało się zaktualizować zadania' }, { status: res.status })
+      console.error('❌ [Todoist Update] Task ID:', id)
+      
+      // Parse error details if possible
+      let errorMessage = 'Nie udało się zaktualizować zadania'
+      try {
+        const errorJson = JSON.parse(errorText)
+        if (errorJson.error) {
+          errorMessage = `Bad Todoist UPDATE: ${errorJson.error}`
+        }
+      } catch {
+        // If not JSON, use the raw text
+        if (errorText) {
+          errorMessage = `Bad Todoist UPDATE: ${errorText}`
+        }
+      }
+      
+      return NextResponse.json({ 
+        error: errorMessage,
+        details: { taskId: id, payload: updatePayload }
+      }, { status: res.status })
     }
 
     const updatedTask = await res.json()
