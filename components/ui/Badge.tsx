@@ -26,10 +26,12 @@ const Badge = React.forwardRef<HTMLDivElement, BadgeProps>(
         tabIndex={isInteractive ? 0 : undefined}
         className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors ${variants[variant]} ${className}`}
         onKeyDown={(e) => {
-          if (isInteractive && props.onClick && (e.key === 'Enter' || e.key === ' ')) {
-            e.preventDefault()
-            props.onClick(e)
-          }
+          if (!isInteractive) return
+          const isActivateKey = e.key === 'Enter' || e.key === ' '
+          if (!isActivateKey) return
+          e.preventDefault()
+          if (props.onClick) props.onClick(e)
+          if (props.onPointerDown) props.onPointerDown(e as any)
         }}
         {...props}
       />
