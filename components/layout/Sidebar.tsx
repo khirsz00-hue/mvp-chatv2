@@ -63,9 +63,9 @@ export default function Sidebar({ activeView, onNavigate, isAdmin, isMobileMenuO
   
   return (
     <aside className={cn(
-      "h-screen bg-white/95 backdrop-blur-md border-r border-white/20 p-4 transition-all duration-300 ease-in-out",
+      "lg:h-screen h-[calc(100vh-4rem)] bg-white/95 backdrop-blur-md border-r border-white/20 p-4 transition-all duration-300 ease-in-out",
       "lg:translate-x-0", // Always visible on large screens
-      "fixed lg:relative top-0 left-0", // Fixed on mobile, relative on desktop
+      "fixed lg:relative top-16 lg:top-0 left-0", // Fixed on mobile, offset below header
       "z-50 lg:z-auto",
       "overflow-y-auto", // Enable scroll if sidebar is taller than screen
       isCollapsed ? "w-16" : "w-64",
