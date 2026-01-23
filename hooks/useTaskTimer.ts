@@ -8,6 +8,7 @@ import { TestDayTask } from '@/lib/types/dayAssistantV2'
 
 export interface TimerState {
   taskId: string
+  taskTitle: string
   startedAt: Date
   estimatedMinutes: number
   elapsedSeconds: number
@@ -57,6 +58,7 @@ export function useTaskTimer(): UseTaskTimerResult {
 
     const newTimer: TimerState = {
       taskId: task.id,
+      taskTitle: task.title,
       startedAt: new Date(),
       estimatedMinutes: task.estimate_min,
       elapsedSeconds: 0,
@@ -100,7 +102,7 @@ export function useTaskTimer(): UseTaskTimerResult {
         const { saveTimeSession } = await import('@/lib/services/timeTrackingService')
         await saveTimeSession({
           task_id: activeTimer.taskId,
-          task_title: '', // title not tracked in this timer state
+          task_title: activeTimer.taskTitle,
           started_at: activeTimer.startedAt.toISOString(),
           ended_at: new Date().toISOString(),
           duration_seconds: activeTimer.elapsedSeconds,

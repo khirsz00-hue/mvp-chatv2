@@ -17,6 +17,37 @@ export interface TimeSession {
   created_at?: string
 }
 
+// Helper functions for localStorage operations
+const STORAGE_KEY = 'allTimeSessions'
+
+function getLocalSessions(): TimeSession[] {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
+  } catch (error) {
+    console.error('Failed to parse local sessions:', error)
+    return []
+  }
+}
+
+function saveLocalSession(session: TimeSession): void {
+  const sessions = getLocalSessions()
+  sessions.push(session)
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions))
+}
+
+// Generate UUID with fallback for older environments
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID()
+  }
+  // Fallback UUID v4 generation
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0
+    const v = c === 'x' ? r : (r & 0x3 | 0x8)
+    return v.toString(16)
+  })
+}
+
 /**
  * Save time session to Supabase and localStorage backup
  */
@@ -44,16 +75,12 @@ export async function saveTimeSession(session: TimeSession): Promise<void> {
     console.log('✅ Time session saved to database')
 
     // Backup to localStorage (for offline)
-    const localSessions = JSON.parse(localStorage.getItem('allTimeSessions') || '[]')
-    localSessions.push(session)
-    localStorage.setItem('allTimeSessions', JSON.stringify(localSessions))
+    saveLocalSession(session)
 
   } catch (error) {
     console.error('❌ Failed to save time session:', error)
     // Fallback: save only locally if Supabase fails
-    const localSessions = JSON.parse(localStorage.getItem('allTimeSessions') || '[]')
-    localSessions.push({ ...session, id: crypto.randomUUID() })
-    localStorage.setItem('allTimeSessions', JSON.stringify(localSessions))
+    saveLocalSession({ ...session, id: generateUUID() })
   }
 }
 
@@ -77,7 +104,7 @@ export async function getTaskTimeSessions(taskId: string, taskSource: string): P
   } catch (error) {
     console.error('Failed to fetch time sessions:', error)
     // Fallback: read from localStorage
-    const localSessions = JSON.parse(localStorage.getItem('allTimeSessions') || '[]')
+    const localSessions = getLocalSessions()
     return localSessions.filter((s: TimeSession) => 
       s.task_id === taskId && s.task_source === taskSource
     )

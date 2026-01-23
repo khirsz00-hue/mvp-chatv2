@@ -13,23 +13,21 @@ import { cn } from '@/lib/utils'
 interface FocusModeProps {
   isActive: boolean
   onToggle: () => void
+  onShakeReminder: () => void
   taskTitle: string
 }
 
-export function FocusMode({ isActive, onToggle, taskTitle }: FocusModeProps) {
-  const [showReminder, setShowReminder] = useState(false)
-
-  // Gentle reminder every 5 minutes - shake animation
+export function FocusMode({ isActive, onToggle, onShakeReminder, taskTitle }: FocusModeProps) {
+  // Gentle reminder every 5 minutes - triggers shake via callback
   useEffect(() => {
     if (!isActive) return
 
     const reminderInterval = setInterval(() => {
-      setShowReminder(true)
-      setTimeout(() => setShowReminder(false), 2000) // Shake for 2 seconds
+      onShakeReminder()
     }, 5 * 60 * 1000) // Every 5 minutes
 
     return () => clearInterval(reminderInterval)
-  }, [isActive])
+  }, [isActive, onShakeReminder])
 
   return (
     <>
@@ -54,20 +52,6 @@ export function FocusMode({ isActive, onToggle, taskTitle }: FocusModeProps) {
           className="fixed inset-0 z-[80] bg-white/60 backdrop-blur-md pointer-events-none"
           style={{ backdropFilter: 'blur(12px)' }}
         />
-      )}
-
-      {/* Gentle reminder - shake */}
-      {showReminder && isActive && (
-        <style>{`
-          @keyframes gentle-shake {
-            0%, 100% { transform: translateX(0); }
-            10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
-            20%, 40%, 60%, 80% { transform: translateX(2px); }
-          }
-          .focus-reminder-shake {
-            animation: gentle-shake 0.5s ease-in-out 3;
-          }
-        `}</style>
       )}
     </>
   )

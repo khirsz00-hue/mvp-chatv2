@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { TimerState } from '@/hooks/useTaskTimer'
 import Button from '@/components/ui/Button'
 import { Pause, Play, CheckCircle, XCircle } from '@phosphor-icons/react'
@@ -38,17 +38,11 @@ export function CurrentActivityBox({
   const [focusModeActive, setFocusModeActive] = useState(false)
   const [applyShake, setApplyShake] = useState(false)
 
-  // Effect for shake animation
-  useEffect(() => {
-    if (!focusModeActive) return
-
-    const shakeInterval = setInterval(() => {
-      setApplyShake(true)
-      setTimeout(() => setApplyShake(false), 1500) // Shake for 1.5s
-    }, 5 * 60 * 1000) // Every 5 minutes
-
-    return () => clearInterval(shakeInterval)
-  }, [focusModeActive])
+  // Callback for shake reminder from FocusMode
+  const handleShakeReminder = useCallback(() => {
+    setApplyShake(true)
+    setTimeout(() => setApplyShake(false), 1500) // Shake for 1.5s
+  }, [])
 
   if (!activeTimer && !breakActive) {
     return null
@@ -77,6 +71,7 @@ export function CurrentActivityBox({
         <FocusMode
           isActive={focusModeActive}
           onToggle={() => setFocusModeActive(!focusModeActive)}
+          onShakeReminder={handleShakeReminder}
           taskTitle={taskTitle || 'Zadanie'}
         />
 
