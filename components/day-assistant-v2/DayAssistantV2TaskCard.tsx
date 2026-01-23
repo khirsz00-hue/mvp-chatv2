@@ -3,7 +3,7 @@
  * Part of Day Assistant V2 Complete Overhaul
  */
 
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { TestDayTask } from '@/lib/types/dayAssistantV2'
 import { Play, DotsThreeVertical, Tag, Brain, Calendar } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
@@ -17,6 +17,15 @@ import {
 } from './DayAssistantV2TaskBadges'
 import { DayAssistantV2TaskMenu } from './DayAssistantV2TaskMenu'
 import { DayAssistantV2TaskTooltip } from './DayAssistantV2TaskTooltip'
+import { supabase } from '@/lib/supabaseClient'
+
+interface Subtask {
+  id: string
+  content: string
+  estimated_duration: number
+  completed: boolean
+  position: number
+}
 
 interface DayAssistantV2TaskCardProps {
   task: TestDayTask
@@ -62,6 +71,38 @@ export function DayAssistantV2TaskCard({
 }: DayAssistantV2TaskCardProps) {
   const todayDate = new Date().toISOString().split('T')[0]
   const priorityBorderColor = getPriorityBorderColor(task.priority)
+  const [firstSubtask, setFirstSubtask] = useState<Subtask | null>(null)
+
+  // Fetch first subtask for full-size cards (not compact or overflow)
+  useEffect(() => {
+    if (!isCompact && !isOverflow) {
+      fetchFirstSubtask()
+    }
+  }, [task.id, isCompact, isOverflow])
+
+  const fetchFirstSubtask = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      const response = await fetch(`/api/day-assistant-v2/subtasks?task_id=${task.id}`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.subtasks && data.subtasks.length > 0) {
+          // Get first incomplete subtask, or first subtask if all completed
+          const firstIncomplete = data.subtasks.find((s: Subtask) => !s.completed)
+          setFirstSubtask(firstIncomplete || data.subtasks[0])
+        }
+      }
+    } catch (error) {
+      console.error('[TaskCard] Error fetching subtasks:', error)
+    }
+  }
 
   // Overflow tasks have special styling
   if (isOverflow) {
@@ -205,6 +246,16 @@ export function DayAssistantV2TaskCard({
           <h4 className="font-semibold text-slate-800 mb-1 group-hover:text-indigo-600 transition-colors">
             {task.title}
           </h4>
+          
+          {/* First subtask */}
+          {firstSubtask && (
+            <p className="text-xs text-indigo-600 mb-2 flex items-center gap-1">
+              <span>📍</span>
+              <span className="font-medium">Pierwszy krok:</span>
+              <span>{firstSubtask.content}</span>
+              <span className="text-slate-400">(~{firstSubtask.estimated_duration} min)</span>
+            </p>
+          )}
           
           {/* Description */}
           {task.description && (
