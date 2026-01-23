@@ -82,7 +82,7 @@ export function TasksAssistant() {
   const [view, setView] = useState<ViewType>('list')
   const [boardGrouping, setBoardGrouping] = useState<BoardGrouping>('day')
   const [filters, setFilters] = useState<FiltersState>({})
-  const [filter, setFilter] = useState<FilterType>('all')
+  const [filter, setFilter] = useState<FilterType>('today')  // ✅ Default to "Dziś"
   const [completedRange, setCompletedRange] = useState<CompletedRange>('recent')
   const [completedSearch, setCompletedSearch] = useState('')
   const [sortBy, setSortBy] = useState<SortType>('date')
@@ -284,6 +284,46 @@ export function TasksAssistant() {
   useEffect(() => {
     fetchProjects()
   }, [fetchProjects])
+  
+  // Auto-sync with Todoist on mount and periodically
+  useEffect(() => {
+    if (!token) return
+    
+    const triggerSync = async () => {
+      try {
+        console.log('🔄 [TasksAssistant] Auto-syncing with Todoist...')
+        
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) return
+        
+        const response = await fetch('/api/todoist/sync', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        if (response.ok) {
+          console.log('✅ [TasksAssistant] Todoist sync completed')
+          // Refresh tasks after sync
+          await fetchTasks()
+        } else {
+          console.warn('⚠️ [TasksAssistant] Todoist sync failed:', response.status)
+        }
+      } catch (error) {
+        console.error('❌ [TasksAssistant] Sync error:', error)
+      }
+    }
+    
+    // Sync on mount
+    triggerSync()
+    
+    // Sync every 2 minutes
+    const syncInterval = setInterval(triggerSync, 120000)
+    
+    return () => clearInterval(syncInterval)
+  }, [token, fetchTasks])
   
   // Monitor active timer/pomodoro
   useEffect(() => {
