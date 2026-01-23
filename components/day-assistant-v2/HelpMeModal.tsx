@@ -131,7 +131,6 @@ export function HelpMeModal({ task, open, onClose, onSuccess }: Props) {
         throw new Error(errorData.error || 'Failed to create subtasks')
       }
 
-      console.log('✅ [HelpMeModal] Subtasks created successfully')
       toast.success('✅ Kroki utworzone!')
       onSuccess()
       onClose()
