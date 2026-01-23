@@ -70,6 +70,8 @@ function mapWorkModeToEnergyFocus(workMode: WorkMode): { energy: number, focus: 
       return { energy: 2, focus: 2 } // Niska energia - łatwe zadania
     case 'hyperfocus':
       return { energy: 4, focus: 4 } // Wysoka energia - trudne zadania
+    case 'quick_wins':
+      return { energy: 3, focus: 3 } // Normalna energia - krótkie zadania
     case 'standard':
     default:
       return { energy: 3, focus: 3 } // Normalna praca
@@ -80,7 +82,7 @@ function mapWorkModeToEnergyFocus(workMode: WorkMode): { energy: number, focus: 
  * Type guard to validate WorkMode
  */
 function isValidWorkMode(value: unknown): value is WorkMode {
-  return typeof value === 'string' && ['low_focus', 'standard', 'hyperfocus'].includes(value)
+  return typeof value === 'string' && ['low_focus', 'standard', 'hyperfocus', 'quick_wins'].includes(value)
 }
 
 /**
@@ -475,10 +477,14 @@ export function calculateTaskScoreV3(
     reasoning.push(`📁 Kontekst ${task.context_type}: +0`)
   }
   
-  // 7. Short task bonus (Standard mode)
-  if (context.workMode === 'standard' && task.estimate_min <= 40) {
+  // 7. Short task bonus (Standard mode or Quick Wins mode)
+  if ((context.workMode === 'standard' || context.workMode === 'quick_wins') && task.estimate_min <= 40) {
     score += 5
     reasoning.push(`⏱ Krótkie zadanie (${task.estimate_min}min): +5`)
+  } else if (context.workMode === 'quick_wins' && task.estimate_min < 20) {
+    // Extra bonus for quick wins mode on very short tasks
+    score += 10
+    reasoning.push(`⚡ Quick Win (${task.estimate_min}min): +10`)
   } else {
     reasoning.push(`⏱ Czas ${task.estimate_min}min: +0`)
   }
@@ -524,8 +530,11 @@ export function scoreAndSortTasksV3(
   } else if (workMode === 'hyperfocus') {
     // Hyperfocus mode: hard tasks only
     filteredTasks = filteredTasks.filter(t => (t.cognitive_load || DEFAULT_COGNITIVE_LOAD) >= HYPERFOCUS_MIN_COGNITIVE_LOAD)
+  } else if (workMode === 'quick_wins') {
+    // Quick wins mode: short tasks only (< 20 minutes)
+    filteredTasks = filteredTasks.filter(t => (t.estimate_min || 0) < 20)
   }
-  // Standard mode: no filtering by cognitive load
+  // Standard mode: no filtering by cognitive load or duration
   
   // Score tasks
   const scored = filteredTasks.map(task => {

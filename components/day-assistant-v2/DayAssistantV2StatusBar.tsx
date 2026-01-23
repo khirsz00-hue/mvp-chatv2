@@ -101,88 +101,184 @@ export function DayAssistantV2StatusBar({
   }
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-6">
-      <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-4 lg:gap-6">
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 md:p-4 mb-6">
+      {/* MOBILE LAYOUT (< 768px) - Ultra-compact, max 2 lines */}
+      <div className="md:hidden">
+        {/* Line 1: Core info */}
+        <div className="flex items-center justify-between gap-2 mb-2">
+          {/* Working Hours */}
+          <button 
+            className="flex items-center gap-1 px-2 py-1 hover:bg-slate-50 rounded transition-all min-w-0 min-h-[44px]"
+            onClick={onEditWorkHours}
+            onKeyDown={(e) => handleKeyDown(e, onEditWorkHours)}
+          >
+            <span className="text-sm">🕐</span>
+            <span className="text-xs font-semibold text-slate-700 whitespace-nowrap">
+              {workHoursStart}-{workHoursEnd}
+            </span>
+          </button>
+
+          {/* Today's Flow */}
+          <div className="flex items-center gap-1 px-2 py-1 min-w-0">
+            <span className="text-xs font-semibold text-slate-700 whitespace-nowrap">
+              ✅ {completedCount} / 📋 {scheduledCount}
+            </span>
+          </div>
+
+          {/* Mode */}
+          <button 
+            className="flex items-center gap-1 px-2 py-1 hover:bg-slate-50 rounded transition-all min-h-[44px]"
+            onClick={onEditMode}
+            onKeyDown={(e) => handleKeyDown(e, onEditMode)}
+          >
+            <span className="text-sm">🎯</span>
+          </button>
+
+          {/* Sync */}
+          <button
+            onClick={handleSync}
+            disabled={isSyncing}
+            className="flex items-center justify-center p-2 hover:bg-slate-50 rounded transition-all disabled:opacity-50 min-w-[44px] min-h-[44px]"
+            title="Sync"
+          >
+            <ArrowsClockwise 
+              size={20} 
+              className={isSyncing ? 'animate-spin' : ''} 
+              weight="bold"
+            />
+          </button>
+        </div>
+
+        {/* Line 2: Day Overload (only if > 0) */}
+        {usedMinutes > 0 && (
+          <div className="flex items-center gap-2">
+            {isOverloaded && <Warning size={14} className="text-amber-500 flex-shrink-0" weight="fill" />}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <span className="text-[10px] text-slate-500 font-medium truncate">
+                  {usedMinutes}/{totalCapacity}min
+                </span>
+                <span className={`text-xs font-bold ${isOverloaded ? 'text-amber-600' : 'text-slate-600'}`}>
+                  {overloadPercent}%
+                </span>
+              </div>
+              <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full rounded-full transition-all ${
+                    isOverloaded 
+                      ? 'bg-gradient-to-r from-amber-400 to-orange-500' 
+                      : 'bg-gradient-to-r from-blue-400 to-indigo-500'
+                  }`}
+                  style={{ width: `${overloadPercent}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Context dropdown on mobile (if exists) - compact */}
+        {projects.length > 0 && onProjectChange && (
+          <div className="mt-2">
+            <select
+              id="project-filter-mobile"
+              value={selectedProject || ''}
+              onChange={(e) => onProjectChange(e.target.value || null)}
+              aria-label="Filter by project"
+              className="w-full text-xs font-medium bg-slate-50 border border-slate-200 rounded px-2 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer min-h-[44px]"
+            >
+              <option value="">Wszystkie projekty</option>
+              {projects.map(project => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      {/* DESKTOP LAYOUT (>= 768px) - Compact single line */}
+      <div className="hidden md:flex items-center gap-3 lg:gap-4 flex-wrap">
         
         {/* WORKING HOURS */}
         <div 
-          className="flex items-center gap-3 group cursor-pointer hover:bg-slate-50 px-3 py-2 rounded-lg transition-all flex-shrink-0"
+          className="flex items-center gap-2 group cursor-pointer hover:bg-slate-50 px-2 py-1.5 rounded-lg transition-all flex-shrink-0 min-h-[44px]"
           onClick={onEditWorkHours}
           onKeyDown={(e) => handleKeyDown(e, onEditWorkHours)}
           role="button"
           tabIndex={0}
         >
-          <Clock size={16} className="text-slate-400" />
+          <Clock size={14} className="text-slate-400" />
           <div>
-            <p className="text-[10px] text-slate-400 uppercase font-semibold tracking-wide">
-              Working Hours
+            <p className="text-[9px] text-slate-400 uppercase font-semibold tracking-wide leading-none">
+              Hours
             </p>
-            <p className="text-sm font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">
-              {workHoursStart} - {workHoursEnd}
+            <p className="text-xs font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">
+              {workHoursStart}-{workHoursEnd}
             </p>
           </div>
-          <Pencil size={10} className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <Pencil size={8} className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
 
-        {/* Separator - hidden on mobile */}
-        <div className="hidden lg:block h-10 w-px bg-slate-200" />
+        {/* Separator */}
+        <div className="h-8 w-px bg-slate-200" />
 
-        {/* TODAY'S FLOW - Simplified */}
-        <div className="flex items-center gap-3 px-3 py-2 flex-shrink-0">
+        {/* TODAY'S FLOW - Compact */}
+        <div className="flex items-center gap-2 px-2 py-1.5 flex-shrink-0">
           <div>
-            <p className="text-[10px] text-slate-400 uppercase font-semibold tracking-wide">
-              Today&apos;s Flow
+            <p className="text-[9px] text-slate-400 uppercase font-semibold tracking-wide leading-none">
+              Today
             </p>
-            <p className="text-sm font-bold text-slate-800">
-              Ukończone: <span className="text-green-600">{completedCount}</span> / Zaplanowane: <span className="text-blue-600">{scheduledCount}</span>
+            <p className="text-xs font-bold text-slate-800">
+              <span className="text-green-600">✓{completedCount}</span> / <span className="text-blue-600">{scheduledCount}</span>
             </p>
           </div>
         </div>
 
-        {/* Separator - hidden on mobile */}
-        <div className="hidden lg:block h-10 w-px bg-slate-200" />
+        {/* Separator */}
+        <div className="h-8 w-px bg-slate-200" />
 
         {/* MODE */}
         <div 
-          className="flex items-center gap-3 group cursor-pointer hover:bg-slate-50 px-3 py-2 rounded-lg transition-all flex-shrink-0"
+          className="flex items-center gap-2 group cursor-pointer hover:bg-slate-50 px-2 py-1.5 rounded-lg transition-all flex-shrink-0 min-h-[44px]"
           onClick={onEditMode}
           onKeyDown={(e) => handleKeyDown(e, onEditMode)}
           role="button"
           tabIndex={0}
         >
-          <Target size={16} className="text-indigo-500" weight="fill" />
+          <Target size={14} className="text-indigo-500" weight="fill" />
           <div>
-            <p className="text-[10px] text-slate-400 uppercase font-semibold tracking-wide">
+            <p className="text-[9px] text-slate-400 uppercase font-semibold tracking-wide leading-none">
               Mode
             </p>
-            <p className="text-sm font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">
+            <p className="text-xs font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">
               {MODE_LABELS[workMode]}
             </p>
           </div>
-          <CaretDown size={10} className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CaretDown size={8} className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
 
-        {/* Separator - hidden on mobile */}
-        <div className="hidden lg:block h-10 w-px bg-slate-200" />
+        {/* Separator */}
+        <div className="h-8 w-px bg-slate-200" />
 
         {/* KONTEKST (PROJECT FILTER) */}
         {projects.length > 0 && onProjectChange && (
           <>
-            <div className="flex flex-col w-full lg:w-auto lg:min-w-[180px] flex-shrink-0">
+            <div className="flex flex-col min-w-[140px] flex-shrink-0">
               <label 
                 htmlFor="project-filter"
-                className="text-[10px] text-slate-400 uppercase font-semibold tracking-wide mb-1"
+                className="text-[9px] text-slate-400 uppercase font-semibold tracking-wide leading-none mb-0.5"
               >
-                Kontekst
+                Context
               </label>
               <select
                 id="project-filter"
                 value={selectedProject || ''}
                 onChange={(e) => onProjectChange(e.target.value || null)}
-                aria-label="Filtruj zadania według projektu"
-                className="text-sm font-medium bg-transparent border-0 p-0 pr-6 focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer text-slate-800 hover:text-indigo-600 transition-colors rounded"
+                aria-label="Filter by project"
+                className="text-xs font-medium bg-transparent border-0 p-0 pr-4 focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer text-slate-800 hover:text-indigo-600 transition-colors rounded min-h-[20px]"
               >
-                <option value="">Wszystkie projekty</option>
+                <option value="">All projects</option>
                 {projects.map(project => (
                   <option key={project.id} value={project.id}>
                     {project.name}
@@ -191,8 +287,8 @@ export function DayAssistantV2StatusBar({
               </select>
             </div>
 
-            {/* Separator - hidden on mobile */}
-            <div className="hidden lg:block h-10 w-px bg-slate-200" />
+            {/* Separator */}
+            <div className="h-8 w-px bg-slate-200" />
           </>
         )}
 
@@ -200,33 +296,33 @@ export function DayAssistantV2StatusBar({
         <button
           onClick={handleSync}
           disabled={isSyncing}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-50 transition-all flex-shrink-0 text-slate-600 hover:text-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Synchronizuj z Todoist"
+          className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-slate-50 transition-all flex-shrink-0 text-slate-600 hover:text-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+          title="Sync with Todoist"
         >
           <ArrowsClockwise 
-            size={16} 
+            size={14} 
             className={isSyncing ? 'animate-spin' : ''} 
             weight="bold"
           />
           <span className="text-xs font-semibold hidden lg:inline">Sync</span>
         </button>
 
-        {/* Separator - hidden on mobile */}
-        <div className="hidden lg:block h-10 w-px bg-slate-200" />
+        {/* Separator */}
+        <div className="h-8 w-px bg-slate-200" />
 
-        {/* DAY OVERLOAD */}
-        <div className="flex-1 flex items-center gap-3 min-w-0">
-          {isOverloaded && <Warning size={16} className="text-amber-500 flex-shrink-0" weight="fill" />}
+        {/* DAY OVERLOAD - Compact format for desktop */}
+        <div className="flex-1 flex items-center gap-2 min-w-0 lg:min-w-[200px]">
+          {isOverloaded && <Warning size={14} className="text-amber-500 flex-shrink-0" weight="fill" />}
           <div className="flex-1 min-w-0">
-            <div className="flex justify-between items-center mb-1">
-              <p className="text-[10px] text-slate-400 uppercase font-semibold tracking-wide">
-                Day Overload
+            <div className="flex justify-between items-center mb-0.5">
+              <p className="text-[9px] text-slate-400 uppercase font-semibold tracking-wide leading-none">
+                Capacity
               </p>
-              <p className={`text-xs font-bold ${isOverloaded ? 'text-amber-600' : 'text-slate-600'}`}>
-                {usedMinutes} min / {remainingMinutes} min left
+              <p className={`text-xs font-bold ${isOverloaded ? 'text-amber-600' : 'text-slate-600'} whitespace-nowrap`}>
+                {usedMinutes}/{totalCapacity}min ({overloadPercent}%)
               </p>
             </div>
-            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+            <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
               <div 
                 className={`h-full rounded-full transition-all ${
                   isOverloaded 
@@ -237,9 +333,6 @@ export function DayAssistantV2StatusBar({
               />
             </div>
           </div>
-          <span className={`text-lg font-bold ml-2 flex-shrink-0 ${isOverloaded ? 'text-amber-600' : 'text-slate-600'}`}>
-            {overloadPercent}%
-          </span>
         </div>
       </div>
     </div>
