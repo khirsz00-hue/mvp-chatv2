@@ -336,8 +336,10 @@ export function TaskCard({
                 <Badge 
                   variant="outline" 
                   className="gap-1 text-xs cursor-pointer" 
-                  onClick={openDatePicker}
-                  onTouchStart={openDatePicker}
+                  onPointerDown={openDatePicker}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') openDatePicker(e)
+                  }}
                 >
                   <CalendarBlank size={12} className="md:hidden" />
                   <CalendarBlank size={14} className="hidden md:inline" />

@@ -22,7 +22,14 @@ const Badge = React.forwardRef<HTMLDivElement, BadgeProps>(
       <div
         ref={ref}
         role="button"
+        tabIndex={0}
         className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors ${variants[variant]} ${className}`}
+        onKeyDown={(e) => {
+          if (props.onClick && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault()
+            props.onClick(e as any)
+          }
+        }}
         {...props}
       />
     )
