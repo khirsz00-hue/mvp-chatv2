@@ -168,6 +168,9 @@ export function UniversalTaskModal({
     dueDate: ''
   })
   
+  // Mobile tabs for advanced features
+  const [activeTab, setActiveTab] = useState<'subtasks' | 'time' | 'history' | null>(null)
+  
   const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
   
   /* =======================
@@ -825,7 +828,7 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
-        className="w-full max-w-[95vw] sm:max-w-xl md:max-w-2xl max-h-[95vh] sm:max-h-[90vh] p-3 sm:p-6 overflow-y-auto"
+        className="w-full max-w-[95vw] sm:max-w-xl md:max-w-2xl max-h-[85vh] sm:max-h-[90vh] p-3 sm:p-6 overflow-y-auto pb-20 sm:pb-6"
         aria-labelledby="universal-task-modal-title"
       >
         <DialogHeader>
@@ -863,29 +866,50 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
             />
           </div>
 
-          {/* Grid Layout - stack on mobile */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            {/* Estimated Time */}
+          {/* Single Column Layout for better readability */}
+          <div className="space-y-3">
+            {/* Project Dropdown */}
             <div>
-              <label className="text-xs sm:text-sm font-medium mb-2 block flex items-center gap-2">
-                <Clock size={16} className="sm:w-[18px] sm:h-[18px]" />
-                Estymat czasu:
+              <label className="text-sm font-medium mb-1 block flex items-center gap-2">
+                <FolderOpen size={18} />
+                Projekt:
               </label>
-              <div className="grid grid-cols-4 gap-1 sm:gap-2 mb-2">
-                {[5, 15, 25, 30, 45, 60, 90, 120].map(time => (
-                  <button
-                    key={time}
-                    type="button"
-                    onClick={() => setEstimatedMinutes(time)}
-                    className={`px-1 py-1 sm:px-2 sm:py-1.5 text-xs sm:text-sm rounded border transition ${
-                      estimatedMinutes === time
-                        ? 'bg-brand-purple text-white border-brand-purple'
-                        : 'bg-white border-gray-300 hover:border-brand-purple'
-                    }`}
-                  >
-                    {time}min
-                  </button>
+              <select
+                value={projectId}
+                onChange={(e) => setProjectId(e.target.value)}
+                className="w-full px-4 py-2 rounded-lg border-2 border-gray-200 focus:border-brand-purple focus:outline-none"
+                disabled={loading}
+              >
+                <option value="">Brak projektu</option>
+                {projects.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
+              </select>
+            </div>
+
+            {/* Estimated Time Slider */}
+            <div>
+              <label className="text-sm font-medium mb-2 block flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Clock size={16} />
+                  Czas:
+                </span>
+                <span className="text-brand-purple font-bold">{estimatedMinutes} min</span>
+              </label>
+              <input
+                type="range"
+                min={5}
+                max={120}
+                step={5}
+                value={estimatedMinutes}
+                onChange={(e) => setEstimatedMinutes(Number(e.target.value))}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-brand-purple"
+              />
+              <div className="flex justify-between text-[10px] text-gray-500 mt-1">
+                <span>5 min</span>
+                <span>30 min</span>
+                <span>60 min</span>
+                <span>120 min</span>
               </div>
             </div>
 
@@ -907,6 +931,38 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                 <span>Łatwe</span>
                 <span>Średnie</span>
                 <span>Trudne</span>
+              </div>
+            </div>
+
+            {/* Priority */}
+            <div>
+              <label className="text-sm font-medium mb-2 block flex items-center gap-2">
+                <Flag size={18} />
+                Priorytet:
+              </label>
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { value: 1, label: 'P1', color: 'bg-red-500', textColor: 'text-red-700', borderColor: 'border-red-500' },
+                  { value: 2, label: 'P2', color: 'bg-orange-500', textColor: 'text-orange-700', borderColor: 'border-orange-500' },
+                  { value: 3, label: 'P3', color: 'bg-blue-500', textColor: 'text-blue-700', borderColor: 'border-blue-500' },
+                  { value: 4, label: 'P4', color: 'bg-gray-400', textColor: 'text-gray-700', borderColor: 'border-gray-400' }
+                ].map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setPriority(opt.value as 1 | 2 | 3 | 4)}
+                    className={`px-3 py-2 rounded-lg border-2 transition text-sm font-medium min-h-[44px] ${
+                      priority === opt.value
+                        ? `${opt.borderColor} bg-opacity-10 ${opt.textColor}`
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex flex-col items-center gap-1">
+                      <div className={`w-3 h-3 rounded-full ${opt.color}`} />
+                      {opt.label}
+                    </div>
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -940,57 +996,6 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                   </button>
                 ))}
               </div>
-            </div>
-
-            {/* Priority */}
-            <div>
-              <label className="text-sm font-medium mb-2 block flex items-center gap-2">
-                <Flag size={18} />
-                Priorytet:
-              </label>
-              <div className="grid grid-cols-4 gap-2">
-                {[
-                  { value: 1, label: 'P1', color: 'bg-red-500', textColor: 'text-red-700', borderColor: 'border-red-500' },
-                  { value: 2, label: 'P2', color: 'bg-orange-500', textColor: 'text-orange-700', borderColor: 'border-orange-500' },
-                  { value: 3, label: 'P3', color: 'bg-blue-500', textColor: 'text-blue-700', borderColor: 'border-blue-500' },
-                  { value: 4, label: 'P4', color: 'bg-gray-400', textColor: 'text-gray-700', borderColor: 'border-gray-400' }
-                ].map(opt => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setPriority(opt.value as 1 | 2 | 3 | 4)}
-                    className={`px-3 py-2 rounded-lg border-2 transition text-sm font-medium ${
-                      priority === opt.value
-                        ? `${opt.borderColor} bg-opacity-10 ${opt.textColor}`
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="flex flex-col items-center gap-1">
-                      <div className={`w-3 h-3 rounded-full ${opt.color}`} />
-                      {opt.label}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Project Dropdown */}
-            <div>
-              <label className="text-sm font-medium mb-1 block flex items-center gap-2">
-                <FolderOpen size={18} />
-                Projekt:
-              </label>
-              <select
-                value={projectId}
-                onChange={(e) => setProjectId(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg border-2 border-gray-200 focus:border-brand-purple focus:outline-none"
-                disabled={loading}
-              >
-                <option value="">Brak projektu</option>
-                {projects.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
             </div>
 
             {/* Labels */}
@@ -1059,21 +1064,17 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
             </div>
           </div>
 
-          {/* Collapsible Sections */}
-          <div className="space-y-3 pt-2">
-            {/* AI Understanding Section */}
-            <CollapsibleSection
-              title="Jak AI rozumie zadanie"
-              icon={<Brain size={18} />}
-              defaultOpen={false}
-            >
-              <div className="flex gap-2 mb-2">
+          {/* AI Understanding - Always Visible */}
+          {aiUnderstanding && (
+            <div className="mt-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
+              <p className="text-xs text-purple-900 mb-2">{aiUnderstanding}</p>
+              <div className="flex gap-2">
                 <Button 
                   type="button"
                   size="sm" 
                   onClick={handleClarify}
                   variant="ghost"
-                  className="border border-gray-200"
+                  className="border border-purple-200 text-xs"
                 >
                   Doprecyzuj
                 </Button>
@@ -1082,19 +1083,16 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                   size="sm" 
                   onClick={handleGeneratePlan}
                   disabled={loadingAI}
-                  className="bg-gradient-to-r from-purple-500 to-pink-500"
+                  className="bg-gradient-to-r from-purple-500 to-pink-500 text-xs"
                 >
                   {loadingAI ? 'Generuję...' : 'Wygeneruj plan'}
                 </Button>
               </div>
-              {loadingAI ? (
-                <div className="text-xs text-gray-500">Analizuję zadanie...</div>
-              ) : aiUnderstanding ? (
-                <p className="text-xs text-purple-900 bg-purple-50 p-3 rounded-lg">{aiUnderstanding}</p>
-              ) : (
-                <p className="text-xs text-gray-400 italic">Wpisz tytuł zadania aby zobaczyć jak AI je rozumie</p>
-              )}
-            </CollapsibleSection>
+            </div>
+          )}
+
+          {/* Desktop: Collapsible Sections */}
+          <div className="hidden sm:block space-y-3 pt-2">
 
             {/* Subtasks Section */}
             {!hideSubtasks && (
@@ -1382,7 +1380,7 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                   </>
                 ) : (
                   <span className="text-xs sm:text-sm">
-                    {isEditMode ? 'Zapisz' : 'Utwórz'}
+                    {isEditMode ? 'Zapisz' : 'Dodaj'}
                   </span>
                 )}
               </Button>
@@ -1393,6 +1391,291 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
             Naciśnij <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">Enter</kbd> aby zapisać lub <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">Esc</kbd> aby anulować
           </p>
         </form>
+
+        {/* Mobile Bottom Tabs */}
+        <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
+          <div className="grid grid-cols-3 gap-1 p-2">
+            {!hideSubtasks && (
+              <button
+                type="button"
+                onClick={() => setActiveTab(activeTab === 'subtasks' ? null : 'subtasks')}
+                className={`flex flex-col items-center justify-center gap-1 py-2 px-3 rounded-lg transition min-h-[44px] ${
+                  activeTab === 'subtasks' 
+                    ? 'bg-purple-100 text-purple-700' 
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <ListChecks size={20} weight={activeTab === 'subtasks' ? 'fill' : 'regular'} />
+                <span className="text-[10px] font-medium">Subtaski</span>
+              </button>
+            )}
+            
+            {!hideTimeTracking && (
+              <button
+                type="button"
+                onClick={() => setActiveTab(activeTab === 'time' ? null : 'time')}
+                className={`flex flex-col items-center justify-center gap-1 py-2 px-3 rounded-lg transition min-h-[44px] ${
+                  activeTab === 'time' 
+                    ? 'bg-purple-100 text-purple-700' 
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <Timer size={20} weight={activeTab === 'time' ? 'fill' : 'regular'} />
+                <span className="text-[10px] font-medium">Czas</span>
+              </button>
+            )}
+            
+            {!hideHistory && isEditMode && (
+              <button
+                type="button"
+                onClick={() => setActiveTab(activeTab === 'history' ? null : 'history')}
+                className={`flex flex-col items-center justify-center gap-1 py-2 px-3 rounded-lg transition min-h-[44px] ${
+                  activeTab === 'history' 
+                    ? 'bg-purple-100 text-purple-700' 
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <ClockClockwise size={20} weight={activeTab === 'history' ? 'fill' : 'regular'} />
+                <span className="text-[10px] font-medium">Historia</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Mobile Tab Content Overlay */}
+        {activeTab && (
+          <div className="sm:hidden fixed inset-0 bg-black/50 z-40" onClick={() => setActiveTab(null)}>
+            <div 
+              className="absolute bottom-[60px] left-0 right-0 bg-white rounded-t-2xl shadow-2xl max-h-[60vh] overflow-y-auto p-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {activeTab === 'subtasks' && (
+                <div>
+                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                    <ListChecks size={18} /> Podzadania ({completedSubtasksCount}/{subtasks.length})
+                  </h3>
+                  <div className="flex gap-2 mb-2">
+                    <Input 
+                      placeholder="Dodaj podzadanie..."
+                      value={newSubtask}
+                      onChange={e => setNewSubtask(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddSubtask())}
+                      className="flex-1"
+                    />
+                    <Button 
+                      type="button"
+                      onClick={handleAddSubtask}
+                      disabled={!newSubtask.trim()}
+                    >
+                      +
+                    </Button>
+                  </div>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {subtasks.length === 0 ? (
+                      <p className="text-xs text-gray-400 text-center py-4">Brak podzadań</p>
+                    ) : (
+                      subtasks.map(sub => (
+                        <label key={sub.id} className="flex items-center gap-2 cursor-pointer p-2 hover:bg-gray-50 rounded">
+                          <input 
+                            type="checkbox" 
+                            checked={sub.completed}
+                            onChange={e => handleToggleSubtask(sub.id, e.target.checked)}
+                            className="w-4 h-4 text-brand-purple border-gray-300 rounded focus:ring-brand-purple"
+                          />
+                          <span className={sub.completed ? 'line-through text-gray-400 text-sm' : 'text-sm'}>
+                            {sub.content}
+                          </span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {activeTab === 'time' && (
+                <div>
+                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                    <Timer size={18} /> Mierzenie czasu
+                  </h3>
+                  {/* Tabs: Manual / Pomodoro */}
+                  <div className="flex gap-2 border-b mb-3">
+                    <button 
+                      type="button"
+                      onClick={() => setTimeTab('manual')}
+                      className={`px-3 py-2 text-sm font-medium ${
+                        timeTab === 'manual' 
+                          ? 'border-b-2 border-purple-600 text-purple-600' 
+                          : 'text-gray-500'
+                      }`}
+                    >
+                      ⏱️ Manual
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setTimeTab('pomodoro')}
+                      className={`px-3 py-2 text-sm font-medium ${
+                        timeTab === 'pomodoro' 
+                          ? 'border-b-2 border-purple-600 text-purple-600' 
+                          : 'text-gray-500'
+                      }`}
+                    >
+                      🍅 Pomodoro
+                    </button>
+                  </div>
+
+                  {timeTab === 'manual' && (
+                    <div>
+                      <div className="text-center text-3xl font-mono mb-3 font-bold text-purple-700">
+                        {formatTime(elapsedSeconds)}
+                      </div>
+                      <div className="flex gap-2 justify-center mb-3">
+                        <Button 
+                          type="button"
+                          onClick={startTimer}
+                          disabled={isTimerRunning}
+                          size="sm"
+                          className="gap-1"
+                        >
+                          <Play size={16} weight="fill" /> Start
+                        </Button>
+                        <Button 
+                          type="button"
+                          onClick={pauseTimer}
+                          disabled={!isTimerRunning}
+                          size="sm"
+                          variant="ghost"
+                          className="gap-1 border border-gray-200"
+                        >
+                          <Pause size={16} weight="fill" /> Pause
+                        </Button>
+                        <Button 
+                          type="button"
+                          onClick={stopTimer}
+                          disabled={elapsedSeconds === 0}
+                          size="sm"
+                          variant="ghost"
+                          className="gap-1 border border-gray-200"
+                        >
+                          <Stop size={16} weight="fill" /> Stop
+                        </Button>
+                      </div>
+                      
+                      {timerSessions.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-gray-100">
+                          <p className="text-xs font-medium text-gray-600 mb-2">Ostatnie sesje:</p>
+                          <div className="text-xs space-y-1">
+                            {timerSessions.slice(0, 3).map(s => (
+                              <div key={s.id} className="text-gray-600">
+                                • {s.duration} min - {s.date}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {timeTab === 'pomodoro' && (
+                    <div>
+                      <div className="text-center mb-4">
+                        <div className="text-4xl font-mono font-bold text-red-600 mb-2">
+                          {formatTime(elapsedSeconds)}
+                        </div>
+                        <p className="text-sm text-gray-600">
+                          {pomodoroPhase === 'work' 
+                            ? `🍅 Faza pracy (${25 - Math.floor(elapsedSeconds / 60)} min pozostało)` 
+                            : `☕ Przerwa (${5 - Math.floor(elapsedSeconds / 60)} min pozostało)`}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Ukończone Pomodoro dziś: {pomodoroCount}
+                        </p>
+                      </div>
+                      
+                      <div className="flex gap-2 justify-center">
+                        {!isTimerRunning ? (
+                          <Button 
+                            type="button"
+                            onClick={startPomodoro}
+                            className="bg-gradient-to-r from-red-500 to-orange-500 gap-2"
+                          >
+                            <Play size={16} weight="fill" />
+                            Start Pomodoro (25min)
+                          </Button>
+                        ) : (
+                          <>
+                            <Button 
+                              type="button"
+                              onClick={() => setIsTimerRunning(false)}
+                              size="sm"
+                              variant="ghost"
+                              className="gap-1 border"
+                            >
+                              <Pause size={16} weight="fill" /> Pause
+                            </Button>
+                            <Button 
+                              type="button"
+                              onClick={stopPomodoro}
+                              size="sm"
+                              variant="ghost"
+                              className="gap-1 border border-red-500 text-red-600"
+                            >
+                              <Stop size={16} weight="fill" /> Stop
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                      
+                      <div className="mt-4">
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className={`h-2 rounded-full transition-all ${
+                              pomodoroPhase === 'work' ? 'bg-red-500' : 'bg-green-500'
+                            }`}
+                            style={{ 
+                              width: `${(elapsedSeconds / (pomodoroPhase === 'work' ? 25 * 60 : 5 * 60)) * 100}%` 
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {activeTab === 'history' && isEditMode && (
+                <div>
+                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                    <ClockClockwise size={18} /> Historia zmian
+                  </h3>
+                  <div className="space-y-2 max-h-48 overflow-y-auto text-xs">
+                    {changeHistory.length === 0 ? (
+                      <p className="text-gray-400 text-center py-4">Brak historii zmian</p>
+                    ) : (
+                      changeHistory.map(change => (
+                        <div key={change.id} className="bg-gray-50 p-2 rounded">
+                          <div className="flex justify-between">
+                            <span className="font-semibold">{change.field}</span>
+                            <span className="text-gray-500">
+                              {new Date(change.timestamp).toLocaleTimeString('pl-PL', { 
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                              })}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-gray-600 mt-1">
+                            <span className="line-through text-red-600">{change.oldValue}</span>
+                            →
+                            <span className="text-green-600">{change.newValue}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </DialogContent>
 
       {/* Clarification Modal */}
