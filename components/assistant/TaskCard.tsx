@@ -450,7 +450,7 @@ export function TaskCard({
         </div>
         
         {/* Mobile: Show context menu */}
-        <div className="md:hidden relative flex-shrink-0 ml-2" ref={mobileMenuRef}>
+        <div className="md:hidden relative flex-shrink-0 ml-2 z-[250]" ref={mobileMenuRef}>
           <Button 
             size="sm" 
             variant="ghost"
@@ -468,7 +468,7 @@ export function TaskCard({
             <div 
               ref={mobileMenuContentRef}
               className={cn(
-                "absolute right-0 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-[200] animate-scale-in",
+                "absolute right-0 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-[300] animate-scale-in",
                 mobileMenuPosition === 'top' ? 'bottom-full' : 'top-full'
               )}
               style={{
