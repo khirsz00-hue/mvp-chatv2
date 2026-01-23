@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState } from 'react'
-import { TestDayTask } from '@/lib/types/dayAssistantV2'
+import { TestDayTask, TestDaySubtask } from '@/lib/types/dayAssistantV2'
 import { Play, DotsThreeVertical, Tag, Brain, Calendar } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import {
@@ -18,14 +18,6 @@ import {
 import { DayAssistantV2TaskMenu } from './DayAssistantV2TaskMenu'
 import { DayAssistantV2TaskTooltip } from './DayAssistantV2TaskTooltip'
 import { supabase } from '@/lib/supabaseClient'
-
-interface Subtask {
-  id: string
-  content: string
-  estimated_duration: number
-  completed: boolean
-  position: number
-}
 
 interface DayAssistantV2TaskCardProps {
   task: TestDayTask
@@ -71,7 +63,7 @@ export function DayAssistantV2TaskCard({
 }: DayAssistantV2TaskCardProps) {
   const todayDate = new Date().toISOString().split('T')[0]
   const priorityBorderColor = getPriorityBorderColor(task.priority)
-  const [firstSubtask, setFirstSubtask] = useState<Subtask | null>(null)
+  const [firstSubtask, setFirstSubtask] = useState<TestDaySubtask | null>(null)
 
   // Fetch first subtask for full-size cards (not compact or overflow)
   useEffect(() => {
@@ -95,7 +87,7 @@ export function DayAssistantV2TaskCard({
         const data = await response.json()
         if (data.subtasks && data.subtasks.length > 0) {
           // Get first incomplete subtask, or first subtask if all completed
-          const firstIncomplete = data.subtasks.find((s: Subtask) => !s.completed)
+          const firstIncomplete = data.subtasks.find((s: TestDaySubtask) => !s.completed)
           setFirstSubtask(firstIncomplete || data.subtasks[0])
         }
       }

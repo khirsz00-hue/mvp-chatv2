@@ -34,8 +34,12 @@ export async function GET(request: NextRequest) {
       .eq('id', taskId)
       .single()
 
-    if (!task || task.user_id !== user.id) {
+    if (!task) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+    }
+    
+    if (task.user_id !== user.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
     // Fetch subtasks
