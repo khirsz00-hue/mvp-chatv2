@@ -894,6 +894,17 @@ export function TasksAssistant() {
   const activeProjectLabel = selectedProject === 'all' 
     ? 'Wszystkie projekty' 
     : projects.find(p => p.id === selectedProject)?.name || 'Projekt'
+  const filterLabelMap: Record<FilterType, string> = {
+    today: 'Zadania na dziś',
+    tomorrow: 'Zadania na jutro',
+    week: 'Zadania na ten tydzień',
+    month: 'Zadania na ten miesiąc',
+    overdue: 'Przeterminowane zadania',
+    unscheduled: 'Zadania do zaplanowania',
+    all: 'Wszystkie zadania',
+    completed: 'Ukończone zadania'
+  }
+  const activeFilterLabel = filterLabelMap[filter] || 'Wszystkie zadania'
   
   const handleDuplicate = async (task: Task) => {
     try {
@@ -1296,7 +1307,7 @@ export function TasksAssistant() {
             {/* Right: Task count badge */}
             <div className="hidden md:block">
               <Badge variant="secondary" className="text-xs px-2 py-1 font-semibold whitespace-nowrap">
-                {sortedTasks.length} {sortedTasks.length === 1 ? 'zadanie' : 'zadań'}
+                {activeFilterLabel} · {sortedTasks.length} {sortedTasks.length === 1 ? 'zadanie' : 'zadań'}
               </Badge>
             </div>
           </div>
@@ -1451,7 +1462,7 @@ export function TasksAssistant() {
               title="Zaznacz wszystkie"
             />
             <span className="text-sm font-medium text-gray-700">
-              Zaznacz wszystkie
+              {activeFilterLabel} — zaznacz wszystkie
             </span>
           </div>
         </div>
