@@ -64,7 +64,7 @@ export function WorkModeModal({
           <button
             onClick={onClose}
             className="p-2 hover:bg-white/20 rounded-lg transition-colors flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center"
-            aria-label="Zamknij"
+            aria-label="Zamknij modal wyboru trybu pracy"
           >
             <X size={24} weight="bold" />
           </button>

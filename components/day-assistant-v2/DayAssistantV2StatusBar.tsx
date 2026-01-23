@@ -155,7 +155,7 @@ export function DayAssistantV2StatusBar({
             {isOverloaded && <Warning size={14} className="text-amber-500 flex-shrink-0" weight="fill" />}
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between gap-2 mb-1">
-                <span className="text-[10px] text-slate-500 font-medium truncate">
+                <span className="text-xs text-slate-500 font-medium truncate">
                   {usedMinutes}/{totalCapacity}min
                 </span>
                 <span className={`text-xs font-bold ${isOverloaded ? 'text-amber-600' : 'text-slate-600'}`}>
