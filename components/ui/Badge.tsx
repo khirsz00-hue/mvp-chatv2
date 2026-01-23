@@ -6,7 +6,10 @@ export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
 
 const Badge = React.forwardRef<HTMLDivElement, BadgeProps>(
   ({ className = '', variant = 'default', ...props }, ref) => {
-    const isInteractive = typeof props.onClick === 'function' || typeof props.onPointerDown === 'function'
+    const isInteractive = 
+      typeof props.onClick === 'function' || 
+      typeof props.onPointerDown === 'function' ||
+      typeof props.onKeyDown === 'function'
     const variants = {
       default: 'bg-gray-100 text-gray-800 border-gray-200',
       secondary: 'bg-blue-100 text-blue-800 border-blue-200',
@@ -31,7 +34,6 @@ const Badge = React.forwardRef<HTMLDivElement, BadgeProps>(
           if (!isActivateKey) return
           e.preventDefault()
           if (props.onClick) props.onClick(e)
-          if (props.onPointerDown) props.onPointerDown(e as React.PointerEvent<HTMLDivElement>)
         }}
         {...props}
       />

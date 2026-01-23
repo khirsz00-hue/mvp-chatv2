@@ -205,7 +205,7 @@ export function TaskCard({
   const dueStr = typeof task.due === 'string' ? task.due : task.due?.date
   const dueInputValue = dueStr ? dueStr.split('T')[0] : ''
 
-  const openDatePicker = (e: React.PointerEvent) => {
+  const openDatePicker = (e: React.SyntheticEvent) => {
     e.stopPropagation()
     const input = datePickerRef.current
     if (!input) return
@@ -336,6 +336,7 @@ export function TaskCard({
                 <Badge 
                   variant="outline" 
                   className="gap-1 text-xs cursor-pointer" 
+                  onClick={openDatePicker}
                   onPointerDown={openDatePicker}
                 >
                   <CalendarBlank size={12} className="md:hidden" />
