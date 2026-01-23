@@ -6,8 +6,11 @@
 
 'use client'
 
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { TestDayTask } from '@/lib/types/dayAssistantV2'
 import { Pause, X, Play } from '@phosphor-icons/react'
+import { FocusMode } from './FocusMode'
+import { cn } from '@/lib/utils'
 
 interface FocusBarProps {
   task: TestDayTask | null
@@ -26,6 +29,31 @@ export function DayAssistantV2FocusBar({
   onResume,
   onStop 
 }: FocusBarProps) {
+  const [focusModeActive, setFocusModeActive] = useState(false)
+  const [applyShake, setApplyShake] = useState(false)
+  const shakeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Shake reminder from FocusMode every 5 minutes
+  const handleShakeReminder = useCallback(() => {
+    setApplyShake(true)
+    if (shakeTimeoutRef.current) {
+      clearTimeout(shakeTimeoutRef.current)
+    }
+    shakeTimeoutRef.current = setTimeout(() => {
+      setApplyShake(false)
+      shakeTimeoutRef.current = null
+    }, 1500)
+  }, [])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (shakeTimeoutRef.current) {
+        clearTimeout(shakeTimeoutRef.current)
+      }
+    }
+  }, [])
+
   if (!task) return null
 
   // Format as MM:SS (not HH:MM:SS)
@@ -36,8 +64,15 @@ export function DayAssistantV2FocusBar({
   }
 
   return (
-    <div className="sticky top-0 z-50 bg-slate-900 rounded-xl shadow-lg hover:shadow-xl transition-shadow mb-3">
-      <div className="flex items-center gap-4 p-3">
+    <div className={cn(
+      "sticky top-0 bg-slate-900 rounded-xl shadow-lg hover:shadow-xl transition-shadow mb-3",
+      focusModeActive ? "z-[90]" : "z-50"
+    )}>
+
+      <div className={cn(
+        "flex items-center gap-4 p-3",
+        applyShake && "focus-reminder-shake"
+      )}>
         
         {/* Timer Display - WITHOUT red dot */}
         <div className="relative w-20 h-12 flex-shrink-0 bg-black/30 rounded-lg flex items-center justify-center px-2 border border-slate-800">
@@ -77,6 +112,12 @@ export function DayAssistantV2FocusBar({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2 flex-shrink-0">
+          <FocusMode
+            isActive={focusModeActive}
+            onToggle={() => setFocusModeActive(!focusModeActive)}
+            onShakeReminder={handleShakeReminder}
+            taskTitle={task.title}
+          />
           {!isPaused ? (
             <button
               onClick={onPause}
