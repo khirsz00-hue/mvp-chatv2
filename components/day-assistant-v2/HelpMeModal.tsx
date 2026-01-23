@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ArrowsClockwise, Trash, Plus } from '@phosphor-icons/react'
 import { toast } from 'sonner'
+import { supabase } from '@/lib/supabaseClient'
 
 interface Task {
   id: string
@@ -101,9 +102,20 @@ export function HelpMeModal({ task, open, onClose, onSuccess }: Props) {
     setLoading(true)
 
     try {
+      // Get authentication session
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        toast.error('Sesja wygasła - zaloguj się ponownie')
+        setLoading(false)
+        return
+      }
+
       const response = await fetch('/api/day-assistant-v2/subtasks/bulk', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
         body: JSON.stringify({
           task_id: task.id,
           steps: steps.map((step, i) => ({
@@ -114,14 +126,18 @@ export function HelpMeModal({ task, open, onClose, onSuccess }: Props) {
         })
       })
 
-      if (!response.ok) throw new Error('Failed to create subtasks')
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to create subtasks')
+      }
 
       toast.success('✅ Kroki utworzone!')
       onSuccess()
       onClose()
     } catch (error) {
       console.error('[HelpMeModal] Error creating subtasks:', error)
-      toast.error('Nie udało się utworzyć kroków')
+      const errorMessage = error instanceof Error ? error.message : 'Nie udało się utworzyć kroków'
+      toast.error(`❌ ${errorMessage}`)
     } finally {
       setLoading(false)
     }
