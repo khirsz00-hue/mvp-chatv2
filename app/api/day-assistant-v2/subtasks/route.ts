@@ -1,6 +1,66 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+export async function GET(request: NextRequest) {
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        global: {
+          headers: {
+            Authorization: request.headers.get('Authorization') || ''
+          }
+        }
+      }
+    )
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const taskId = searchParams.get('task_id')
+
+    if (!taskId) {
+      return NextResponse.json({ error: 'task_id is required' }, { status: 400 })
+    }
+
+    // Verify task belongs to user
+    const { data: task } = await supabase
+      .from('day_assistant_v2_tasks')
+      .select('user_id')
+      .eq('id', taskId)
+      .single()
+
+    if (!task) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+    }
+    
+    if (task.user_id !== user.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    // Fetch subtasks
+    const { data: subtasks, error: fetchError } = await supabase
+      .from('day_assistant_v2_subtasks')
+      .select('*')
+      .eq('task_id', taskId)
+      .order('position', { ascending: true })
+
+    if (fetchError) {
+      console.error('[subtasks] Fetch error:', fetchError)
+      return NextResponse.json({ error: 'Failed to fetch subtasks' }, { status: 500 })
+    }
+
+    return NextResponse.json({ subtasks: subtasks || [] })
+  } catch (error) {
+    console.error('[subtasks] Error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = createClient(
