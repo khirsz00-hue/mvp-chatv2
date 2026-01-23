@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS time_sessions (
   started_at TIMESTAMP NOT NULL,
   ended_at TIMESTAMP,
   duration_seconds INTEGER,
-  session_type TEXT DEFAULT 'manual' CHECK (session_type IN ('manual', 'pomodoro')),
+  session_type TEXT DEFAULT 'manual' CHECK (session_type IN ('manual', 'pomodoro', 'focus')),
   metadata JSONB DEFAULT '{}',
   created_at TIMESTAMP DEFAULT NOW()
 );
