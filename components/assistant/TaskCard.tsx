@@ -205,7 +205,7 @@ export function TaskCard({
   const dueStr = typeof task.due === 'string' ? task.due : task.due?.date
   const dueInputValue = dueStr ? dueStr.split('T')[0] : ''
 
-  const openDatePicker = (e: React.SyntheticEvent) => {
+  const openDatePicker = (e: React.PointerEvent) => {
     e.stopPropagation()
     const input = datePickerRef.current
     if (!input) return
