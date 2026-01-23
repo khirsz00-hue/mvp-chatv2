@@ -37,6 +37,7 @@ import {
 import { format, parseISO } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { useTaskTimer } from './TaskTimer'
+import { getTaskTimeSessions, type TimeSession } from '@/lib/services/timeTrackingService'
 import { AITaskBreakdownModal } from './AITaskBreakdownModal'
 import { PomodoroTimer } from './PomodoroTimer'
 import { TaskChatModal } from './TaskChatModal'
@@ -267,6 +268,8 @@ export function TaskDetailsModal({
 
   const { startTimer, stopTimer, getActiveTimer } = useTaskTimer()
   const { showToast } = useToast()
+  const [timeSessions, setTimeSessions] = useState<TimeSession[]>([])
+  const [timeSessionsLoading, setTimeSessionsLoading] = useState(false)
 
   /* =======================
      FETCH PROJECTS
@@ -628,19 +631,37 @@ W 1-2 zwięzłych zdaniach wyjaśnij jak rozumiesz to zadanie, bez dodatkowych k
     }
   }, [task?.id, getActiveTimer])
 
-  // Get sessions for this task from localStorage (must be before early return)
-  const getSessions = useCallback((storageKey: string) => {
-    if (!task) return []
-    try {
-      const sessions = JSON.parse(localStorage.getItem(storageKey) || '[]')
-      return sessions.filter((s: { taskId: string }) => s.taskId === task.id)
-    } catch {
-      return []
+  // Load unified time sessions for this task
+  useEffect(() => {
+    if (!task?.id) {
+      setTimeSessions([])
+      return
     }
-  }, [task])
 
-  const getTimerSessions = useCallback(() => getSessions('timerSessions'), [getSessions])
-  const getPomodoroSessions = useCallback(() => getSessions('pomodoroSessions'), [getSessions])
+    let mounted = true
+    const load = async () => {
+      setTimeSessionsLoading(true)
+      try {
+        const sessions = await getTaskTimeSessions(task.id, 'assistant_tasks')
+        if (mounted) {
+          setTimeSessions(sessions || [])
+        }
+      } catch (err) {
+        console.error('Failed to load time sessions', err)
+        if (mounted) setTimeSessions([])
+      } finally {
+        if (mounted) setTimeSessionsLoading(false)
+      }
+    }
+    load()
+
+    return () => {
+      mounted = false
+    }
+  }, [task?.id])
+
+  const manualSessions = timeSessions.filter(s => s.session_type === 'manual')
+  const pomodoroSessions = timeSessions.filter(s => s.session_type === 'pomodoro')
 
   if (!task) return null
 
@@ -1337,22 +1358,24 @@ Wygeneruj 4-7 konkretnych subtasków w JSON:
                         <div className="bg-white rounded p-2 max-h-32 overflow-y-auto">
                           {activeTimeTab === 'manual' ? (
                             <div className="space-y-1.5">
-                              {getTimerSessions().length === 0 ? (
+                              {timeSessionsLoading ? (
+                                <p className="text-[10px] text-gray-500 text-center py-3">Ładowanie…</p>
+                              ) : manualSessions.length === 0 ? (
                                 <p className="text-[10px] text-gray-500 text-center py-3">
                                   Brak sesji manualnych
                                 </p>
                               ) : (
-                                getTimerSessions().map((session: any, idx: number) => (
+                                manualSessions.map(session => (
                                   <div
-                                    key={idx}
+                                    key={session.id || session.started_at}
                                     className="flex items-center justify-between text-[10px] border-b border-gray-100 pb-1.5"
                                   >
                                     <div>
                                       <p className="font-medium text-gray-800">
-                                        {formatStopwatch(session.durationSeconds)}
+                                        {formatStopwatch(session.duration_seconds)}
                                       </p>
                                       <p className="text-gray-500">
-                                        {format(parseISO(session.startTime), 'dd MMM HH:mm', { locale: pl })}
+                                        {format(parseISO(session.started_at), 'dd MMM HH:mm', { locale: pl })}
                                       </p>
                                     </div>
                                   </div>
@@ -1361,22 +1384,24 @@ Wygeneruj 4-7 konkretnych subtasków w JSON:
                             </div>
                           ) : (
                             <div className="space-y-1.5">
-                              {getPomodoroSessions().length === 0 ? (
+                              {timeSessionsLoading ? (
+                                <p className="text-[10px] text-gray-500 text-center py-3">Ładowanie…</p>
+                              ) : pomodoroSessions.length === 0 ? (
                                 <p className="text-[10px] text-gray-500 text-center py-3">
                                   Brak sesji pomodoro
                                 </p>
                               ) : (
-                                getPomodoroSessions().map((session: any, idx: number) => (
+                                pomodoroSessions.map(session => (
                                   <div
-                                    key={idx}
+                                    key={session.id || session.started_at}
                                     className="flex items-center justify-between text-[10px] border-b border-gray-100 pb-1.5"
                                   >
                                     <div>
                                       <p className="font-medium text-gray-800">
-                                        🍅 {formatStopwatch(session.durationSeconds)}
+                                        🍅 {formatStopwatch(session.duration_seconds)}
                                       </p>
                                       <p className="text-gray-500">
-                                        {format(parseISO(session.startTime), 'dd MMM HH:mm', { locale: pl })}
+                                        {format(parseISO(session.started_at), 'dd MMM HH:mm', { locale: pl })}
                                       </p>
                                     </div>
                                   </div>
