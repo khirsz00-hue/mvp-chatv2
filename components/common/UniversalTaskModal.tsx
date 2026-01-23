@@ -1444,7 +1444,13 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
 
         {/* Mobile Tab Content Overlay */}
         {activeTab && (
-          <div className="sm:hidden fixed inset-0 bg-black/50 z-40" onClick={() => setActiveTab(null)}>
+          <div 
+            className="sm:hidden fixed inset-0 bg-black/50 z-40" 
+            onClick={() => setActiveTab(null)}
+            onKeyDown={(e) => e.key === 'Escape' && setActiveTab(null)}
+            role="dialog"
+            aria-modal="true"
+          >
             <div 
               className="absolute bottom-[60px] left-0 right-0 bg-white rounded-t-2xl shadow-2xl max-h-[60vh] overflow-y-auto p-4"
               onClick={(e) => e.stopPropagation()}

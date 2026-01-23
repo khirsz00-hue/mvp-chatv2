@@ -16,7 +16,7 @@ export default function TestModalPage() {
     cognitive_load: 3,
     project_id: '',
     priority: 2,
-    due: '2024-02-01',
+    due: '2026-03-01',
     labels: ['praca', 'ważne']
   }
   
@@ -63,7 +63,7 @@ export default function TestModalPage() {
               <li>✅ AI Understanding zawsze widoczny (gdy jest content)</li>
               <li>✅ Mobile: bottom tabs dla advanced features</li>
               <li>✅ Desktop: collapsible sections (bez zmian)</li>
-              <li>✅ Przycisk "Dodaj" zamiast "Utwórz"</li>
+              <li>✅ Przycisk &quot;Dodaj&quot; zamiast &quot;Utwórz&quot;</li>
             </ul>
           </div>
           
