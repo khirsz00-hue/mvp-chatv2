@@ -299,9 +299,6 @@ export function TasksAssistant() {
   useEffect(() => {
     if (!token) return
     
-    // Reset the cleanup flag on each effect run
-    syncCleanupRef.current = true
-    
     const triggerSync = async () => {
       if (!syncCleanupRef.current) return  // Skip if component unmounted
       
