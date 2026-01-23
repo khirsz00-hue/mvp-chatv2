@@ -1299,7 +1299,10 @@ export function TasksAssistant() {
                 {/* Dropdown for more filters and smart views */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="flex-shrink-0 px-2 text-xs inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium transition-colors hover:bg-gray-100 h-9 border border-transparent data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm">
+                    <button 
+                      className="flex-shrink-0 px-2 text-xs inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium transition-colors hover:bg-gray-100 h-9 border border-transparent data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm"
+                      aria-label="Więcej opcji filtrowania"
+                    >
                       <DotsThree size={16} weight="bold" />
                     </button>
                   </DropdownMenuTrigger>
@@ -1423,7 +1426,7 @@ export function TasksAssistant() {
           <div className="flex items-center gap-3">
             <input
               type="checkbox"
-              checked={false}
+              checked={selectedTaskIds.size === sortedTasks.length && sortedTasks.length > 0}
               onChange={toggleAllTasksSelection}
               className="w-4 h-4 text-brand-purple border-gray-300 rounded focus:ring-brand-purple cursor-pointer"
               title="Zaznacz wszystkie"
