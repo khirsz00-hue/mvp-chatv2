@@ -59,8 +59,7 @@ export async function POST(req: Request) {
         if (/^\d{4}-\d{2}-\d{2}$/.test(updates.due_string)) {
           console.warn('⚠️ [Todoist Update] Converting due_string with date format to due_date:', updates.due_string)
           updatePayload.due_date = updates.due_string
-          // Remove due_string to avoid sending both
-          delete updatePayload.due_string
+          // Don't set due_string to avoid sending both
         } else {
           // Natural language string like "today", "tomorrow", "no date"
           updatePayload.due_string = updates.due_string
