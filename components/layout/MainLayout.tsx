@@ -42,6 +42,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [showChat, setShowChat] = useState(false)
+  const [journalRequired, setJournalRequired] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -147,8 +148,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
   
-  // Block scroll when mobile menu is open
-  useEffect(() => {
+    // Block scroll when mobile menu is open
+    useEffect(() => {
     // Store original overflow value
     const originalOverflow = document.body.style.overflow
     
@@ -163,6 +164,36 @@ export default function MainLayout({ children }: MainLayoutProps) {
       document.body.style.overflow = originalOverflow
     }
   }, [isMobileMenuOpen])
+
+  // Wymagaj uruchomienia dziennika na start dnia (z możliwością wyłączenia w ustawieniach)
+  useEffect(() => {
+    const checkJournalRequirement = () => {
+      try {
+        const disabled = localStorage.getItem('journal_guard_disabled') === 'true'
+        if (disabled) {
+          setJournalRequired(false)
+          return
+        }
+
+        const today = new Date().toISOString().split('T')[0]
+        const completedKey = `journal_completed_${today}`
+        const completed = localStorage.getItem(completedKey) === 'true'
+        setJournalRequired(!completed)
+
+        if (!completed) {
+          setActiveView('journal')
+          localStorage.setItem('active_assistant', 'journal')
+        }
+      } catch {
+        // ignore storage issues
+      }
+    }
+
+    checkJournalRequirement()
+    const handleJournalSaved = () => checkJournalRequirement()
+    window.addEventListener('journal-saved', handleJournalSaved)
+    return () => window.removeEventListener('journal-saved', handleJournalSaved)
+  }, [])
   
   const handleQuickAdd = async (taskData: TaskData) => {
     try {
@@ -294,6 +325,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
   }
   
   const handleNavigate = (view: AssistantId) => {
+    if (journalRequired && view !== 'journal') {
+      toast.error('Zapisz dzisiejszy wpis w dzienniku, aby przejść dalej')
+      setActiveView('journal')
+      return
+    }
     setActiveView(view)
     setIsMobileMenuOpen(false) // Close mobile menu after navigation
     try { localStorage.setItem('active_assistant', view) } catch {}
