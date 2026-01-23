@@ -106,6 +106,9 @@ export function TasksAssistant() {
   // Feature flag for unified task API (Phase 2B)
   const USE_UNIFIED_API = process.env.NEXT_PUBLIC_USE_UNIFIED_TASKS === 'true'
   
+  // Ref for cleanup in auto-sync effect
+  const syncCleanupRef = useRef(true)
+  
   const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
 
   const smartViews = useMemo(() => ([
@@ -267,20 +270,24 @@ export function TasksAssistant() {
     }
   }, [showToast])
   
-  // Fetch tasks
+  // Fetch tasks initially
   useEffect(() => {
     // In unified API mode without token, always fetch local tasks
     // In legacy mode, require token
     if (!token && !USE_UNIFIED_API) return
     
+    // Initial fetch on mount
     fetchTasks()
     
-    // Poll every 45 seconds
-    const interval = setInterval(() => {
-      fetchTasks()
-    }, 45000)
-    
-    return () => clearInterval(interval)
+    // Note: Periodic fetching is handled by the auto-sync effect below for Todoist users
+    // For non-Todoist users, we poll every 45 seconds
+    if (!token) {
+      const interval = setInterval(() => {
+        fetchTasks()
+      }, 45000)
+      
+      return () => clearInterval(interval)
+    }
   }, [token, fetchTasks, USE_UNIFIED_API])
   
   // Fetch projects
@@ -292,16 +299,17 @@ export function TasksAssistant() {
   useEffect(() => {
     if (!token) return
     
-    const isActiveRef = { current: true }  // Flag to prevent operations after unmount
+    // Reset the cleanup flag on each effect run
+    syncCleanupRef.current = true
     
     const triggerSync = async () => {
-      if (!isActiveRef.current) return  // Skip if component unmounted
+      if (!syncCleanupRef.current) return  // Skip if component unmounted
       
       try {
         console.log('🔄 [TasksAssistant] Auto-syncing with Todoist...')
         
         const { data } = await supabase.auth.getSession()
-        if (!data?.session || !isActiveRef.current) return
+        if (!data?.session || !syncCleanupRef.current) return
         
         const response = await fetch('/api/todoist/sync', {
           method: 'POST',
@@ -311,19 +319,19 @@ export function TasksAssistant() {
           }
         })
         
-        if (!isActiveRef.current) return  // Check again before proceeding
+        if (!syncCleanupRef.current) return  // Check again before proceeding
         
         if (response.ok) {
           console.log('✅ [TasksAssistant] Todoist sync completed')
           // Refresh tasks after sync
-          if (isActiveRef.current) {
+          if (syncCleanupRef.current) {
             await fetchTasks()
           }
         } else {
           console.warn('⚠️ [TasksAssistant] Todoist sync failed:', response.status)
         }
       } catch (error) {
-        if (isActiveRef.current) {
+        if (syncCleanupRef.current) {
           console.error('❌ [TasksAssistant] Sync error:', error)
         }
       }
@@ -336,7 +344,7 @@ export function TasksAssistant() {
     const syncInterval = setInterval(triggerSync, TODOIST_SYNC_INTERVAL_MS)
     
     return () => {
-      isActiveRef.current = false
+      syncCleanupRef.current = false
       clearInterval(syncInterval)
     }
   }, [token, fetchTasks])
