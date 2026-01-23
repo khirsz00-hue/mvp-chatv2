@@ -148,45 +148,17 @@ export function TaskTimer({ onClose }: TaskTimerProps) {
       
       // Only save if there's actual elapsed time
       if (actualElapsed > 0) {
-        // Save to database via Supabase
-        try {
-          const { supabase } = await import('@/lib/supabaseClient')
-          const { data: { user } } = await supabase.auth.getUser()
-          
-          if (user) {
-            const startedAt = new Date(timerState.startTime).toISOString()
-            const endedAt = new Date().toISOString()
-            
-            await supabase
-              .from('time_sessions')
-              .insert({
-                user_id: user.id,
-                task_id: timerState.taskId,
-                task_source: 'assistant_tasks',
-                task_title: timerState.taskTitle,
-                started_at: startedAt,
-                ended_at: endedAt,
-                duration_seconds: actualElapsed,
-                session_type: 'manual'
-              })
-            
-            console.log('✅ Timer session saved to database')
-          }
-        } catch (error) {
-          console.error('❌ Failed to save timer session to database:', error)
-        }
-        
-        // Also save to localStorage as backup
-        const sessions: TimerSession[] = JSON.parse(localStorage.getItem('timerSessions') || '[]')
-        const newSession: TimerSession = {
-          taskId: timerState.taskId,
-          taskTitle: timerState.taskTitle,
-          startTime: new Date(timerState.startTime).toISOString(),
-          endTime: new Date().toISOString(),
-          durationSeconds: actualElapsed
-        }
-        sessions.push(newSession)
-        localStorage.setItem('timerSessions', JSON.stringify(sessions))
+        // Use unified time tracking service
+        const { saveTimeSession } = await import('@/lib/services/timeTrackingService')
+        await saveTimeSession({
+          task_id: timerState.taskId,
+          task_title: timerState.taskTitle,
+          started_at: new Date(timerState.startTime).toISOString(),
+          ended_at: new Date().toISOString(),
+          duration_seconds: actualElapsed,
+          session_type: 'manual',
+          task_source: 'assistant_tasks'
+        })
       }
     }
     
@@ -315,15 +287,13 @@ export function useTaskTimer() {
     window.dispatchEvent(new CustomEvent('timerStateChanged', { detail: timerState }))
   }
   
-  const stopTimer = () => {
+  const stopTimer = async () => {
     const stored = localStorage.getItem('taskTimer')
     if (stored) {
       const parsed = JSON.parse(stored)
       
       // Save session to history if timer was running
       if (parsed.taskId && parsed.taskTitle && parsed.startTime) {
-        const sessions: TimerSession[] = JSON.parse(localStorage.getItem('timerSessions') || '[]')
-        
         // Calculate actual elapsed time
         let actualElapsed = parsed.elapsedSeconds || 0
         if (parsed.isRunning && parsed.startTime) {
@@ -333,15 +303,16 @@ export function useTaskTimer() {
         
         // Only save if there's actual elapsed time
         if (actualElapsed > 0) {
-          const newSession: TimerSession = {
-            taskId: parsed.taskId,
-            taskTitle: parsed.taskTitle,
-            startTime: new Date(parsed.startTime).toISOString(),
-            endTime: new Date().toISOString(),
-            durationSeconds: actualElapsed
-          }
-          sessions.push(newSession)
-          localStorage.setItem('timerSessions', JSON.stringify(sessions))
+          const { saveTimeSession } = await import('@/lib/services/timeTrackingService')
+          await saveTimeSession({
+            task_id: parsed.taskId,
+            task_title: parsed.taskTitle,
+            started_at: new Date(parsed.startTime).toISOString(),
+            ended_at: new Date().toISOString(),
+            duration_seconds: actualElapsed,
+            session_type: 'manual',
+            task_source: 'assistant_tasks'
+          })
         }
       }
     }
