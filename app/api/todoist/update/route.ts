@@ -6,7 +6,8 @@ interface TodoistUpdatePayload {
   priority?: number
   project_id?: string
   labels?: string[]
-  due_date?: string | null  // ✅ Changed from due_string
+  due_date?: string | null
+  due_string?: string
 }
 
 export async function POST(req: Request) {
@@ -27,7 +28,7 @@ export async function POST(req: Request) {
     if (updates.project_id !== undefined) updatePayload.project_id = updates.project_id
     if (updates.labels !== undefined) updatePayload.labels = updates.labels
     
-    // ✅ FIX: Handle due date - use due_date (YYYY-MM-DD format only)
+    // ✅ FIX: Handle due date - use due_string for setting, due_date: null for clearing
     if (updates.due !== undefined) {
       if (updates.due === null) {
         // Remove due date
@@ -35,14 +36,14 @@ export async function POST(req: Request) {
       } else if (typeof updates.due === 'string') {
         // Validate format YYYY-MM-DD
         if (/^\d{4}-\d{2}-\d{2}$/.test(updates.due)) {
-          updatePayload.due_date = updates.due
+          updatePayload.due_string = updates.due
         } else {
           console.warn('⚠️ [Todoist Update] Invalid due date format:', updates.due)
         }
       } else if (updates.due && typeof updates.due === 'object' && updates.due.date) {
         // Extract date from object
         if (/^\d{4}-\d{2}-\d{2}$/.test(updates.due.date)) {
-          updatePayload.due_date = updates.due.date
+          updatePayload.due_string = updates.due.date
         } else {
           console.warn('⚠️ [Todoist Update] Invalid due date format in object:', updates.due.date)
         }
