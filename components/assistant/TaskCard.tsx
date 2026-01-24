@@ -78,7 +78,12 @@ export function TaskCard({
   // Detect mobile device
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent))
+      // Prioritize user agent detection for actual mobile devices
+      // even if desktop window is resized small
+      const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+      const isSmallScreen = window.innerWidth < 768
+      // Only treat as mobile if it's actually a mobile device OR small screen on non-desktop
+      setIsMobile(isMobileDevice || (isSmallScreen && !window.matchMedia('(pointer: fine)').matches))
     }
     checkMobile()
     window.addEventListener('resize', checkMobile)
@@ -235,6 +240,8 @@ export function TaskCard({
       try {
         input.showPicker()
       } catch (err) {
+        // showPicker() can fail due to user gesture requirements or browser restrictions
+        console.log('Native date picker failed, falling back to click:', err)
         input.click()
       }
     } else {
