@@ -22,6 +22,8 @@ export function initPWAGestureControl() {
   }
 
   const touchMoveHandler = (e: TouchEvent) => {
+    if (e.touches.length === 0) return // Safety check
+    
     const touchY = e.touches[0].clientY
     const touchYDelta = touchY - lastTouchY
     lastTouchY = touchY
@@ -32,8 +34,8 @@ export function initPWAGestureControl() {
     }
   }
 
-  // Prevent pinch-to-zoom gesture
-  const touchHandler = (e: TouchEvent) => {
+  // Prevent pinch-to-zoom gesture (multiple touches)
+  const multiTouchHandler = (e: TouchEvent) => {
     if (e.touches.length > 1) {
       e.preventDefault()
     }
@@ -66,7 +68,7 @@ export function initPWAGestureControl() {
   // Add event listeners
   document.addEventListener('touchstart', touchStartHandler, { passive: false })
   document.addEventListener('touchmove', touchMoveHandler, { passive: false })
-  document.addEventListener('touchstart', touchHandler, { passive: false })
+  document.addEventListener('touchstart', multiTouchHandler, { passive: false })
   document.addEventListener('touchend', touchEndHandler, { passive: false })
   document.addEventListener('contextmenu', contextMenuHandler, { passive: false })
   document.addEventListener('wheel', wheelHandler, { passive: false })
@@ -75,7 +77,7 @@ export function initPWAGestureControl() {
   return () => {
     document.removeEventListener('touchstart', touchStartHandler)
     document.removeEventListener('touchmove', touchMoveHandler)
-    document.removeEventListener('touchstart', touchHandler)
+    document.removeEventListener('touchstart', multiTouchHandler)
     document.removeEventListener('touchend', touchEndHandler)
     document.removeEventListener('contextmenu', contextMenuHandler)
     document.removeEventListener('wheel', wheelHandler)
