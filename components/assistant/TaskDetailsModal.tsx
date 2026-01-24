@@ -109,6 +109,22 @@ const formatStopwatch = (seconds: number): string => {
     .padStart(2, '0')}`
 }
 
+/**
+ * Render source badge for time session
+ */
+const SessionSourceBadge = ({ source }: { source: string }) => {
+  const isDayAssistant = source === 'day_assistant_v2'
+  return (
+    <span className={`ml-2 px-1 rounded text-[8px] ${
+      isDayAssistant 
+        ? 'bg-blue-100 text-blue-700' 
+        : 'bg-purple-100 text-purple-700'
+    }`}>
+      {isDayAssistant ? 'Asystent Dnia' : 'Zadania'}
+    </span>
+  )
+}
+
 const POMODORO_WORK_DURATION = 25 * 60
 const POMODORO_SHORT_BREAK_DURATION = 5 * 60
 const POMODORO_LONG_BREAK_DURATION = 15 * 60
@@ -642,9 +658,16 @@ W 1-2 zwięzłych zdaniach wyjaśnij jak rozumiesz to zadanie, bez dodatkowych k
     const load = async () => {
       setTimeSessionsLoading(true)
       try {
-        const sessions = await getTaskTimeSessions(task.id, 'assistant_tasks')
+        // ✅ Fetch from BOTH sources
+        const assistantSessions = await getTaskTimeSessions(task.id, 'assistant_tasks')
+        const dayAssistantSessions = await getTaskTimeSessions(task.id, 'day_assistant_v2')
+        
+        // Combine and sort by date (newest first)
+        const allSessions = [...assistantSessions, ...dayAssistantSessions]
+          .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())
+        
         if (mounted) {
-          setTimeSessions(sessions || [])
+          setTimeSessions(allSessions || [])
         }
       } catch (err) {
         console.error('Failed to load time sessions', err)
@@ -1376,6 +1399,8 @@ Wygeneruj 4-7 konkretnych subtasków w JSON:
                                       </p>
                                       <p className="text-gray-500">
                                         {format(parseISO(session.started_at), 'dd MMM HH:mm', { locale: pl })}
+                                        {/* Show source badge */}
+                                        <SessionSourceBadge source={session.task_source} />
                                       </p>
                                     </div>
                                   </div>
@@ -1402,6 +1427,8 @@ Wygeneruj 4-7 konkretnych subtasków w JSON:
                                       </p>
                                       <p className="text-gray-500">
                                         {format(parseISO(session.started_at), 'dd MMM HH:mm', { locale: pl })}
+                                        {/* Show source badge */}
+                                        <SessionSourceBadge source={session.task_source} />
                                       </p>
                                     </div>
                                   </div>
