@@ -1,16 +1,34 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { ChatCircle, X, Minus, PaperPlaneRight, CircleNotch, Sparkle } from '@phosphor-icons/react'
+import { ChatCircle, X, Minus, PaperPlaneRight, CircleNotch, Sparkle, Play, Clock, Calendar } from '@phosphor-icons/react'
 import { supabase } from '@/lib/supabaseClient'
 import { toast } from 'sonner'
 import { useChatStream } from '@/hooks/useChatStream'
+
+interface TaskData {
+  id: string
+  title: string
+  description?: string
+  priority: number
+  estimate_min: number
+  due_date?: string
+}
+
+interface StructuredResponse {
+  type: 'tasks' | 'meeting_slots' | 'text'
+  text: string
+  tasks?: TaskData[]
+  slots?: Array<{ time: string; duration: number; energyLevel?: number }>
+  footer?: string
+}
 
 interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
   timestamp: Date
+  structured?: StructuredResponse
 }
 
 interface ChatAssistantProps {
@@ -18,21 +36,112 @@ interface ChatAssistantProps {
   onClose: () => void
 }
 
+// TaskCard component for rendering tasks in chat
+function TaskCard({ task }: { task: TaskData }) {
+  const priorityColors = {
+    1: { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-300', label: 'P1' },
+    2: { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300', label: 'P2' },
+    3: { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-300', label: 'P3' },
+    4: { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300', label: 'P4' }
+  }
+  
+  const priority = priorityColors[task.priority as keyof typeof priorityColors] || priorityColors[4]
+  
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return ''
+    const date = new Date(dateStr)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const taskDate = new Date(date)
+    taskDate.setHours(0, 0, 0, 0)
+    
+    if (taskDate.getTime() === today.getTime()) return 'Dziś'
+    if (taskDate.getTime() === today.getTime() + 86400000) return 'Jutro'
+    if (taskDate < today) return 'Przeterminowane'
+    return date.toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })
+  }
+  
+  return (
+    <div className="bg-white border-2 border-gray-200 rounded-xl p-4 hover:shadow-lg transition-shadow cursor-pointer mt-2">
+      <div className="flex items-start justify-between mb-2">
+        <div className="flex items-center gap-2 flex-1">
+          <span className={`${priority.bg} ${priority.text} ${priority.border} border px-2 py-0.5 rounded text-xs font-bold`}>
+            {priority.label}
+          </span>
+          <h3 className="font-semibold text-gray-900 text-sm">{task.title}</h3>
+        </div>
+        <button 
+          onClick={() => {
+            // Navigate to task or start timer
+            window.location.href = `/day-assistant-v2?task=${task.id}`
+          }}
+          className="px-3 py-1 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-lg text-xs hover:scale-105 transition flex items-center gap-1 flex-shrink-0 ml-2">
+          <Play size={12} weight="fill" />
+          Zacznij
+        </button>
+      </div>
+      <div className="flex items-center gap-3 text-xs text-gray-600">
+        <span className="flex items-center gap-1">
+          <Clock size={14} weight="bold" />
+          {task.estimate_min} min
+        </span>
+        {task.due_date && (
+          <span className="flex items-center gap-1">
+            <Calendar size={14} weight="bold" />
+            {formatDate(task.due_date)}
+          </span>
+        )}
+      </div>
+      {task.description && (
+        <p className="text-xs text-gray-500 mt-2 line-clamp-2">{task.description}</p>
+      )}
+    </div>
+  )
+}
+
+// Meeting slot card component
+function MeetingSlotCard({ slot }: { slot: { time: string; duration: number; energyLevel?: number } }) {
+  return (
+    <div className="bg-white border-2 border-cyan-200 rounded-xl p-3 hover:shadow-lg transition-shadow cursor-pointer mt-2">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="font-semibold text-gray-900 text-sm">{slot.time}</div>
+          <div className="text-xs text-gray-600 mt-1">
+            {slot.duration} min
+            {slot.energyLevel && (
+              <span className="ml-2">• Energia: {slot.energyLevel}/10</span>
+            )}
+          </div>
+        </div>
+        <Calendar size={20} className="text-cyan-600" weight="bold" />
+      </div>
+    </div>
+  )
+}
+
 export function ChatAssistant({ open, onClose }: ChatAssistantProps) {
   const [isMinimized, setIsMinimized] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [lastMessageTime, setLastMessageTime] = useState(0)
-  const { streamMessage, isStreaming } = useChatStream()
+  const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to bottom when new messages arrive (only if user is near bottom)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const container = messagesContainerRef.current
+    if (!container) return
+
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100
+    
+    if (isNearBottom) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    }
   }, [messages])
 
   const handleSend = async () => {
-    if (!input.trim() || isStreaming) return
+    if (!input.trim() || isLoading) return
 
     // Rate limiting: min 2s between messages
     const now = Date.now()
@@ -41,6 +150,7 @@ export function ChatAssistant({ open, onClose }: ChatAssistantProps) {
       return
     }
     setLastMessageTime(now)
+    setIsLoading(true)
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
@@ -50,6 +160,7 @@ export function ChatAssistant({ open, onClose }: ChatAssistantProps) {
     }
 
     setMessages(prev => [...prev, userMessage])
+    const currentInput = input.trim()
     setInput('')
 
     try {
@@ -59,34 +170,90 @@ export function ChatAssistant({ open, onClose }: ChatAssistantProps) {
         return
       }
 
-      // Create AI message placeholder
-      const aiMessage: Message = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: '',
-        timestamp: new Date()
-      }
-      
-      setMessages(prev => [...prev, aiMessage])
+      // Call API to check if we get structured response
+      const response = await fetch('/api/chat-assistant', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          message: currentInput,
+          conversationHistory: messages.slice(-6).map(m => ({ role: m.role, content: m.content }))
+        })
+      })
 
-      // Stream response
-      await streamMessage(
-        input.trim(),
-        messages.slice(-6).map(m => ({ role: m.role, content: m.content })),
-        session.access_token,
-        (chunk) => {
-          // Update AI message content in real-time
-          setMessages(prev => prev.map(msg => 
-            msg.id === aiMessage.id 
-              ? { ...msg, content: msg.content + chunk }
-              : msg
-          ))
+      if (!response.ok) {
+        throw new Error('Failed to get response')
+      }
+
+      // Check if it's a structured JSON response or a stream
+      const contentType = response.headers.get('content-type')
+      
+      if (contentType?.includes('application/json')) {
+        // Structured response
+        const data: StructuredResponse = await response.json()
+        
+        const aiMessage: Message = {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: data.text,
+          timestamp: new Date(),
+          structured: data
         }
-      )
+        
+        setMessages(prev => [...prev, aiMessage])
+      } else {
+        // Stream response
+        const aiMessage: Message = {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: '',
+          timestamp: new Date()
+        }
+        
+        setMessages(prev => [...prev, aiMessage])
+
+        // Read the stream
+        const reader = response.body?.getReader()
+        const decoder = new TextDecoder()
+
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            const chunk = decoder.decode(value, { stream: true })
+            const lines = chunk.split('\n\n')
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6)
+                if (data === '[DONE]') continue
+
+                try {
+                  const parsed = JSON.parse(data)
+                  if (parsed.text) {
+                    setMessages(prev => prev.map(msg => 
+                      msg.id === aiMessage.id 
+                        ? { ...msg, content: msg.content + parsed.text }
+                        : msg
+                    ))
+                  }
+                } catch (e) {
+                  // Ignore parse errors
+                }
+              }
+            }
+          }
+        }
+      }
 
     } catch (error) {
       console.error('Chat error:', error)
       toast.error('Błąd podczas wysyłania wiadomości')
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -146,17 +313,20 @@ export function ChatAssistant({ open, onClose }: ChatAssistantProps) {
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+      <div 
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50"
+        style={{ paddingBottom: '20px' }}>
         {messages.length === 0 && (
           <div className="text-center text-gray-500 text-sm mt-10">
             <Sparkle size={32} className="mx-auto mb-2 text-gray-400" />
             <p>Zapytaj o zadania, priorytety,<br/>dziennik lub wzorce zachowań</p>
             <div className="mt-6 space-y-2">
               {[
-                'Jakie mam zadania na dziś?',
-                'Kiedy jestem najbardziej produktywny?',
-                'Jak spałem ostatnio?',
-                'Które zadania odkładam?'
+                'Co mam na dziś?',
+                'Jakie mam przeterminowane?',
+                'Kiedy najlepszy czas na spotkanie?',
+                'Nie mogę się skupić'
               ].map((suggestion) => (
                 <button
                   key={suggestion}
@@ -180,24 +350,46 @@ export function ChatAssistant({ open, onClose }: ChatAssistantProps) {
               </div>
             )}
             
-            <div className={`max-w-[80%] px-4 py-2 rounded-2xl text-sm
-                           ${msg.role === 'user' 
-                             ? 'rounded-tr-sm bg-gradient-to-r from-purple-600 to-pink-600 text-white' 
-                             : 'rounded-tl-sm bg-white text-gray-900 shadow-sm border border-gray-100'
-                           }`}>
-              {msg.content}
+            <div className={`max-w-[85%] ${msg.role === 'user' ? '' : 'flex-1'}`}>
+              <div className={`px-4 py-2 rounded-2xl text-sm
+                             ${msg.role === 'user' 
+                               ? 'rounded-tr-sm bg-gradient-to-r from-purple-600 to-pink-600 text-white' 
+                               : 'rounded-tl-sm bg-white text-gray-900 shadow-sm border border-gray-100'
+                             }`}>
+                {msg.content}
+              </div>
+              
+              {/* Render structured content (tasks or slots) */}
+              {msg.role === 'assistant' && msg.structured && (
+                <div className="mt-2">
+                  {msg.structured.type === 'tasks' && msg.structured.tasks && (
+                    <div className="space-y-2">
+                      {msg.structured.tasks.map(task => (
+                        <TaskCard key={task.id} task={task} />
+                      ))}
+                    </div>
+                  )}
+                  
+                  {msg.structured.type === 'meeting_slots' && msg.structured.slots && (
+                    <div className="space-y-2">
+                      {msg.structured.slots.map((slot, idx) => (
+                        <MeetingSlotCard key={idx} slot={slot} />
+                      ))}
+                    </div>
+                  )}
+                  
+                  {msg.structured.footer && (
+                    <div className="mt-2 px-4 py-2 rounded-xl text-sm bg-white text-gray-700 border border-gray-100">
+                      {msg.structured.footer}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         ))}
         
-        {/* Typing indicator */}
-        {isStreaming && messages.length > 0 && messages[messages.length - 1]?.role === 'assistant' && messages[messages.length - 1]?.content === '' && (
-          <div className="flex gap-2 ml-10">
-            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-          </div>
-        )}
+        {/* Typing indicator - removed as we don't use streaming anymore for structured */}
         
         <div ref={messagesEndRef} />
       </div>
@@ -211,18 +403,18 @@ export function ChatAssistant({ open, onClose }: ChatAssistantProps) {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
             placeholder="Zapytaj o zadania, priorytety..."
-            disabled={isStreaming}
+            disabled={isLoading}
             className="flex-1 px-4 py-2 rounded-full border border-gray-300
                        focus:outline-none focus:ring-2 focus:ring-cyan-500
                        text-sm disabled:bg-gray-100"
           />
           <button 
             onClick={handleSend}
-            disabled={isStreaming || !input.trim()}
+            disabled={isLoading || !input.trim()}
             className="w-10 h-10 rounded-full bg-gradient-to-r from-cyan-600 to-blue-600
                        text-white flex items-center justify-center
                        hover:scale-110 transition disabled:opacity-50 disabled:scale-100">
-            {isStreaming ? (
+            {isLoading ? (
               <CircleNotch size={20} weight="bold" className="animate-spin" />
             ) : (
               <PaperPlaneRight size={20} weight="fill" />

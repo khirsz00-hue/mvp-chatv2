@@ -5,7 +5,15 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedSupabaseClient, getAuthenticatedUser } from '@/lib/supabaseAuth'
-import { fetchChatContext, formatMinimalContextForAI } from '@/lib/services/chatContextService'
+import { 
+  fetchChatContext, 
+  formatMinimalContextForAI,
+  findFreeTimeSlots,
+  getOverdueTasks,
+  getTodayTasks,
+  getSimplestTasks,
+  TaskContext
+} from '@/lib/services/chatContextService'
 import OpenAI from 'openai'
 
 // Initialize OpenAI client only if API key is available
@@ -25,26 +33,59 @@ interface ChatRequest {
   conversationHistory?: ChatMessage[]
 }
 
-const SYSTEM_PROMPT = `Jesteś AI asystentem ADHD Buddy. 
+interface StructuredResponse {
+  type: 'tasks' | 'meeting_slots' | 'text'
+  text: string
+  tasks?: TaskContext[]
+  slots?: Array<{ time: string; duration: number; energyLevel?: number }>
+  footer?: string
+}
 
-ZASADY ODPOWIEDZI:
-- Maksymalnie 1-2 zdania
-- Zero pouczeń ("powinieneś", "sugeruję", "warto")
+const SYSTEM_PROMPT = `Jesteś asystentem ADHD. Komunikuj się zgodnie z tymi zasadami:
+
+STYL ODPOWIEDZI:
+- Maksymalnie 2-3 krótkie zdania
+- Używaj wypunktowań i emoji (✅ ⏰ 🎯 ⚡ 💪 ⚠️)
+- ZERO pouczeń typu "powinieneś", "warto byłoby", "sugeruję"
 - Tylko konkretne fakty i liczby
-- Format: "{odpowiedź}. {opcjonalny dodatkowy fakt}."
+- Akcent na TO CO TERAZ, nie na przyszłość
 
-PRZYKŁADY:
+PRZYKŁADY DOBRYCH ODPOWIEDZI:
+
 User: "Kiedy najlepszy czas na spotkanie?"
-AI: "Środa 15:00 - wolny slot, energia 8/10."
+AI: "✅ Najbliższe wolne:
+• Środa 15:00-16:00 (energia 8/10)
+• Czwartek 10:00-11:30 (najlepszy focus)
+Która opcja?"
 
-User: "Jakie zadania na dziś?"
-AI: "8 zadań, 210 min. 3 MUST: mvpPost, Faktury, Pavel Lux."
+User: "Jakie mam zadania na dziś?"
+AI: "🎯 Dziś masz 6 zadań (3h 20min):
+[Pokaż jako karty - system to obsłuży]
+Reszta (3) ma niższy priorytet."
 
-User: "Jak spałem?"
-AI: "Ostatnie 7 dni: 6.2h średnio. Najlepiej: sobota (8h)."
+User: "Nie mogę się skupić"
+AI: "💪 Rozumiem. Wybierz JEDNO:
+[Pokaż najprostsze zadania jako karty]
+Od którego zaczynasz?"
 
-NIE TWÓRZ kolejek zadań - to robi Day Assistant V2.
-NIE POUCZAJ jak pracować.`
+User: "Jakie mam przeterminowane?"
+AI: "⚠️ 4 przeterminowane (łącznie 2h 15min):
+[Pokaż jako karty]
+Które jako pierwsze?"
+
+ZAKAZANE FORMUŁOWANIA:
+❌ "Powinieneś zacząć od..."
+❌ "Sugerowałbym, aby..."
+❌ "Warto byłoby..."
+❌ "Proponuję następujące kroki..."
+❌ Długie paragrafy
+
+DOZWOLONE:
+✅ "Masz X zadań"
+✅ "Najlepszy czas: ..."
+✅ "Od którego zaczynasz?"
+✅ Wypunktowania
+✅ Karty zadań (automatycznie dodane przez system)`
 
 export async function POST(request: NextRequest) {
   try {
@@ -100,6 +141,79 @@ export async function POST(request: NextRequest) {
 - Overdue: ${context.tasks.overdue.length}
 - Journal entries: ${context.journal.recent.length}
 - Active decisions: ${context.decisions.active.length}`)
+
+    // Detect user intent and prepare structured response if needed
+    const userMessageLower = message.toLowerCase()
+    let structuredResponse: StructuredResponse | null = null
+
+    // Intent: Meeting time questions
+    if (
+      userMessageLower.includes('spotkanie') ||
+      userMessageLower.includes('wolny') ||
+      userMessageLower.includes('umówić') ||
+      (userMessageLower.includes('kiedy') && (userMessageLower.includes('czas') || userMessageLower.includes('slot')))
+    ) {
+      const slots = await findFreeTimeSlots(supabase, user.id)
+      if (slots.length > 0) {
+        structuredResponse = {
+          type: 'meeting_slots',
+          text: `✅ Najbliższe wolne sloty:`,
+          slots: slots
+        }
+      }
+    }
+    // Intent: Tasks today
+    else if (
+      (userMessageLower.includes('zadania') || userMessageLower.includes('task') || userMessageLower.includes('co')) &&
+      (userMessageLower.includes('dziś') || userMessageLower.includes('dzisiaj') || userMessageLower.includes('today'))
+    ) {
+      const tasks = await getTodayTasks(supabase, user.id, 5)
+      const totalTime = tasks.reduce((sum, t) => sum + t.estimate_min, 0)
+      const totalCount = context.tasks.today.length
+      structuredResponse = {
+        type: 'tasks',
+        text: `🎯 Dziś masz ${totalCount} ${totalCount === 1 ? 'zadanie' : totalCount < 5 ? 'zadania' : 'zadań'} (${Math.floor(totalTime / 60)}h ${totalTime % 60}min):`,
+        tasks: tasks,
+        footer: totalCount > 5 ? `Reszta (${totalCount - 5}) ma niższy priorytet.` : undefined
+      }
+    }
+    // Intent: Overdue tasks
+    else if (
+      (userMessageLower.includes('przeterminowane') || userMessageLower.includes('overdue') || userMessageLower.includes('spóźnione')) ||
+      (userMessageLower.includes('jakie') && userMessageLower.includes('zaległe'))
+    ) {
+      const tasks = await getOverdueTasks(supabase, user.id, 5)
+      const totalTime = tasks.reduce((sum, t) => sum + t.estimate_min, 0)
+      structuredResponse = {
+        type: 'tasks',
+        text: `⚠️ ${tasks.length} ${tasks.length === 1 ? 'przeterminowane' : 'przeterminowanych'} (łącznie ${Math.floor(totalTime / 60)}h ${totalTime % 60}min):`,
+        tasks: tasks,
+        footer: 'Które jako pierwsze?'
+      }
+    }
+    // Intent: Emotional support / overwhelmed
+    else if (
+      userMessageLower.includes('nie mogę się skupić') ||
+      userMessageLower.includes('nie mogę się ogarnąć') ||
+      userMessageLower.includes('przytłacza') ||
+      userMessageLower.includes('za dużo') ||
+      userMessageLower.includes('overwhelmed')
+    ) {
+      const tasks = await getSimplestTasks(supabase, user.id, 3)
+      structuredResponse = {
+        type: 'tasks',
+        text: `💪 Rozumiem. Wybierz JEDNO:`,
+        tasks: tasks,
+        footer: 'Od którego zaczynasz?'
+      }
+    }
+
+    // If we have structured response, return it immediately without calling OpenAI
+    if (structuredResponse) {
+      console.log(`✅ [Chat Assistant API] Returning structured response: ${structuredResponse.type}`)
+      
+      return NextResponse.json(structuredResponse)
+    }
 
     // Build messages for OpenAI
     const messages: ChatMessage[] = [
