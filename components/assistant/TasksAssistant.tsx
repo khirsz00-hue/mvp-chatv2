@@ -83,10 +83,10 @@ export function TasksAssistant() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(false)
-  const [view, setView] = useState<ViewType>('list')
+  const [view, setView] = useState<ViewType>('board')
   const [boardGrouping, setBoardGrouping] = useState<BoardGrouping>('day')
   const [filters, setFilters] = useState<FiltersState>({})
-  const [filter, setFilter] = useState<FilterType>('today')  // ✅ Default to "Dziś"
+  const [filter, setFilter] = useState<FilterType>('week')  // ✅ Default to "Tydzień"
   const [completedRange, setCompletedRange] = useState<CompletedRange>('recent')
   const [completedSearch, setCompletedSearch] = useState('')
   const [sortBy, setSortBy] = useState<SortType>('date')
@@ -1469,7 +1469,7 @@ export function TasksAssistant() {
       )}
       
       {/* Content */}
-      <div className="mt-6">
+      <div className="mt-6 pb-24">
         {loading && tasks.length === 0 ? (
           <Card className="p-8 text-center">
             <div className="flex items-center justify-center gap-2">
@@ -1588,48 +1588,48 @@ export function TasksAssistant() {
         <div className="flex items-center justify-around px-2 py-3">
           <button
             onClick={() => setMobileBottomSheet('filter')}
-            className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-all min-w-[44px] min-h-[44px]"
+            className="flex flex-col items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-all min-w-[44px] min-h-[44px]"
             aria-label="Filtry"
           >
-            <Funnel size={20} weight="bold" className="text-brand-purple" />
-            <span className="text-xs font-medium text-gray-700">Filtr</span>
+            <CalendarBlank size={18} weight="bold" className="text-brand-purple" />
+            <span className="text-xs font-medium text-gray-700">Data</span>
           </button>
           
           {view === 'list' && (
             <button
               onClick={() => setMobileBottomSheet('group')}
-              className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-all min-w-[44px] min-h-[44px]"
+              className="flex flex-col items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-all min-w-[44px] min-h-[44px]"
               aria-label="Grupowanie"
             >
-              <SlidersHorizontal size={20} weight="bold" className="text-brand-purple" />
+              <SlidersHorizontal size={18} weight="bold" className="text-brand-purple" />
               <span className="text-xs font-medium text-gray-700">Grupuj</span>
             </button>
           )}
           
           <button
             onClick={() => setMobileBottomSheet('sort')}
-            className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-all min-w-[44px] min-h-[44px]"
+            className="flex flex-col items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-all min-w-[44px] min-h-[44px]"
             aria-label="Sortowanie"
           >
-            <SortAscending size={20} weight="bold" className="text-brand-purple" />
+            <SortAscending size={18} weight="bold" className="text-brand-purple" />
             <span className="text-xs font-medium text-gray-700">Sort</span>
           </button>
           
           <button
             onClick={() => setMobileBottomSheet('project')}
-            className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-all min-w-[44px] min-h-[44px]"
+            className="flex flex-col items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-all min-w-[44px] min-h-[44px]"
             aria-label="Projekty"
           >
-            <FolderOpen size={20} weight="bold" className="text-brand-purple" />
+            <FolderOpen size={18} weight="bold" className="text-brand-purple" />
             <span className="text-xs font-medium text-gray-700">Projekt</span>
           </button>
           
           <button
             onClick={() => setMobileBottomSheet('quick')}
-            className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-all min-w-[44px] min-h-[44px]"
+            className="flex flex-col items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-all min-w-[44px] min-h-[44px]"
             aria-label="Szybkie widoki"
           >
-            <Lightning size={20} weight="bold" className="text-brand-purple" />
+            <Lightning size={18} weight="bold" className="text-brand-purple" />
             <span className="text-xs font-medium text-gray-700">Szybkie</span>
           </button>
         </div>
