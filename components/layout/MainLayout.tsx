@@ -10,7 +10,6 @@ import { TasksAssistant } from '@/components/assistant/TasksAssistant'
 import { JournalAssistantWrapper } from '@/components/journal/JournalAssistantWrapper'
 import { DecisionAssistant } from '@/src/features/decision-assistant/components/DecisionAssistant'
 import { DayAssistantV2View } from '@/components/day-assistant-v2/DayAssistantV2View'
-import { WeekAssistantView } from '@/components/week-assistant/WeekAssistantView'
 import SubscriptionWall from '@/components/subscription/SubscriptionWall'
 import { VoiceCapture } from '@/components/voice/VoiceCapture'
 import TrialBanner from '@/components/subscription/TrialBanner'
@@ -257,6 +256,18 @@ export default function MainLayout({ children }: MainLayoutProps) {
   }
   
   const renderAssistant = () => {
+    // Handle legacy 'planning' value
+    if (activeView === 'planning' as any) {
+      return (
+        <div className="glass p-8 rounded-2xl text-center">
+          <h2 className="text-2xl font-bold mb-4">Asystent Tygodnia</h2>
+          <p className="text-muted-foreground">
+            Ten asystent został usunięty
+          </p>
+        </div>
+      )
+    }
+    
     switch (activeView) {
       case 'tasks':
         return <TasksAssistant />
@@ -303,8 +314,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </div>
         )
       
-      case 'planning':
-        return <WeekAssistantView />
       case 'support':
         return (
           <div className="glass p-8 rounded-2xl text-center">
