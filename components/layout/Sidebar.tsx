@@ -2,11 +2,11 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { ListChecks, CalendarBlank, Notebook, Brain, HandHeart, GearSix, Sun, Users, CalendarCheck, Sparkle, SunHorizon, UserCircle } from '@phosphor-icons/react'
+import { ListChecks, Notebook, Brain, HandHeart, GearSix, Sun, Users, CalendarCheck, Sparkle, SunHorizon, UserCircle } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 
 // Updated assistant IDs - removed old 'day-assistant' v1, keeping only v2
-export type AssistantId = 'tasks' | 'day-assistant-v2' | 'planning' | 'journal' | 'decisions' | 'community' | 'support' | 'admin'
+export type AssistantId = 'tasks' | 'day-assistant-v2' | 'journal' | 'decisions' | 'community' | 'support' | 'admin'
 
 interface Assistant {
   id: AssistantId
@@ -20,7 +20,6 @@ interface Assistant {
 const assistants: Assistant[] = [
   { id: 'tasks', icon: ListChecks, label: 'Zadania', color: 'text-blue-500' },
   { id: 'day-assistant-v2', icon: CalendarCheck, label: 'Asystent Dnia', color: 'text-amber-500' },
-  { id: 'planning', icon: CalendarBlank, label: 'Asystent Tygodnia', color: 'text-green-500' },
   { id: 'journal', icon: Notebook, label: 'Dziennik', color: 'text-purple-500' },
   { id: 'decisions', icon: Brain, label: 'Decyzje', color: 'text-orange-500' },
   { id: 'community', icon: Users, label: 'Społeczność', color: 'text-teal-500' },
@@ -141,7 +140,7 @@ export default function Sidebar({ activeView, onNavigate, isAdmin, isMobileMenuO
 
 // Helper to validate assistant IDs
 export function isValidAssistantId(id: string): id is AssistantId {
-  const validIds: AssistantId[] = ['tasks', 'day-assistant-v2', 'planning', 'journal', 'decisions', 'community', 'support', 'admin']
+  const validIds: AssistantId[] = ['tasks', 'day-assistant-v2', 'journal', 'decisions', 'community', 'support', 'admin']
   return validIds.includes(id as AssistantId)
 }
 
