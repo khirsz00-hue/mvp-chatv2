@@ -5,15 +5,12 @@
 
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState } from 'react'
 import { TimerState } from '@/hooks/useTaskTimer'
 import Button from '@/components/ui/Button'
 import { Pause, Play, CheckCircle, XCircle } from '@phosphor-icons/react'
 import { FocusMode } from './FocusMode'
 import { cn } from '@/lib/utils'
-
-// Shake duration: 1.5 seconds
-const SHAKE_DURATION_MS = 1500
 
 interface CurrentActivityBoxProps {
   activeTimer: TimerState | null
@@ -39,31 +36,6 @@ export function CurrentActivityBox({
   onStop
 }: CurrentActivityBoxProps) {
   const [focusModeActive, setFocusModeActive] = useState(false)
-  const [applyShake, setApplyShake] = useState(false)
-  const shakeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-
-  // Callback for shake reminder from FocusMode
-  const handleShakeReminder = useCallback(() => {
-    setApplyShake(true)
-    // Clear any existing timeout
-    if (shakeTimeoutRef.current) {
-      clearTimeout(shakeTimeoutRef.current)
-    }
-    // Set new timeout to clear shake
-    shakeTimeoutRef.current = setTimeout(() => {
-      setApplyShake(false)
-      shakeTimeoutRef.current = null
-    }, SHAKE_DURATION_MS)
-  }, [])
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (shakeTimeoutRef.current) {
-        clearTimeout(shakeTimeoutRef.current)
-      }
-    }
-  }, [])
 
   if (!activeTimer && !breakActive) {
     return null
@@ -88,19 +60,25 @@ export function CurrentActivityBox({
   if (activeTimer) {
     return (
       <>
-        {/* Focus Mode component (renders button and backdrop) */}
-        <FocusMode
-          isActive={focusModeActive}
-          onToggle={() => setFocusModeActive(!focusModeActive)}
-          onShakeReminder={handleShakeReminder}
-          taskTitle={taskTitle || 'Zadanie'}
-        />
+        {/* Focus Mode Modal - renders when active */}
+        {focusModeActive && (
+          <FocusMode
+            task={{
+              title: taskTitle || 'Zadanie',
+              elapsedSeconds: activeTimer.elapsedSeconds,
+              isPaused: activeTimer.isPaused
+            }}
+            onExit={() => setFocusModeActive(false)}
+            onPause={onPause}
+            onResume={onResume}
+            onStop={onStop}
+          />
+        )}
 
-        {/* Timer Box - stays sharp thanks to z-index */}
+        {/* Timer Box */}
         <div className={cn(
           "sticky top-0 mb-4 p-4 bg-purple-50 border-2 border-purple-300 rounded-lg shadow-md transition-all",
-          focusModeActive ? "z-[90] shadow-2xl" : "z-10",
-          applyShake && "focus-reminder-shake"
+          "z-10"
         )}>
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex-1">
@@ -141,6 +119,13 @@ export function CurrentActivityBox({
               </Button>
               <Button size="sm" onClick={onComplete} className="bg-green-600 hover:bg-green-700">
                 <CheckCircle size={16} className="mr-1" weight="fill" /> Ukończone
+              </Button>
+              <Button 
+                size="sm" 
+                onClick={() => setFocusModeActive(true)}
+                className="bg-purple-600 hover:bg-purple-700 text-white"
+              >
+                👁️ FOCUS
               </Button>
             </div>
           </div>

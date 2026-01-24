@@ -5,6 +5,7 @@ import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import { Timer as TimerIcon, Play, Pause, Stop, X } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
+import { FocusMode } from '@/components/day-assistant-v2/FocusMode'
 
 interface TimerSession {
   taskId: string
@@ -36,6 +37,7 @@ export function TaskTimer({ onClose }: TaskTimerProps) {
     isRunning: false,
     isPaused: false
   })
+  const [focusModeActive, setFocusModeActive] = useState(false)
   
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   
@@ -189,7 +191,23 @@ export function TaskTimer({ onClose }: TaskTimerProps) {
   }
   
   return (
-    <div className="fixed bottom-6 right-6 z-40">
+    <>
+      {/* Focus Mode Modal - renders when active */}
+      {focusModeActive && (
+        <FocusMode
+          task={{
+            title: timerState.taskTitle || 'Zadanie',
+            elapsedSeconds: timerState.elapsedSeconds,
+            isPaused: timerState.isPaused
+          }}
+          onExit={() => setFocusModeActive(false)}
+          onPause={pauseTimer}
+          onResume={resumeTimer}
+          onStop={stopTimer}
+        />
+      )}
+
+      <div className="fixed bottom-6 right-6 z-40">
       <Card className={cn(
         'p-4 shadow-2xl border-2 min-w-[280px]',
         timerState.isRunning && !timerState.isPaused ? 'border-red-500 animate-pulse' : 'border-gray-200'
@@ -266,8 +284,18 @@ export function TaskTimer({ onClose }: TaskTimerProps) {
             Stop
           </Button>
         </div>
+        
+        {/* FOCUS button */}
+        <Button
+          onClick={() => setFocusModeActive(true)}
+          className="w-full gap-2 mt-2 bg-purple-600 hover:bg-purple-700 text-white"
+          size="sm"
+        >
+          👁️ FOCUS
+        </Button>
       </Card>
     </div>
+    </>
   )
 }
 
