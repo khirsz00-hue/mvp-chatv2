@@ -6,12 +6,13 @@ import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import { CalendarBlank, CheckCircle, Trash, DotsThree, Circle, CheckSquare, ChatCircle, Brain, Timer as TimerIcon, Stop } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
-import { format, parseISO } from 'date-fns'
+import { format, parseISO, addDays } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { useTaskTimer } from './TaskTimer'
 import { TaskChatModal } from './TaskChatModal'
 import { HelpMeModal } from '@/components/day-assistant-v2/HelpMeModal'
 import { useToast } from '@/components/ui/Toast'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 
 interface Subtask {
   id: string
@@ -68,9 +69,26 @@ export function TaskCard({
   const mobileMenuRef = useRef<HTMLDivElement>(null)
   const mobileMenuContentRef = useRef<HTMLDivElement>(null)
   const datePickerRef = useRef<HTMLInputElement>(null)
+  const [isMobile, setIsMobile] = useState(false)
+  const [showMobileDatePicker, setShowMobileDatePicker] = useState(false)
   
   const { startTimer, stopTimer, getActiveTimer } = useTaskTimer()
   const { showToast } = useToast()
+  
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      // Prioritize user agent detection for actual mobile devices
+      // even if desktop window is resized small
+      const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+      const isSmallScreen = window.innerWidth < 768
+      // Only treat as mobile if it's actually a mobile device OR small screen on non-desktop
+      setIsMobile(isMobileDevice || (isSmallScreen && !window.matchMedia('(pointer: fine)').matches))
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
   
   // Check if this task has an active timer
   useEffect(() => {
@@ -207,11 +225,25 @@ export function TaskCard({
 
   const openDatePicker = (e: React.SyntheticEvent) => {
     e.stopPropagation()
+    
+    // On mobile, show custom modal
+    if (isMobile) {
+      setShowMobileDatePicker(true)
+      return
+    }
+    
+    // Desktop: use native picker
     const input = datePickerRef.current
     if (!input) return
-    // Prefer native picker when available
+    
     if (typeof input.showPicker === 'function') {
-      input.showPicker()
+      try {
+        input.showPicker()
+      } catch (err) {
+        // showPicker() can fail due to user gesture requirements or browser restrictions
+        console.log('Native date picker failed, falling back to click:', err)
+        input.click()
+      }
     } else {
       input.click()
     }
@@ -337,6 +369,7 @@ export function TaskCard({
                   variant="outline" 
                   className="gap-1 text-xs cursor-pointer" 
                   onClick={openDatePicker}
+                  style={{ touchAction: 'manipulation' }}
                 >
                   <CalendarBlank size={12} className="md:hidden" />
                   <CalendarBlank size={14} className="hidden md:inline" />
@@ -567,6 +600,55 @@ export function TaskCard({
         onClose={() => setShowChatModal(false)}
         task={task}
       />
+
+      {/* Mobile Date Picker Modal */}
+      {showMobileDatePicker && (
+        <Dialog open={showMobileDatePicker} onOpenChange={setShowMobileDatePicker}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Wybierz nową datę</DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-3">
+              {/* Quick date buttons - min 44px dla mobile */}
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { label: 'Dziś', value: format(new Date(), 'yyyy-MM-dd') },
+                  { label: 'Jutro', value: format(addDays(new Date(), 1), 'yyyy-MM-dd') },
+                  { label: 'Za 3 dni', value: format(addDays(new Date(), 3), 'yyyy-MM-dd') },
+                  { label: 'Za tydzień', value: format(addDays(new Date(), 7), 'yyyy-MM-dd') }
+                ].map(({ label, value }) => (
+                  <Button
+                    key={value}
+                    variant="outline"
+                    onClick={async () => {
+                      await handleDueDateChange(value)
+                      setShowMobileDatePicker(false)
+                    }}
+                    className="min-h-[44px]"
+                  >
+                    {label}
+                  </Button>
+                ))}
+              </div>
+              
+              {/* Native date input jako fallback */}
+              <div className="pt-2 border-t">
+                <label className="text-sm font-medium mb-2 block">Lub wybierz datę:</label>
+                <input
+                  type="date"
+                  value={dueInputValue}
+                  onChange={async (e) => {
+                    await handleDueDateChange(e.target.value)
+                    setShowMobileDatePicker(false)
+                  }}
+                  className="w-full px-3 py-2 border rounded-lg min-h-[44px]"
+                />
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </Card>
   )
 }
