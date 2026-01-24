@@ -109,6 +109,22 @@ const formatStopwatch = (seconds: number): string => {
     .padStart(2, '0')}`
 }
 
+/**
+ * Render source badge for time session
+ */
+const SessionSourceBadge = ({ source }: { source: string }) => {
+  const isDayAssistant = source === 'day_assistant_v2'
+  return (
+    <span className={`ml-2 px-1 rounded text-[8px] ${
+      isDayAssistant 
+        ? 'bg-blue-100 text-blue-700' 
+        : 'bg-purple-100 text-purple-700'
+    }`}>
+      {isDayAssistant ? 'Asystent Dnia' : 'Zadania'}
+    </span>
+  )
+}
+
 const POMODORO_WORK_DURATION = 25 * 60
 const POMODORO_SHORT_BREAK_DURATION = 5 * 60
 const POMODORO_LONG_BREAK_DURATION = 15 * 60
@@ -1384,13 +1400,7 @@ Wygeneruj 4-7 konkretnych subtasków w JSON:
                                       <p className="text-gray-500">
                                         {format(parseISO(session.started_at), 'dd MMM HH:mm', { locale: pl })}
                                         {/* Show source badge */}
-                                        <span className={`ml-2 px-1 rounded text-[8px] ${
-                                          session.task_source === 'day_assistant_v2' 
-                                            ? 'bg-blue-100 text-blue-700' 
-                                            : 'bg-purple-100 text-purple-700'
-                                        }`}>
-                                          {session.task_source === 'day_assistant_v2' ? 'Asystent Dnia' : 'Zadania'}
-                                        </span>
+                                        <SessionSourceBadge source={session.task_source} />
                                       </p>
                                     </div>
                                   </div>
@@ -1418,13 +1428,7 @@ Wygeneruj 4-7 konkretnych subtasków w JSON:
                                       <p className="text-gray-500">
                                         {format(parseISO(session.started_at), 'dd MMM HH:mm', { locale: pl })}
                                         {/* Show source badge */}
-                                        <span className={`ml-2 px-1 rounded text-[8px] ${
-                                          session.task_source === 'day_assistant_v2' 
-                                            ? 'bg-blue-100 text-blue-700' 
-                                            : 'bg-purple-100 text-purple-700'
-                                        }`}>
-                                          {session.task_source === 'day_assistant_v2' ? 'Asystent Dnia' : 'Zadania'}
-                                        </span>
+                                        <SessionSourceBadge source={session.task_source} />
                                       </p>
                                     </div>
                                   </div>
