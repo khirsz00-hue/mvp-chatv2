@@ -20,6 +20,7 @@ import { toast } from 'sonner'
 import { recalculateDailyTotal } from '@/lib/gamification'
 import { FloatingChatButton } from '@/components/chat/FloatingChatButton'
 import { ChatAssistant } from '@/components/chat/ChatAssistant'
+import { JournalReminderModal } from '@/components/journal/JournalReminderModal'
 
 /**
  * SubscriptionWall jest teraz WŁĄCZONY
@@ -42,6 +43,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [showChat, setShowChat] = useState(false)
   const [journalRequired, setJournalRequired] = useState(false)
+  const [showJournalReminder, setShowJournalReminder] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -110,6 +112,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
         localStorage.setItem('active_assistant', 'day-assistant-v2')
       } else if (stored && stored !== 'community' && isValidAssistantId(stored)) {
         setActiveView(stored)
+      } else if (!stored) {
+        // Default to tasks if no saved preference
+        setActiveView('tasks')
+        localStorage.setItem('active_assistant', 'tasks')
       }
     } catch {}
 
@@ -163,6 +169,38 @@ export default function MainLayout({ children }: MainLayoutProps) {
       document.body.style.overflow = originalOverflow
     }
   }, [isMobileMenuOpen])
+
+  // Friendly journal reminder (non-blocking) - shows once per day
+  useEffect(() => {
+    const checkJournalReminder = () => {
+      try {
+        // Don't show if journal guard is disabled
+        const disabled = localStorage.getItem('journal_guard_disabled') === 'true'
+        if (disabled) {
+          return
+        }
+
+        const today = new Date().toISOString().split('T')[0]
+        const reminderShownKey = `journal_reminder_shown_${today}`
+        const completedKey = `journal_completed_${today}`
+        
+        const reminderShown = localStorage.getItem(reminderShownKey) === 'true'
+        const completed = localStorage.getItem(completedKey) === 'true'
+        
+        // Show reminder if not shown today and journal not completed
+        if (!reminderShown && !completed && !loading && user) {
+          // Small delay to let the app load first
+          setTimeout(() => {
+            setShowJournalReminder(true)
+          }, 1500)
+        }
+      } catch (error) {
+        console.error('Error checking journal reminder:', error)
+      }
+    }
+
+    checkJournalReminder()
+  }, [loading, user])
 
   // Wymagaj uruchomienia dziennika na start dnia (z możliwością wyłączenia w ustawieniach)
   useEffect(() => {
@@ -342,6 +380,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
     try { localStorage.setItem('active_assistant', view) } catch {}
   }
 
+  const handleGoToJournal = () => {
+    setActiveView('journal')
+    setIsMobileMenuOpen(false)
+    try { localStorage.setItem('active_assistant', 'journal') } catch {}
+  }
+
   const handleSignOut = async () => {
     await supabase.auth.signOut()
   }
@@ -418,6 +462,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
               open={showChat}
               onClose={() => setShowChat(false)}
             />
+            
+            {/* Journal Reminder Modal - Shows once per day */}
+            <JournalReminderModal
+              open={showJournalReminder}
+              onClose={() => setShowJournalReminder(false)}
+              onGoToJournal={handleGoToJournal}
+            />
           </div>
         </SubscriptionWall>
       ) : (
@@ -476,6 +527,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
           <ChatAssistant
             open={showChat}
             onClose={() => setShowChat(false)}
+          />
+          
+          {/* Journal Reminder Modal - Shows once per day */}
+          <JournalReminderModal
+            open={showJournalReminder}
+            onClose={() => setShowJournalReminder(false)}
+            onGoToJournal={handleGoToJournal}
           />
         </div>
       )}

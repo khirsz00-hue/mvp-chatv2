@@ -450,6 +450,22 @@ export function JournalArchiveView({ onBack }: JournalArchiveViewProps) {
                   </div>
                 </div>
 
+                {entry.completed_tasks_snapshot && entry.completed_tasks_snapshot.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-2">
+                      Ukończone zadania:
+                    </h4>
+                    <ul className="space-y-1">
+                      {entry.completed_tasks_snapshot.map((task, index) => (
+                        <li key={index} className="text-sm text-gray-600 flex items-center gap-2">
+                          <span className="text-green-500">✓</span>
+                          {task}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 {entry.notes && entry.notes.length > 0 && (
                   <div className="mb-4">
                     <h4 className="text-sm font-semibold text-gray-700 mb-2">
