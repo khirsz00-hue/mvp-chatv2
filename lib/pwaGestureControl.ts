@@ -92,7 +92,10 @@ export function isPWAMode(): boolean {
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches
   
   // Check for iOS standalone
-  const isIOSStandalone = (window.navigator as any).standalone === true
+  interface NavigatorStandalone {
+    standalone?: boolean
+  }
+  const isIOSStandalone = (window.navigator as NavigatorStandalone).standalone === true
   
   // Check for Android TWA
   const isAndroidTWA = document.referrer.includes('android-app://')

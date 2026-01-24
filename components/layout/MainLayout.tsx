@@ -384,10 +384,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             
             {/* 🎮 GAMIFICATION: Voice Capture Button */}
             {/* Floating Action Buttons - Stacked vertically with safe area support */}
-            <div className="fixed z-30 lg:z-50 flex flex-col gap-3" style={{
-              bottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))',
-              right: 'calc(1.5rem + env(safe-area-inset-right, 0px))'
-            }}>
+            <div className="fab-container">
               {/* Add Task Button - Top */}
               <FloatingAddButton onClick={() => setShowQuickAdd(true)} />
               
@@ -446,10 +443,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           
           {/* 🎮 GAMIFICATION: Voice Capture Button */}
           {/* Floating Action Buttons - Stacked vertically with safe area support */}
-          <div className="fixed z-30 lg:z-50 flex flex-col gap-3" style={{
-            bottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))',
-            right: 'calc(1.5rem + env(safe-area-inset-right, 0px))'
-          }}>
+          <div className="fab-container">
             {/* Add Task Button - Top */}
             <FloatingAddButton onClick={() => setShowQuickAdd(true)} />
             

@@ -7,7 +7,8 @@ html {
   scroll-behavior: smooth;
   height: 100%;
   width: 100%;
-  overflow: hidden;
+  overflow-x: hidden; /* Prevent horizontal scroll */
+  overflow-y: auto; /* Allow vertical scroll for accessibility */
   overscroll-behavior: none;
 }
 
@@ -325,6 +326,23 @@ input[type="range"]::-moz-range-thumb:active {
 /* Bottom bar height constant for consistency */
 .mobile-bottom-bar-spacing {
   padding-bottom: calc(var(--mobile-bottom-bar-height) + env(safe-area-inset-bottom, 0px));
+}
+
+/* FAB (Floating Action Button) container with safe area support */
+.fab-container {
+  position: fixed;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+  right: calc(1.5rem + env(safe-area-inset-right, 0px));
+}
+
+@media (min-width: 1024px) {
+  .fab-container {
+    z-index: 50;
+  }
 }
 
 /* Ensure content is scrollable behind bottom bar on mobile */
