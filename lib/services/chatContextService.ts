@@ -365,3 +365,158 @@ export function formatContextForAI(context: UserContext): string {
 
   return sections.join('\n')
 }
+
+/**
+ * Find free time slots for meetings
+ * Analyzes existing tasks and suggests best times
+ */
+export async function findFreeTimeSlots(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<Array<{ time: string; duration: number; energyLevel?: number }>> {
+  const today = new Date().toISOString().split('T')[0]
+  const sevenDaysFromNow = new Date(Date.now() + SEVEN_DAYS_MS)
+    .toISOString()
+    .split('T')[0]
+
+  // Fetch tasks for the next 7 days
+  const { data: tasks } = await supabase
+    .from('day_assistant_v2_tasks')
+    .select('due_date, estimate_min')
+    .eq('user_id', userId)
+    .gte('due_date', today)
+    .lte('due_date', sevenDaysFromNow)
+    .eq('completed', false)
+    .order('due_date', { ascending: true })
+
+  // Get recent journal entries for energy patterns
+  const sevenDaysAgo = new Date(Date.now() - SEVEN_DAYS_MS)
+    .toISOString()
+    .split('T')[0]
+  const { data: journalEntries } = await supabase
+    .from('journal_entries')
+    .select('date, energy')
+    .eq('user_id', userId)
+    .gte('date', sevenDaysAgo)
+    .order('date', { ascending: false })
+
+  // Calculate average energy level
+  const avgEnergy = journalEntries && journalEntries.length > 0
+    ? Math.round(journalEntries.reduce((sum, e) => sum + (e.energy || 7), 0) / journalEntries.length)
+    : 7
+
+  // Simple slot finding: look for days with less than 4 hours of work
+  const tasksByDate: Record<string, number> = {}
+  tasks?.forEach(task => {
+    if (task.due_date) {
+      tasksByDate[task.due_date] = (tasksByDate[task.due_date] || 0) + task.estimate_min
+    }
+  })
+
+  const freeSlots: Array<{ time: string; duration: number; energyLevel?: number }> = []
+  
+  // Check next 7 days
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(Date.now() + i * 24 * 60 * 60 * 1000)
+    const dateStr = date.toISOString().split('T')[0]
+    const dayName = date.toLocaleDateString('pl-PL', { weekday: 'long' })
+    const busyMinutes = tasksByDate[dateStr] || 0
+    
+    // Skip weekends
+    const dayOfWeek = date.getDay()
+    if (dayOfWeek === 0 || dayOfWeek === 6) continue
+
+    // If less than 4 hours busy, suggest morning (10:00) and afternoon (15:00) slots
+    if (busyMinutes < 240) {
+      freeSlots.push({
+        time: `${dayName.charAt(0).toUpperCase() + dayName.slice(1)} 10:00-11:00`,
+        duration: 60,
+        energyLevel: avgEnergy + 1 // Morning usually better
+      })
+      freeSlots.push({
+        time: `${dayName.charAt(0).toUpperCase() + dayName.slice(1)} 15:00-16:00`,
+        duration: 60,
+        energyLevel: avgEnergy
+      })
+    }
+  }
+
+  return freeSlots.slice(0, 3) // Return top 3 slots
+}
+
+/**
+ * Get overdue tasks sorted by priority
+ */
+export async function getOverdueTasks(
+  supabase: SupabaseClient,
+  userId: string,
+  limit: number = 5
+): Promise<TaskContext[]> {
+  const today = new Date().toISOString().split('T')[0]
+
+  const { data: tasks } = await supabase
+    .from('day_assistant_v2_tasks')
+    .select(
+      'id, title, description, priority, is_must, is_important, estimate_min, cognitive_load, due_date, completed, postpone_count, context_type, tags'
+    )
+    .eq('user_id', userId)
+    .lt('due_date', today)
+    .eq('completed', false)
+    .order('priority', { ascending: true }) // P1 first
+    .order('due_date', { ascending: true }) // Oldest first
+    .limit(limit)
+
+  return (tasks || []) as TaskContext[]
+}
+
+/**
+ * Get today's tasks sorted by priority
+ */
+export async function getTodayTasks(
+  supabase: SupabaseClient,
+  userId: string,
+  limit: number = 5
+): Promise<TaskContext[]> {
+  const today = new Date().toISOString().split('T')[0]
+
+  const { data: tasks } = await supabase
+    .from('day_assistant_v2_tasks')
+    .select(
+      'id, title, description, priority, is_must, is_important, estimate_min, cognitive_load, due_date, completed, postpone_count, context_type, tags'
+    )
+    .eq('user_id', userId)
+    .eq('due_date', today)
+    .eq('completed', false)
+    .order('priority', { ascending: true }) // P1 first
+    .limit(limit)
+
+  return (tasks || []) as TaskContext[]
+}
+
+/**
+ * Get simplest tasks for emotional support
+ * Filters by low cognitive load, short duration, and lower priority
+ */
+export async function getSimplestTasks(
+  supabase: SupabaseClient,
+  userId: string,
+  limit: number = 3
+): Promise<TaskContext[]> {
+  const today = new Date().toISOString().split('T')[0]
+
+  const { data: tasks } = await supabase
+    .from('day_assistant_v2_tasks')
+    .select(
+      'id, title, description, priority, is_must, is_important, estimate_min, cognitive_load, due_date, completed, postpone_count, context_type, tags'
+    )
+    .eq('user_id', userId)
+    .eq('due_date', today)
+    .eq('completed', false)
+    .lte('estimate_min', 30) // Max 30 minutes
+    .lte('cognitive_load', 3) // Low cognitive load
+    .order('estimate_min', { ascending: true }) // Shortest first
+    .order('cognitive_load', { ascending: true })
+    .limit(limit)
+
+  return (tasks || []) as TaskContext[]
+}
