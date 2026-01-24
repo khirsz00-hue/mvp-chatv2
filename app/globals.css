@@ -5,10 +5,10 @@
 /* === Design System: Global Resets === */
 html {
   scroll-behavior: smooth;
-}
-
-html, body, #__next {
   height: 100%;
+  width: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 body {
@@ -20,21 +20,17 @@ body {
   -webkit-overflow-scrolling: touch;
   /* iOS safe areas */
   padding-bottom: env(safe-area-inset-bottom);
-  /* Prevent rubber band effect on iOS */
-  position: fixed;
-  width: 100%;
+  /* Layout */
   height: 100%;
+  width: 100%;
   overflow: hidden;
 }
 
-/* Allow scrolling in main content area */
-#__next,
-html {
+/* Next.js root container */
+#__next {
   height: 100%;
   width: 100%;
   overflow: hidden;
-  overscroll-behavior: none;
-  position: fixed;
 }
 
 /* Prevent accidental zoom on form inputs - applied to interactive elements only */
@@ -61,9 +57,61 @@ main {
   -webkit-overflow-scrolling: touch;
 }
 
+/* Sidebar should allow touch scrolling */
+aside {
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Remove tap highlight on mobile - applied to interactive elements only */
 a, button {
   -webkit-tap-highlight-color: transparent;
+}
+
+/* === Range/Slider Touch Improvements === */
+input[type="range"] {
+  touch-action: none; /* Allow full control for sliders */
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 4px;
+  background: #e5e7eb;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #8B5CF6;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover,
+input[type="range"]::-webkit-slider-thumb:active {
+  transform: scale(1.2);
+  box-shadow: 0 4px 8px rgba(139, 92, 246, 0.4);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #8B5CF6;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+input[type="range"]::-moz-range-thumb:hover,
+input[type="range"]::-moz-range-thumb:active {
+  transform: scale(1.2);
+  box-shadow: 0 4px 8px rgba(139, 92, 246, 0.4);
 }
 
 /* === Design System: Focus Ring Utilities === */
