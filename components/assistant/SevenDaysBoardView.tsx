@@ -439,7 +439,7 @@ export function SevenDaysBoardView({
             {columns.map(day => (
               <div 
                 key={day.id} 
-                className="w-[85vw] sm:w-[45vw] md:w-[32vw] lg:w-80 xl:w-96 flex-shrink-0 snap-start"
+                className="w-[65vw] sm:w-[45vw] md:w-[32vw] lg:w-80 xl:w-96 flex-shrink-0 snap-start"
               >
                 <DayColumnComponent
                   day={day}
