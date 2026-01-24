@@ -202,21 +202,21 @@ export function DecisionAssistant() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="h-full overflow-y-auto scrollable space-y-6 px-2 sm:px-0">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-pink bg-clip-text text-transparent">
+          <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-pink bg-clip-text text-transparent">
             Asystent Decyzji
           </h1>
-          <p className="text-gray-600 mt-2 text-lg">
+          <p className="text-gray-600 mt-2 text-base sm:text-lg">
             Podejmuj lepsze decyzje dzięki metodzie 6 kapeluszy myślowych
           </p>
         </div>
 
         <Button
           onClick={() => setShowCreateForm(!showCreateForm)}
-          className="gap-2"
+          className="gap-2 w-full sm:w-auto"
           disabled={loading}
         >
           <Plus size={20} weight="bold" />
@@ -226,8 +226,8 @@ export function DecisionAssistant() {
 
       {/* Create Form */}
       {showCreateForm && (
-        <Card className="p-6">
-          <h2 className="text-xl font-semibold mb-4">Nowa decyzja</h2>
+        <Card className="p-4 sm:p-6">
+          <h2 className="text-lg sm:text-xl font-semibold mb-4">Nowa decyzja</h2>
           
           <div className="space-y-4">
             <div>
@@ -253,7 +253,7 @@ export function DecisionAssistant() {
               />
             </div>
 
-            <div className="flex justify-end gap-2 pt-4">
+            <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -262,10 +262,11 @@ export function DecisionAssistant() {
                   setDescription('')
                 }}
                 disabled={loading}
+                className="w-full sm:w-auto"
               >
                 Anuluj
               </Button>
-              <Button onClick={handleCreateDecision} disabled={loading}>
+              <Button onClick={handleCreateDecision} disabled={loading} className="w-full sm:w-auto">
                 {loading ? 'Tworzenie...' : 'Utwórz decyzję'}
               </Button>
             </div>
@@ -275,7 +276,7 @@ export function DecisionAssistant() {
 
       {/* Decisions List */}
       <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Twoje decyzje</h2>
+        <h2 className="text-lg sm:text-xl font-semibold">Twoje decyzje</h2>
 
         {loading ? (
           <Card className="p-8 text-center">
@@ -285,25 +286,25 @@ export function DecisionAssistant() {
             </div>
           </Card>
         ) : decisions.length === 0 ? (
-          <Card className="p-12 text-center">
-            <div className="text-6xl mb-4">🧠</div>
-            <h3 className="text-lg font-semibold text-gray-600 mb-2">
+          <Card className="p-8 sm:p-12 text-center">
+            <div className="text-4xl sm:text-6xl mb-4">🧠</div>
+            <h3 className="text-base sm:text-lg font-semibold text-gray-600 mb-2">
               Brak decyzji
             </h3>
-            <p className="text-gray-500">
+            <p className="text-sm sm:text-base text-gray-500">
               Utwórz swoją pierwszą decyzję i skorzystaj z pomocy AI
             </p>
           </Card>
         ) : (
           decisions.map((decision) => (
-            <Card key={decision.id} className="p-6">
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <h3 className="text-xl font-semibold mb-2">{decision.title}</h3>
-                  <p className="text-gray-600 mb-3 line-clamp-2">
+            <Card key={decision.id} className="p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg sm:text-xl font-semibold mb-2 break-words">{decision.title}</h3>
+                  <p className="text-sm sm:text-base text-gray-600 mb-3 line-clamp-2 break-words">
                     {decision.description}
                   </p>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                     <span
                       className={`px-3 py-1 rounded-full text-xs font-medium ${
                         decision.status === 'completed'
@@ -320,31 +321,31 @@ export function DecisionAssistant() {
                         :  'Szkic'}
                     </span>
                     {decision.current_hat && (
-                      <span className="text-sm text-gray-500">
+                      <span className="text-xs sm:text-sm text-gray-500">
                         Aktualny etap: {getHatEmoji(decision.current_hat)} {getHatName(decision.current_hat)}
                       </span>
                     )}
                   </div>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex gap-2 w-full sm:w-auto">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setSelectedDecisionId(decision.id)}
-                    className="gap-1"
+                    className="gap-1 flex-1 sm:flex-initial"
                   >
                     <Eye size={16} weight="bold" />
-                    Szczegóły
+                    <span className="hidden sm:inline">Szczegóły</span>
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => handleDeleteDecision(decision.id)}
-                    className="gap-1 text-red-600 hover:bg-red-50"
+                    className="gap-1 text-red-600 hover:bg-red-50 flex-1 sm:flex-initial"
                   >
                     <Trash size={16} weight="bold" />
-                    Usuń
+                    <span className="hidden sm:inline">Usuń</span>
                   </Button>
                 </div>
               </div>

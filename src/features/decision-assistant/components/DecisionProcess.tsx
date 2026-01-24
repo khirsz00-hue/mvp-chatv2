@@ -241,7 +241,7 @@ export function DecisionProcess({ decisionId, onBack }: DecisionProcessProps) {
   const currentHat = HATS[currentHatIndex]
 
   return (
-    <div className="space-y-6">
+    <div className="h-full overflow-y-auto scrollable space-y-6 px-2 sm:px-0">
       {/* Progress Bar */}
       <ProgressBar currentStep={currentHatIndex + 1} totalSteps={HATS.length} />
 

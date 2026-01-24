@@ -405,7 +405,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     <>
       {ENABLE_SUBSCRIPTION_WALL ? (
         <SubscriptionWall>
-          <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 overflow-x-hidden">
+          <div className="fixed inset-0 bg-gradient-to-br from-purple-50 via-white to-pink-50 flex flex-col overflow-hidden">
             <Header 
               user={user ? { email: user.email, name: user.user_metadata?.full_name } : null}
               onSignOut={handleSignOut}
@@ -413,7 +413,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               isMobileMenuOpen={isMobileMenuOpen}
             />
             <TrialBanner />
-            <div className="flex relative">
+            <div className="flex flex-1 relative overflow-hidden">
               {/* Mobile overlay */}
               {isMobileMenuOpen && (
                 <div 
@@ -430,14 +430,14 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 isMobileMenuOpen={isMobileMenuOpen}
                 onClose={() => setIsMobileMenuOpen(false)}
               />
-              <main className="flex-1 p-4 sm:p-6">
+              <main className="flex-1 overflow-y-auto scrollable p-4 sm:p-6">
                 {children || renderAssistant()}
               </main>
             </div>
             
             {/* 🎮 GAMIFICATION: Voice Capture Button */}
-            {/* Floating Action Buttons - Stacked vertically */}
-            <div className="fixed bottom-6 right-6 z-30 lg:z-50 flex flex-col gap-3">
+            {/* Floating Action Buttons - Stacked vertically with safe area support */}
+            <div className="fab-container">
               {/* Add Task Button - Top */}
               <FloatingAddButton onClick={() => setShowQuickAdd(true)} />
               
@@ -472,14 +472,14 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </div>
         </SubscriptionWall>
       ) : (
-        <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 overflow-x-hidden">
+        <div className="fixed inset-0 bg-gradient-to-br from-purple-50 via-white to-pink-50 flex flex-col overflow-hidden">
           <Header 
             user={user ? { email: user.email, name: user.user_metadata?.full_name } : null}
             onSignOut={handleSignOut}
             onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             isMobileMenuOpen={isMobileMenuOpen}
           />
-          <div className="flex relative">
+          <div className="flex flex-1 relative overflow-hidden">
             {/* Mobile overlay */}
             {isMobileMenuOpen && (
               <div 
@@ -496,14 +496,14 @@ export default function MainLayout({ children }: MainLayoutProps) {
               isMobileMenuOpen={isMobileMenuOpen}
               onClose={() => setIsMobileMenuOpen(false)}
             />
-            <main className="flex-1 p-4 sm:p-6">
+            <main className="flex-1 overflow-y-auto scrollable p-4 sm:p-6">
               {children || renderAssistant()}
             </main>
           </div>
           
           {/* 🎮 GAMIFICATION: Voice Capture Button */}
-          {/* Floating Action Buttons - Stacked vertically */}
-          <div className="fixed bottom-6 right-6 z-30 lg:z-50 flex flex-col gap-3">
+          {/* Floating Action Buttons - Stacked vertically with safe area support */}
+          <div className="fab-container">
             {/* Add Task Button - Top */}
             <FloatingAddButton onClick={() => setShowQuickAdd(true)} />
             

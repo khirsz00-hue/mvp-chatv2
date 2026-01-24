@@ -5,20 +5,33 @@
 /* === Design System: Global Resets === */
 html {
   scroll-behavior: smooth;
-}
-
-html, body, #__next {
   height: 100%;
+  width: 100%;
+  overflow-x: hidden; /* Prevent horizontal scroll */
+  overflow-y: auto; /* Allow vertical scroll for accessibility */
+  overscroll-behavior: none;
 }
 
 body {
   @apply bg-gray-50 text-gray-800 antialiased font-sans;
-  /* Prevent pull-to-refresh on mobile */
+  /* Prevent pull-to-refresh and rubber band effect on mobile */
   overscroll-behavior-y: none;
   overscroll-behavior-x: none;
+  overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
   /* iOS safe areas */
   padding-bottom: env(safe-area-inset-bottom);
+  /* Layout */
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Next.js root container */
+#__next {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
 }
 
 /* Prevent accidental zoom on form inputs - applied to interactive elements only */
@@ -26,9 +39,80 @@ input, textarea, select, button {
   touch-action: manipulation;
 }
 
+/* Prevent pinch-to-zoom globally */
+* {
+  touch-action: pan-x pan-y;
+}
+
+/* Allow specific touch actions for scrollable elements */
+.scrollable {
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+  overflow-y: auto;
+}
+
+/* Main content container should be scrollable */
+main {
+  touch-action: pan-y;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Sidebar should allow touch scrolling */
+aside {
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Remove tap highlight on mobile - applied to interactive elements only */
 a, button {
   -webkit-tap-highlight-color: transparent;
+}
+
+/* === Range/Slider Touch Improvements === */
+input[type="range"] {
+  touch-action: none; /* Allow full control for sliders */
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 4px;
+  background: #e5e7eb;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #8B5CF6;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover,
+input[type="range"]::-webkit-slider-thumb:active {
+  transform: scale(1.2);
+  box-shadow: 0 4px 8px rgba(139, 92, 246, 0.4);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #8B5CF6;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+input[type="range"]::-moz-range-thumb:hover,
+input[type="range"]::-moz-range-thumb:active {
+  transform: scale(1.2);
+  box-shadow: 0 4px 8px rgba(139, 92, 246, 0.4);
 }
 
 /* === Design System: Focus Ring Utilities === */
@@ -242,6 +326,23 @@ a, button {
 /* Bottom bar height constant for consistency */
 .mobile-bottom-bar-spacing {
   padding-bottom: calc(var(--mobile-bottom-bar-height) + env(safe-area-inset-bottom, 0px));
+}
+
+/* FAB (Floating Action Button) container with safe area support */
+.fab-container {
+  position: fixed;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+  right: calc(1.5rem + env(safe-area-inset-right, 0px));
+}
+
+@media (min-width: 1024px) {
+  .fab-container {
+    z-index: 50;
+  }
 }
 
 /* Ensure content is scrollable behind bottom bar on mobile */

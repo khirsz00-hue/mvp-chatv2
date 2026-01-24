@@ -2,6 +2,7 @@ import './globals.css'
 import type { Metadata, Viewport } from 'next'
 import { ToastProvider } from '@/components/ui/Toast'
 import { AuthStateProvider } from '@/components/auth/AuthStateProvider'
+import { PWAGestureHandler } from '@/components/pwa/PWAGestureHandler'
 
 export const metadata: Metadata = {
   title: 'AI Assistants PRO',
@@ -29,9 +30,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="format-detection" content="telephone=no" />
       </head>
       <body>
+        <PWAGestureHandler />
         <AuthStateProvider>
           <ToastProvider>
             {children}
