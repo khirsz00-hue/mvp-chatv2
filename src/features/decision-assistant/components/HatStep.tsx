@@ -97,28 +97,28 @@ export function HatStep({
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6 px-2 sm:px-0">
       {/* Header */}
-      <Card className={`p-6 border-2 ${hatColors[hatColor]}`}>
-        <div className="flex items-center gap-4 mb-4">
-          <span className="text-5xl">{hatEmoji}</span>
+      <Card className={`p-4 sm:p-6 border-2 ${hatColors[hatColor]}`}>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 mb-4">
+          <span className="text-4xl sm:text-5xl">{hatEmoji}</span>
           <div className="flex-1">
-            <h2 className={`text-2xl font-bold ${hatTextColors[hatColor]}`}>
+            <h2 className={`text-xl sm:text-2xl font-bold ${hatTextColors[hatColor]}`}>
               {hatName}
             </h2>
-            <p className={`text-sm mt-1 ${hatColor === 'black' ? 'text-gray-300' : 'text-gray-600'}`}>
+            <p className={`text-xs sm:text-sm mt-1 ${hatColor === 'black' ? 'text-gray-300' : 'text-gray-600'}`}>
               {hatDescription}
             </p>
           </div>
         </div>
 
         {/* Decision Reminder */}
-        <div className={`p-4 rounded-lg ${hatColor === 'black' ? 'bg-gray-700' : 'bg-white'} border ${hatColor === 'black' ? 'border-gray-600' : 'border-gray-200'}`}>
-          <h3 className={`font-semibold mb-2 ${hatTextColors[hatColor]}`}>
+        <div className={`p-3 sm:p-4 rounded-lg ${hatColor === 'black' ? 'bg-gray-700' : 'bg-white'} border ${hatColor === 'black' ? 'border-gray-600' : 'border-gray-200'}`}>
+          <h3 className={`font-semibold mb-2 text-sm sm:text-base ${hatTextColors[hatColor]}`}>
             Twoja decyzja:
           </h3>
-          <p className={`font-medium ${hatTextColors[hatColor]}`}>{decisionTitle}</p>
-          <p className={`text-sm mt-1 ${hatColor === 'black' ? 'text-gray-300' : 'text-gray-600'}`}>
+          <p className={`font-medium text-sm sm:text-base ${hatTextColors[hatColor]} break-words`}>{decisionTitle}</p>
+          <p className={`text-xs sm:text-sm mt-1 ${hatColor === 'black' ? 'text-gray-300' : 'text-gray-600'} break-words`}>
             {decisionDescription}
           </p>
         </div>
@@ -126,26 +126,26 @@ export function HatStep({
 
       {/* Questions */}
       {isGeneratingQuestions ? (
-        <Card className="p-8 text-center">
+        <Card className="p-6 sm:p-8 text-center">
           <div className="flex items-center justify-center gap-2">
             <div className="w-4 h-4 border-2 border-brand-purple border-t-transparent rounded-full animate-spin" />
-            <span className="text-gray-600">Generuję pytania...</span>
+            <span className="text-sm sm:text-base text-gray-600">Generuję pytania...</span>
           </div>
         </Card>
       ) : (
-        <Card className="p-6 space-y-6">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <p className="text-sm text-blue-800">
+        <Card className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+            <p className="text-xs sm:text-sm text-blue-800">
               💡 <strong>Wskazówka:</strong> Odpowiedz przynajmniej na jedno pytanie lub wpisz 
               dodatkowe przemyślenia, aby przejść do kolejnego etapu.
             </p>
           </div>
           
-          <h3 className="text-lg font-semibold">Odpowiedz na pytania:</h3>
+          <h3 className="text-base sm:text-lg font-semibold">Odpowiedz na pytania:</h3>
           
           {questions.map((question, index) => (
             <div key={index} className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-gray-700 break-words">
                 {index + 1}. {question}
               </label>
               <Textarea
@@ -153,7 +153,7 @@ export function HatStep({
                 onChange={(e) => handleAnswerChange(index, e.target.value)}
                 placeholder="Twoja odpowiedź..."
                 rows={3}
-                className="w-full"
+                className="w-full text-sm sm:text-base"
               />
             </div>
           ))}
@@ -168,14 +168,14 @@ export function HatStep({
               onChange={(e) => setAdditionalThoughts(e.target.value)}
               placeholder={getAdditionalThoughtsPlaceholder(hatColor)}
               rows={4}
-              className="w-full"
+              className="w-full text-sm sm:text-base"
             />
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-col items-end gap-3 pt-4">
+          <div className="flex flex-col items-stretch sm:items-end gap-3 pt-4">
             {!hasAnyAnswer && (
-              <p className="text-sm text-red-600 font-medium">
+              <p className="text-xs sm:text-sm text-red-600 font-medium text-center sm:text-right">
                 ⚠️ Odpowiedz przynajmniej na jedno pytanie, aby przejść dalej
               </p>
             )}
