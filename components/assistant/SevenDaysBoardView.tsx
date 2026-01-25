@@ -59,6 +59,8 @@ export function SevenDaysBoardView({
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [movingTaskId, setMovingTaskId] = useState<string | null>(null)
   const [scrollPosition, setScrollPosition] = useState(0)
+  const [scrollProgress, setScrollProgress] = useState(0) // 0-100 for scrollbar
+  const [scrollProgress, setScrollProgress] = useState(0) // 0-100 for scrollbar
   const [dragStartPos, setDragStartPos] = useState<{ x: number; y: number } | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -409,7 +411,12 @@ export function SevenDaysBoardView({
 
   const handleScroll = () => {
     if (scrollContainerRef.current) {
-      setScrollPosition(scrollContainerRef.current.scrollLeft)
+      const container = scrollContainerRef.current
+      setScrollPosition(container.scrollLeft)
+      // Calculate progress: (current / max) * 100
+      const maxScroll = container.scrollWidth - container.clientWidth
+      const progress = maxScroll > 0 ? (container.scrollLeft / maxScroll) * 100 : 0
+      setScrollProgress(progress)
     }
   }
 
@@ -532,7 +539,17 @@ export function SevenDaysBoardView({
             aria-label="Scroll right"
           >
             <CaretRight size={16} weight="bold" className="text-gray-700 sm:size-5" />
-          </button>
+
+        {/* Custom scrollbar indicator - positioned above cards, below date range */}
+        <div className="relative w-full h-1 bg-gray-100 rounded-full overflow-hidden mb-2">
+          <div
+            className="h-full bg-gradient-to-r from-brand-purple to-brand-pink rounded-full transition-all duration-75"
+            style={{
+              width: `${Math.max(20, ((scrollContainerRef.current?.clientWidth || 0) / (scrollContainerRef.current?.scrollWidth || 1)) * 100)}%`,
+              marginLeft: `${scrollProgress}%`,
+              transform: 'translateX(-100%)'
+            }}
+          />
         </div>
 
         {/* Scrollable carousel container - single row on all devices */}
