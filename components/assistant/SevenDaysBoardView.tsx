@@ -547,6 +547,8 @@ export function SevenDaysBoardView({
             aria-label="Scroll right"
           >
             <CaretRight size={16} weight="bold" className="text-gray-700 sm:size-5" />
+          </button>
+        </div>
 
         {/* Custom scrollbar indicator - positioned above cards, below date range */}
         <div className="relative w-full h-1 bg-gray-100 rounded-full overflow-hidden mb-2">
