@@ -102,7 +102,7 @@ export function TasksAssistant() {
   const [activeTimerInfo, setActiveTimerInfo] = useState<{ taskId: string; taskTitle: string; isActive: boolean; elapsedSeconds?: number; startTime?: number } | null>(null)
   
   // Mobile bottom sheet states
-  const [mobileBottomSheet, setMobileBottomSheet] = useState<'filter' | 'group' | 'sort' | 'project' | 'quick' | null>(null)
+  const [mobileBottomSheet, setMobileBottomSheet] = useState<'filter' | 'group' | 'sort' | 'project' | 'quick' | 'boardGrouping' | null>(null)
   
   // Feature flag for unified task API (Phase 2B)
   const USE_UNIFIED_API = process.env.NEXT_PUBLIC_USE_UNIFIED_TASKS === 'true'
@@ -862,27 +862,44 @@ export function TasksAssistant() {
     }
   }
   
-  const handleMove = async (taskId: string, newDate: string) => {
+  const handleMove = async (taskId: string, newValue: string, grouping?: BoardGrouping) => {
     try {
       const task = tasks.find(t => t.id === taskId)
-      const oldDate = task ? (typeof task.due === 'string' ? task.due : task.due?.date) : null
-      
-      await handleUpdate(taskId, { due: newDate }, false)
-      showToast('Zadanie przeniesione', 'success')
-      
-      // Track analytics for postponement
-      if (task && oldDate && oldDate !== newDate) {
-        trackTaskAnalytics({
-          task_id: taskId,
-          task_title: task.content,
-          task_project: task.project_id || null,
-          task_labels: task.labels || [],
-          priority: task.priority || 4,
-          action_type: 'postponed',
-          postponed_from: oldDate,
-          postponed_to: newDate
-        })
+      if (!task) {
+        console.error('Task not found:', taskId)
+        return
       }
+      
+      const currentGrouping = grouping || boardGrouping
+      
+      let updates: Partial<Task> = {}
+      
+      // Determine what to update based on grouping type
+      if (currentGrouping === 'day') {
+        const oldDate = typeof task.due === 'string' ? task.due : task.due?.date
+        updates.due = newValue
+        
+        // Track analytics for postponement
+        if (oldDate && oldDate !== newValue) {
+          trackTaskAnalytics({
+            task_id: taskId,
+            task_title: task.content,
+            task_project: task.project_id || null,
+            task_labels: task.labels || [],
+            priority: task.priority || 4,
+            action_type: 'postponed',
+            postponed_from: oldDate,
+            postponed_to: newValue
+          })
+        }
+      } else if (currentGrouping === 'priority') {
+        updates.priority = parseInt(newValue) as 1 | 2 | 3 | 4
+      } else if (currentGrouping === 'project') {
+        updates.project_id = newValue === 'none' ? undefined : newValue
+      }
+      
+      await handleUpdate(taskId, updates, false)
+      showToast('Zadanie przeniesione', 'success')
     } catch (err) {
       console.error('Error moving task:', err)
       showToast('Nie udało się przenieść zadania', 'error')
@@ -1267,7 +1284,7 @@ export function TasksAssistant() {
               </div>
             </div>
             
-            {/* Middle: Compact filters - Desktop only (≥768px) - ONLY for list view */}
+            {/* Middle: Compact filters - Desktop only (≥768px) */}
             {view === 'list' && (
               <div className="hidden md:flex items-center gap-3 flex-1 justify-center">
                 {/* Sortowanie (Sorting) */}
@@ -1317,6 +1334,26 @@ export function TasksAssistant() {
                     {projects.map(p => (
                       <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
+                  </select>
+                </div>
+              </div>
+            )}
+            
+            {/* Middle: Board grouping selector - Desktop only (≥768px) - ONLY for board view */}
+            {view === 'board' && (
+              <div className="hidden md:flex items-center gap-3 flex-1 justify-center">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide px-1">
+                    Grupowanie
+                  </label>
+                  <select 
+                    value={boardGrouping} 
+                    onChange={(e) => setBoardGrouping(e.target.value as BoardGrouping)}
+                    className="px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-brand-purple transition-colors min-w-[140px]"
+                  >
+                    <option value="day">📅 Dni</option>
+                    <option value="priority">🚩 Priorytety</option>
+                    <option value="project">📁 Projekty</option>
                   </select>
                 </div>
               </div>
@@ -1554,6 +1591,7 @@ export function TasksAssistant() {
       <SevenDaysBoardView 
         tasks={activeTasks}
         grouping={boardGrouping}
+        projects={projects}
         onMove={handleMove}
         onComplete={handleComplete}
         onDelete={handleDelete}
@@ -1616,6 +1654,17 @@ export function TasksAssistant() {
           {view === 'list' && (
             <button
               onClick={() => setMobileBottomSheet('group')}
+              className="flex flex-col items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-all min-w-[44px] min-h-[44px]"
+              aria-label="Grupowanie"
+            >
+              <SlidersHorizontal size={18} weight="bold" className="text-brand-purple" />
+              <span className="text-xs font-medium text-gray-700">Grupuj</span>
+            </button>
+          )}
+          
+          {view === 'board' && (
+            <button
+              onClick={() => setMobileBottomSheet('boardGrouping')}
               className="flex flex-col items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-all min-w-[44px] min-h-[44px]"
               aria-label="Grupowanie"
             >
@@ -1708,6 +1757,36 @@ export function TasksAssistant() {
               }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all min-h-[44px] ${
                 groupBy === value
+                  ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-md'
+                  : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <span className="text-xl">{icon}</span>
+              <span className="font-medium">{label}</span>
+            </button>
+          ))}
+        </div>
+      </BottomSheet>
+      
+      <BottomSheet
+        isOpen={mobileBottomSheet === 'boardGrouping'}
+        onClose={() => setMobileBottomSheet(null)}
+        title="Grupowanie Tablicy"
+      >
+        <div className="space-y-2">
+          {[
+            { value: 'day', label: 'Dni', icon: '📅' },
+            { value: 'priority', label: 'Priorytety', icon: '🚩' },
+            { value: 'project', label: 'Projekty', icon: '📁' }
+          ].map(({ value, label, icon }) => (
+            <button
+              key={value}
+              onClick={() => {
+                setBoardGrouping(value as BoardGrouping)
+                setMobileBottomSheet(null)
+              }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all min-h-[44px] ${
+                boardGrouping === value
                   ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-md'
                   : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
               }`}
