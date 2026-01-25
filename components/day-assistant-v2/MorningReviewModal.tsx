@@ -741,9 +741,10 @@ export function MorningReviewModal({
           </p>
         </div>
       </DialogContent>
+    </Dialog>
 
-      {/* Date Picker Dialog */}
-      <Dialog open={showDatePicker} onOpenChange={setShowDatePicker}>
+    {/* Date Picker Dialog */}
+    <Dialog open={showDatePicker} onOpenChange={setShowDatePicker}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
