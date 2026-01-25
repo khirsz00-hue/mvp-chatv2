@@ -348,7 +348,7 @@ input[type="range"]::-moz-range-thumb:active {
 /* Ensure content is scrollable behind bottom bar on mobile */
 @media (max-width: 767px) {
   main {
-    padding-bottom: calc(var(--mobile-bottom-bar-height) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(max(var(--mobile-bottom-bar-height, 70px), 70px) + env(safe-area-inset-bottom, 0px));
   }
 }
 

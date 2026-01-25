@@ -1,22 +1,33 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Microphone } from '@phosphor-icons/react'
 import { VoiceRambleModal } from './VoiceRambleModal'
 
 interface VoiceCaptureProps {
   className?: string
+  isOpen?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
-export function VoiceCapture({ className }: VoiceCaptureProps) {
+export function VoiceCapture({ className, isOpen: externalIsOpen, onOpenChange }: VoiceCaptureProps) {
   const [isModalOpen, setIsModalOpen] = useState(false)
+
+  // Handle external isOpen prop
+  useEffect(() => {
+    if (externalIsOpen !== undefined) {
+      setIsModalOpen(externalIsOpen)
+    }
+  }, [externalIsOpen])
 
   const handleOpenModal = () => {
     setIsModalOpen(true)
+    onOpenChange?.(true)
   }
 
   const handleCloseModal = () => {
     setIsModalOpen(false)
+    onOpenChange?.(false)
   }
 
   return (

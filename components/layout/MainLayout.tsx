@@ -14,7 +14,8 @@ import SubscriptionWall from '@/components/subscription/SubscriptionWall'
 import { VoiceCapture } from '@/components/voice/VoiceCapture'
 import TrialBanner from '@/components/subscription/TrialBanner'
 import { FloatingAddButton } from '@/components/day-assistant-v2/FloatingAddButton'
-import { UniversalTaskModal, TaskData } from '@/components/common/UniversalTaskModal'
+import { MobileFloatingMenu } from '@/components/day-assistant-v2/MobileFloatingMenu'
+import { MobileFloatingMenu } from '@/components/day-assistant-v2/MobileFloatingMenu'import { UniversalTaskModal, TaskData } from '@/components/common/UniversalTaskModal'
 import { TaskContext } from '@/lib/services/contextInferenceService'
 import { toast } from 'sonner'
 import { recalculateDailyTotal } from '@/lib/gamification'
@@ -42,6 +43,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [showChat, setShowChat] = useState(false)
+  const [showVoice, setShowVoice] = useState(false)
   const [journalRequired, setJournalRequired] = useState(false)
   const [showJournalReminder, setShowJournalReminder] = useState(false)
   const router = useRouter()
@@ -437,7 +439,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
             
             {/* 🎮 GAMIFICATION: Voice Capture Button */}
             {/* Floating Action Buttons - Stacked vertically with safe area support */}
-            <div className="fab-container">
+            {/* Desktop: Floating Action Buttons - Stacked vertically with safe area support */}
+            <div className="fab-container hidden md:flex">
               {/* Add Task Button - Top */}
               <FloatingAddButton onClick={() => setShowQuickAdd(true)} />
               
@@ -446,6 +449,20 @@ export default function MainLayout({ children }: MainLayoutProps) {
               
               {/* Voice Ramble Button - Bottom */}
               <VoiceCapture />
+            </div>
+
+            {/* Mobile: Floating Menu - Single button with vertical menu */}
+            <div className="md:hidden fixed z-40 bottom-6 right-6" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)', paddingRight: 'env(safe-area-inset-right, 0px)' }}>
+              <MobileFloatingMenu 
+                onAddTask={() => setShowQuickAdd(true)}
+                onOpenChat={() => setShowChat(true)}
+                onOpenVoice={() => setShowVoice(true)}
+              />
+            </div>
+
+            {/* Voice Modal reference for mobile */}
+            <div className="hidden">
+              <VoiceCapture isOpen={showVoice} onOpenChange={setShowVoice} />
             </div>
             
             {/* Universal Task Modal for Quick Add (Shift+Q) */}
