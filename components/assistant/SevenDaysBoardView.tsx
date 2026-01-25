@@ -838,14 +838,21 @@ function MiniTaskCard({
             </p>
             
             {/* Show due date when grouping is not by day */}
-            {grouping !== 'day' && task.due && (
-              <div className="flex items-center gap-1 mt-0.5 text-[10px] text-gray-500">
-                <CalendarBlank size={10} weight="bold" />
-                <span>
-                  {format(parseISO(typeof task.due === 'string' ? task.due : task.due.date), 'd MMM', { locale: pl })}
-                </span>
-              </div>
-            )}
+            {grouping !== 'day' && task.due && (() => {
+              try {
+                const dueStr = typeof task.due === 'string' ? task.due : task.due.date
+                return (
+                  <div className="flex items-center gap-1 mt-0.5 text-[10px] text-gray-500">
+                    <CalendarBlank size={10} weight="bold" />
+                    <span>
+                      {format(parseISO(dueStr), 'd MMM', { locale: pl })}
+                    </span>
+                  </div>
+                )
+              } catch {
+                return null
+              }
+            })()}
           </div>
           
           {/* Context menu button */}

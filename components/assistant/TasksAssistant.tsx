@@ -865,17 +865,22 @@ export function TasksAssistant() {
   const handleMove = async (taskId: string, newValue: string, grouping?: BoardGrouping) => {
     try {
       const task = tasks.find(t => t.id === taskId)
+      if (!task) {
+        console.error('Task not found:', taskId)
+        return
+      }
+      
       const currentGrouping = grouping || boardGrouping
       
       let updates: Partial<Task> = {}
       
       // Determine what to update based on grouping type
       if (currentGrouping === 'day') {
-        const oldDate = task ? (typeof task.due === 'string' ? task.due : task.due?.date) : null
+        const oldDate = typeof task.due === 'string' ? task.due : task.due?.date
         updates.due = newValue
         
         // Track analytics for postponement
-        if (task && oldDate && oldDate !== newValue) {
+        if (oldDate && oldDate !== newValue) {
           trackTaskAnalytics({
             task_id: taskId,
             task_title: task.content,
