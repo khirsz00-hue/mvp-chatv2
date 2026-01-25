@@ -60,6 +60,7 @@ export function SevenDaysBoardView({
   const [movingTaskId, setMovingTaskId] = useState<string | null>(null)
   const [scrollPosition, setScrollPosition] = useState(0)
   const [scrollProgress, setScrollProgress] = useState(0) // 0-100 for scrollbar
+  const [scrollProgress, setScrollProgress] = useState(0) // 0-100 for scrollbar
   const [dragStartPos, setDragStartPos] = useState<{ x: number; y: number } | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -427,6 +428,8 @@ export function SevenDaysBoardView({
     }
   }
 
+  const [canScrollRight, setCanScrollRight] = useState(false)
+
   useEffect(() => {
     if (scrollContainerRef.current) {
       const container = scrollContainerRef.current
@@ -437,6 +440,7 @@ export function SevenDaysBoardView({
   const canScrollLeft = scrollPosition > 0
   
   // Check if today is visible in viewport
+  const [isTodayVisible, setIsTodayVisible] = useState(true)
   
   useEffect(() => {
     if (!scrollContainerRef.current || grouping !== 'day') return
