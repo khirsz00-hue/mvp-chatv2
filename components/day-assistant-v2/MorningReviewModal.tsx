@@ -788,6 +788,5 @@ export function MorningReviewModal({
           </div>
         </DialogContent>
       </Dialog>
-    </Dialog>
   )
 }
