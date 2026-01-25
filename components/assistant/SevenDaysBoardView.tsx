@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { DndContext, closestCenter, DragEndEvent, DragOverlay, DragStartEvent, useDroppable, DragMoveEvent } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -101,31 +101,33 @@ export function SevenDaysBoardView({
     }, 100)
   }
 
-  const days: DayColumn[] = grouping === 'day'
-    ? Array.from({ length: 7 }, (_, i) => {
-        const date = addDays(startDate, i)
-        const dateStr = format(date, 'yyyy-MM-dd')
-        
-        return {
-          id: dateStr,
-          date,
-          dateStr,
-          label: format(date, 'EEEE', { locale: pl }),
-          shortLabel: format(date, 'EEE', { locale: pl }),
-          tasks: tasks.filter(task => {
-            const taskDueStr = typeof task.due === 'string' ? task.due : task.due?.date
-            if (!taskDueStr) return false
-            
-            try {
-              const taskDate = startOfDay(parseISO(taskDueStr))
-              return isSameDay(taskDate, date)
-            } catch {
-              return false
-            }
-          })
-        }
-      })
-    : []
+  const days: DayColumn[] = useMemo(() => 
+    grouping === 'day'
+      ? Array.from({ length: 7 }, (_, i) => {
+          const date = addDays(startDate, i)
+          const dateStr = format(date, 'yyyy-MM-dd')
+          
+          return {
+            id: dateStr,
+            date,
+            dateStr,
+            label: format(date, 'EEEE', { locale: pl }),
+            shortLabel: format(date, 'EEE', { locale: pl }),
+            tasks: tasks.filter(task => {
+              const taskDueStr = typeof task.due === 'string' ? task.due : task.due?.date
+              if (!taskDueStr) return false
+              
+              try {
+                const taskDate = startOfDay(parseISO(taskDueStr))
+                return isSameDay(taskDate, date)
+              } catch {
+                return false
+              }
+            })
+          }
+        })
+      : []
+  , [grouping, startDate, tasks])
 
   const statusColumns = grouping === 'status'
     ? [
