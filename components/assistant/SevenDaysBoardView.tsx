@@ -449,18 +449,18 @@ export function SevenDaysBoardView({
     >
       {/* Header with date range and navigation */}
       {grouping === 'day' && (
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 px-2 sticky top-0 bg-white z-10 pb-2">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3 px-2 sticky top-0 bg-white z-10 pb-1.5">
+          <div className="flex items-center gap-2">
             <Button
               size="sm"
               variant="outline"
               onClick={goToPreviousWeek}
-              className="gap-1"
+              className="gap-0.5 h-7 px-2"
             >
-              <CaretLeft size={16} weight="bold" />
+              <CaretLeft size={14} weight="bold" />
             </Button>
             
-            <h3 className="text-lg font-bold text-gray-800 min-w-[200px] text-center">
+            <h3 className="text-sm font-bold text-gray-800 min-w-[180px] text-center">
               {dateRangeLabel}
             </h3>
             
@@ -468,9 +468,9 @@ export function SevenDaysBoardView({
               size="sm"
               variant="outline"
               onClick={goToNextWeek}
-              className="gap-1"
+              className="gap-0.5 h-7 px-2"
             >
-              <CaretRight size={16} weight="bold" />
+              <CaretRight size={14} weight="bold" />
             </Button>
           </div>
           
@@ -480,9 +480,9 @@ export function SevenDaysBoardView({
               size="sm"
               variant="default"
               onClick={goToToday}
-              className="gap-1.5 bg-gradient-to-r from-brand-purple to-brand-pink hover:opacity-90 text-white font-semibold"
+              className="gap-1 h-7 px-2 bg-gradient-to-r from-brand-purple to-brand-pink hover:opacity-90 text-white font-semibold text-xs"
             >
-              <CalendarBlank size={16} weight="bold" />
+              <CalendarBlank size={14} weight="bold" />
               Dzisiaj
             </Button>
           )}
@@ -509,11 +509,11 @@ export function SevenDaysBoardView({
           }}
         >
           {/* Single row flex layout for carousel behavior */}
-          <div className="flex gap-3 w-max px-1 sm:px-2 pb-1">
+          <div className="flex gap-2 w-max px-1 sm:px-2 pb-1">
             {columns.map(day => (
               <div 
                 key={day.id} 
-                className="w-[65vw] sm:w-[45vw] md:w-[32vw] lg:w-80 xl:w-96 flex-shrink-0 snap-start"
+                className="w-[65vw] sm:w-[40vw] md:w-[28vw] lg:w-64 xl:w-72 flex-shrink-0 snap-start"
               >
                 <DayColumnComponent
                   day={day}
@@ -531,18 +531,18 @@ export function SevenDaysBoardView({
         </div>
         
         {/* Navigation arrows positioned below the day cards header area */}
-        <div className="absolute top-14 left-0 right-0 flex items-center justify-between pointer-events-none px-2 sm:px-0">
+        <div className="absolute top-12 left-0 right-0 flex items-center justify-between pointer-events-none px-2 sm:px-0">
           {/* Left scroll arrow */}
           <button
             onClick={scrollLeft}
             disabled={!canScrollLeft}
             className={cn(
-              'pointer-events-auto flex w-10 h-10 items-center justify-center bg-white/95 backdrop-blur-sm rounded-full shadow-lg border-2 border-gray-200 transition-all hover:shadow-xl hover:scale-110',
+              'pointer-events-auto flex w-8 h-8 items-center justify-center bg-white/95 backdrop-blur-sm rounded-full shadow-lg border border-gray-200 transition-all hover:shadow-xl hover:scale-110',
               !canScrollLeft && 'opacity-0 pointer-events-none'
             )}
             aria-label="Scroll left"
           >
-            <CaretLeft size={20} weight="bold" className="text-gray-700" />
+            <CaretLeft size={16} weight="bold" className="text-gray-700" />
           </button>
 
           {/* Right scroll arrow */}
@@ -550,12 +550,12 @@ export function SevenDaysBoardView({
             onClick={scrollRight}
             disabled={!canScrollRight}
             className={cn(
-              'pointer-events-auto flex w-10 h-10 items-center justify-center bg-white/95 backdrop-blur-sm rounded-full shadow-lg border-2 border-gray-200 transition-all hover:shadow-xl hover:scale-110',
+              'pointer-events-auto flex w-8 h-8 items-center justify-center bg-white/95 backdrop-blur-sm rounded-full shadow-lg border border-gray-200 transition-all hover:shadow-xl hover:scale-110',
               !canScrollRight && 'opacity-0 pointer-events-none'
             )}
             aria-label="Scroll right"
           >
-            <CaretRight size={20} weight="bold" className="text-gray-700" />
+            <CaretRight size={16} weight="bold" className="text-gray-700" />
           </button>
         </div>
       </div>
@@ -601,26 +601,26 @@ function DayColumnComponent({
     <div
       ref={setNodeRef}
       className={cn(
-        'w-full bg-white rounded-xl border-2 shadow-sm transition-all flex flex-col',
+        'w-full bg-white rounded-lg border shadow-sm transition-all flex flex-col',
         isOver ? 'border-brand-purple bg-brand-purple/5 shadow-lg' : 'border-gray-200',
         isToday && 'border-brand-pink shadow-md'
       )}
     >
       {/* Header */}
       <div className={cn(
-        'p-3 border-b flex items-center justify-between',
+        'px-2 py-1.5 border-b flex items-center justify-between',
         isToday && 'bg-gradient-to-r from-brand-purple/10 to-brand-pink/10'
       )}>
         <div className="flex-1 min-w-0">
           <h3 className={cn(
-            'font-bold text-base truncate',
+            'font-semibold text-sm truncate',
             isToday && 'text-brand-purple'
           )}>
             <span className="hidden sm:inline">{day.label}</span>
             <span className="sm:hidden">{day.shortLabel}</span>
           </h3>
           {grouping === 'day' && (
-            <p className="text-xs text-gray-500 truncate">
+            <p className="text-[10px] text-gray-500 truncate leading-tight">
               {format(day.date, 'd MMM', { locale: pl })}
             </p>
           )}
@@ -629,7 +629,7 @@ function DayColumnComponent({
         <Badge 
           variant={isToday ? 'default' : 'secondary'} 
           className={cn(
-            'ml-2 text-xs px-2 py-0.5',
+            'ml-1.5 text-[10px] px-1.5 py-0',
             day.tasks.length > 5 && 'bg-orange-500 text-white'
           )}
         >
@@ -642,11 +642,11 @@ function DayColumnComponent({
         items={day.tasks.map(t => t.id)}
         strategy={verticalListSortingStrategy}
       >
-        <div className="p-1.5 space-y-1 min-h-[150px] max-h-[calc(100vh-280px)] overflow-y-auto">
+        <div className="p-1 space-y-1 min-h-[120px] max-h-[calc(100vh-280px)] overflow-y-auto">
           {day.tasks.length === 0 ? (
-            <div className="text-center py-6 text-gray-400">
-              <CalendarBlank size={24} className="mx-auto mb-1 opacity-40" />
-              <p className="text-xs font-medium">Brak zadań</p>
+            <div className="text-center py-4 text-gray-400">
+              <CalendarBlank size={18} className="mx-auto mb-0.5 opacity-40" />
+              <p className="text-[10px] font-medium">Brak zadań</p>
             </div>
           ) : (
             day.tasks.map(task => (
@@ -667,14 +667,14 @@ function DayColumnComponent({
 
       {/* Add Task Button */}
       {onAddForKey && (
-        <div className="p-2 border-t bg-gray-50/50">
+        <div className="p-1 border-t bg-gray-50/50">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => onAddForKey(day.id)}
-            className="w-full gap-1.5 text-gray-600 hover:text-brand-purple hover:bg-brand-purple/5 font-medium text-xs py-1.5"
+            className="w-full gap-1 text-gray-600 hover:text-brand-purple hover:bg-brand-purple/5 font-medium text-[10px] py-1"
           >
-            <Plus size={16} weight="bold" />
+            <Plus size={12} weight="bold" />
             Dodaj
           </Button>
         </div>
@@ -807,7 +807,7 @@ function MiniTaskCard({
       {/* Using div instead of Card component for ultra-compact design with minimal padding */}
       <div
         className={cn(
-          'px-2 py-1.5 border-l-2 rounded-md transition-all hover:shadow-sm group text-xs cursor-pointer',
+          'px-1.5 py-1 border-l-2 rounded transition-all hover:shadow-sm group text-xs cursor-pointer',
           priorityColors[task.priority] || priorityColors[4],
           loading && 'opacity-50'
         )}
@@ -818,22 +818,22 @@ function MiniTaskCard({
         tabIndex={0}
         aria-label={`Task: ${task.content}`}
       >
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1">
           {/* Drag handle - only this part is draggable */}
           {dragHandleProps && (
             <button
               {...dragHandleProps}
-              className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-200 rounded opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+              className="cursor-grab active:cursor-grabbing p-0.5 hover:bg-gray-200 rounded opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
               onClick={(e) => e.stopPropagation()}
               title="Przeciągnij aby przenieść"
             >
-              <DotsNine size={14} weight="bold" className="text-gray-400" />
+              <DotsNine size={12} weight="bold" className="text-gray-400" />
             </button>
           )}
           
           {/* Content */}
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-xs line-clamp-1 group-hover:text-brand-purple transition-colors">
+            <p className="font-medium text-[11px] line-clamp-1 group-hover:text-brand-purple transition-colors leading-tight">
               {task.content}
             </p>
             
@@ -842,8 +842,8 @@ function MiniTaskCard({
               try {
                 const dueStr = typeof task.due === 'string' ? task.due : task.due.date
                 return (
-                  <div className="flex items-center gap-1 mt-0.5 text-[10px] text-gray-500">
-                    <CalendarBlank size={10} weight="bold" />
+                  <div className="flex items-center gap-0.5 mt-0.5 text-[9px] text-gray-500">
+                    <CalendarBlank size={9} weight="bold" />
                     <span>
                       {format(parseISO(dueStr), 'd MMM', { locale: pl })}
                     </span>
@@ -869,15 +869,15 @@ function MiniTaskCard({
             className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-gray-200 rounded flex-shrink-0"
             title="Więcej opcji"
           >
-            <DotsThree size={14} weight="bold" className="text-gray-600" />
+            <DotsThree size={12} weight="bold" className="text-gray-600" />
           </button>
         </div>
       </div>
       
       {/* Enhanced tooltip on hover */}
       {showTooltip && task.description && (
-        <div className="absolute z-50 left-0 right-0 top-full mt-1 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-xl pointer-events-none">
-          <div className="font-semibold mb-1">{task.content}</div>
+        <div className="absolute z-50 left-0 right-0 top-full mt-1 p-2 bg-gray-900 text-white text-[10px] rounded shadow-xl pointer-events-none">
+          <div className="font-semibold mb-0.5">{task.content}</div>
           <div className="text-gray-300 line-clamp-3">{task.description}</div>
         </div>
       )}
@@ -893,7 +893,7 @@ function MiniTaskCard({
             }}
           />
           <div 
-            className="fixed z-[200] bg-white rounded-lg shadow-xl border border-gray-200 p-2 space-y-1 min-w-[160px]"
+            className="fixed z-[200] bg-white rounded shadow-xl border border-gray-200 p-1 space-y-0.5 min-w-[140px]"
             style={{ left: menuPosition.x, top: menuPosition.y }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -903,9 +903,9 @@ function MiniTaskCard({
                 onDetails?.(task)
                 setShowContextMenu(false)
               }}
-              className="flex items-center gap-2 w-full px-3 py-2 text-xs rounded hover:bg-gray-100 transition-colors text-gray-700"
+              className="flex items-center gap-1.5 w-full px-2 py-1.5 text-[11px] rounded hover:bg-gray-100 transition-colors text-gray-700"
             >
-              <Brain size={14} weight="bold" />
+              <Brain size={12} weight="bold" />
               <span>Doprecyzuj</span>
             </button>
             <button
@@ -914,9 +914,9 @@ function MiniTaskCard({
                 handleComplete(e)
                 setShowContextMenu(false)
               }}
-              className="flex items-center gap-2 w-full px-3 py-2 text-xs rounded hover:bg-gray-100 transition-colors text-green-600"
+              className="flex items-center gap-1.5 w-full px-2 py-1.5 text-[11px] rounded hover:bg-gray-100 transition-colors text-green-600"
             >
-              <CheckCircle size={14} weight="bold" />
+              <CheckCircle size={12} weight="bold" />
               <span>Ukończ</span>
             </button>
             <button
@@ -925,9 +925,9 @@ function MiniTaskCard({
                 handleDelete(e)
                 setShowContextMenu(false)
               }}
-              className="flex items-center gap-2 w-full px-3 py-2 text-xs rounded hover:bg-gray-100 transition-colors text-red-600"
+              className="flex items-center gap-1.5 w-full px-2 py-1.5 text-[11px] rounded hover:bg-gray-100 transition-colors text-red-600"
             >
-              <Trash size={14} weight="bold" />
+              <Trash size={12} weight="bold" />
               <span>Usuń</span>
             </button>
           </div>
