@@ -629,7 +629,7 @@ function DayColumnComponent({
         <Badge 
           variant={isToday ? 'default' : 'secondary'} 
           className={cn(
-            'ml-1.5 text-[10px] px-1.5 py-0',
+            'ml-1.5 text-[10px] px-1.5 py-0.5',
             day.tasks.length > 5 && 'bg-orange-500 text-white'
           )}
         >
@@ -842,8 +842,8 @@ function MiniTaskCard({
               try {
                 const dueStr = typeof task.due === 'string' ? task.due : task.due.date
                 return (
-                  <div className="flex items-center gap-0.5 mt-0.5 text-[9px] text-gray-500">
-                    <CalendarBlank size={9} weight="bold" />
+                  <div className="flex items-center gap-0.5 mt-0.5 text-[10px] text-gray-500">
+                    <CalendarBlank size={10} weight="bold" />
                     <span>
                       {format(parseISO(dueStr), 'd MMM', { locale: pl })}
                     </span>
