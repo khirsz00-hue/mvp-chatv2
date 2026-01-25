@@ -505,20 +505,20 @@ export function SevenDaysBoardView({
       )}
 
       {/* Carousel container with navigation arrows */}
-      <div className="relative pb-4 w-full overflow-x-hidden">
+      <div className="relative pb-4 sm:pb-4 md:pb-6 lg:pb-8 w-full overflow-x-hidden pb-[env(safe-area-inset-bottom)]">
         {/* Navigation arrows - positioned absolutely above the container */}
-        <div className="absolute -top-14 left-0 right-0 flex items-center justify-between pointer-events-none px-2 sm:px-0 z-20">
+        <div className="absolute -top-12 sm:-top-14 left-0 right-0 flex items-center justify-between pointer-events-none px-1 sm:px-0 z-20">
           {/* Left scroll arrow */}
           <button
             onClick={scrollLeft}
             disabled={!canScrollLeft}
             className={cn(
-              'pointer-events-auto flex w-10 h-10 items-center justify-center bg-white/95 backdrop-blur-sm rounded-full shadow-lg border-2 border-gray-200 transition-all hover:shadow-xl hover:scale-110',
+              'pointer-events-auto flex w-8 h-8 sm:w-10 sm:h-10 items-center justify-center bg-white/95 backdrop-blur-sm rounded-full shadow-lg border-2 border-gray-200 transition-all hover:shadow-xl hover:scale-110',
               !canScrollLeft && 'opacity-0 pointer-events-none'
             )}
             aria-label="Scroll left"
           >
-            <CaretLeft size={20} weight="bold" className="text-gray-700" />
+            <CaretLeft size={16} weight="bold" className="text-gray-700 sm:size-5" />
           </button>
 
           {/* Right scroll arrow */}
@@ -526,12 +526,12 @@ export function SevenDaysBoardView({
             onClick={scrollRight}
             disabled={!canScrollRight}
             className={cn(
-              'pointer-events-auto flex w-10 h-10 items-center justify-center bg-white/95 backdrop-blur-sm rounded-full shadow-lg border-2 border-gray-200 transition-all hover:shadow-xl hover:scale-110',
+              'pointer-events-auto flex w-8 h-8 sm:w-10 sm:h-10 items-center justify-center bg-white/95 backdrop-blur-sm rounded-full shadow-lg border-2 border-gray-200 transition-all hover:shadow-xl hover:scale-110',
               !canScrollRight && 'opacity-0 pointer-events-none'
             )}
             aria-label="Scroll right"
           >
-            <CaretRight size={20} weight="bold" className="text-gray-700" />
+            <CaretRight size={16} weight="bold" className="text-gray-700 sm:size-5" />
           </button>
         </div>
 
@@ -544,7 +544,7 @@ export function SevenDaysBoardView({
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseLeave}
           className={cn(
-            "overflow-x-auto scrollbar-hide snap-x snap-mandatory w-full h-[calc(100vh-220px)]",
+            "overflow-x-auto scrollbar-hide snap-x snap-mandatory w-full h-[calc(100vh-240px)] sm:h-[calc(100vh-220px)] md:h-[calc(100vh-200px)] lg:h-[calc(100vh-180px)]",
             isMouseDragging && "cursor-grabbing select-none"
           )}
           style={{ 
@@ -657,7 +657,7 @@ function DayColumnComponent({
         items={day.tasks.map(t => t.id)}
         strategy={verticalListSortingStrategy}
       >
-        <div className="p-1.5 space-y-1 min-h-[150px] max-h-[calc(100vh-280px)] overflow-y-auto">
+        <div className="p-1.5 space-y-1 min-h-[120px] max-h-[calc(100vh-300px)] sm:max-h-[calc(100vh-280px)] md:max-h-[calc(100vh-260px)] overflow-y-auto">
           {day.tasks.length === 0 ? (
             <div className="text-center py-6 text-gray-400">
               <CalendarBlank size={24} className="mx-auto mb-1 opacity-40" />
