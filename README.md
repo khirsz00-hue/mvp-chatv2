@@ -4,8 +4,8 @@ Modularna platforma AI zbudowana w **Next.js 14 + Supabase + OpenAI + Tailwind +
 
 ## 🎯 Asystenci AI
 
-1. 📝 **Todoist Helper** - Zarządzaj zadaniami z AI (w pełni zaimplementowany)
-2. ☀️ **Day Assistant (Asystent Dnia)** - NOW/NEXT/LATER workflow z trybami energii (w pełni zaimplementowany MVP)
+1. 📝 **Asystent Zadań** - Zarządzaj zadaniami z AI (w pełni zaimplementowany)
+2. ☀️ **Day Assistant (Asystent Dnia)** - NOW/NEXT/LATER workflow z trybami pracy: 🔴 Crisis (Zjazd), 🟡 Normal (Normalnie), 🟢 Flow (w pełni zaimplementowany MVP)
 3. 📅 **AI Planner** - Inteligentne planowanie dnia (w przygotowaniu)
 4. 📔 **Journal** - Codzienny dziennik refleksji (w pełni zaimplementowany)
 5. 🧠 **Decision Assistant** - Framework decyzyjny Six Thinking Hats (w pełni zaimplementowany)
@@ -28,7 +28,7 @@ Aplikacja wykorzystuje nową strukturę layoutu z glassmorphism i nawigacją:
 │  [Logo AI Assistants PRO]        [User Menu]   │  ← Header (glass)
 ├──────────┬──────────────────────────────────────┤
 │          │                                      │
-│ 📝 Todoist│                                     │
+│ 📝 Zadania│                                     │
 │ ☀️ Day    │     Content Area                    │
 │ 📅 Planner│     (DayAssistantView, Tasks, etc)  │
 │ 📔 Journal│                                     │
