@@ -41,51 +41,97 @@ interface StructuredResponse {
   footer?: string
 }
 
-const SYSTEM_PROMPT = `Jesteś asystentem ADHD. Komunikuj się zgodnie z tymi zasadami:
+const SYSTEM_PROMPT = `Jesteś AI asystentem ADHD Buddy - inteligentnym kompanem, nie botem.
 
-STYL ODPOWIEDZI:
-- Maksymalnie 2-3 krótkie zdania
-- Używaj wypunktowań i emoji (✅ ⏰ 🎯 ⚡ 💪 ⚠️)
-- ZERO pouczeń typu "powinieneś", "warto byłoby", "sugeruję"
-- Tylko konkretne fakty i liczby
-- Akcent na TO CO TERAZ, nie na przyszłość
+FILOZOFIA:
+- Jesteś CIEKAWY użytkownika - chcesz go zrozumieć
+- ZAWSZE najpierw przeanalizuj intencję pytania
+- Bazujesz na REALNYCH danych (kalendarz, taski, journal)
+- Dajesz insighty, nie generyki
+- Jeśli nie masz pewności - dopytaj KONKRETNIE (nie ogólnie)
 
-PRZYKŁADY DOBRYCH ODPOWIEDZI:
+ZASADY ODPOWIEDZI:
+- Maksymalnie 2-3 zdania + opcjonalne karty/lista
+- Format wypunktowany dla łatwego skanowania
+- Konkretne liczby i fakty z danych użytkownika
+- Ciepły ton ("Rozumiem", "Super wybór"), ale metodyczny
+- Używaj emoji: ✅ ⏰ 🎯 ⚡ 💪 ⚠️ 📅 💭 🧠 🔥
 
-User: "Kiedy najlepszy czas na spotkanie?"
-AI: "✅ Najbliższe wolne:
-• Środa 15:00-16:00 (energia 8/10)
-• Czwartek 10:00-11:30 (najlepszy focus)
-Która opcja?"
+KIEDY DOPYTAĆ:
+- Meeting scheduling → zapytaj o typ i focus level (light/medium/high)
+- "Nie mogę się zebrać" → coaching flow (patrz COACHING PROTOCOL)
+- Brak wystarczających danych → dopytaj KONKRETNIE
 
-User: "Jakie mam zadania na dziś?"
-AI: "🎯 Dziś masz 6 zadań (3h 20min):
-[Pokaż jako karty - system to obsłuży]
-Reszta (3) ma niższy priorytet."
+RENDERING TASKÓW:
+- System automatycznie pokaże zadania jako wizualne karty
+- Grupuj kontekstowo (MUST, IT, Admin, etc.)
+- Zaznaczaj overdue tasks
 
-User: "Nie mogę się skupić"
-AI: "💪 Rozumiem. Wybierz JEDNO:
-[Pokaż najprostsze zadania jako karty]
-Od którego zaczynasz?"
+COACHING PROTOCOL (blokada emocjonalna):
+Gdy user pisze: "nie mogę się zebrać", "nie mogę się skupić", "czuję się przytłoczony/a"
 
-User: "Jakie mam przeterminowane?"
-AI: "⚠️ 4 przeterminowane (łącznie 2h 15min):
-[Pokaż jako karty]
-Które jako pierwsze?"
+1️⃣ DISCOVER ROOT CAUSE
+"💭 Czy umiesz sprecyzować, co Cię blokuje?"
 
-ZAKAZANE FORMUŁOWANIA:
-❌ "Powinieneś zacząć od..."
-❌ "Sugerowałbym, aby..."
-❌ "Warto byłoby..."
-❌ "Proponuję następujące kroki..."
+2️⃣ NARROW DOWN (po odpowiedzi usera)
+"Rozumiem. [System pokaże 3 najprostsze taski jako karty]
+Który wydaje Ci się najłatwiejszy?"
+
+3️⃣ MICRO-STEP (unlock dopaminy)
+"Super wybór. Może zaczniesz od {micro_step}? To uwolni trochę energii."
+
+Micro steps examples:
+- "otwarcia Gmail" (dla email task)
+- "otwarcia spreadsheet" (dla data task)
+- "stworzenia nowego pliku" (dla writing task)
+
+4️⃣ NEGOTIATE if needed
+"Okej, zmieńmy podejście. Może lepiej {alternative}?"
+
+ZASADY COACHING:
+✅ Każde pytanie MUSI przybliżać do rozwiązania
+✅ Ciepły ale metodyczny ton
+✅ Propozycja → słuchanie → adaptacja
+✅ NIE narzucaj ("musisz"), tylko sugeruj ("może")
+❌ Zero small talk bez celu
+❌ Zero generycznych rad
+
+PRZYKŁADY:
+
+User: "kiedy najlepszy czas na spotkanie?"
+AI: "Czego dotyczy spotkanie i jakiego wymaga zaangażowania?
+• Light (rozmowa, check-in)
+• Medium (dyskusja, planning)
+• High (deep work, prezentacja)"
+
+User: "light, check-in 30min"
+AI: "📅 Brak spotkań w tym tygodniu. Proponuję:
+[System pokaże 3 sloty z reasoningiem]
+Który pasuje?"
+
+User: "nie mogę się zebrać"
+AI: "💭 Czy umiesz sprecyzować, co Cię blokuje?"
+
+User: "wszystko za trudne"
+AI: "Rozumiem. Masz 3 proste taski:
+[System pokaże karty najłatwiejszych tasków]
+Który wydaje Ci się najłatwiejszy?"
+
+User: "jakie mam taski na dziś?"
+AI: "🎯 Dziś masz X zadań (Yh Zmin):
+[System automatycznie pokaże karty]
+Od którego zaczniesz?"
+
+ZAKAZANE:
+❌ "Powinieneś", "sugeruję", "warto byłoby"
 ❌ Długie paragrafy
+❌ Generyczne rady bez danych
+❌ Tworzenie kolejek zadań (to robi Day Assistant V2)
 
 DOZWOLONE:
-✅ "Masz X zadań"
-✅ "Najlepszy czas: ..."
-✅ "Od którego zaczynasz?"
-✅ Wypunktowania
-✅ Karty zadań (automatycznie dodane przez system)`
+✅ Konkretne liczby i fakty
+✅ Pytania przybliżające do rozwiązania
+✅ Ciepłe ale metodyczne podejście`
 
 export async function POST(request: NextRequest) {
   try {
@@ -146,19 +192,83 @@ export async function POST(request: NextRequest) {
     const userMessageLower = message.toLowerCase()
     let structuredResponse: StructuredResponse | null = null
 
-    // Intent: Meeting time questions
+    // Intent: Emotional support / overwhelmed - COACHING FLOW
     if (
+      userMessageLower.includes('nie mogę się skupić') ||
+      userMessageLower.includes('nie mogę się zebrać') ||
+      userMessageLower.includes('nie mogę się ogarnąć') ||
+      userMessageLower.includes('przytłacza') ||
+      userMessageLower.includes('przytłoczony') ||
+      userMessageLower.includes('przytłoczona') ||
+      userMessageLower.includes('za dużo') ||
+      userMessageLower.includes('overwhelmed')
+    ) {
+      // Check if this is the first message in conversation or user hasn't specified what blocks them
+      const isInitialBlockage = conversationHistory.length === 0 || 
+        !conversationHistory.some(msg => msg.role === 'assistant' && msg.content.includes('💭'))
+
+      if (isInitialBlockage) {
+        // Step 1: Ask what blocks them
+        return NextResponse.json({
+          type: 'text',
+          text: '💭 Czy umiesz sprecyzować, co Cię blokuje?'
+        })
+      } else {
+        // Step 2: Show simplest tasks
+        const tasks = await getSimplestTasks(supabase, user.id, 3)
+        structuredResponse = {
+          type: 'tasks',
+          text: `Rozumiem. Masz ${tasks.length} ${tasks.length === 1 ? 'prosty task' : 'proste taski'}:`,
+          tasks: tasks,
+          footer: 'Który wydaje Ci się najłatwiejszy?'
+        }
+      }
+    }
+    // Intent: Meeting time questions - SMART SCHEDULING FLOW
+    else if (
       userMessageLower.includes('spotkanie') ||
       userMessageLower.includes('wolny') ||
       userMessageLower.includes('umówić') ||
       (userMessageLower.includes('kiedy') && (userMessageLower.includes('czas') || userMessageLower.includes('slot')))
     ) {
-      const slots = await findFreeTimeSlots(supabase, user.id)
-      if (slots.length > 0) {
-        structuredResponse = {
-          type: 'meeting_slots',
-          text: `✅ Najbliższe wolne sloty:`,
-          slots: slots
+      // Check if user has specified meeting type and focus level
+      const hasFocusLevel = userMessageLower.includes('light') || 
+                            userMessageLower.includes('medium') || 
+                            userMessageLower.includes('high') ||
+                            userMessageLower.includes('check-in') ||
+                            userMessageLower.includes('rozmowa') ||
+                            userMessageLower.includes('deep work')
+
+      if (!hasFocusLevel && conversationHistory.length === 0) {
+        // Step 1: Ask about meeting type
+        return NextResponse.json({
+          type: 'text',
+          text: `Czego dotyczy spotkanie i jakiego wymaga zaangażowania?
+• Light (rozmowa, check-in)
+• Medium (dyskusja, planning)
+• High (deep work, prezentacja)`
+        })
+      } else {
+        // Step 2: Analyze data and provide recommendations
+        const slots = await findFreeTimeSlots(supabase, user.id)
+        const calendarStatus = context.calendar?.has_integration 
+          ? (context.calendar.events_next_7_days.length > 0 
+              ? `📅 Masz ${context.calendar.events_next_7_days.length} ${context.calendar.events_next_7_days.length === 1 ? 'spotkanie' : 'spotkań'} w tym tygodniu.`
+              : '📅 W tym tygodniu nie masz żadnych spotkań w kalendarzu.')
+          : '📅 Brak integracji z kalendarzem.'
+
+        if (slots.length > 0) {
+          structuredResponse = {
+            type: 'meeting_slots',
+            text: `${calendarStatus}\n\nAnalizując Twoje zadania, proponuję:`,
+            slots: slots,
+            footer: 'Który termin pasuje?'
+          }
+        } else {
+          return NextResponse.json({
+            type: 'text',
+            text: `${calendarStatus}\n\nW najbliższym tygodniu wszystkie dni są dość zajęte. Może warto przenieść jakieś zadania?`
+          })
         }
       }
     }
@@ -174,7 +284,7 @@ export async function POST(request: NextRequest) {
         type: 'tasks',
         text: `🎯 Dziś masz ${totalCount} ${totalCount === 1 ? 'zadanie' : totalCount < 5 ? 'zadania' : 'zadań'} (${Math.floor(totalTime / 60)}h ${totalTime % 60}min):`,
         tasks: tasks,
-        footer: totalCount > 5 ? `Reszta (${totalCount - 5}) ma niższy priorytet.` : undefined
+        footer: totalCount > 5 ? `Reszta (${totalCount - 5}) ma niższy priorytet.` : 'Od którego zaczniesz?'
       }
     }
     // Intent: Overdue tasks
@@ -189,22 +299,6 @@ export async function POST(request: NextRequest) {
         text: `⚠️ ${tasks.length} ${tasks.length === 1 ? 'przeterminowane' : 'przeterminowanych'} (łącznie ${Math.floor(totalTime / 60)}h ${totalTime % 60}min):`,
         tasks: tasks,
         footer: 'Które jako pierwsze?'
-      }
-    }
-    // Intent: Emotional support / overwhelmed
-    else if (
-      userMessageLower.includes('nie mogę się skupić') ||
-      userMessageLower.includes('nie mogę się ogarnąć') ||
-      userMessageLower.includes('przytłacza') ||
-      userMessageLower.includes('za dużo') ||
-      userMessageLower.includes('overwhelmed')
-    ) {
-      const tasks = await getSimplestTasks(supabase, user.id, 3)
-      structuredResponse = {
-        type: 'tasks',
-        text: `💪 Rozumiem. Wybierz JEDNO:`,
-        tasks: tasks,
-        footer: 'Od którego zaczynasz?'
       }
     }
 

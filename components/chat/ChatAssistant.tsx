@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { ChatCircle, X, Minus, PaperPlaneRight, CircleNotch, Sparkle, Play, Clock, Calendar } from '@phosphor-icons/react'
+import { ChatCircle, X, Minus, PaperPlaneRight, CircleNotch, Sparkle, Calendar } from '@phosphor-icons/react'
 import { supabase } from '@/lib/supabaseClient'
 import { toast } from 'sonner'
-import { useChatStream } from '@/hooks/useChatStream'
+import { TaskCard } from './TaskCard'
 
 interface TaskData {
   id: string
@@ -13,6 +13,9 @@ interface TaskData {
   priority: number
   estimate_min: number
   due_date?: string
+  cognitive_load?: number
+  context_type?: string
+  postpone_count?: number
 }
 
 interface StructuredResponse {
@@ -34,69 +37,6 @@ interface Message {
 interface ChatAssistantProps {
   open: boolean
   onClose: () => void
-}
-
-// TaskCard component for rendering tasks in chat
-function TaskCard({ task }: { task: TaskData }) {
-  const priorityColors = {
-    1: { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-300', label: 'P1' },
-    2: { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300', label: 'P2' },
-    3: { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-300', label: 'P3' },
-    4: { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300', label: 'P4' }
-  }
-  
-  const priority = priorityColors[task.priority as keyof typeof priorityColors] || priorityColors[4]
-  
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return ''
-    const date = new Date(dateStr)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const taskDate = new Date(date)
-    taskDate.setHours(0, 0, 0, 0)
-    
-    if (taskDate.getTime() === today.getTime()) return 'Dziś'
-    if (taskDate.getTime() === today.getTime() + 86400000) return 'Jutro'
-    if (taskDate < today) return 'Przeterminowane'
-    return date.toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })
-  }
-  
-  return (
-    <div className="bg-white border-2 border-gray-200 rounded-xl p-4 hover:shadow-lg transition-shadow cursor-pointer mt-2">
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex items-center gap-2 flex-1">
-          <span className={`${priority.bg} ${priority.text} ${priority.border} border px-2 py-0.5 rounded text-xs font-bold`}>
-            {priority.label}
-          </span>
-          <h3 className="font-semibold text-gray-900 text-sm">{task.title}</h3>
-        </div>
-        <button 
-          onClick={() => {
-            // Navigate to task or start timer
-            window.location.href = `/day-assistant-v2?task=${task.id}`
-          }}
-          className="px-3 py-1 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-lg text-xs hover:scale-105 transition flex items-center gap-1 flex-shrink-0 ml-2">
-          <Play size={12} weight="fill" />
-          Zacznij
-        </button>
-      </div>
-      <div className="flex items-center gap-3 text-xs text-gray-600">
-        <span className="flex items-center gap-1">
-          <Clock size={14} weight="bold" />
-          {task.estimate_min} min
-        </span>
-        {task.due_date && (
-          <span className="flex items-center gap-1">
-            <Calendar size={14} weight="bold" />
-            {formatDate(task.due_date)}
-          </span>
-        )}
-      </div>
-      {task.description && (
-        <p className="text-xs text-gray-500 mt-2 line-clamp-2">{task.description}</p>
-      )}
-    </div>
-  )
 }
 
 // Meeting slot card component
@@ -364,9 +304,34 @@ export function ChatAssistant({ open, onClose }: ChatAssistantProps) {
                 <div className="mt-2">
                   {msg.structured.type === 'tasks' && msg.structured.tasks && (
                     <div className="space-y-2">
-                      {msg.structured.tasks.map(task => (
-                        <TaskCard key={task.id} task={task} />
-                      ))}
+                      {(() => {
+                        // Calculate overdue status once for all tasks
+                        const today = new Date()
+                        return msg.structured.tasks!.map(task => {
+                          // Check if task is overdue
+                          const isOverdue = task.due_date ? new Date(task.due_date) < today : false
+                          const priorityLabel = task.priority === 1 ? 'P1' 
+                            : task.priority === 2 ? 'P2' 
+                            : task.priority === 3 ? 'P3' 
+                            : 'P4'
+                          
+                          return (
+                            <TaskCard 
+                              key={task.id} 
+                              id={task.id}
+                              title={task.title}
+                              description={task.description}
+                              estimate={`${task.estimate_min}min`}
+                              priority={priorityLabel}
+                              cognitive_load={task.cognitive_load}
+                              due_date={task.due_date}
+                              overdue={isOverdue}
+                              context_type={task.context_type}
+                              postpone_count={task.postpone_count}
+                            />
+                          )
+                        })
+                      })()}
                     </div>
                   )}
                   
