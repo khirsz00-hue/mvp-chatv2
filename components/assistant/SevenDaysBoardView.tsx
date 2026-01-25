@@ -506,6 +506,35 @@ export function SevenDaysBoardView({
 
       {/* Carousel container with navigation arrows */}
       <div className="relative pb-4 w-full overflow-x-hidden">
+        {/* Navigation arrows - positioned absolutely above the container */}
+        <div className="absolute -top-14 left-0 right-0 flex items-center justify-between pointer-events-none px-2 sm:px-0 z-20">
+          {/* Left scroll arrow */}
+          <button
+            onClick={scrollLeft}
+            disabled={!canScrollLeft}
+            className={cn(
+              'pointer-events-auto flex w-10 h-10 items-center justify-center bg-white/95 backdrop-blur-sm rounded-full shadow-lg border-2 border-gray-200 transition-all hover:shadow-xl hover:scale-110',
+              !canScrollLeft && 'opacity-0 pointer-events-none'
+            )}
+            aria-label="Scroll left"
+          >
+            <CaretLeft size={20} weight="bold" className="text-gray-700" />
+          </button>
+
+          {/* Right scroll arrow */}
+          <button
+            onClick={scrollRight}
+            disabled={!canScrollRight}
+            className={cn(
+              'pointer-events-auto flex w-10 h-10 items-center justify-center bg-white/95 backdrop-blur-sm rounded-full shadow-lg border-2 border-gray-200 transition-all hover:shadow-xl hover:scale-110',
+              !canScrollRight && 'opacity-0 pointer-events-none'
+            )}
+            aria-label="Scroll right"
+          >
+            <CaretRight size={20} weight="bold" className="text-gray-700" />
+          </button>
+        </div>
+
         {/* Scrollable carousel container - single row on all devices */}
         <div
           ref={scrollContainerRef}
@@ -543,35 +572,6 @@ export function SevenDaysBoardView({
               </div>
             ))}
           </div>
-        </div>
-        
-        {/* Navigation arrows positioned below the day cards header area */}
-        <div className="absolute top-14 left-0 right-0 flex items-center justify-between pointer-events-none px-2 sm:px-0">
-          {/* Left scroll arrow */}
-          <button
-            onClick={scrollLeft}
-            disabled={!canScrollLeft}
-            className={cn(
-              'pointer-events-auto flex w-10 h-10 items-center justify-center bg-white/95 backdrop-blur-sm rounded-full shadow-lg border-2 border-gray-200 transition-all hover:shadow-xl hover:scale-110',
-              !canScrollLeft && 'opacity-0 pointer-events-none'
-            )}
-            aria-label="Scroll left"
-          >
-            <CaretLeft size={20} weight="bold" className="text-gray-700" />
-          </button>
-
-          {/* Right scroll arrow */}
-          <button
-            onClick={scrollRight}
-            disabled={!canScrollRight}
-            className={cn(
-              'pointer-events-auto flex w-10 h-10 items-center justify-center bg-white/95 backdrop-blur-sm rounded-full shadow-lg border-2 border-gray-200 transition-all hover:shadow-xl hover:scale-110',
-              !canScrollRight && 'opacity-0 pointer-events-none'
-            )}
-            aria-label="Scroll right"
-          >
-            <CaretRight size={20} weight="bold" className="text-gray-700" />
-          </button>
         </div>
       </div>
 
