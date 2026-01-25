@@ -896,8 +896,6 @@ export function TasksAssistant() {
         }
       } else if (currentGrouping === 'status') {
         updates.status = newValue as 'todo' | 'in_progress' | 'done'
-      } else if (currentGrouping === 'status') {
-        updates.status = newValue as 'todo' | 'in_progress' | 'done'
       } else if (currentGrouping === 'priority') {
         updates.priority = parseInt(newValue) as 1 | 2 | 3 | 4
       } else if (currentGrouping === 'project') {
