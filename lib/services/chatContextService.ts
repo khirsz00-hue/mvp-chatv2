@@ -68,6 +68,17 @@ export interface UserContext {
     avg_postpone_count: number
     total_tasks_count: number
     completed_tasks_count: number
+    typical_work_start_time?: string
+    task_context_groups?: Record<string, number>
+    cognitive_load_distribution?: { low: number; medium: number; high: number }
+  }
+  calendar?: {
+    events_next_7_days: Array<{
+      title: string
+      start: string
+      end: string
+    }>
+    has_integration: boolean
   }
 }
 
@@ -195,6 +206,9 @@ export async function fetchChatContext(
     avg_postpone_count: 0,
     total_tasks_count: 0,
     completed_tasks_count: 0,
+    typical_work_start_time: undefined as string | undefined,
+    task_context_groups: {} as Record<string, number>,
+    cognitive_load_distribution: { low: 0, medium: 0, high: 0 }
   }
 
   if (allTasks && allTasks.length > 0) {
@@ -217,6 +231,48 @@ export async function fetchChatContext(
       .sort(([, a], [, b]) => b - a)
       .slice(0, 3)
       .map(([context]) => context)
+
+    // Group tasks by context_type
+    const contextGroups: Record<string, number> = {}
+    allTasks.forEach((task) => {
+      if (task.context_type) {
+        contextGroups[task.context_type] = (contextGroups[task.context_type] || 0) + 1
+      }
+    })
+    patterns.task_context_groups = contextGroups
+
+    // Cognitive load distribution (today's tasks only)
+    const todayTasksData = todayTasks.data || []
+    todayTasksData.forEach((task: any) => {
+      const load = task.cognitive_load || 0
+      if (load <= 2) patterns.cognitive_load_distribution.low++
+      else if (load <= 3) patterns.cognitive_load_distribution.medium++
+      else patterns.cognitive_load_distribution.high++
+    })
+  }
+
+  // Extract typical work start time from journal entries
+  if (journalEntries && journalEntries.length > 0) {
+    // For now, assume a default work start time
+    // In the future, this could be extracted from journal notes or a dedicated field
+    patterns.typical_work_start_time = '9:00'
+  }
+
+  // Check for calendar integration
+  const { data: calendarIntegration } = await supabase
+    .from('user_profiles')
+    .select('google_calendar_token')
+    .eq('user_id', userId)
+    .single()
+
+  const hasCalendarIntegration = !!(calendarIntegration?.google_calendar_token)
+
+  // If calendar is integrated, fetch events (simplified for now)
+  let calendarEvents: Array<{ title: string; start: string; end: string }> = []
+  if (hasCalendarIntegration) {
+    // In a real implementation, we'd call Google Calendar API here
+    // For now, we'll leave it empty
+    calendarEvents = []
   }
 
   return {
@@ -234,6 +290,10 @@ export async function fetchChatContext(
       active: (activeDecisions || []) as DecisionContext[],
     },
     patterns,
+    calendar: {
+      events_next_7_days: calendarEvents,
+      has_integration: hasCalendarIntegration
+    }
   }
 }
 
@@ -247,35 +307,75 @@ export function formatMinimalContextForAI(context: UserContext): string {
   const mustTasksToday = context.tasks.today.filter((t) => t.is_must)
   const totalTimeToday = context.tasks.today.reduce((sum, t) => sum + t.estimate_min, 0)
   
-  // Get top 10 tasks
-  const topTasks = context.tasks.today.slice(0, 10).map(t => ({
+  // Group tasks by context
+  const tasksByContext: Record<string, any[]> = {}
+  context.tasks.today.forEach(t => {
+    const ctx = t.context_type || 'Other'
+    if (!tasksByContext[ctx]) tasksByContext[ctx] = []
+    tasksByContext[ctx].push({
+      id: t.id,
+      title: t.title,
+      time: t.estimate_min,
+      must: t.is_must,
+      cognitive_load: t.cognitive_load,
+      priority: t.priority
+    })
+  })
+  
+  // Get overdue tasks with details
+  const overdueTasks = context.tasks.overdue.slice(0, 5).map(t => ({
+    id: t.id,
     title: t.title,
-    time: t.estimate_min,
-    must: t.is_must
+    postpone_count: t.postpone_count,
+    due_date: t.due_date,
+    estimate_min: t.estimate_min
+  }))
+
+  // Calendar summary
+  const calendarSummary = context.calendar?.has_integration 
+    ? (context.calendar.events_next_7_days.length > 0 
+        ? `${context.calendar.events_next_7_days.length} spotkań w najbliższych 7 dniach`
+        : 'Brak spotkań w najbliższych 7 dniach')
+    : 'Brak integracji z kalendarzem'
+  
+  // Recent productivity from journal
+  const recentNotes = context.journal.recent.slice(0, 3).map(j => ({
+    date: j.date,
+    energy: j.energy,
+    notes: j.notes?.slice(0, 2) // First 2 notes only
   }))
   
-  // Compact JSON structure
+  // Compact JSON structure with richer insights
   return JSON.stringify({
     tasks: {
       today: {
         total: context.tasks.today.length,
         must: mustTasksToday.length,
         totalTime: totalTimeToday,
-        list: topTasks
+        byContext: tasksByContext
       },
-      overdue: context.tasks.overdue.length
+      overdue: {
+        count: context.tasks.overdue.length,
+        list: overdueTasks
+      },
+      cognitive_load_distribution: context.patterns.cognitive_load_distribution
+    },
+    calendar: {
+      summary: calendarSummary,
+      has_integration: context.calendar?.has_integration || false
     },
     journal: {
       avgEnergy: context.journal.stats.avg_energy || 0,
       avgSleep: context.journal.stats.avg_hours_slept || 0,
-      lastEntry: context.journal.recent[0] || null
+      recent: recentNotes
     },
-    decisions: context.decisions.active.map(d => d.title),
     patterns: {
+      typicalWorkStart: context.patterns.typical_work_start_time || '9:00',
       completionRate: context.patterns.total_tasks_count > 0 
         ? Math.round((context.patterns.completed_tasks_count / context.patterns.total_tasks_count) * 100) 
         : 0,
-      avgPostpones: context.patterns.avg_postpone_count
+      avgPostpones: context.patterns.avg_postpone_count,
+      mostPostponedContexts: context.patterns.most_postponed_contexts
     }
   }, null, 2)
 }
