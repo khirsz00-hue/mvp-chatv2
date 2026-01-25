@@ -21,6 +21,7 @@ interface Task {
   due?: { date: string } | string
   completed?: boolean
   created_at?: string
+  status?: 'todo' | 'in_progress' | 'done'
 }
 
 type BoardGrouping = 'day' | 'status' | 'priority' | 'project'
@@ -142,7 +143,7 @@ export function SevenDaysBoardView({
         dateStr: col.id,
         label: col.label,
         shortLabel: col.label,
-        tasks: tasks.filter(t => (t as any).status === col.id)
+        tasks: tasks.filter(t => (t.status || 'todo') === col.id)
       }))
     : []
 
@@ -313,7 +314,7 @@ export function SevenDaysBoardView({
       grouping === 'day'
         ? (task.due ? (typeof task.due === 'string' ? task.due : task.due.date) : '')
         : grouping === 'status'
-          ? (task as any).status || ''
+          ? (task.status || 'todo')
           : grouping === 'priority'
             ? String(task.priority)
             : task.project_id || 'none'

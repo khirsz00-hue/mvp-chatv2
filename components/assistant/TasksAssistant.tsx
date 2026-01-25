@@ -33,6 +33,7 @@ interface Task {
   subtasks?: any[]
   duration?: number
   labels?: string[]
+  status?: 'todo' | 'in_progress' | 'done'
 }
 
 interface Project {
@@ -893,6 +894,10 @@ export function TasksAssistant() {
             postponed_to: newValue
           })
         }
+      } else if (currentGrouping === 'status') {
+        updates.status = newValue as 'todo' | 'in_progress' | 'done'
+      } else if (currentGrouping === 'status') {
+        updates.status = newValue as 'todo' | 'in_progress' | 'done'
       } else if (currentGrouping === 'priority') {
         updates.priority = parseInt(newValue) as 1 | 2 | 3 | 4
       } else if (currentGrouping === 'project') {

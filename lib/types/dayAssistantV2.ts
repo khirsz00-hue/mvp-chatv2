@@ -129,6 +129,8 @@ export interface TestDayTask {
   moved_reason?: string | null
   last_moved_at?: string | null
   auto_moved: boolean
+  // Task status
+  status?: 'todo' | 'in_progress' | 'done'
   // Metadata
   metadata: Record<string, any>
   created_at: string
