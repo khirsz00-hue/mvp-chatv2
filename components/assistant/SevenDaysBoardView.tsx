@@ -350,7 +350,7 @@ export function SevenDaysBoardView({
     
     setIsMouseDragging(true)
     
-    const clientX = 'clientX' in e ? e.clientX : (e as React.TouchEvent).touches[0].clientX
+    const clientX = 'clientX' in e ? e.clientX : (e as React.TouchEvent).touches[0]?.clientX ?? 0
     setMouseStartX(clientX)
     setScrollStartX(scrollContainerRef.current.scrollLeft)
     
@@ -360,10 +360,11 @@ export function SevenDaysBoardView({
     }
   }
   
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handleMouseMove = (e: React.MouseEvent | React.TouchEvent) => {
     if (!isMouseDragging || !scrollContainerRef.current) return
     
-    const deltaX = e.clientX - mouseStartX
+    const clientX = 'clientX' in e ? e.clientX : (e as React.TouchEvent).touches[0]?.clientX ?? 0
+    const deltaX = clientX - mouseStartX
     const newScrollLeft = scrollStartX - deltaX
     scrollContainerRef.current.scrollLeft = newScrollLeft
     
@@ -372,9 +373,9 @@ export function SevenDaysBoardView({
     const scrollThreshold = 80
     const scrollSpeed = 15
     
-    if (e.clientX < rect.left + scrollThreshold && scrollContainerRef.current.scrollLeft > 0) {
+    if (clientX < rect.left + scrollThreshold && scrollContainerRef.current.scrollLeft > 0) {
       scrollContainerRef.current.scrollLeft = Math.max(0, scrollContainerRef.current.scrollLeft - scrollSpeed)
-    } else if (e.clientX > rect.right - scrollThreshold && scrollContainerRef.current.scrollLeft < scrollContainerRef.current.scrollWidth - scrollContainerRef.current.clientWidth) {
+    } else if (clientX > rect.right - scrollThreshold && scrollContainerRef.current.scrollLeft < scrollContainerRef.current.scrollWidth - scrollContainerRef.current.clientWidth) {
       scrollContainerRef.current.scrollLeft = Math.min(
         scrollContainerRef.current.scrollWidth - scrollContainerRef.current.clientWidth,
         scrollContainerRef.current.scrollLeft + scrollSpeed
@@ -382,7 +383,7 @@ export function SevenDaysBoardView({
     }
   }
   
-  const handleMouseUp = () => {
+  const handleMouseUp = (_e?: React.MouseEvent | React.TouchEvent) => {
     setIsMouseDragging(false)
   }
   
