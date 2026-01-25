@@ -361,7 +361,6 @@ export function SevenDaysBoardView({
       e.preventDefault()
     }
   }
-  }
   
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isMouseDragging || !scrollContainerRef.current) return

@@ -1312,42 +1312,6 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                     </>
                   )}
                 </div>
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Ukończone Pomodoro dziś: {pomodoroCount}
-                      </p>
-                    </div>
-                    
-                    <div className="flex gap-2 justify-center">
-                      {!isTimerRunning ? (
-                        <Button 
-                          type="button"
-                          onClick={startPomodoro}
-                          className="bg-gradient-to-r from-red-500 to-orange-500 gap-2"
-                        >
-                          <Play size={16} weight="fill" />
-                          Start Pomodoro (25min)
-                        </Button>
-                      ) : (
-                        <>
-                          <Button 
-                            type="button"
-                            onClick={() => setIsTimerRunning(false)}
-                            size="sm"
-                            variant="ghost"
-                            className="gap-1 border"
-                          >
-                            <Pause size={16} weight="fill" /> Pause
-                          </Button>
-                          <Button 
-                            type="button"
-                            onClick={stopPomodoro}
-                            size="sm"
-                            variant="ghost"
-                            className="gap-1 border border-red-500 text-red-600"
-                          >
-                            <Stop size={16} weight="fill" /> Stop
-                          </Button>
               </CollapsibleSection>
             )}
 
@@ -1705,52 +1669,7 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                     )}
                   </div>
                 )}
-                          variant="ghost"
-                          className="gap-1 border border-gray-200"
-                        >
-                          <Stop size={16} weight="fill" /> Stop
-                        </Button>
-                      </div>
-                      
-                      {timerSessions.length > 0 && (
-                        <div className="mt-3 pt-3 border-t border-gray-100">
-                          <p className="text-xs font-medium text-gray-600 mb-2">Ostatnie sesje:</p>
-                          <div className="text-xs space-y-1">
-                            {timerSessions.slice(0, 3).map(s => (
-                              <div key={s.id} className="text-gray-600">
-                                • {s.duration} min - {s.date}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
 
-                  {timeTab === 'pomodoro' && (
-                    <div>
-                      <div className="text-center mb-4">
-                        <div className="text-4xl font-mono font-bold text-red-600 mb-2">
-                          {formatTime(elapsedSeconds)}
-                        </div>
-                        <p className="text-sm text-gray-600">
-                          {pomodoroPhase === 'work' 
-                            ? `🍅 Faza pracy (${25 - Math.floor(elapsedSeconds / 60)} min pozostało)` 
-                            : `☕ Przerwa (${5 - Math.floor(elapsedSeconds / 60)} min pozostało)`}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Ukończone Pomodoro dziś: {pomodoroCount}
-                        </p>
-                      </div>
-                      
-                      <div className="flex gap-2 justify-center">
-                        {!isTimerRunning ? (
-                          <Button 
-                            type="button"
-                            onClick={startPomodoro}
-                            className="bg-gradient-to-r from-red-500 to-orange-500 gap-2"
-                )}
-                
                 {activeTab === 'history' && isEditMode && (
                   <div>
                     {changeHistory.length === 0 ? (

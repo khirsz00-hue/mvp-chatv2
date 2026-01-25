@@ -1638,7 +1638,8 @@ export function TasksAssistant() {
           setShowUniversalModal(true)
         }}
       />
-      )}
+      )
+      ) : null}
       </div>
       
       {/* Modals */}
