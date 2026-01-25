@@ -616,7 +616,8 @@ function DayColumnComponent({
             'font-bold text-base truncate',
             isToday && 'text-brand-purple'
           )}>
-            {day.shortLabel}
+            <span className="hidden sm:inline">{day.label}</span>
+            <span className="sm:hidden">{day.shortLabel}</span>
           </h3>
           {grouping === 'day' && (
             <p className="text-xs text-gray-500 truncate">
