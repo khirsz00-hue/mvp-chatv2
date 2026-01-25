@@ -125,7 +125,7 @@ export function DayAssistantV2TaskCard({
             </div>
             
             {/* Title */}
-            <h4 className="font-medium text-sm text-slate-600 mb-1">{task.title}</h4>
+            <h4 className="font-medium text-sm text-slate-600 mb-1 truncate">{task.title}</h4>
             
             {/* Due date */}
             {task.due_date && (
@@ -177,7 +177,7 @@ export function DayAssistantV2TaskCard({
             </div>
             
             {/* Title */}
-            <h4 className="font-medium text-sm text-slate-800 group-hover:text-indigo-600 transition-colors mb-1">
+            <h4 className="font-medium text-sm text-slate-800 group-hover:text-indigo-600 transition-colors mb-1 truncate">
               {task.title}
             </h4>
             
@@ -235,7 +235,7 @@ export function DayAssistantV2TaskCard({
           </div>
           
           {/* Title */}
-          <h4 className="font-semibold text-slate-800 mb-1 group-hover:text-indigo-600 transition-colors">
+          <h4 className="font-semibold text-slate-800 mb-1 group-hover:text-indigo-600 transition-colors truncate">
             {task.title}
           </h4>
           

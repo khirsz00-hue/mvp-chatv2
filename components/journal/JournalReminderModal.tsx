@@ -42,32 +42,32 @@ export function JournalReminderModal({ open, onClose, onGoToJournal }: JournalRe
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="w-[calc(100%-2rem)] max-w-md mx-auto sm:w-full">
         <DialogHeader>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-brand-purple/10 to-brand-pink/10 flex items-center justify-center">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-2">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-brand-purple/10 to-brand-pink/10 flex items-center justify-center flex-shrink-0">
               <Book size={24} weight="bold" className="text-brand-purple" />
             </div>
-            <DialogTitle className="text-2xl font-bold">
+            <DialogTitle className="text-xl sm:text-2xl font-bold">
               Uzupełnij dziennik
             </DialogTitle>
           </div>
-          <DialogDescription className="text-base text-gray-600">
+          <DialogDescription className="text-sm sm:text-base text-gray-600 mt-3">
             Pamiętaj o uzupełnieniu dzisiejszego wpisu w dzienniku. Regularne zapisywanie pomoże Ci lepiej zrozumieć swoje wzorce i postępy.
           </DialogDescription>
         </DialogHeader>
 
-        <DialogFooter className="gap-2 mt-4">
+        <DialogFooter className="gap-2 mt-6 flex flex-col-reverse sm:flex-row">
           <Button
             onClick={handleClose}
             variant="outline"
-            className="flex-1"
+            className="w-full sm:flex-1"
           >
             Zamknij
           </Button>
           <Button
             onClick={handleGoToJournal}
-            className="flex-1 gap-2"
+            className="w-full sm:flex-1 gap-2"
           >
             <Book size={20} weight="bold" />
             Przejdź do dziennika

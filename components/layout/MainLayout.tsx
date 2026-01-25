@@ -218,11 +218,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
         const completedKey = `journal_completed_${today}`
         const completed = localStorage.getItem(completedKey) === 'true'
         setJournalRequired(!completed)
-
-        if (!completed) {
-          setActiveView('journal')
-          localStorage.setItem('active_assistant', 'journal')
-        }
       } catch {
         // ignore storage issues
       }

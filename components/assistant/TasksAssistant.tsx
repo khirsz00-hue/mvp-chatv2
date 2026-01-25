@@ -11,6 +11,7 @@ import { pl } from 'date-fns/locale'
 import { UniversalTaskModal, TaskData } from '@/components/common/UniversalTaskModal'
 import { TaskCard } from './TaskCard'
 import { SevenDaysBoardView } from './SevenDaysBoardView'
+import { MobileDayCarousel } from './MobileDayCarousel'
 import { MonthView } from './MonthView'
 import { TaskTimer } from './TaskTimer'
 import { PomodoroTimer } from './PomodoroTimer'
@@ -1588,6 +1589,29 @@ export function TasksAssistant() {
             </div>
           )
         ) : view === 'board' ? (
+      // Mobile view for day board
+      typeof window !== 'undefined' && window.innerWidth < 768 && boardGrouping === 'day' ? (
+        <MobileDayCarousel
+          tasks={activeTasks}
+          onMove={handleMove}
+          onComplete={handleComplete}
+          onDelete={handleDelete}
+          onDetails={(t) => {
+            setUniversalModalTask(t)
+            setShowUniversalModal(true)
+          }}
+          onAddForKey={(key) => {
+            setUniversalModalTask({
+              id: '',
+              content: '',
+              description: '',
+              priority: 4,
+              due: key
+            })
+            setShowUniversalModal(true)
+          }}
+        />
+      ) : (
       <SevenDaysBoardView 
         tasks={activeTasks}
         grouping={boardGrouping}
@@ -1611,7 +1635,7 @@ export function TasksAssistant() {
           setShowUniversalModal(true)
         }}
       />
-        ) : null}
+      )}
       </div>
       
       {/* Modals */}

@@ -86,7 +86,7 @@ export function SevenDaysBoardView({
   const goToToday = () => {
     const today = startOfDay(new Date())
     setStartDate(today)
-    
+  
     // Scroll to today's column (only for day grouping)
     if (grouping !== 'day') return
     setTimeout(() => {

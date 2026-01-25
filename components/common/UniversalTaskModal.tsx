@@ -828,241 +828,353 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
-        className="w-full max-w-[92vw] sm:max-w-xl md:max-w-2xl max-h-[75vh] sm:max-h-[82vh] md:max-h-[85vh] p-3 sm:p-5 overflow-y-auto pb-20 sm:pb-6"
+        className="w-full max-w-[95vw] sm:max-w-2xl md:max-w-3xl max-h-[90vh] p-0 overflow-hidden"
         aria-labelledby="universal-task-modal-title"
       >
-        <DialogHeader>
-          <DialogTitle id="universal-task-modal-title" className="flex items-center gap-2">
+        <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-3 border-b">
+          <DialogTitle id="universal-task-modal-title" className="flex items-center gap-2 text-lg sm:text-xl">
             <Lightning size={24} className="text-brand-purple" weight="fill" />
             {modalTitle}
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
-          {/* Title Input */}
-          <div>
-            <label className="text-xs sm:text-sm font-medium mb-1 block">
-              Tytuł zadania <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Co chcesz zrobić?"
-              autoFocus
-              className="w-full px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base rounded-lg border-2 border-gray-200 focus:border-brand-purple focus:outline-none"
-            />
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="text-xs sm:text-sm font-medium mb-1 block">Opis (opcjonalny)</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Dodatkowe szczegóły..."
-              rows={2}
-              className="w-full px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base rounded-lg border-2 border-gray-200 focus:border-brand-purple focus:outline-none resize-none"
-            />
-          </div>
-
-          {/* Single Column Layout for better readability */}
-          <div className="space-y-3">
-            {/* Project Dropdown */}
+        <form onSubmit={handleSubmit} className="flex flex-col h-full">
+          {/* Scrollable Content */}
+          <div className="overflow-y-auto px-4 sm:px-6 py-4 space-y-4 flex-1">
+            {/* Title Input */}
             <div>
-              <label className="text-sm font-medium mb-1 block flex items-center gap-2">
-                <FolderOpen size={18} />
-                Projekt:
-              </label>
-              <select
-                value={projectId}
-                onChange={(e) => setProjectId(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg border-2 border-gray-200 focus:border-brand-purple focus:outline-none"
-                disabled={loading}
-              >
-                <option value="">Brak projektu</option>
-                {projects.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Estimated Time Slider */}
-            <div>
-              <label className="text-sm font-medium mb-2 block flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <Clock size={16} />
-                  Czas:
-                </span>
-                <span className="text-brand-purple font-bold">{estimatedMinutes} min</span>
+              <label className="text-sm font-medium mb-1.5 block">
+                Tytuł zadania <span className="text-red-500">*</span>
               </label>
               <input
-                type="range"
-                min={5}
-                max={120}
-                step={5}
-                value={estimatedMinutes}
-                onChange={(e) => setEstimatedMinutes(Number(e.target.value))}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-brand-purple"
+                type="text"
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="Co chcesz zrobić?"
+                className="w-full px-4 py-2.5 text-base rounded-lg border-2 border-gray-200 focus:border-brand-purple focus:outline-none transition"
               />
-              <div className="flex justify-between text-[10px] text-gray-500 mt-1">
-                <span>5 min</span>
-                <span>30 min</span>
-                <span>60 min</span>
-                <span>120 min</span>
-              </div>
             </div>
 
-            {/* Cognitive Load Slider */}
+            {/* Description */}
             <div>
-              <label className="text-sm font-medium mb-2 block flex items-center gap-2">
-                <Brain size={18} />
-                Obciążenie kognitywne: <span className="font-bold text-brand-purple">{cognitiveLoad}/5</span>
-              </label>
-              <input
-                type="range"
-                min={1}
-                max={5}
-                value={cognitiveLoad}
-                onChange={(e) => setCognitiveLoad(Number(e.target.value))}
-                className="w-full accent-brand-purple"
+              <label className="text-sm font-medium mb-1.5 block">Opis (opcjonalny)</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Dodatkowe szczegóły..."
+                rows={2}
+                className="w-full px-4 py-2.5 text-base rounded-lg border-2 border-gray-200 focus:border-brand-purple focus:outline-none resize-none transition"
               />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>Łatwe</span>
-                <span>Średnie</span>
-                <span>Trudne</span>
-              </div>
             </div>
 
-            {/* Priority */}
-            <div>
-              <label className="text-sm font-medium mb-2 block flex items-center gap-2">
-                <Flag size={18} />
-                Priorytet:
-              </label>
-              <div className="grid grid-cols-4 gap-2">
-                {[
-                  { value: 1, label: 'P1', color: 'bg-red-500', textColor: 'text-red-700', borderColor: 'border-red-500' },
-                  { value: 2, label: 'P2', color: 'bg-orange-500', textColor: 'text-orange-700', borderColor: 'border-orange-500' },
-                  { value: 3, label: 'P3', color: 'bg-blue-500', textColor: 'text-blue-700', borderColor: 'border-blue-500' },
-                  { value: 4, label: 'P4', color: 'bg-gray-400', textColor: 'text-gray-700', borderColor: 'border-gray-400' }
-                ].map(opt => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setPriority(opt.value as 1 | 2 | 3 | 4)}
-                    className={`px-3 py-2 rounded-lg border-2 transition text-sm font-medium min-h-[44px] ${
-                      priority === opt.value
-                        ? `${opt.borderColor} bg-opacity-10 ${opt.textColor}`
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
+            {/* Desktop: Compact Inline Fields */}
+            <div className="hidden md:grid grid-cols-2 gap-4">
+              {/* Left Column */}
+              <div className="space-y-4">
+                {/* Czas + Trudność */}
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Clock size={16} />
+                        Czas:
+                      </span>
+                      <span className="text-brand-purple font-bold text-sm">{estimatedMinutes} min</span>
+                    </label>
+                    <input
+                      type="range"
+                      min={5}
+                      max={120}
+                      step={5}
+                      value={estimatedMinutes}
+                      onChange={(e) => setEstimatedMinutes(Number(e.target.value))}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-brand-purple"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Brain size={16} />
+                        Trudność:
+                      </span>
+                      <span className="text-brand-purple font-bold text-sm">{cognitiveLoad}/5</span>
+                    </label>
+                    <input
+                      type="range"
+                      min={1}
+                      max={5}
+                      value={cognitiveLoad}
+                      onChange={(e) => setCognitiveLoad(Number(e.target.value))}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-brand-purple"
+                    />
+                  </div>
+                </div>
+
+                {/* Projekt */}
+                <div>
+                  <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5">
+                    <FolderOpen size={16} />
+                    Projekt:
+                  </label>
+                  <select
+                    value={projectId}
+                    onChange={(e) => setProjectId(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border-2 border-gray-200 focus:border-brand-purple focus:outline-none transition"
+                    disabled={loading}
                   >
-                    <div className="flex flex-col items-center gap-1">
-                      <div className={`w-3 h-3 rounded-full ${opt.color}`} />
-                      {opt.label}
+                    <option value="">Brak projektu</option>
+                    {projects.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Right Column */}
+              <div className="space-y-4">
+                {/* Priorytet (compact inline) */}
+                <div>
+                  <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5">
+                    <Flag size={16} />
+                    Priorytet:
+                  </label>
+                  <div className="flex gap-2">
+                    {[
+                      { value: 1, label: 'P1', color: 'bg-red-500', borderColor: 'border-red-500' },
+                      { value: 2, label: 'P2', color: 'bg-orange-500', borderColor: 'border-orange-500' },
+                      { value: 3, label: 'P3', color: 'bg-blue-500', borderColor: 'border-blue-500' },
+                      { value: 4, label: 'P4', color: 'bg-gray-400', borderColor: 'border-gray-400' }
+                    ].map(opt => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setPriority(opt.value as 1 | 2 | 3 | 4)}
+                        className={`flex-1 px-2 py-2 rounded-lg border-2 transition text-xs font-medium ${
+                          priority === opt.value
+                            ? `${opt.borderColor} bg-opacity-10`
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex flex-col items-center gap-1">
+                          <div className={`w-2.5 h-2.5 rounded-full ${opt.color}`} />
+                          {opt.label}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Termin (compact) */}
+                <div>
+                  <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5">
+                    <CalendarBlank size={16} />
+                    Termin:
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="date"
+                      value={dueDate}
+                      onChange={(e) => setDueDate(e.target.value)}
+                      className="flex-1 px-3 py-2 text-sm rounded-lg border-2 border-gray-200 focus:border-brand-purple focus:outline-none transition"
+                    />
+                    <div className="flex gap-1">
+                      {[
+                        { label: 'Dziś', value: format(new Date(), 'yyyy-MM-dd') },
+                        { label: 'Jutro', value: format(addDays(new Date(), 1), 'yyyy-MM-dd') }
+                      ].map(qd => (
+                        <button
+                          key={qd.label}
+                          type="button"
+                          onClick={() => setDueDate(qd.value)}
+                          className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition whitespace-nowrap"
+                        >
+                          {qd.label}
+                        </button>
+                      ))}
                     </div>
-                  </button>
-                ))}
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Due Date */}
-            <div>
-              <label className="text-sm font-medium mb-1 block flex items-center gap-2">
-                <CalendarBlank size={18} />
-                Termin:
-              </label>
-              <input
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg border-2 border-gray-200 focus:border-brand-purple focus:outline-none"
-              />
-              {/* Quick date buttons */}
-              <div className="flex gap-2 mt-2 flex-wrap">
-                {[
-                  { label: 'Dziś', value: format(new Date(), 'yyyy-MM-dd') },
-                  { label: 'Jutro', value: format(addDays(new Date(), 1), 'yyyy-MM-dd') },
-                  { label: 'Za 3 dni', value: format(addDays(new Date(), 3), 'yyyy-MM-dd') },
-                  { label: 'Za tydzień', value: format(addDays(new Date(), 7), 'yyyy-MM-dd') }
-                ].map(qd => (
-                  <button
-                    key={qd.label}
-                    type="button"
-                    onClick={() => setDueDate(qd.value)}
-                    className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition"
-                  >
-                    {qd.label}
-                  </button>
-                ))}
+            {/* Mobile: Simplified Stack Layout */}
+            <div className="md:hidden space-y-3">
+              {/* Czas + Trudność inline */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium mb-1 flex items-center justify-between">
+                    <span className="flex items-center gap-1">
+                      <Clock size={14} />
+                      Czas
+                    </span>
+                    <span className="text-brand-purple font-bold text-xs">{estimatedMinutes}m</span>
+                  </label>
+                  <input
+                    type="range"
+                    min={5}
+                    max={120}
+                    step={5}
+                    value={estimatedMinutes}
+                    onChange={(e) => setEstimatedMinutes(Number(e.target.value))}
+                    className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-brand-purple"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium mb-1 flex items-center justify-between">
+                    <span className="flex items-center gap-1">
+                      <Brain size={14} />
+                      Trudność
+                    </span>
+                    <span className="text-brand-purple font-bold text-xs">{cognitiveLoad}/5</span>
+                  </label>
+                  <input
+                    type="range"
+                    min={1}
+                    max={5}
+                    value={cognitiveLoad}
+                    onChange={(e) => setCognitiveLoad(Number(e.target.value))}
+                    className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-brand-purple"
+                  />
+                </div>
+              </div>
+
+              {/* Projekt */}
+              <div>
+                <label className="text-xs font-medium mb-1 flex items-center gap-1">
+                  <FolderOpen size={14} />
+                  Projekt
+                </label>
+                <select
+                  value={projectId}
+                  onChange={(e) => setProjectId(e.target.value)}
+                  className="w-full px-3 py-2 text-sm rounded-lg border-2 border-gray-200 focus:border-brand-purple focus:outline-none"
+                  disabled={loading}
+                >
+                  <option value="">Brak projektu</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Priorytet */}
+              <div>
+                <label className="text-xs font-medium mb-1 flex items-center gap-1">
+                  <Flag size={14} />
+                  Priorytet
+                </label>
+                <div className="flex gap-2">
+                  {[
+                    { value: 1, label: 'P1', color: 'bg-red-500', borderColor: 'border-red-500' },
+                    { value: 2, label: 'P2', color: 'bg-orange-500', borderColor: 'border-orange-500' },
+                    { value: 3, label: 'P3', color: 'bg-blue-500', borderColor: 'border-blue-500' },
+                    { value: 4, label: 'P4', color: 'bg-gray-400', borderColor: 'border-gray-400' }
+                  ].map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setPriority(opt.value as 1 | 2 | 3 | 4)}
+                      className={`flex-1 px-2 py-2.5 rounded-lg border-2 transition text-xs font-medium min-h-[44px] ${
+                        priority === opt.value
+                          ? `${opt.borderColor} bg-opacity-10`
+                          : 'border-gray-200'
+                      }`}
+                    >
+                      <div className="flex flex-col items-center gap-0.5">
+                        <div className={`w-2 h-2 rounded-full ${opt.color}`} />
+                        {opt.label}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Termin */}
+              <div>
+                <label className="text-xs font-medium mb-1 flex items-center gap-1">
+                  <CalendarBlank size={14} />
+                  Termin
+                </label>
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="w-full px-3 py-2 text-sm rounded-lg border-2 border-gray-200 focus:border-brand-purple focus:outline-none"
+                />
+                <div className="flex gap-1.5 mt-1.5">
+                  {[
+                    { label: 'Dziś', value: format(new Date(), 'yyyy-MM-dd') },
+                    { label: 'Jutro', value: format(addDays(new Date(), 1), 'yyyy-MM-dd') },
+                    { label: '+3 dni', value: format(addDays(new Date(), 3), 'yyyy-MM-dd') }
+                  ].map(qd => (
+                    <button
+                      key={qd.label}
+                      type="button"
+                      onClick={() => setDueDate(qd.value)}
+                      className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition"
+                    >
+                      {qd.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
-            {/* Labels */}
+            {/* Etykiety - Unified for Both Desktop & Mobile */}
             <div>
-              <label className="text-sm font-medium mb-1 block flex items-center gap-2">
-                <Tag size={18} />
-                Etykiety:
+              <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5">
+                <Tag size={16} />
+                Etykiety
               </label>
               
-              {/* Add new label input */}
-              <div className="flex gap-2 mb-2">
-                <Input
+              {/* Combined Input + Dropdown */}
+              <div className="relative">
+                <input
+                  type="text"
                   value={newLabel}
                   onChange={(e) => setNewLabel(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddLabel())}
-                  placeholder="Dodaj etykietę..."
-                  className="flex-1"
+                  placeholder="Wpisz nową lub wybierz..."
+                  list="label-suggestions"
+                  className="w-full px-4 py-2.5 text-sm rounded-lg border-2 border-gray-200 focus:border-brand-purple focus:outline-none transition pr-12"
                 />
+                <datalist id="label-suggestions">
+                  {availableLabels
+                    .filter(label => !selectedLabels.includes(label.name))
+                    .map(label => (
+                      <option key={label.id} value={label.name} />
+                    ))}
+                </datalist>
                 <Button
                   type="button"
                   onClick={handleAddLabel}
                   disabled={!newLabel.trim()}
+                  className="absolute right-1 top-1 bottom-1 px-3 text-xs"
+                  size="sm"
                 >
                   +
                 </Button>
               </div>
               
-              {/* Selected Labels - click to remove */}
-              <div className="flex flex-wrap gap-2">
-                {selectedLabels.map(label => (
-                  <span
-                    key={label}
-                    className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs flex items-center gap-1 cursor-pointer hover:bg-red-100 hover:text-red-800 transition"
-                    onClick={() => handleRemoveLabel(label)}
-                    title="Kliknij aby usunąć"
-                  >
-                    {label}
-                    <span className="font-bold">×</span>
-                  </span>
-                ))}
-              </div>
-              
-              {/* Available labels dropdown (from Todoist) */}
-              {availableLabels.length > 0 && (
-                <select
-                  className="w-full px-4 py-2 rounded-lg border-2 border-gray-200 focus:border-brand-purple focus:outline-none mt-2"
-                  value=""
-                  onChange={(e) => {
-                    const label = e.target.value
-                    if (label && !selectedLabels.includes(label)) {
-                      setSelectedLabels([...selectedLabels, label])
-                    }
-                  }}
-                  disabled={loading}
-                >
-                  <option value="">Wybierz z Todoist...</option>
-                  {availableLabels
-                    .filter(label => !selectedLabels.includes(label.name))
-                    .map(label => (
-                      <option key={label.id} value={label.name}>
-                        {label.name}
-                      </option>
-                    ))}
-                </select>
+              {/* Selected Labels */}
+              {selectedLabels.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {selectedLabels.map(label => (
+                    <span
+                      key={label}
+                      className="px-2.5 py-1 bg-purple-100 text-purple-800 rounded-full text-xs flex items-center gap-1 cursor-pointer hover:bg-red-100 hover:text-red-800 transition"
+                      onClick={() => handleRemoveLabel(label)}
+                      title="Kliknij aby usunąć"
+                    >
+                      {label}
+                      <span className="font-bold text-sm">×</span>
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
-          </div>
 
           {/* AI Understanding - Always Visible */}
           {aiUnderstanding && (
@@ -1139,102 +1251,67 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
               </CollapsibleSection>
             )}
 
-            {/* Time Tracking Section */}
+            {/* Time Tracking Section - History Only */}
             {!hideTimeTracking && (
               <CollapsibleSection
-                title="Mierzenie czasu"
+                title="Historia czasu pracy"
                 icon={<Timer size={18} />}
                 defaultOpen={false}
               >
-                {/* Tabs: Manual / Pomodoro */}
-                <div className="flex gap-2 border-b mb-3">
-                  <button 
-                    type="button"
-                    onClick={() => setTimeTab('manual')}
-                    className={`px-3 py-2 text-sm font-medium ${
-                      timeTab === 'manual' 
-                        ? 'border-b-2 border-purple-600 text-purple-600' 
-                        : 'text-gray-500'
-                    }`}
-                  >
-                    ⏱️ Manual
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => setTimeTab('pomodoro')}
-                    className={`px-3 py-2 text-sm font-medium ${
-                      timeTab === 'pomodoro' 
-                        ? 'border-b-2 border-purple-600 text-purple-600' 
-                        : 'text-gray-500'
-                    }`}
-                  >
-                    🍅 Pomodoro
-                  </button>
-                </div>
-
-                {timeTab === 'manual' && (
-                  <div>
-                    <div className="text-center text-3xl font-mono mb-3 font-bold text-purple-700">
-                      {formatTime(elapsedSeconds)}
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {timerSessions.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Timer size={48} className="mx-auto text-gray-300 mb-3" />
+                      <p className="text-sm text-gray-400">Brak historii czasu pracy</p>
+                      <p className="text-xs text-gray-400 mt-1">Sesje zostaną zapisane automatycznie</p>
                     </div>
-                    <div className="flex gap-2 justify-center mb-3">
-                      <Button 
-                        type="button"
-                        onClick={startTimer}
-                        disabled={isTimerRunning}
-                        size="sm"
-                        className="gap-1"
-                      >
-                        <Play size={16} weight="fill" /> Start
-                      </Button>
-                      <Button 
-                        type="button"
-                        onClick={pauseTimer}
-                        disabled={!isTimerRunning}
-                        size="sm"
-                        variant="ghost"
-                        className="gap-1 border border-gray-200"
-                      >
-                        <Pause size={16} weight="fill" /> Pause
-                      </Button>
-                      <Button 
-                        type="button"
-                        onClick={stopTimer}
-                        disabled={elapsedSeconds === 0}
-                        size="sm"
-                        variant="ghost"
-                        className="gap-1 border border-gray-200"
-                      >
-                        <Stop size={16} weight="fill" /> Stop
-                      </Button>
-                    </div>
-                    
-                    {/* Mini history - last 3 sessions */}
-                    {timerSessions.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-gray-100">
-                        <p className="text-xs font-medium text-gray-600 mb-2">Ostatnie sesje:</p>
-                        <div className="text-xs space-y-1">
-                          {timerSessions.slice(0, 3).map(s => (
-                            <div key={s.id} className="text-gray-600">
-                              • {s.duration} min - {s.date}
-                            </div>
-                          ))}
+                  ) : (
+                    <>
+                      {/* Summary */}
+                      <div className="bg-purple-50 rounded-lg p-3 mb-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-purple-900">Całkowity czas:</span>
+                          <span className="text-lg font-bold text-purple-700">
+                            {timerSessions.reduce((sum, s) => sum + s.duration, 0)} min
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-xs text-purple-700">Sesji:</span>
+                          <span className="text-sm font-semibold text-purple-700">
+                            {timerSessions.length}
+                          </span>
                         </div>
                       </div>
-                    )}
-                  </div>
-                )}
 
-                {timeTab === 'pomodoro' && (
-                  <div>
-                    <div className="text-center mb-4">
-                      <div className="text-4xl font-mono font-bold text-red-600 mb-2">
-                        {formatTime(elapsedSeconds)}
+                      {/* Session list */}
+                      <div className="space-y-1.5">
+                        {timerSessions.map((session, idx) => (
+                          <div 
+                            key={session.id} 
+                            className="flex items-center justify-between p-2.5 bg-gray-50 hover:bg-gray-100 rounded-lg transition text-sm"
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-bold">
+                                {timerSessions.length - idx}
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">
+                                  {session.duration} min
+                                </p>
+                                <p className="text-xs text-gray-500">{session.date}</p>
+                              </div>
+                            </div>
+                            {session.sessionType && (
+                              <Badge variant="outline" className="text-xs">
+                                {session.sessionType === 'pomodoro' ? '🍅 Pomodoro' : '⏱️ Manual'}
+                              </Badge>
+                            )}
+                          </div>
+                        ))}
                       </div>
-                      <p className="text-sm text-gray-600">
-                        {pomodoroPhase === 'work' 
-                          ? `🍅 Faza pracy (${25 - Math.floor(elapsedSeconds / 60)} min pozostało)` 
-                          : `☕ Przerwa (${5 - Math.floor(elapsedSeconds / 60)} min pozostało)`}
+                    </>
+                  )}
+                </div>
                       </p>
                       <p className="text-xs text-gray-500 mt-1">
                         Ukończone Pomodoro dziś: {pomodoroCount}
@@ -1271,25 +1348,6 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                           >
                             <Stop size={16} weight="fill" /> Stop
                           </Button>
-                        </>
-                      )}
-                    </div>
-                    
-                    {/* Progress bar */}
-                    <div className="mt-4">
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          className={`h-2 rounded-full transition-all ${
-                            pomodoroPhase === 'work' ? 'bg-red-500' : 'bg-green-500'
-                          }`}
-                          style={{ 
-                            width: `${(elapsedSeconds / (pomodoroPhase === 'work' ? 25 * 60 : 5 * 60)) * 100}%` 
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
               </CollapsibleSection>
             )}
 
@@ -1328,19 +1386,48 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
             )}
           </div>
 
-          {/* Submit Buttons with improved layout */}
-          <DialogFooter className="flex flex-col sm:flex-row justify-between pt-3 sm:pt-4 border-t gap-2 sm:gap-0">
-            <div className="flex gap-2 justify-center sm:justify-start">
+          {/* AI Understanding - Below tabs */}
+          {aiUnderstanding && (
+            <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+              <p className="text-xs text-purple-900 mb-2">{aiUnderstanding}</p>
+              <div className="flex gap-2">
+                <Button 
+                  type="button"
+                  size="sm" 
+                  onClick={handleClarify}
+                  variant="ghost"
+                  className="border border-purple-200 text-xs"
+                >
+                  Doprecyzuj
+                </Button>
+                <Button 
+                  type="button"
+                  size="sm" 
+                  onClick={handleGeneratePlan}
+                  disabled={loadingAI}
+                  className="bg-gradient-to-r from-purple-500 to-pink-500 text-xs"
+                >
+                  {loadingAI ? 'Generuję...' : 'Wygeneruj plan'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Desktop & Mobile: Sticky Bottom Buttons */}
+        <div className="sticky bottom-0 bg-white border-t px-4 sm:px-6 py-3 sm:py-4 mt-auto">
+          {/* Desktop Button Layout */}
+          <div className="hidden sm:flex justify-between items-center">
+            <div className="flex gap-2">
               {isEditMode && onDelete && (
                 <Button
                   type="button"
                   variant="ghost"
                   onClick={handleDelete}
-                  size="sm"
-                  className="text-red-600 hover:bg-red-50 gap-2"
+                  className="text-red-600 hover:bg-red-50 gap-2 border border-red-200"
                 >
                   <Trash size={16} />
-                  <span className="hidden sm:inline">Usuń</span>
+                  Usuń
                 </Button>
               )}
               {isEditMode && onComplete && (
@@ -1348,217 +1435,276 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                   type="button"
                   variant="ghost"
                   onClick={handleComplete}
-                  size="sm"
-                  className="text-green-600 hover:bg-green-50 gap-2"
+                  className="text-green-600 hover:bg-green-50 gap-2 border border-green-200"
                 >
                   <CheckCircle size={16} />
-                  <span className="hidden sm:inline">Ukończ</span>
+                  Ukończ
                 </Button>
               )}
             </div>
 
-            <div className="flex gap-2 w-full sm:w-auto">
+            <div className="flex gap-2">
               <Button
                 type="button"
                 variant="ghost"
                 onClick={() => onOpenChange(false)}
-                className="flex-1 sm:flex-none"
-                size="sm"
               >
                 Anuluj
               </Button>
               <Button
                 type="submit"
                 disabled={!content.trim() || saving}
-                className="bg-gradient-to-r from-brand-purple to-brand-pink gap-2 flex-1 sm:flex-none"
-                size="sm"
+                className="bg-gradient-to-r from-brand-purple to-brand-pink min-w-[100px]"
               >
                 {saving ? (
-                  <>
-                    <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span className="text-xs sm:text-sm">Zapisywanie...</span>
-                  </>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Zapisywanie...
+                  </div>
                 ) : (
-                  <span className="text-xs sm:text-sm">
-                    {isEditMode ? 'Zapisz' : 'Dodaj'}
-                  </span>
+                  isEditMode ? 'Zapisz' : 'Dodaj'
                 )}
               </Button>
             </div>
-          </DialogFooter>
+          </div>
 
-          <p className="text-xs text-center text-gray-500" role="note">
-            Naciśnij <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">Enter</kbd> aby zapisać lub <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">Esc</kbd> aby anulować
-          </p>
-        </form>
-
-        {/* Mobile Bottom Tabs */}
-        <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
-          <div className="grid grid-cols-3 gap-1 p-2">
-            {!hideSubtasks && (
-              <button
+          {/* Mobile Button Layout - Thumb-Friendly */}
+          <div className="sm:hidden">
+            <div className="flex gap-2 mb-2">
+              <Button
                 type="button"
-                onClick={() => setActiveTab(activeTab === 'subtasks' ? null : 'subtasks')}
-                className={`flex flex-col items-center justify-center gap-1 py-2 px-3 rounded-lg transition min-h-[44px] ${
-                  activeTab === 'subtasks' 
-                    ? 'bg-purple-100 text-purple-700' 
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
+                variant="ghost"
+                onClick={() => onOpenChange(false)}
+                className="flex-1 min-h-[48px] border border-gray-300"
               >
-                <ListChecks size={20} weight={activeTab === 'subtasks' ? 'fill' : 'regular'} />
-                <span className="text-[10px] font-medium">Subtaski</span>
-              </button>
-            )}
+                Anuluj
+              </Button>
+              <Button
+                type="submit"
+                disabled={!content.trim() || saving}
+                className="flex-1 min-h-[48px] bg-gradient-to-r from-brand-purple to-brand-pink font-semibold"
+              >
+                {saving ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Zapisywanie...
+                  </div>
+                ) : (
+                  isEditMode ? 'Zapisz' : 'Dodaj'
+                )}
+              </Button>
+            </div>
             
-            {!hideTimeTracking && (
-              <button
-                type="button"
-                onClick={() => setActiveTab(activeTab === 'time' ? null : 'time')}
-                className={`flex flex-col items-center justify-center gap-1 py-2 px-3 rounded-lg transition min-h-[44px] ${
-                  activeTab === 'time' 
-                    ? 'bg-purple-100 text-purple-700' 
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <Timer size={20} weight={activeTab === 'time' ? 'fill' : 'regular'} />
-                <span className="text-[10px] font-medium">Czas</span>
-              </button>
-            )}
-            
-            {!hideHistory && isEditMode && (
-              <button
-                type="button"
-                onClick={() => setActiveTab(activeTab === 'history' ? null : 'history')}
-                className={`flex flex-col items-center justify-center gap-1 py-2 px-3 rounded-lg transition min-h-[44px] ${
-                  activeTab === 'history' 
-                    ? 'bg-purple-100 text-purple-700' 
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <ClockClockwise size={20} weight={activeTab === 'history' ? 'fill' : 'regular'} />
-                <span className="text-[10px] font-medium">Historia</span>
-              </button>
+            {/* Secondary actions row for mobile */}
+            {isEditMode && (onDelete || onComplete) && (
+              <div className="flex gap-2">
+                {onComplete && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={handleComplete}
+                    className="flex-1 min-h-[44px] text-green-600 border border-green-200"
+                  >
+                    <CheckCircle size={18} />
+                    Ukończ
+                  </Button>
+                )}
+                {onDelete && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={handleDelete}
+                    className="flex-1 min-h-[44px] text-red-600 border border-red-200"
+                  >
+                    <Trash size={18} />
+                    Usuń
+                  </Button>
+                )}
+              </div>
             )}
           </div>
+
+          <p className="text-xs text-center text-gray-400 mt-2 hidden sm:block">
+            <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">Enter</kbd> aby zapisać lub <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">Esc</kbd> aby anulować
+          </p>
         </div>
+      </form>
+
+        {/* Mobile Bottom Tabs - Above buttons */}
+        {((!hideSubtasks && subtasks.length > 0) || (!hideTimeTracking && timerSessions.length > 0) || (!hideHistory && isEditMode)) && (
+          <div className="sm:hidden border-t border-gray-200 bg-gray-50 px-4 py-3">
+            <div className="flex gap-2 overflow-x-auto">
+              {!hideSubtasks && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab(activeTab === 'subtasks' ? null : 'subtasks')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition min-h-[44px] ${
+                    activeTab === 'subtasks' 
+                      ? 'bg-purple-600 text-white' 
+                      : 'bg-white text-gray-700 border border-gray-200'
+                  }`}
+                >
+                  <ListChecks size={18} weight={activeTab === 'subtasks' ? 'fill' : 'regular'} />
+                  <span className="text-sm font-medium">Podzadania ({completedSubtasksCount}/{subtasks.length})</span>
+                </button>
+              )}
+              
+              {!hideTimeTracking && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab(activeTab === 'time' ? null : 'time')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition min-h-[44px] ${
+                    activeTab === 'time' 
+                      ? 'bg-purple-600 text-white' 
+                      : 'bg-white text-gray-700 border border-gray-200'
+                  }`}
+                >
+                  <Timer size={18} weight={activeTab === 'time' ? 'fill' : 'regular'} />
+                  <span className="text-sm font-medium">Czas pracy</span>
+                </button>
+              )}
+              
+              {!hideHistory && isEditMode && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab(activeTab === 'history' ? null : 'history')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition min-h-[44px] ${
+                    activeTab === 'history' 
+                      ? 'bg-purple-600 text-white' 
+                      : 'bg-white text-gray-700 border border-gray-200'
+                  }`}
+                >
+                  <ClockClockwise size={18} weight={activeTab === 'history' ? 'fill' : 'regular'} />
+                  <span className="text-sm font-medium">Historia</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Mobile Tab Content Overlay */}
         {activeTab && (
           <div 
-            className="sm:hidden fixed inset-0 bg-black/50 z-40" 
+            className="sm:hidden fixed inset-0 bg-black/50 z-[60]" 
             onClick={() => setActiveTab(null)}
-            onKeyDown={(e) => e.key === 'Escape' && setActiveTab(null)}
-            role="dialog"
-            aria-modal="true"
           >
             <div 
-              className="absolute bottom-[60px] left-0 right-0 bg-white rounded-t-2xl shadow-2xl max-h-[60vh] overflow-y-auto p-4"
+              className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl max-h-[65vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
-              {activeTab === 'subtasks' && (
-                <div>
-                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                    <ListChecks size={18} /> Podzadania ({completedSubtasksCount}/{subtasks.length})
-                  </h3>
-                  <div className="flex gap-2 mb-2">
-                    <Input 
-                      placeholder="Dodaj podzadanie..."
-                      value={newSubtask}
-                      onChange={e => setNewSubtask(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddSubtask())}
-                      className="flex-1"
-                    />
-                    <Button 
-                      type="button"
-                      onClick={handleAddSubtask}
-                      disabled={!newSubtask.trim()}
-                    >
-                      +
-                    </Button>
+              {/* Close handle */}
+              <div className="sticky top-0 bg-white pt-3 pb-2 px-4 border-b border-gray-200 flex items-center justify-between">
+                <h3 className="text-base font-semibold flex items-center gap-2">
+                  {activeTab === 'subtasks' && <><ListChecks size={20} /> Podzadania</>}
+                  {activeTab === 'time' && <><Timer size={20} /> Historia czasu</>}
+                  {activeTab === 'history' && <><ClockClockwise size={20} /> Historia zmian</>}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab(null)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition"
+                >
+                  <span className="text-2xl text-gray-400">×</span>
+                </button>
+              </div>
+
+              <div className="p-4 pb-safe">
+                {activeTab === 'subtasks' && (
+                  <div>
+                    <div className="flex gap-2 mb-3">
+                      <Input 
+                        placeholder="Dodaj podzadanie..."
+                        value={newSubtask}
+                        onChange={e => setNewSubtask(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddSubtask())}
+                        className="flex-1"
+                      />
+                      <Button 
+                        type="button"
+                        onClick={handleAddSubtask}
+                        disabled={!newSubtask.trim()}
+                        className="min-h-[44px] px-4"
+                      >
+                        +
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      {subtasks.length === 0 ? (
+                        <p className="text-sm text-gray-400 text-center py-8">Brak podzadań</p>
+                      ) : (
+                        subtasks.map(sub => (
+                          <label key={sub.id} className="flex items-center gap-3 p-3 bg-gray-50 hover:bg-gray-100 rounded-lg cursor-pointer transition">
+                            <input 
+                              type="checkbox" 
+                              checked={sub.completed}
+                              onChange={e => handleToggleSubtask(sub.id, e.target.checked)}
+                              className="w-5 h-5 text-brand-purple border-gray-300 rounded focus:ring-brand-purple"
+                            />
+                            <span className={sub.completed ? 'line-through text-gray-400 text-sm flex-1' : 'text-sm flex-1'}>
+                              {sub.content}
+                            </span>
+                          </label>
+                        ))
+                      )}
+                    </div>
                   </div>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {subtasks.length === 0 ? (
-                      <p className="text-xs text-gray-400 text-center py-4">Brak podzadań</p>
+                )}
+                
+                {activeTab === 'time' && (
+                  <div>
+                    {timerSessions.length === 0 ? (
+                      <div className="text-center py-12">
+                        <Timer size={56} className="mx-auto text-gray-300 mb-4" />
+                        <p className="text-sm text-gray-400">Brak historii czasu pracy</p>
+                      </div>
                     ) : (
-                      subtasks.map(sub => (
-                        <label key={sub.id} className="flex items-center gap-2 cursor-pointer p-2 hover:bg-gray-50 rounded">
-                          <input 
-                            type="checkbox" 
-                            checked={sub.completed}
-                            onChange={e => handleToggleSubtask(sub.id, e.target.checked)}
-                            className="w-4 h-4 text-brand-purple border-gray-300 rounded focus:ring-brand-purple"
-                          />
-                          <span className={sub.completed ? 'line-through text-gray-400 text-sm' : 'text-sm'}>
-                            {sub.content}
-                          </span>
-                        </label>
-                      ))
+                      <>
+                        {/* Summary */}
+                        <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4 mb-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-purple-900">Całkowity czas:</span>
+                            <span className="text-2xl font-bold text-purple-700">
+                              {timerSessions.reduce((sum, s) => sum + s.duration, 0)} min
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-purple-700">Liczba sesji:</span>
+                            <span className="text-sm font-semibold text-purple-700">
+                              {timerSessions.length}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Session list */}
+                        <div className="space-y-2">
+                          {timerSessions.map((session, idx) => (
+                            <div 
+                              key={session.id} 
+                              className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-sm font-bold">
+                                  #{timerSessions.length - idx}
+                                </div>
+                                <div>
+                                  <p className="text-base font-semibold text-gray-900">
+                                    {session.duration} min
+                                  </p>
+                                  <p className="text-xs text-gray-500">{session.date}</p>
+                                </div>
+                              </div>
+                              {session.sessionType && (
+                                <Badge variant="outline" className="text-xs">
+                                  {session.sessionType === 'pomodoro' ? '🍅' : '⏱️'}
+                                </Badge>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </>
                     )}
                   </div>
-                </div>
-              )}
-              
-              {activeTab === 'time' && (
-                <div>
-                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                    <Timer size={18} /> Mierzenie czasu
-                  </h3>
-                  {/* Tabs: Manual / Pomodoro */}
-                  <div className="flex gap-2 border-b mb-3">
-                    <button 
-                      type="button"
-                      onClick={() => setTimeTab('manual')}
-                      className={`px-3 py-2 text-sm font-medium ${
-                        timeTab === 'manual' 
-                          ? 'border-b-2 border-purple-600 text-purple-600' 
-                          : 'text-gray-500'
-                      }`}
-                    >
-                      ⏱️ Manual
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => setTimeTab('pomodoro')}
-                      className={`px-3 py-2 text-sm font-medium ${
-                        timeTab === 'pomodoro' 
-                          ? 'border-b-2 border-purple-600 text-purple-600' 
-                          : 'text-gray-500'
-                      }`}
-                    >
-                      🍅 Pomodoro
-                    </button>
-                  </div>
-
-                  {timeTab === 'manual' && (
-                    <div>
-                      <div className="text-center text-3xl font-mono mb-3 font-bold text-purple-700">
-                        {formatTime(elapsedSeconds)}
-                      </div>
-                      <div className="flex gap-2 justify-center mb-3">
-                        <Button 
-                          type="button"
-                          onClick={startTimer}
-                          disabled={isTimerRunning}
-                          size="sm"
-                          className="gap-1"
-                        >
-                          <Play size={16} weight="fill" /> Start
-                        </Button>
-                        <Button 
-                          type="button"
-                          onClick={pauseTimer}
-                          disabled={!isTimerRunning}
-                          size="sm"
-                          variant="ghost"
-                          className="gap-1 border border-gray-200"
-                        >
-                          <Pause size={16} weight="fill" /> Pause
-                        </Button>
-                        <Button 
-                          type="button"
-                          onClick={stopTimer}
-                          disabled={elapsedSeconds === 0}
-                          size="sm"
+                )}
                           variant="ghost"
                           className="gap-1 border border-gray-200"
                         >
@@ -1603,82 +1749,40 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                             type="button"
                             onClick={startPomodoro}
                             className="bg-gradient-to-r from-red-500 to-orange-500 gap-2"
-                          >
-                            <Play size={16} weight="fill" />
-                            Start Pomodoro (25min)
-                          </Button>
-                        ) : (
-                          <>
-                            <Button 
-                              type="button"
-                              onClick={() => setIsTimerRunning(false)}
-                              size="sm"
-                              variant="ghost"
-                              className="gap-1 border"
-                            >
-                              <Pause size={16} weight="fill" /> Pause
-                            </Button>
-                            <Button 
-                              type="button"
-                              onClick={stopPomodoro}
-                              size="sm"
-                              variant="ghost"
-                              className="gap-1 border border-red-500 text-red-600"
-                            >
-                              <Stop size={16} weight="fill" /> Stop
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                      
-                      <div className="mt-4">
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
-                            className={`h-2 rounded-full transition-all ${
-                              pomodoroPhase === 'work' ? 'bg-red-500' : 'bg-green-500'
-                            }`}
-                            style={{ 
-                              width: `${(elapsedSeconds / (pomodoroPhase === 'work' ? 25 * 60 : 5 * 60)) * 100}%` 
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              {activeTab === 'history' && isEditMode && (
-                <div>
-                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                    <ClockClockwise size={18} /> Historia zmian
-                  </h3>
-                  <div className="space-y-2 max-h-48 overflow-y-auto text-xs">
+                )}
+                
+                {activeTab === 'history' && isEditMode && (
+                  <div>
                     {changeHistory.length === 0 ? (
-                      <p className="text-gray-400 text-center py-4">Brak historii zmian</p>
+                      <div className="text-center py-12">
+                        <ClockClockwise size={56} className="mx-auto text-gray-300 mb-4" />
+                        <p className="text-sm text-gray-400">Brak historii zmian</p>
+                      </div>
                     ) : (
-                      changeHistory.map(change => (
-                        <div key={change.id} className="bg-gray-50 p-2 rounded">
-                          <div className="flex justify-between">
-                            <span className="font-semibold">{change.field}</span>
-                            <span className="text-gray-500">
-                              {new Date(change.timestamp).toLocaleTimeString('pl-PL', { 
-                                hour: '2-digit', 
-                                minute: '2-digit' 
-                              })}
-                            </span>
+                      <div className="space-y-2">
+                        {changeHistory.map(change => (
+                          <div key={change.id} className="bg-gray-50 p-3 rounded-lg">
+                            <div className="flex justify-between items-start mb-2">
+                              <span className="font-semibold text-sm text-gray-900">{change.field}</span>
+                              <span className="text-xs text-gray-500">
+                                {new Date(change.timestamp).toLocaleTimeString('pl-PL', { 
+                                  hour: '2-digit', 
+                                  minute: '2-digit' 
+                                })}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <span className="line-through text-red-600 flex-1">{change.oldValue}</span>
+                              <span className="text-gray-400">→</span>
+                              <span className="text-green-600 flex-1">{change.newValue}</span>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 text-gray-600 mt-1">
-                            <span className="line-through text-red-600">{change.oldValue}</span>
-                            →
-                            <span className="text-green-600">{change.newValue}</span>
-                          </div>
-                        </div>
-                      ))
+                        ))}
+                      </div>
                     )}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         )}
