@@ -60,7 +60,6 @@ export function SevenDaysBoardView({
   const [movingTaskId, setMovingTaskId] = useState<string | null>(null)
   const [scrollPosition, setScrollPosition] = useState(0)
   const [scrollProgress, setScrollProgress] = useState(0) // 0-100 for scrollbar
-  const [scrollProgress, setScrollProgress] = useState(0) // 0-100 for scrollbar
   const [dragStartPos, setDragStartPos] = useState<{ x: number; y: number } | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -359,7 +358,6 @@ export function SevenDaysBoardView({
     if ('preventDefault' in e && 'button' in e) {
       e.preventDefault()
     }
-  }
   }
   
   const handleMouseMove = (e: React.MouseEvent) => {
