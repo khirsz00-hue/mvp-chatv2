@@ -250,9 +250,9 @@ export function SevenDaysBoardView({
     
     const x = event.delta.x + clientX
     
-    // Auto-scroll threshold (50px from edge)
-    const scrollThreshold = 50
-    const scrollSpeed = 10
+    // Auto-scroll threshold (100px from edge for more responsive scrolling)
+    const scrollThreshold = 100
+    const scrollSpeed = 20
     
     // Clear existing interval
     if (autoScrollIntervalRef.current) {
@@ -343,7 +343,7 @@ export function SevenDaysBoardView({
     // Only start drag on left mouse button and not on interactive elements
     if (e.button !== 0) return
     const target = e.target as HTMLElement
-    if (target.closest('button') || target.closest('select') || target.closest('input')) return
+    if (target.closest('button') || target.closest('select') || target.closest('input') || target.closest('[role="button"]')) return
     
     setIsMouseDragging(true)
     setMouseStartX(e.clientX)
@@ -356,7 +356,22 @@ export function SevenDaysBoardView({
     if (!isMouseDragging || !scrollContainerRef.current) return
     
     const deltaX = e.clientX - mouseStartX
-    scrollContainerRef.current.scrollLeft = scrollStartX - deltaX
+    const newScrollLeft = scrollStartX - deltaX
+    scrollContainerRef.current.scrollLeft = newScrollLeft
+    
+    // Auto-scroll if near edge during mouse drag
+    const rect = scrollContainerRef.current.getBoundingClientRect()
+    const scrollThreshold = 80
+    const scrollSpeed = 15
+    
+    if (e.clientX < rect.left + scrollThreshold && scrollContainerRef.current.scrollLeft > 0) {
+      scrollContainerRef.current.scrollLeft = Math.max(0, scrollContainerRef.current.scrollLeft - scrollSpeed)
+    } else if (e.clientX > rect.right - scrollThreshold && scrollContainerRef.current.scrollLeft < scrollContainerRef.current.scrollWidth - scrollContainerRef.current.clientWidth) {
+      scrollContainerRef.current.scrollLeft = Math.min(
+        scrollContainerRef.current.scrollWidth - scrollContainerRef.current.clientWidth,
+        scrollContainerRef.current.scrollLeft + scrollSpeed
+      )
+    }
   }
   
   const handleMouseUp = () => {
@@ -513,7 +528,7 @@ export function SevenDaysBoardView({
             {columns.map(day => (
               <div 
                 key={day.id} 
-                className="w-[65vw] sm:w-[45vw] md:w-[32vw] lg:w-80 xl:w-96 flex-shrink-0 snap-start"
+                className="w-[calc(100vw-24px)] sm:w-[calc(50vw-20px)] md:w-[calc(33.33vw-16px)] lg:w-[280px] xl:w-[340px] 2xl:w-[380px] flex-shrink-0 snap-start"
               >
                 <DayColumnComponent
                   day={day}
