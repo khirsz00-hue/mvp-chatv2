@@ -438,7 +438,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
             </div>
             
             {/* 🎮 GAMIFICATION: Voice Capture Button */}
-            {/* Floating Action Buttons - Stacked vertically with safe area support */}
             {/* Desktop: Floating Action Buttons - Stacked vertically with safe area support */}
             <div className="fab-container hidden md:flex">
               {/* Add Task Button - Top */}
@@ -519,8 +518,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </div>
           
           {/* 🎮 GAMIFICATION: Voice Capture Button */}
-          {/* Floating Action Buttons - Stacked vertically with safe area support */}
-          <div className="fab-container">
+          {/* Desktop: Floating Action Buttons - Stacked vertically with safe area support */}
+          <div className="fab-container hidden md:flex">
             {/* Add Task Button - Top */}
             <FloatingAddButton onClick={() => setShowQuickAdd(true)} />
             
@@ -529,6 +528,20 @@ export default function MainLayout({ children }: MainLayoutProps) {
             
             {/* Voice Ramble Button - Bottom */}
             <VoiceCapture />
+          </div>
+
+          {/* Mobile: Floating Menu - Single button with vertical menu */}
+          <div className="md:hidden fixed z-40 bottom-6 right-6" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)', paddingRight: 'env(safe-area-inset-right, 0px)' }}>
+            <MobileFloatingMenu 
+              onAddTask={() => setShowQuickAdd(true)}
+              onOpenChat={() => setShowChat(true)}
+              onOpenVoice={() => setShowVoice(true)}
+            />
+          </div>
+
+          {/* Voice Modal reference for mobile */}
+          <div className="hidden">
+            <VoiceCapture isOpen={showVoice} onOpenChange={setShowVoice} />
           </div>
           
           {/* Universal Task Modal for Quick Add (Shift+Q) */}
