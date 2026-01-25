@@ -63,6 +63,11 @@ export function SevenDaysBoardView({
   const [isDragging, setIsDragging] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const autoScrollIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  
+  // Mouse drag scrolling state
+  const [isMouseDragging, setIsMouseDragging] = useState(false)
+  const [mouseStartX, setMouseStartX] = useState(0)
+  const [scrollStartX, setScrollStartX] = useState(0)
 
   // Constants
   const DRAG_THRESHOLD = 5 // pixels of movement before considering it a drag
@@ -317,6 +322,45 @@ export function SevenDaysBoardView({
       }
     }
   }, [])
+  
+  // Mouse drag scrolling handlers
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!scrollContainerRef.current) return
+    // Only start drag on left mouse button and not on interactive elements
+    if (e.button !== 0) return
+    const target = e.target as HTMLElement
+    if (target.closest('button') || target.closest('select') || target.closest('input')) return
+    
+    setIsMouseDragging(true)
+    setMouseStartX(e.clientX)
+    setScrollStartX(scrollContainerRef.current.scrollLeft)
+    // Prevent text selection during drag
+    e.preventDefault()
+  }
+  
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isMouseDragging || !scrollContainerRef.current) return
+    
+    const deltaX = e.clientX - mouseStartX
+    scrollContainerRef.current.scrollLeft = scrollStartX - deltaX
+  }
+  
+  const handleMouseUp = () => {
+    setIsMouseDragging(false)
+  }
+  
+  const handleMouseLeave = () => {
+    setIsMouseDragging(false)
+  }
+  
+  // Add global mouse up listener
+  useEffect(() => {
+    if (isMouseDragging) {
+      const handleGlobalMouseUp = () => setIsMouseDragging(false)
+      window.addEventListener('mouseup', handleGlobalMouseUp)
+      return () => window.removeEventListener('mouseup', handleGlobalMouseUp)
+    }
+  }, [isMouseDragging])
 
   const scrollLeft = () => {
     if (scrollContainerRef.current && columns.length > 0) {
@@ -350,6 +394,37 @@ export function SevenDaysBoardView({
   }, [scrollPosition])
 
   const canScrollLeft = scrollPosition > 0
+  
+  // Check if today is visible in viewport
+  const [isTodayVisible, setIsTodayVisible] = useState(true)
+  
+  useEffect(() => {
+    if (!scrollContainerRef.current || grouping !== 'day') return
+    
+    const checkTodayVisibility = () => {
+      if (!scrollContainerRef.current) return
+      
+      const todayIndex = days.findIndex(d => isSameDay(d.date, new Date()))
+      if (todayIndex < 0) {
+        setIsTodayVisible(false)
+        return
+      }
+      
+      const container = scrollContainerRef.current
+      const columnWidth = container.scrollWidth / days.length
+      const todayLeft = columnWidth * todayIndex
+      const todayRight = todayLeft + columnWidth
+      
+      const viewportLeft = container.scrollLeft
+      const viewportRight = viewportLeft + container.clientWidth
+      
+      // Today is visible if any part of it is in the viewport
+      const visible = todayRight > viewportLeft && todayLeft < viewportRight
+      setIsTodayVisible(visible)
+    }
+    
+    checkTodayVisibility()
+  }, [scrollPosition, days, grouping])
 
   return (
     <DndContext
@@ -385,7 +460,8 @@ export function SevenDaysBoardView({
             </Button>
           </div>
           
-          {!isCurrentWeek && (
+          {/* Show "Dzisiaj" button when today is not visible or not in current week */}
+          {(!isTodayVisible || !isCurrentWeek) && (
             <Button
               size="sm"
               variant="default"
@@ -400,39 +476,23 @@ export function SevenDaysBoardView({
       )}
 
       {/* Carousel container with navigation arrows */}
-        <div className="relative pb-4 w-full overflow-x-hidden">
-        {/* Left scroll arrow - visible on all devices */}
-          <button
-            onClick={scrollLeft}
-            disabled={!canScrollLeft}
-            className={cn(
-              'flex absolute left-2 sm:left-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 sm:w-10 sm:h-10 items-center justify-center bg-white/95 backdrop-blur-sm rounded-full shadow-xl border-2 border-gray-200 transition-all hover:shadow-xl hover:scale-110',
-              !canScrollLeft && 'opacity-0 pointer-events-none'
-            )}
-            aria-label="Scroll left"
-          >
-            <CaretLeft size={24} weight="bold" className="text-gray-700" />
-          </button>
-
-        {/* Right scroll arrow - visible on all devices */}
-          <button
-            onClick={scrollRight}
-            disabled={!canScrollRight}
-            className={cn(
-              'flex absolute right-2 sm:right-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 sm:w-10 sm:h-10 items-center justify-center bg-white/95 backdrop-blur-sm rounded-full shadow-xl border-2 border-gray-200 transition-all hover:shadow-xl hover:scale-110',
-              !canScrollRight && 'opacity-0 pointer-events-none'
-            )}
-            aria-label="Scroll right"
-          >
-            <CaretRight size={24} weight="bold" className="text-gray-700" />
-          </button>
-
+      <div className="relative pb-4 w-full overflow-x-hidden">
         {/* Scrollable carousel container - single row on all devices */}
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
-          className="overflow-x-auto scrollbar-hide snap-x snap-mandatory w-full h-[calc(100vh-220px)]"
-          style={{ scrollBehavior: 'smooth' }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseLeave}
+          className={cn(
+            "overflow-x-auto scrollbar-hide snap-x snap-mandatory w-full h-[calc(100vh-220px)]",
+            isMouseDragging && "cursor-grabbing select-none"
+          )}
+          style={{ 
+            scrollBehavior: isMouseDragging ? 'auto' : 'smooth',
+            cursor: isMouseDragging ? 'grabbing' : 'grab'
+          }}
         >
           {/* Single row flex layout for carousel behavior */}
           <div className="flex gap-3 w-max px-1 sm:px-2 pb-1">
@@ -453,6 +513,35 @@ export function SevenDaysBoardView({
               </div>
             ))}
           </div>
+        </div>
+        
+        {/* Navigation arrows positioned below the day cards header area */}
+        <div className="absolute top-14 left-0 right-0 flex items-center justify-between pointer-events-none px-2 sm:px-0">
+          {/* Left scroll arrow */}
+          <button
+            onClick={scrollLeft}
+            disabled={!canScrollLeft}
+            className={cn(
+              'pointer-events-auto flex w-10 h-10 items-center justify-center bg-white/95 backdrop-blur-sm rounded-full shadow-lg border-2 border-gray-200 transition-all hover:shadow-xl hover:scale-110',
+              !canScrollLeft && 'opacity-0 pointer-events-none'
+            )}
+            aria-label="Scroll left"
+          >
+            <CaretLeft size={20} weight="bold" className="text-gray-700" />
+          </button>
+
+          {/* Right scroll arrow */}
+          <button
+            onClick={scrollRight}
+            disabled={!canScrollRight}
+            className={cn(
+              'pointer-events-auto flex w-10 h-10 items-center justify-center bg-white/95 backdrop-blur-sm rounded-full shadow-lg border-2 border-gray-200 transition-all hover:shadow-xl hover:scale-110',
+              !canScrollRight && 'opacity-0 pointer-events-none'
+            )}
+            aria-label="Scroll right"
+          >
+            <CaretRight size={20} weight="bold" className="text-gray-700" />
+          </button>
         </div>
       </div>
 

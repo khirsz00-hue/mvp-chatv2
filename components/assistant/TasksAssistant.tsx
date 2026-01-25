@@ -1267,42 +1267,60 @@ export function TasksAssistant() {
               </div>
             </div>
             
-            {/* Middle: Compact filters - Desktop only (≥768px) */}
-            <div className="hidden md:flex items-center gap-2 flex-1 justify-center">
-              <select 
-                value={sortBy} 
-                onChange={(e) => setSortBy(e.target.value as SortType)}
-                className="px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-brand-purple transition-colors min-w-[120px] max-w-[180px]"
-              >
-                <option value="date">📅 Data</option>
-                <option value="priority">🚩 Priorytet</option>
-                <option value="name">🔤 Nazwa</option>
-              </select>
-              
-              {view === 'list' && (
-                <select 
-                  value={groupBy} 
-                  onChange={(e) => setGroupBy(e.target.value as GroupByType)}
-                  className="px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-brand-purple transition-colors min-w-[120px] max-w-[180px]"
-                >
-                  <option value="none">📋 Brak</option>
-                  <option value="day">📅 Dzień</option>
-                  <option value="project">📁 Projekt</option>
-                  <option value="priority">🚩 Priorytet</option>
-                </select>
-              )}
-              
-              <select 
-                value={selectedProject} 
-                onChange={(e) => setSelectedProject(e.target.value)}
-                className="px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-brand-purple transition-colors min-w-[120px] max-w-[180px]"
-              >
-                <option value="all">📁 Projekty</option>
-                {projects.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
+            {/* Middle: Compact filters - Desktop only (≥768px) - ONLY for list view */}
+            {view === 'list' && (
+              <div className="hidden md:flex items-center gap-3 flex-1 justify-center">
+                {/* Sortowanie (Sorting) */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide px-1">
+                    Sortowanie
+                  </label>
+                  <select 
+                    value={sortBy} 
+                    onChange={(e) => setSortBy(e.target.value as SortType)}
+                    className="px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-brand-purple transition-colors min-w-[120px] max-w-[180px]"
+                  >
+                    <option value="date">📅 Data</option>
+                    <option value="priority">🚩 Priorytet</option>
+                    <option value="name">🔤 Nazwa</option>
+                  </select>
+                </div>
+                
+                {/* Grupowanie (Grouping) */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide px-1">
+                    Grupowanie
+                  </label>
+                  <select 
+                    value={groupBy} 
+                    onChange={(e) => setGroupBy(e.target.value as GroupByType)}
+                    className="px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-brand-purple transition-colors min-w-[120px] max-w-[180px]"
+                  >
+                    <option value="none">📋 Brak</option>
+                    <option value="day">📅 Dzień</option>
+                    <option value="project">📁 Projekt</option>
+                    <option value="priority">🚩 Priorytet</option>
+                  </select>
+                </div>
+                
+                {/* Filtrowanie (Filtering) */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide px-1">
+                    Filtrowanie
+                  </label>
+                  <select 
+                    value={selectedProject} 
+                    onChange={(e) => setSelectedProject(e.target.value)}
+                    className="px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-brand-purple transition-colors min-w-[120px] max-w-[180px]"
+                  >
+                    <option value="all">📁 Projekty</option>
+                    {projects.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
             
             {/* Right: Task count badge */}
             <div className="hidden md:block">
