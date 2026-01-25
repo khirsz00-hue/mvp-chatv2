@@ -146,29 +146,41 @@ export function SevenDaysBoardView({
 
   const priorityColumns = grouping === 'priority'
     ? [
-        { id: '1', label: 'P1' },
-        { id: '2', label: 'P2' },
-        { id: '3', label: 'P3' },
-        { id: '4', label: 'P4' }
+        { id: '1', label: 'Wysoki (P1)', shortLabel: 'P1' },
+        { id: '2', label: 'Średni (P2)', shortLabel: 'P2' },
+        { id: '3', label: 'Niski (P3)', shortLabel: 'P3' },
+        { id: '4', label: 'Bez priorytetu (P4)', shortLabel: 'P4' }
       ].map(col => ({
         id: col.id,
         date: new Date(),
         dateStr: col.id,
         label: col.label,
-        shortLabel: col.label,
+        shortLabel: col.shortLabel,
         tasks: tasks.filter(t => String(t.priority) === col.id)
       }))
     : []
 
   const projectColumns = grouping === 'project'
-    ? (projects || []).map(p => ({
-        id: p.id || 'none',
-        date: new Date(),
-        dateStr: p.id || 'none',
-        label: p.name || 'Bez projektu',
-        shortLabel: p.name || 'Bez projektu',
-        tasks: tasks.filter(t => (t.project_id || 'none') === (p.id || 'none'))
-      }))
+    ? [
+        // First, add column for tasks without a project
+        {
+          id: 'none',
+          date: new Date(),
+          dateStr: 'none',
+          label: 'Bez projektu',
+          shortLabel: 'Bez projektu',
+          tasks: tasks.filter(t => !t.project_id)
+        },
+        // Then add columns for each project
+        ...(projects || []).map(p => ({
+          id: p.id,
+          date: new Date(),
+          dateStr: p.id,
+          label: p.name,
+          shortLabel: p.name,
+          tasks: tasks.filter(t => t.project_id === p.id)
+        }))
+      ]
     : []
 
   const columns: DayColumn[] =
@@ -511,6 +523,7 @@ export function SevenDaysBoardView({
                   onAddForKey={onAddForKey}
                   movingTaskId={movingTaskId}
                   isDraggingGlobal={isDragging}
+                  grouping={grouping}
                 />
               </div>
             ))}
@@ -551,7 +564,7 @@ export function SevenDaysBoardView({
         {activeTask ? (
           <div className="w-64">
             <div className="vibrate-drag shadow-2xl opacity-90">
-              <MiniTaskCard task={activeTask} />
+              <MiniTaskCard task={activeTask} grouping={grouping} />
             </div>
           </div>
         ) : null}
@@ -568,7 +581,8 @@ function DayColumnComponent({
   onDetails,
   onAddForKey,
   movingTaskId,
-  isDraggingGlobal
+  isDraggingGlobal,
+  grouping
 }: {
   day: DayColumn
   onComplete: (id: string) => Promise<void>
@@ -577,6 +591,7 @@ function DayColumnComponent({
   onAddForKey?: (key: string) => void
   movingTaskId: string | null
   isDraggingGlobal: boolean
+  grouping: BoardGrouping
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: day.id })
   
@@ -603,9 +618,11 @@ function DayColumnComponent({
           )}>
             {day.shortLabel}
           </h3>
-          <p className="text-xs text-gray-500 truncate">
-            {format(day.date, 'd MMM', { locale: pl })}
-          </p>
+          {grouping === 'day' && (
+            <p className="text-xs text-gray-500 truncate">
+              {format(day.date, 'd MMM', { locale: pl })}
+            </p>
+          )}
         </div>
         
         <Badge 
@@ -640,6 +657,7 @@ function DayColumnComponent({
                 onDetails={onDetails}
                 isMoving={movingTaskId === task.id}
                 isDraggingGlobal={isDraggingGlobal}
+                grouping={grouping}
               />
             ))
           )}
@@ -671,7 +689,8 @@ function SortableTaskCard({
   onDelete,
   onDetails,
   isMoving,
-  isDraggingGlobal
+  isDraggingGlobal,
+  grouping
 }: {
   task: Task
   onComplete: (id: string) => Promise<void>
@@ -679,6 +698,7 @@ function SortableTaskCard({
   onDetails: (task: Task) => void
   isMoving: boolean
   isDraggingGlobal: boolean
+  grouping: BoardGrouping
 }) {
   const {
     attributes,
@@ -713,6 +733,7 @@ function SortableTaskCard({
         onDetails={onDetails}
         dragHandleProps={{ ...attributes, ...listeners }}
         isDraggingGlobal={isDraggingGlobal}
+        grouping={grouping}
       />
     </div>
   )
@@ -725,7 +746,8 @@ function MiniTaskCard({
   onDelete,
   onDetails,
   dragHandleProps,
-  isDraggingGlobal
+  isDraggingGlobal,
+  grouping
 }: {
   task: Task
   onComplete?: (id: string) => Promise<void>
@@ -733,6 +755,7 @@ function MiniTaskCard({
   onDetails?: (task: Task) => void
   dragHandleProps?: any
   isDraggingGlobal?: boolean
+  grouping?: BoardGrouping
 }) {
   const [loading, setLoading] = useState(false)
   const [showTooltip, setShowTooltip] = useState(false)
@@ -812,6 +835,16 @@ function MiniTaskCard({
             <p className="font-medium text-xs line-clamp-1 group-hover:text-brand-purple transition-colors">
               {task.content}
             </p>
+            
+            {/* Show due date when grouping is not by day */}
+            {grouping !== 'day' && task.due && (
+              <div className="flex items-center gap-1 mt-0.5 text-[10px] text-gray-500">
+                <CalendarBlank size={10} weight="bold" />
+                <span>
+                  {format(parseISO(typeof task.due === 'string' ? task.due : task.due.date), 'd MMM', { locale: pl })}
+                </span>
+              </div>
+            )}
           </div>
           
           {/* Context menu button */}
