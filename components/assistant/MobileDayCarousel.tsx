@@ -193,8 +193,8 @@ export function MobileDayCarousel({
   useEffect(() => {
     if (!draggedTaskId) return
     
-    const handleMouseMove = (e: MouseEvent) => handleDragMove(e)
-    const handleTouchMove = (e: TouchEvent) => handleDragMove(e)
+    const handleMouseMove = (e: MouseEvent) => handleDragMove(e as any)
+    const handleTouchMove = (e: TouchEvent) => handleDragMove(e as any)
     const handleMouseUp = () => handleDragEnd(draggedTaskId)
     const handleTouchEnd = () => handleDragEnd(draggedTaskId)
     

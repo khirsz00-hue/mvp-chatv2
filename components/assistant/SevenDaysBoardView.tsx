@@ -61,7 +61,6 @@ export function SevenDaysBoardView({
   const [movingTaskId, setMovingTaskId] = useState<string | null>(null)
   const [scrollPosition, setScrollPosition] = useState(0)
   const [scrollProgress, setScrollProgress] = useState(0) // 0-100 for scrollbar
-  const [scrollProgress, setScrollProgress] = useState(0) // 0-100 for scrollbar
   const [dragStartPos, setDragStartPos] = useState<{ x: number; y: number } | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -362,10 +361,11 @@ export function SevenDaysBoardView({
     }
   }
   
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handleMouseMove = (e: React.MouseEvent | React.TouchEvent) => {
     if (!isMouseDragging || !scrollContainerRef.current) return
     
-    const deltaX = e.clientX - mouseStartX
+    const clientX = 'clientX' in e ? e.clientX : (e as React.TouchEvent).touches[0].clientX
+    const deltaX = clientX - mouseStartX
     const newScrollLeft = scrollStartX - deltaX
     scrollContainerRef.current.scrollLeft = newScrollLeft
     
@@ -374,9 +374,9 @@ export function SevenDaysBoardView({
     const scrollThreshold = 80
     const scrollSpeed = 15
     
-    if (e.clientX < rect.left + scrollThreshold && scrollContainerRef.current.scrollLeft > 0) {
+    if ('clientX' in e && e.clientX < rect.left + scrollThreshold && scrollContainerRef.current.scrollLeft > 0) {
       scrollContainerRef.current.scrollLeft = Math.max(0, scrollContainerRef.current.scrollLeft - scrollSpeed)
-    } else if (e.clientX > rect.right - scrollThreshold && scrollContainerRef.current.scrollLeft < scrollContainerRef.current.scrollWidth - scrollContainerRef.current.clientWidth) {
+    } else if ('clientX' in e && e.clientX > rect.right - scrollThreshold && scrollContainerRef.current.scrollLeft < scrollContainerRef.current.scrollWidth - scrollContainerRef.current.clientWidth) {
       scrollContainerRef.current.scrollLeft = Math.min(
         scrollContainerRef.current.scrollWidth - scrollContainerRef.current.clientWidth,
         scrollContainerRef.current.scrollLeft + scrollSpeed
