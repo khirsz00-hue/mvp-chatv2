@@ -61,7 +61,6 @@ export function SevenDaysBoardView({
   const [scrollPosition, setScrollPosition] = useState(0)
   const [dragStartPos, setDragStartPos] = useState<{ x: number; y: number } | null>(null)
   const [isDragging, setIsDragging] = useState(false)
-  const [showDragHint, setShowDragHint] = useState(true)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const autoScrollIntervalRef = useRef<NodeJS.Timeout | null>(null)
   
@@ -329,11 +328,9 @@ export function SevenDaysBoardView({
     }
   }
 
-  // Clean up interval on unmount and hide drag hint after 5 seconds  
+  // Clean up interval on unmount
   useEffect(() => {
-    const timer = setTimeout(() => setShowDragHint(false), 5000)
     return () => {
-      clearTimeout(timer)
       if (autoScrollIntervalRef.current) {
         clearInterval(autoScrollIntervalRef.current)
       }
@@ -357,7 +354,6 @@ export function SevenDaysBoardView({
   
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isMouseDragging || !scrollContainerRef.current) return
-    if (showDragHint) setShowDragHint(false)
     
     const deltaX = e.clientX - mouseStartX
     const newScrollLeft = scrollStartX - deltaX
@@ -548,9 +544,8 @@ export function SevenDaysBoardView({
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseLeave}
           className={cn(
-            "relative overflow-x-auto scrollbar-hide snap-x snap-mandatory w-full h-[calc(100vh-240px)] sm:h-[calc(100vh-220px)] md:h-[calc(100vh-200px)] lg:h-[calc(100vh-180px)] group",
-            "after:absolute after:right-0 after:top-0 after:bottom-0 after:w-12 after:bg-gradient-to-l after:from-white after:to-transparent after:pointer-events-none after:hidden after:md:block",
-            "before:absolute before:left-0 before:top-0 before:bottom-0 before:w-12 before:bg-gradient-to-r before:from-white before:to-transparent before:pointer-events-none before:hidden before:md:block",
+            "overflow-x-auto snap-x snap-mandatory w-full h-[calc(100vh-240px)] sm:h-[calc(100vh-220px)] md:h-[calc(100vh-200px)] lg:h-[calc(100vh-180px)]",
+            "[&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gradient-to-r [&::-webkit-scrollbar-thumb]:from-brand-purple [&::-webkit-scrollbar-thumb]:to-brand-pink [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-gradient-to-r hover:[&::-webkit-scrollbar-thumb]:from-brand-purple hover:[&::-webkit-scrollbar-thumb]:to-brand-pink",
             isMouseDragging && "cursor-grabbing select-none"
           )}
           style={{ 
@@ -558,13 +553,6 @@ export function SevenDaysBoardView({
             cursor: isMouseDragging ? 'grabbing' : 'grab'
           }}
         >
-          {/* Drag hint - pokazuje się na desktop przy pierwszym wejściu */}
-          {showDragHint && (
-            <div className="absolute left-1/2 -translate-x-1/2 -top-16 bg-gray-900 text-white px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap opacity-90 animate-pulse z-30 pointer-events-none hidden md:block">
-              ✋ Przeciągnij aby przewinąć kolumny
-            </div>
-          )}
-
           {/* Single row flex layout for carousel behavior */}
           <div className="flex gap-3 w-max px-1 sm:px-2 pb-1">
             {columns.map(day => (
