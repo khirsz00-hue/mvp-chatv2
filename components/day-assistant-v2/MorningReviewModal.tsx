@@ -250,6 +250,7 @@ export function MorningReviewModal({
   }
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden flex flex-col">
         {/* Header with gradient */}
@@ -612,134 +613,6 @@ export function MorningReviewModal({
             </AnimatePresence>
           </div>
         </div>
-                      <span>Przenieś zaznaczone</span>
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleBulkDelete}
-                      className="flex items-center gap-1 text-red-600 hover:text-red-700"
-                    >
-                      <Trash size={16} />
-                      <span>Usuń zaznaczone</span>
-                    </Button>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          <div className="space-y-3">
-            {remainingTasks.map(task => {
-              const daysOverdueText = task.due_date 
-                ? getDaysOverdueText(task.due_date, selectedDate)
-                : 'brak terminu'
-              const isSelected = selectedTasks.has(task.id)
-
-              return (
-                <div
-                  key={task.id}
-                  className={`bg-red-50 border-2 rounded-lg p-4 space-y-3 ${
-                    isSelected ? 'border-brand-purple' : 'border-red-200'
-                  }`}
-                >
-                  {/* Task info */}
-                  <div className="space-y-2">
-                    <div className="flex items-start gap-2">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => handleToggleTask(task.id)}
-                        className="mt-1 cursor-pointer"
-                      />
-                      <span className="text-lg mt-0.5">🔴</span>
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-red-900">{task.title}</h4>
-                        <p className="text-sm text-red-700 mt-1">
-                          Termin: {daysOverdueText}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Task metadata */}
-                    <div className="flex flex-wrap items-center gap-2 text-sm text-red-800">
-                      <TaskBadges task={task} today={selectedDate} />
-                      <span>⏱ {task.estimate_min} min</span>
-                      <span>📊 Priorytet: {task.priority}</span>
-                      {task.context_type && (
-                        <span className="px-2 py-0.5 bg-red-100 rounded">
-                          🏷️ {task.context_type}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Action buttons */}
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => handleAction(task, 'complete')}
-                      className="flex items-center gap-1 bg-green-600 hover:bg-green-700"
-                    >
-                      <Check size={16} />
-                      <span>Ukończ</span>
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => handleAction(task, 'today')}
-                      className="flex items-center gap-1"
-                    >
-                      <CheckCircle size={16} />
-                      <span>Dodaj na dziś</span>
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleAction(task, 'tomorrow')}
-                      className="flex items-center gap-1"
-                    >
-                      <ArrowRight size={16} />
-                      <span>Jutro</span>
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleAction(task, 'reschedule')}
-                      className="flex items-center gap-1"
-                    >
-                      <CalendarBlank size={16} />
-                      <span>Przenieś</span>
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleAction(task, 'delete')}
-                      className="flex items-center gap-1 text-red-600 hover:text-red-700"
-                    >
-                      <Trash size={16} />
-                      <span>Usuń</span>
-                    </Button>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Review later button */}
-          <div className="flex justify-center pt-4 border-t">
-            <Button
-              variant="ghost"
-              onClick={handleReviewLater}
-              className="flex items-center gap-2"
-            >
-              <X size={16} />
-              <span>Przejrzę później</span>
-            </Button>
-          </div>
-          <p className="text-xs text-center text-muted-foreground">
-            Zadania zostaną w sekcji przeterminowane
-          </p>
-        </div>
       </DialogContent>
     </Dialog>
 
@@ -789,5 +662,6 @@ export function MorningReviewModal({
           </div>
         </DialogContent>
       </Dialog>
+    </>
   )
 }
