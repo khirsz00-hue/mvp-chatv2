@@ -1,6 +1,7 @@
 'use client'
 
 import { Play, Clock, Calendar, Brain } from '@phosphor-icons/react'
+import { useRouter } from 'next/navigation'
 
 export interface TaskCardProps {
   id: string
@@ -31,6 +32,8 @@ export function TaskCard({
   context_type,
   postpone_count
 }: TaskCardProps) {
+  const router = useRouter()
+  
   const priorityConfig = {
     P1: { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-300' },
     P2: { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300' },
@@ -67,14 +70,20 @@ export function TaskCard({
     )
   }
 
+  const handleCardClick = () => {
+    router.push(`/day-assistant-v2?task=${id}`)
+  }
+
+  const handleStartClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    router.push(`/day-assistant-v2?task=${id}&autostart=true`)
+  }
+
   return (
     <div 
       className={`bg-white border-2 rounded-xl p-4 hover:shadow-lg transition-all cursor-pointer mt-2
         ${overdue ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-cyan-400'}`}
-      onClick={() => {
-        // Navigate to task or start timer
-        window.location.href = `/day-assistant-v2?task=${id}`
-      }}
+      onClick={handleCardClick}
     >
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-2 flex-1 flex-wrap">
@@ -93,10 +102,7 @@ export function TaskCard({
           )}
         </div>
         <button
-          onClick={(e) => {
-            e.stopPropagation()
-            window.location.href = `/day-assistant-v2?task=${id}&autostart=true`
-          }}
+          onClick={handleStartClick}
           className="px-3 py-1 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-lg text-xs 
                      hover:scale-105 transition flex items-center gap-1 flex-shrink-0 ml-2"
         >

@@ -304,30 +304,34 @@ export function ChatAssistant({ open, onClose }: ChatAssistantProps) {
                 <div className="mt-2">
                   {msg.structured.type === 'tasks' && msg.structured.tasks && (
                     <div className="space-y-2">
-                      {msg.structured.tasks.map(task => {
-                        // Check if task is overdue
-                        const isOverdue = task.due_date ? new Date(task.due_date) < new Date() : false
-                        const priorityLabel = task.priority === 1 ? 'P1' 
-                          : task.priority === 2 ? 'P2' 
-                          : task.priority === 3 ? 'P3' 
-                          : 'P4'
-                        
-                        return (
-                          <TaskCard 
-                            key={task.id} 
-                            id={task.id}
-                            title={task.title}
-                            description={task.description}
-                            estimate={`${task.estimate_min}min`}
-                            priority={priorityLabel}
-                            cognitive_load={task.cognitive_load}
-                            due_date={task.due_date}
-                            overdue={isOverdue}
-                            context_type={task.context_type}
-                            postpone_count={task.postpone_count}
-                          />
-                        )
-                      })}
+                      {(() => {
+                        // Calculate overdue status once for all tasks
+                        const today = new Date()
+                        return msg.structured.tasks!.map(task => {
+                          // Check if task is overdue
+                          const isOverdue = task.due_date ? new Date(task.due_date) < today : false
+                          const priorityLabel = task.priority === 1 ? 'P1' 
+                            : task.priority === 2 ? 'P2' 
+                            : task.priority === 3 ? 'P3' 
+                            : 'P4'
+                          
+                          return (
+                            <TaskCard 
+                              key={task.id} 
+                              id={task.id}
+                              title={task.title}
+                              description={task.description}
+                              estimate={`${task.estimate_min}min`}
+                              priority={priorityLabel}
+                              cognitive_load={task.cognitive_load}
+                              due_date={task.due_date}
+                              overdue={isOverdue}
+                              context_type={task.context_type}
+                              postpone_count={task.postpone_count}
+                            />
+                          )
+                        })
+                      })()}
                     </div>
                   )}
                   

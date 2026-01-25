@@ -252,10 +252,10 @@ export async function fetchChatContext(
   }
 
   // Extract typical work start time from journal entries
+  // TODO: In the future, extract from journal notes or add dedicated field
+  const DEFAULT_WORK_START_TIME = '9:00'
   if (journalEntries && journalEntries.length > 0) {
-    // For now, assume a default work start time
-    // In the future, this could be extracted from journal notes or a dedicated field
-    patterns.typical_work_start_time = '9:00'
+    patterns.typical_work_start_time = DEFAULT_WORK_START_TIME
   }
 
   // Check for calendar integration
@@ -267,11 +267,12 @@ export async function fetchChatContext(
 
   const hasCalendarIntegration = !!(calendarIntegration?.google_calendar_token)
 
-  // If calendar is integrated, fetch events (simplified for now)
+  // If calendar is integrated, fetch events
+  // TODO: Implement actual Google Calendar API integration
   let calendarEvents: Array<{ title: string; start: string; end: string }> = []
   if (hasCalendarIntegration) {
-    // In a real implementation, we'd call Google Calendar API here
-    // For now, we'll leave it empty
+    // Placeholder for future Google Calendar API integration
+    // Will fetch events for next 7 days when implemented
     calendarEvents = []
   }
 
