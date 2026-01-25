@@ -340,18 +340,26 @@ export function SevenDaysBoardView({
   }, [])
   
   // Mouse drag scrolling handlers
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handleMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
     if (!scrollContainerRef.current) return
-    // Only start drag on left mouse button and not on interactive elements
-    if (e.button !== 0) return
+    
+    // Handle mouse button check (only for mouse events)
+    if ('button' in e && e.button !== 0) return
+    
     const target = e.target as HTMLElement
     if (target.closest('button') || target.closest('select') || target.closest('input') || target.closest('[role="button"]')) return
     
     setIsMouseDragging(true)
-    setMouseStartX(e.clientX)
+    
+    const clientX = 'clientX' in e ? e.clientX : (e as React.TouchEvent).touches[0].clientX
+    setMouseStartX(clientX)
     setScrollStartX(scrollContainerRef.current.scrollLeft)
-    // Prevent text selection during drag
-    e.preventDefault()
+    
+    // Prevent text selection during drag (only for mouse events)
+    if ('preventDefault' in e && 'button' in e) {
+      e.preventDefault()
+    }
+  }
   }
   
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -560,6 +568,9 @@ export function SevenDaysBoardView({
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseLeave}
+          onTouchStart={handleMouseDown}
+          onTouchMove={handleMouseMove}
+          onTouchEnd={handleMouseUp}
           className={cn(
             "overflow-x-auto snap-x snap-mandatory w-full h-[calc(100vh-240px)] sm:h-[calc(100vh-220px)] md:h-[calc(100vh-200px)] lg:h-[calc(100vh-180px)]",
             "[&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gradient-to-r [&::-webkit-scrollbar-thumb]:from-brand-purple [&::-webkit-scrollbar-thumb]:to-brand-pink [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-gradient-to-r hover:[&::-webkit-scrollbar-thumb]:from-brand-purple hover:[&::-webkit-scrollbar-thumb]:to-brand-pink",
@@ -567,7 +578,9 @@ export function SevenDaysBoardView({
           )}
           style={{ 
             scrollBehavior: isMouseDragging ? 'auto' : 'smooth',
-            cursor: isMouseDragging ? 'grabbing' : 'grab'
+            cursor: isMouseDragging ? 'grabbing' : 'grab',
+            WebkitOverflowScrolling: 'touch',
+            WebkitTouchCallout: 'none'
           }}
         >
           {/* Single row flex layout for carousel behavior */}
@@ -575,7 +588,7 @@ export function SevenDaysBoardView({
             {columns.map(day => (
               <div 
                 key={day.id} 
-                className="w-[calc(100vw-24px)] sm:w-[calc(50vw-20px)] md:w-[calc(33.33vw-16px)] lg:w-[280px] xl:w-[340px] 2xl:w-[380px] flex-shrink-0 snap-start"
+                className="w-[calc(100vw-32px)] sm:w-[calc(66vw-24px)] md:w-[calc(33.33vw-16px)] lg:w-[280px] xl:w-[340px] 2xl:w-[380px] flex-shrink-0 snap-start"
               >
                 <DayColumnComponent
                   day={day}
