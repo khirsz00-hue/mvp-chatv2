@@ -215,6 +215,66 @@ export function MobileDayCarousel({
     <DndContext
       collisionDetection={closestCenter}
     >
+      {draggedTaskId && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-brand-purple text-white px-4 py-2 rounded-full shadow-lg text-sm font-medium animate-bounce">
+          Kliknij w dzień aby przenieść zadanie
+        </div>
+      )}
+      
+      {/* Week mini cards navigation */}
+      <div className="flex gap-1 p-2 bg-white border-b overflow-x-auto scrollbar-hide">
+        {Array.from({ length: 7 }, (_, i) => {
+          const day = addDays(activeDay, i - 3) // Show 3 days before, current, 3 days after
+          const isActive = isSameDay(day, activeDay)
+          const dayTasks = tasks.filter(t => {
+            const taskDue = typeof t.due === 'string' ? t.due : t.due?.date
+            if (!taskDue) return false
+            try {
+              return isSameDay(startOfDay(parseISO(taskDue)), day)
+            } catch {
+              return false
+            }
+          })
+          
+          return (
+            <button
+              key={i}
+              onClick={async () => {
+                if (draggedTaskId) {
+                  // If dragging, move task to this day
+                  await onMove(draggedTaskId, format(day, 'yyyy-MM-dd'))
+                  setDraggedTaskId(null)
+                } else {
+                  // Otherwise, navigate to this day
+                  setActiveDay(day)
+                }
+              }}
+              className={cn(
+                'flex-shrink-0 px-3 py-2 rounded-lg text-xs font-medium transition-all',
+                isActive 
+                  ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-md' 
+                  : draggedTaskId
+                    ? 'bg-brand-purple/10 text-brand-purple border-2 border-dashed border-brand-purple hover:bg-brand-purple/20'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              )}
+            >
+              <div className="text-center">
+                <div className="font-bold">{format(day, 'd')}</div>
+                <div className="text-[10px] opacity-75">{format(day, 'EEE', { locale: pl })}</div>
+                {dayTasks.length > 0 && (
+                  <div className={cn(
+                    'text-[9px] mt-0.5 px-1.5 rounded-full',
+                    isActive ? 'bg-white/30' : 'bg-brand-purple/20 text-brand-purple'
+                  )}>
+                    {dayTasks.length}
+                  </div>
+                )}
+              </div>
+            </button>
+          )
+        })}
+      </div>
+      
       {/* Header */}
       <div className="px-4 py-3 flex items-center justify-between">
         <Button
@@ -579,3 +639,4 @@ function MoveToDaySheet({
     </>
   )
 }
+export { MobileDayCarousel }

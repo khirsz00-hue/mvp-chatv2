@@ -126,7 +126,12 @@ export function TasksAssistant() {
     const checkMobile = () => {
       const mobile = window.innerWidth < 768
       setIsMobile(mobile)
-      console.log('[TasksAssistant] Mobile detection:', { width: window.innerWidth, isMobile: mobile })
+      console.log('[TasksAssistant] Mobile detection:', { 
+        width: window.innerWidth, 
+        isMobile: mobile,
+        view,
+        boardGrouping
+      })
     }
     
     checkMobile()
@@ -1748,8 +1753,18 @@ export function TasksAssistant() {
             </div>
           )
         ) : view === 'board' ? (
-      // Mobile view for day board on mobile devices
-      isMobile && boardGrouping === 'day' ? (
+      // Mobile view - always show simplified carousel on mobile
+      (() => {
+        const shouldUseMobileCarousel = isMobile
+        console.log('[TasksAssistant] Board rendering:', { 
+          isMobile, 
+          boardGrouping, 
+          view,
+          shouldUseMobileCarousel,
+          tasksCount: activeTasks.length 
+        })
+        
+        return shouldUseMobileCarousel ? (
         <MobileDayCarousel
           tasks={activeTasks}
           onMove={handleMove}
@@ -1800,6 +1815,7 @@ export function TasksAssistant() {
           }}
         />
       )
+      })()
     ) : null}
       </div>
       
