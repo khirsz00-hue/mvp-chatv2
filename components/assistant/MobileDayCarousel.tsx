@@ -39,6 +39,8 @@ export function MobileDayCarousel({
   onDetails,
   onAddForKey
 }: MobileDayCarouselProps) {
+  console.log('[MobileDayCarousel] RENDERING', { tasksCount: tasks.length })
+  
   const [activeDay, setActiveDay] = useState(startOfDay(new Date()))
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
   const [dragTargetDay, setDragTargetDay] = useState<string | null>(null)

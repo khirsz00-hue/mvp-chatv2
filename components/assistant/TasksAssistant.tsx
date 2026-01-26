@@ -130,14 +130,15 @@ export function TasksAssistant() {
         width: window.innerWidth, 
         isMobile: mobile,
         view,
-        boardGrouping
+        boardGrouping,
+        willShowMobileCarousel: mobile && view === 'board'
       })
     }
     
     checkMobile()
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
-  }, [])
+  }, [view, boardGrouping])
   
   const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
 
@@ -1753,18 +1754,8 @@ export function TasksAssistant() {
             </div>
           )
         ) : view === 'board' ? (
-      // Mobile view - always show simplified carousel on mobile
-      (() => {
-        const shouldUseMobileCarousel = isMobile
-        console.log('[TasksAssistant] Board rendering:', { 
-          isMobile, 
-          boardGrouping, 
-          view,
-          shouldUseMobileCarousel,
-          tasksCount: activeTasks.length 
-        })
-        
-        return shouldUseMobileCarousel ? (
+      // Mobile: use MobileDayCarousel; Desktop: use SevenDaysBoardView
+      isMobile ? (
         <MobileDayCarousel
           tasks={activeTasks}
           onMove={handleMove}
@@ -1815,7 +1806,6 @@ export function TasksAssistant() {
           }}
         />
       )
-      })()
     ) : null}
       </div>
       
