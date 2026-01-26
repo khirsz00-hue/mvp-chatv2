@@ -209,7 +209,7 @@ export function MobileDayCarousel({
       window.removeEventListener('mouseup', handleMouseUp)
       window.removeEventListener('touchend', handleTouchEnd)
     }
-  }, [draggedTaskId, activeDay])
+  }, [draggedTaskId, activeDay, handleDragEnd, handleDragMove])
 
   return (
     <DndContext
