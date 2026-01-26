@@ -18,29 +18,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Brak wymaganych parametrów' }, { status: 400 })
     }
 
-    // Build update payload for Todoist API
     const updatePayload: TodoistUpdatePayload = {}
-    
+
     if (updates.content !== undefined) updatePayload.content = updates.content
     if (updates.description !== undefined) updatePayload.description = updates.description
     if (updates.priority !== undefined) updatePayload.priority = updates.priority
     if (updates.labels !== undefined) updatePayload.labels = updates.labels
-    
-    // ✅ FIX: Handle due date - use due_string for setting and clearing
-    // ✅ POPRAWKA: Handle due date properly - use due_date (not due_string) for updates
+
     if (updates.due !== undefined) {
       if (updates.due === null) {
-        // Remove due date - Todoist API requires "no date" string
-        updatePayload.due_string = "no date"
+        updatePayload.due_string = 'no date'
       } else if (typeof updates.due === 'string') {
-        // Validate format YYYY-MM-DD
         if (/^\d{4}-\d{2}-\d{2}$/.test(updates.due)) {
           updatePayload.due_date = updates.due
         } else {
           console.warn('⚠️ [Todoist Update] Invalid due date format:', updates.due)
         }
       } else if (updates.due && typeof updates.due === 'object' && updates.due.date) {
-        // Extract date from object
         if (/^\d{4}-\d{2}-\d{2}$/.test(updates.due.date)) {
           updatePayload.due_date = updates.due.date
         } else {
@@ -48,23 +42,18 @@ export async function POST(req: Request) {
         }
       }
     }
-    
-    // ✅ FIX: Handle due_string if passed directly (convert YYYY-MM-DD to due_date)
-    // Todoist API requires due_date for date-only format, due_string for natural language
+
     if (updates.due_string !== undefined) {
       if (typeof updates.due_string === 'string') {
-        // Check if it's in YYYY-MM-DD format - should use due_date instead
         if (/^\d{4}-\d{2}-\d{2}$/.test(updates.due_string)) {
           console.warn('⚠️ [Todoist Update] Converting due_string with date format to due_date:', updates.due_string)
           updatePayload.due_date = updates.due_string
-          // Don't set due_string to avoid sending both
         } else {
-          // Natural language string like "today", "tomorrow", "no date"
           updatePayload.due_string = updates.due_string
         }
       }
     }
-    
+
     const normalizedProjectId = (() => {
       if (projectIdToMove === undefined || projectIdToMove === null) return undefined
       if (typeof projectIdToMove === 'string') {
@@ -149,7 +138,6 @@ export async function POST(req: Request) {
       console.error('❌ [Todoist Update] Failed payload:', JSON.stringify(updatePayload))
       console.error('❌ [Todoist Update] Task ID:', id)
       
-      // Parse error details if possible
       let errorMessage = 'Nie udało się zaktualizować zadania'
       try {
         const errorJson = JSON.parse(errorText)
@@ -157,7 +145,6 @@ export async function POST(req: Request) {
           errorMessage = `Bad Todoist UPDATE: ${errorJson.error}`
         }
       } catch {
-        // If not JSON, use the raw text
         if (errorText) {
           errorMessage = `Bad Todoist UPDATE: ${errorText}`
         }
