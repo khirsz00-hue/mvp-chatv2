@@ -176,7 +176,7 @@ export function MobileDayCarousel({
       )}
       
       {/* Week mini cards navigation */}
-      <div className="relative z-30">
+      <div className="relative z-30 select-none" style={{ WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}>
         {/* Left gradient overlay */}
         <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white to-transparent pointer-events-none z-10" />
         {/* Right gradient overlay */}
@@ -184,18 +184,19 @@ export function MobileDayCarousel({
         
         <div 
           data-scrollbar="visible"
-          className="flex gap-1 p-2 pb-3 bg-white border-b snap-x snap-mandatory"
-          style={{
-            overflowX: 'scroll',
+          className="flex gap-1 p-2 pb-3 bg-white border-b"
+          style={{overflowX: 'scroll',
             scrollbarWidth: 'thin',
             scrollbarColor: '#a855f7 #f3f4f6',
             WebkitOverflowScrolling: 'touch',
             display: 'flex',
-            flexWrap: 'nowrap'
+            flexWrap: 'nowrap',
+            minWidth: '100%',
+            width: 'max-content'
           }}
         >
-          {Array.from({ length: 7 }, (_, i) => {
-          const day = addDays(activeDay, i - 3) // Show 3 days before, current, 3 days after
+          {Array.from({ length: 15 }, (_, i) => {
+          const day = addDays(new Date(), i - 4) // Show 4 days before today, today, 10 days after
           const isActive = isSameDay(day, activeDay)
           const dayTasks = tasks.filter(t => {
             const taskDue = typeof t.due === 'string' ? t.due : t.due?.date
@@ -370,10 +371,14 @@ function DayCard({
   return (
     <div
       className={cn(
-        'rounded-xl border-2 shadow-sm transition-all flex flex-col',
-        isToday ? 'border-brand-pink bg-brand-pink/5' : 'border-gray-200 bg-white'
+        'rounded-xl border-2 shadow-sm transition-all flex flex-col select-none',
+        isToday ? 'border-brand-purple bg-gradient-to-br from-brand-purple/5 to-brand-pink/5' : 'border-gray-200 bg-white'
       )}
-      style={{ height: 'calc(100dvh - 180px)' }}
+      style={{ 
+        height: 'calc(100dvh - 140px)',
+        WebkitUserSelect: 'none',
+        WebkitTouchCallout: 'none'
+      }}
       onTouchStart={onSwipeStart}
       onTouchEnd={onSwipeEnd}
     >
@@ -509,30 +514,48 @@ function TaskCardMobile({
     <div data-task-id={task.id} className="relative">
       <div
         className={cn(
-          'px-2 py-1.5 border-l-2 rounded-md transition-all duration-200 ease-out text-xs cursor-pointer group transform hover:scale-[1.02] active:scale-[0.98]',
-          priorityColors[task.priority] || priorityColors[4],
+          'px-3 py-2 border-l-4 rounded-lg transition-all duration-200 ease-out text-sm cursor-pointer group bg-white shadow-sm hover:shadow-md select-none',
+          task.priority === 1 && 'border-l-red-500',
+          task.priority === 2 && 'border-l-orange-500',
+          task.priority === 3 && 'border-l-blue-500',
+          task.priority === 4 && 'border-l-gray-300',
           loading && 'opacity-50'
         )}
-        onClick={() => onDetails(task)}
-        onTouchStart={() => {
+        style={{
+          WebkitUserSelect: 'none',
+          WebkitTouchCallout: 'none'
+        }}
+        onClick={(e) => {
+          // Only trigger if not in drag mode
+          if (!longPressTimerRef.current) {
+            onDetails(task)
+          }
+        }}
+        onTouchStart={(e) => {
+          console.log('[TaskCard] Touch start:', task.id)
           longPressTimerRef.current = setTimeout(() => {
+            console.log('[TaskCard] Long press activated:', task.id)
             onStartDrag(task.id)
           }, 500)
         }}
         onTouchEnd={() => {
+          console.log('[TaskCard] Touch end, clearing timer')
           if (longPressTimerRef.current) {
             clearTimeout(longPressTimerRef.current)
+            longPressTimerRef.current = null
           }
         }}
         onTouchMove={() => {
           if (longPressTimerRef.current) {
+            console.log('[TaskCard] Touch move, clearing timer')
             clearTimeout(longPressTimerRef.current)
+            longPressTimerRef.current = null
           }
         }}
       >
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-xs line-clamp-1 group-hover:text-brand-purple">
+            <p className="font-medium text-sm line-clamp-2 text-gray-800">
               {task.content}
             </p>
           </div>
@@ -542,9 +565,9 @@ function TaskCardMobile({
               e.stopPropagation()
               setShowMenu(!showMenu)
             }}
-            className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-gray-200 rounded flex-shrink-0"
+            className="md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1.5 hover:bg-gray-100 rounded-lg flex-shrink-0"
           >
-            <DotsThree size={14} weight="bold" className="text-gray-600" />
+            <DotsThree size={18} weight="bold" className="text-gray-600" />
           </button>
         </div>
       </div>

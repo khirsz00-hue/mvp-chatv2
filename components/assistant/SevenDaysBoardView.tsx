@@ -531,7 +531,24 @@ function DayColumnComponent({
         items={day.tasks.map(t => t.id)}
         strategy={verticalListSortingStrategy}
       >
-        <div className="p-1.5 space-y-1 min-h-[150px] max-h-[calc(100vh-280px)] overflow-y-auto">
+        <div 
+          className="p-1.5 space-y-1 min-h-[150px] max-h-[calc(100vh-280px)] overflow-y-auto scroll-smooth"
+          onDragOver={(e) => {
+            // Auto-scroll when dragging near edges
+            const container = e.currentTarget
+            const rect = container.getBoundingClientRect()
+            const mouseY = e.clientY - rect.top
+            const scrollThreshold = 50
+            
+            if (mouseY < scrollThreshold) {
+              // Scroll up
+              container.scrollTop -= 10
+            } else if (mouseY > rect.height - scrollThreshold) {
+              // Scroll down
+              container.scrollTop += 10
+            }
+          }}
+        >
           {day.tasks.length === 0 ? (
             <div className="text-center py-6 text-gray-400">
               <CalendarBlank size={24} className="mx-auto mb-1 opacity-40" />
