@@ -12,6 +12,8 @@ import { format, addDays, parseISO, startOfDay, isSameDay, isSameWeek } from 'da
 import { pl } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 
+type BoardGrouping = 'day' | 'status' | 'priority' | 'project'
+
 interface Task {
   id: string
   content: string
@@ -21,15 +23,18 @@ interface Task {
   due?: { date: string } | string
   completed?: boolean
   created_at?: string
+  status?: 'todo' | 'in_progress' | 'done'
 }
 
 interface SevenDaysBoardViewProps {
   tasks: Task[]
+  grouping: BoardGrouping
+  projects?: { id: string; name: string }[]
   onMove: (taskId: string, newDate: string) => Promise<void>
   onComplete: (taskId: string) => Promise<void>
   onDelete: (taskId: string) => Promise<void>
   onDetails: (task: Task) => void
-  onAddForDate?: (date: string) => void
+  onAddForKey?: (key: string) => void
 }
 
 interface DayColumn {
@@ -43,11 +48,13 @@ interface DayColumn {
 
 export function SevenDaysBoardView({
   tasks,
+  grouping,
+  projects,
   onMove,
   onComplete,
   onDelete,
   onDetails,
-  onAddForDate
+  onAddForKey
 }:  SevenDaysBoardViewProps) {
   const [startDate, setStartDate] = useState(startOfDay(new Date()))
   const [activeTask, setActiveTask] = useState<Task | null>(null)
@@ -373,7 +380,7 @@ export function SevenDaysBoardView({
                   onComplete={onComplete}
                   onDelete={onDelete}
                   onDetails={onDetails}
-                  onAddForDate={onAddForDate}
+                  onAddForKey={onAddForKey}
                   movingTaskId={movingTaskId}
                   isDraggingGlobal={isDragging}
                 />
@@ -402,7 +409,7 @@ function DayColumnComponent({
   onComplete,
   onDelete,
   onDetails,
-  onAddForDate,
+  onAddForKey,
   movingTaskId,
   isDraggingGlobal
 }: {
@@ -410,7 +417,7 @@ function DayColumnComponent({
   onComplete: (id: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
   onDetails: (task: Task) => void
-  onAddForDate?: (date: string) => void
+  onAddForKey?: (date: string) => void
   movingTaskId: string | null
   isDraggingGlobal: boolean
 }) {
@@ -483,12 +490,12 @@ function DayColumnComponent({
       </SortableContext>
 
       {/* Add Task Button */}
-      {onAddForDate && (
+      {onAddForKey && (
         <div className="p-2 border-t bg-gray-50/50">
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => onAddForDate(day.dateStr)}
+            onClick={() => onAddForKey(day.dateStr)}
             className="w-full gap-1.5 text-gray-600 hover:text-brand-purple hover:bg-brand-purple/5 font-medium text-xs py-1.5"
           >
             <Plus size={16} weight="bold" />
