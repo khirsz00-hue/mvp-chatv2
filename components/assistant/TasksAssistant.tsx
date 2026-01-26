@@ -87,7 +87,7 @@ export function TasksAssistant() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(false)
-  const [view, setView] = useState<ViewType>('board')
+  const [view, setView] = useState<ViewType>('list')  // ✅ Default to list view
   const [boardGrouping, setBoardGrouping] = useState<BoardGrouping>('day')
   const [filters, setFilters] = useState<FiltersState>({})
   const [filter, setFilter] = useState<FilterType>('week')  // ✅ Default to "Tydzień"
@@ -100,6 +100,10 @@ export function TasksAssistant() {
   const [mobileControl, setMobileControl] = useState<'sort' | 'group' | 'project' | null>(null)
   const [showUniversalModal, setShowUniversalModal] = useState(false)
   const [universalModalTask, setUniversalModalTask] = useState<Task | null>(null)
+  
+  // Board view week navigation state
+  const [boardWeekLabel, setBoardWeekLabel] = useState('')
+  const [boardStartDate, setBoardStartDate] = useState<Date | null>(null)
   const [showPomodoro, setShowPomodoro] = useState(false)
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
   const [bulkActionLoading, setBulkActionLoading] = useState(false)
@@ -1419,8 +1423,59 @@ export function TasksAssistant() {
               </div>
             )}
             
-            {/* Middle: Board grouping selector - Desktop only (≥768px) - ONLY for board view */}
-            {view === 'board' && (
+            {/* Middle: Board grouping selector + week navigation - Desktop only (≥768px) - ONLY for board view */}
+            {view === 'board' && boardGrouping === 'day' && (
+              <div className="hidden md:flex items-center gap-3 flex-1 justify-center">
+                {/* Week Navigation */}
+                {boardWeekLabel && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        if (boardStartDate) {
+                          const newDate = addDays(boardStartDate, -7)
+                          setBoardStartDate(newDate)
+                        }
+                      }}
+                      className="px-2 py-1.5 rounded-md border border-gray-200 hover:bg-gray-50 transition-colors"
+                    >
+                      <CaretLeft size={16} weight="bold" className="text-gray-600" />
+                    </button>
+                    <span className="text-sm font-semibold text-gray-700 min-w-[180px] text-center">
+                      {boardWeekLabel}
+                    </span>
+                    <button
+                      onClick={() => {
+                        if (boardStartDate) {
+                          const newDate = addDays(boardStartDate, 7)
+                          setBoardStartDate(newDate)
+                        }
+                      }}
+                      className="px-2 py-1.5 rounded-md border border-gray-200 hover:bg-gray-50 transition-colors"
+                    >
+                      <CaretRight size={16} weight="bold" className="text-gray-600" />
+                    </button>
+                  </div>
+                )}
+                
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide px-1">
+                    Grupowanie
+                  </label>
+                  <select 
+                    value={boardGrouping} 
+                    onChange={(e) => setBoardGrouping(e.target.value as BoardGrouping)}
+                    className="px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-brand-purple transition-colors min-w-[140px]"
+                  >
+                    <option value="day">📅 Dni</option>
+                    <option value="priority">🚩 Priorytety</option>
+                    <option value="project">📁 Projekty</option>
+                  </select>
+                </div>
+              </div>
+            )}
+            
+            {/* Middle: Board grouping selector - Desktop only (≥768px) - For non-day groupings */}
+            {view === 'board' && boardGrouping !== 'day' && (
               <div className="hidden md:flex items-center gap-3 flex-1 justify-center">
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide px-1">
@@ -1712,6 +1767,11 @@ export function TasksAssistant() {
               due: boardGrouping === 'day' ? key : undefined
             } as Task)
             setShowUniversalModal(true)
+          }}
+          showDateRangeInHeader={boardGrouping === 'day'}
+          onWeekChange={(startDate, label) => {
+            setBoardStartDate(startDate)
+            setBoardWeekLabel(label)
           }}
         />
       )

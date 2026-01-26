@@ -35,6 +35,8 @@ interface SevenDaysBoardViewProps {
   onDelete: (taskId: string) => Promise<void>
   onDetails: (task: Task) => void
   onAddForKey?: (key: string) => void
+  showDateRangeInHeader?: boolean  // Whether to show date range in parent header
+  onWeekChange?: (startDate: Date, dateRangeLabel: string) => void  // Callback when week changes
 }
 
 interface DayColumn {
@@ -54,7 +56,9 @@ export function SevenDaysBoardView({
   onComplete,
   onDelete,
   onDetails,
-  onAddForKey
+  onAddForKey,
+  showDateRangeInHeader = false,
+  onWeekChange
 }:  SevenDaysBoardViewProps) {
   const [startDate, setStartDate] = useState(startOfDay(new Date()))
   const [activeTask, setActiveTask] = useState<Task | null>(null)
@@ -70,11 +74,25 @@ export function SevenDaysBoardView({
 
   // Navigation functions
   const goToPreviousWeek = () => {
-    setStartDate(prev => addDays(prev, -7))
+    setStartDate(prev => {
+      const newDate = addDays(prev, -7)
+      if (onWeekChange) {
+        const newLabel = `${format(newDate, 'd MMM', { locale: pl })} - ${format(addDays(newDate, 6), 'd MMM yyyy', { locale: pl })}`
+        onWeekChange(newDate, newLabel)
+      }
+      return newDate
+    })
   }
 
   const goToNextWeek = () => {
-    setStartDate(prev => addDays(prev, 7))
+    setStartDate(prev => {
+      const newDate = addDays(prev, 7)
+      if (onWeekChange) {
+        const newLabel = `${format(newDate, 'd MMM', { locale: pl })} - ${format(addDays(newDate, 6), 'd MMM yyyy', { locale: pl })}`
+        onWeekChange(newDate, newLabel)
+      }
+      return newDate
+    })
   }
 
   const goToToday = () => {
@@ -178,9 +196,9 @@ export function SevenDaysBoardView({
     
     const x = event.delta.x + clientX
     
-    // Auto-scroll threshold (50px from edge)
-    const scrollThreshold = 50
-    const scrollSpeed = 10
+    // Auto-scroll threshold (80px from edge for easier control)
+    const scrollThreshold = 80
+    const scrollSpeed = 3  // Reduced from 10 to 3 for better control
     
     // Clear existing interval
     if (autoScrollIntervalRef.current) {
@@ -297,43 +315,89 @@ export function SevenDaysBoardView({
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
     >
-      {/* Header with date range and navigation */}
-      <div className="flex items-center justify-between mb-4 px-2">
-        <div className="flex items-center gap-3">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={goToPreviousWeek}
-            className="gap-1"
-          >
-            <CaretLeft size={16} weight="bold" />
-          </Button>
+      {/* Header with date range and navigation - only show if not in parent header */}
+      {!showDateRangeInHeader && (
+        <div className="flex items-center justify-between mb-4 px-2">
+          <div className="flex items-center gap-3">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={goToPreviousWeek}
+              className="gap-1"
+            >
+              <CaretLeft size={16} weight="bold" />
+            </Button>
+            
+            <h3 className="text-lg font-bold text-gray-800 min-w-[200px] text-center">
+              {dateRangeLabel}
+            </h3>
+            
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={goToNextWeek}
+              className="gap-1"
+            >
+              <CaretRight size={16} weight="bold" />
+            </Button>
+          </div>
           
-          <h3 className="text-lg font-bold text-gray-800 min-w-[200px] text-center">
-            {dateRangeLabel}
-          </h3>
-          
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={goToNextWeek}
-            className="gap-1"
-          >
-            <CaretRight size={16} weight="bold" />
-          </Button>
+          {!isCurrentWeek && (
+            <Button
+              size="sm"
+              variant="default"
+              onClick={goToToday}
+              className="gap-1.5 bg-gradient-to-r from-brand-purple to-brand-pink hover:opacity-90 text-white font-semibold"
+            >
+              <CalendarBlank size={16} weight="bold" />
+              Dzisiaj
+            </Button>
+          )}
         </div>
-        
-        {!isCurrentWeek && (
-          <Button
-            size="sm"
-            variant="default"
-            onClick={goToToday}
-            className="gap-1.5 bg-gradient-to-r from-brand-purple to-brand-pink hover:opacity-90 text-white font-semibold"
-          >
-            <CalendarBlank size={16} weight="bold" />
-            Dzisiaj
-          </Button>
-        )}
+      )}
+
+      {/* Horizontal day navigation tabs - visible on mobile */}
+      <div className="md:hidden mb-3 overflow-x-auto scrollbar-hide">
+        <div className="flex gap-2 px-2 pb-2">
+          {days.map(day => {
+            const isToday = isSameDay(day.date, new Date())
+            const taskCount = day.tasks.length
+            return (
+              <button
+                key={day.id}
+                onClick={() => {
+                  if (scrollContainerRef.current) {
+                    const dayIndex = days.findIndex(d => d.id === day.id)
+                    const columnWidth = 280 // approximate mobile card width
+                    scrollContainerRef.current.scrollTo({ 
+                      left: columnWidth * dayIndex, 
+                      behavior: 'smooth' 
+                    })
+                  }
+                }}
+                className={cn(
+                  'flex-shrink-0 px-4 py-2 rounded-lg text-sm font-semibold transition-all border-2',
+                  isToday 
+                    ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white border-transparent shadow-md' 
+                    : 'bg-white text-gray-700 border-gray-200 hover:border-brand-purple hover:shadow-sm'
+                )}
+              >
+                <div className="flex flex-col items-center gap-0.5">
+                  <span>{day.shortLabel}</span>
+                  <span className="text-xs opacity-75">{format(day.date, 'd MMM', { locale: pl })}</span>
+                  {taskCount > 0 && (
+                    <span className={cn(
+                      'text-[10px] px-1.5 py-0.5 rounded-full mt-0.5',
+                      isToday ? 'bg-white/20' : 'bg-gray-100'
+                    )}>
+                      {taskCount}
+                    </span>
+                  )}
+                </div>
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* Carousel container with navigation arrows */}
@@ -372,9 +436,9 @@ export function SevenDaysBoardView({
           style={{ scrollBehavior: 'smooth' }}
         >
           {/* Single row flex layout for carousel behavior */}
-          <div className="flex gap-3 w-max">
+          <div className="flex gap-3 w-max px-2 md:px-0">
             {days.map(day => (
-              <div key={day.id} className="w-64 sm:w-72 md:w-80 flex-shrink-0 snap-start">
+              <div key={day.id} className="w-[calc(100vw-5rem)] sm:w-72 md:w-80 flex-shrink-0 snap-center">
                 <DayColumnComponent
                   day={day}
                   onComplete={onComplete}
@@ -530,7 +594,14 @@ function SortableTaskCard({
     transform,
     transition,
     isDragging
-  } = useSortable({ id: task.id })
+  } = useSortable({ 
+    id: task.id,
+    // Enable touch events for mobile drag&drop
+    activationConstraint: {
+      delay: 150,  // Slight delay to distinguish between tap and drag
+      tolerance: 5  // Allow 5px movement before starting drag
+    }
+  })
 
   const style = {
     transform: CSS.Transform.toString(transform),
