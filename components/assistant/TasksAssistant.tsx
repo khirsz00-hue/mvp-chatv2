@@ -1377,7 +1377,7 @@ export function TasksAssistant() {
         </div>
         
         {/* Control Bar - Compact Desktop Layout */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 mb-4">
           <div className="flex items-center justify-between gap-3">
             {/* Left: View switcher */}
             <div className="flex items-center gap-2">

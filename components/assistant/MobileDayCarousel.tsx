@@ -180,7 +180,13 @@ export function MobileDayCarousel({
         {/* Right gradient overlay */}
         <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none z-10" />
         
-        <div className="flex gap-1 p-2 bg-white border-b overflow-x-auto scrollbar-hide snap-x snap-mandatory scroll-smooth">
+        <div 
+          className="flex gap-1 p-2 pb-3 bg-white border-b overflow-x-auto snap-x snap-mandatory scroll-smooth"
+          style={{
+            scrollbarWidth: 'thin',
+            scrollbarColor: '#a855f7 #f3f4f6'
+          }}
+        >
           {Array.from({ length: 7 }, (_, i) => {
           const day = addDays(activeDay, i - 3) // Show 3 days before, current, 3 days after
           const isActive = isSameDay(day, activeDay)
@@ -197,28 +203,42 @@ export function MobileDayCarousel({
           return (
             <button
               key={i}
-              onClick={async () => {
+              onClick={async (e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                
+                const dayStr = format(day, 'yyyy-MM-dd')
+                console.log('[MiniCard] Clicked:', { day: dayStr, draggedTaskId, isActive })
+                
                 if (draggedTaskId) {
                   // If dragging and clicking the same day (active), cancel drag
                   if (isActive) {
+                    console.log('[MiniCard] Canceling drag')
                     setDraggedTaskId(null)
                     return
                   }
                   // Otherwise, move task to this day
-                  await onMove(draggedTaskId, format(day, 'yyyy-MM-dd'))
-                  setDraggedTaskId(null)
+                  console.log('[MiniCard] Moving task to:', dayStr)
+                  try {
+                    await onMove(draggedTaskId, dayStr)
+                    console.log('[MiniCard] Move completed')
+                    setDraggedTaskId(null)
+                  } catch (err) {
+                    console.error('[MiniCard] Move failed:', err)
+                  }
                 } else {
                   // Otherwise, navigate to this day
+                  console.log('[MiniCard] Navigating to:', dayStr)
                   setActiveDay(day)
                 }
               }}
               className={cn(
-                'flex-shrink-0 px-3 py-2 rounded-lg text-xs font-medium transition-all',
+                'flex-shrink-0 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ease-out transform active:scale-95',
                 isActive 
                   ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-md' 
                   : draggedTaskId
-                    ? 'bg-brand-purple/10 text-brand-purple border-2 border-dashed border-brand-purple hover:bg-brand-purple/20'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? 'bg-brand-purple/10 text-brand-purple border-2 border-dashed border-brand-purple hover:bg-brand-purple/20 hover:scale-105'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:scale-105'
               )}
             >
               <div className="text-center">
@@ -324,7 +344,7 @@ function DayCard({
         'rounded-xl border-2 shadow-sm transition-all flex flex-col',
         isToday ? 'border-brand-pink bg-brand-pink/5' : 'border-gray-200 bg-white'
       )}
-      style={{ height: 'calc(100dvh - 280px)' }}
+      style={{ height: 'calc(100dvh - 220px)' }}
       onTouchStart={onSwipeStart}
       onTouchEnd={onSwipeEnd}
     >
@@ -460,7 +480,7 @@ function TaskCardMobile({
     <div data-task-id={task.id} className="relative">
       <div
         className={cn(
-          'px-2 py-1.5 border-l-2 rounded-md transition-all text-xs cursor-pointer group',
+          'px-2 py-1.5 border-l-2 rounded-md transition-all duration-200 ease-out text-xs cursor-pointer group transform hover:scale-[1.02] active:scale-[0.98]',
           priorityColors[task.priority] || priorityColors[4],
           loading && 'opacity-50'
         )}
