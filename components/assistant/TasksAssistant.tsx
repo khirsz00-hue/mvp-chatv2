@@ -124,7 +124,9 @@ export function TasksAssistant() {
   // Mobile detection effect
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768)
+      const mobile = window.innerWidth < 768
+      setIsMobile(mobile)
+      console.log('[TasksAssistant] Mobile detection:', { width: window.innerWidth, isMobile: mobile })
     }
     
     checkMobile()
@@ -1746,7 +1748,7 @@ export function TasksAssistant() {
             </div>
           )
         ) : view === 'board' ? (
-      // Mobile view for day board
+      // Mobile view for day board on mobile devices
       isMobile && boardGrouping === 'day' ? (
         <MobileDayCarousel
           tasks={activeTasks}
