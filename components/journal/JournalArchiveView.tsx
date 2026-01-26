@@ -163,13 +163,13 @@ export function JournalArchiveView({ onBack }: JournalArchiveViewProps) {
           <div className="text-2xl font-bold text-brand-purple">
             {stats.avgSleepQuality.toFixed(1)}
           </div>
-          <div className="text-xs text-gray-600">Śr. Jakość snu</div>
+          <div className="text-xs text-gray-600">Śr. Focus/Sprawczość</div>
         </div>
         <div className="text-center">
           <div className="text-2xl font-bold text-brand-purple">
             {stats.avgHoursSlept.toFixed(1)}h
           </div>
-          <div className="text-xs text-gray-600">Śr. Godziny snu</div>
+          <div className="text-xs text-gray-600">Śr. Czas Focus</div>
         </div>
         <div className="text-center">
           <div className="text-2xl font-bold text-brand-purple">
@@ -437,13 +437,13 @@ export function JournalArchiveView({ onBack }: JournalArchiveViewProps) {
                     </div>
                   </div>
                   <div>
-                    <div className="text-sm text-gray-600">Jakość snu</div>
+                    <div className="text-sm text-gray-600">Focus/Sprawczość</div>
                     <div className="text-lg font-semibold text-brand-purple">
                       {entry.sleep_quality || 0}/10
                     </div>
                   </div>
                   <div>
-                    <div className="text-sm text-gray-600">Godziny snu</div>
+                    <div className="text-sm text-gray-600">Czas Focus</div>
                     <div className="text-lg font-semibold text-brand-purple">
                       {entry.hours_slept || 0}h
                     </div>

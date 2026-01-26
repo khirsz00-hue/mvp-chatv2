@@ -437,10 +437,10 @@ export function formatContextForAI(context: UserContext): string {
       `- Średnia motywacja: ${context.journal.stats.avg_motivation}/10`
     )
     sections.push(
-      `- Średnia jakość snu: ${context.journal.stats.avg_sleep_quality}/10`
+      `- Średni Focus/Sprawczość: ${context.journal.stats.avg_sleep_quality}/10`
     )
     sections.push(
-      `- Średni czas snu: ${context.journal.stats.avg_hours_slept}h`
+      `- Średni czas Focus: ${context.journal.stats.avg_hours_slept}h`
     )
   } else {
     sections.push('- Brak danych z dziennika')

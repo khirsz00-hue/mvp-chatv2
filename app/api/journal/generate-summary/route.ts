@@ -71,8 +71,8 @@ export async function POST(req: Request) {
 Dane z dnia:
 - Energia: ${energy}/10
 - Motywacja: ${motivation}/10
-- Jakość snu: ${sleepQuality}/10
-- Godziny snu: ${hoursSlept}h
+- Focus/Sprawczość: ${sleepQuality}/10
+- Czas Focus: ${hoursSlept}h
 
 Notatki:
 - ${notesText}

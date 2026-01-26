@@ -510,7 +510,7 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
           {/* Sleep Quality */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Jakość snu: {sleepQuality}/10
+              Focus/Sprawczość: {sleepQuality}/10
             </label>
             <input
               type="range"
@@ -525,7 +525,7 @@ export function JournalAssistantMain({ onShowArchive }: JournalAssistantMainProp
           {/* Hours Slept */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Godziny snu: {hoursSlept}h
+              Czas Focus: {hoursSlept}h
             </label>
             <input
               type="range"
