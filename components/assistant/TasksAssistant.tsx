@@ -120,6 +120,7 @@ export function TasksAssistant() {
   
   // Ref for cleanup in auto-sync effect
   const syncCleanupRef = useRef(true)
+  const lastManualUpdateRef = useRef<number>(0)
   
   // Mobile detection effect
   useEffect(() => {
@@ -334,6 +335,13 @@ export function TasksAssistant() {
     
     const triggerSync = async () => {
       if (!syncCleanupRef.current) return  // Skip if component unmounted
+      
+      // Skip sync if manual update happened in last 10 seconds
+      const timeSinceLastUpdate = Date.now() - lastManualUpdateRef.current
+      if (timeSinceLastUpdate < 10000) {
+        console.log('⏭️ [TasksAssistant] Skipping auto-sync - recent manual update')
+        return
+      }
       
       try {
         console.log('🔄 [TasksAssistant] Auto-syncing with Todoist...')
@@ -880,6 +888,9 @@ export function TasksAssistant() {
         showToast('Nie znaleziono zadania', 'error')
         return
       }
+      
+      // Mark timestamp of manual update to prevent auto-sync conflicts
+      lastManualUpdateRef.current = Date.now()
 
       // ⚡ OPTIMISTIC UPDATE - Update UI immediately for instant feedback
       setTasks(prev => prev.map(t => 

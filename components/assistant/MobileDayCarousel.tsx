@@ -155,9 +155,22 @@ export function MobileDayCarousel({
       collisionDetection={closestCenter}
     >
       {draggedTaskId && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-brand-purple text-white px-4 py-2 rounded-full shadow-lg text-sm font-medium animate-bounce">
-          Kliknij w dzień aby przenieść zadanie
-        </div>
+        <>
+          <div 
+            className="fixed inset-0 z-40 bg-black/20" 
+            onClick={() => setDraggedTaskId(null)}
+          />
+          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-brand-purple text-white px-4 py-2 rounded-full shadow-lg text-sm font-medium">
+            <span>Kliknij w dzień aby przenieść zadanie</span>
+            <button
+              onClick={() => setDraggedTaskId(null)}
+              className="ml-2 p-1 hover:bg-white/20 rounded-full transition-colors"
+              aria-label="Anuluj"
+            >
+              ✕
+            </button>
+          </div>
+        </>
       )}
       
       {/* Week mini cards navigation */}
@@ -186,7 +199,12 @@ export function MobileDayCarousel({
               key={i}
               onClick={async () => {
                 if (draggedTaskId) {
-                  // If dragging, move task to this day
+                  // If dragging and clicking the same day (active), cancel drag
+                  if (isActive) {
+                    setDraggedTaskId(null)
+                    return
+                  }
+                  // Otherwise, move task to this day
                   await onMove(draggedTaskId, format(day, 'yyyy-MM-dd'))
                   setDraggedTaskId(null)
                 } else {
@@ -282,7 +300,9 @@ function DayCard({
   onDelete,
   onDetails,
   onMove,
-  onAddForKey
+  onAddForKey,
+  onSwipeStart,
+  onSwipeEnd
 }: {
   day: any
   tasks: Task[]
@@ -293,6 +313,8 @@ function DayCard({
   onDetails: (task: Task) => void
   onMove: (taskId: string, newDate: string) => Promise<void>
   onAddForKey?: (date: string) => void
+  onSwipeStart?: (e: React.TouchEvent) => void
+  onSwipeEnd?: (e: React.TouchEvent) => void
 }) {
   const isToday = isSameDay(day.date, new Date())
   
@@ -303,8 +325,8 @@ function DayCard({
         isToday ? 'border-brand-pink bg-brand-pink/5' : 'border-gray-200 bg-white'
       )}
       style={{ height: 'calc(100dvh - 280px)' }}
-      onTouchStart={handleSwipeStart}
-      onTouchEnd={handleSwipeEnd}
+      onTouchStart={onSwipeStart}
+      onTouchEnd={onSwipeEnd}
     >
       {/* Header */}
       <div className={cn(
