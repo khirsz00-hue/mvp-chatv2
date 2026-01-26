@@ -130,7 +130,7 @@ export function MobileDayCarousel({
     }
   }
 
-  const handleDragMove = (e: React.MouseEvent | React.TouchEvent) => {
+  const handleDragMove = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     if (!draggedTaskId || !containerRef.current) return
     
     const clientX = 'clientX' in e ? e.clientX : (e as React.TouchEvent).touches?.[0]?.clientX
@@ -162,9 +162,9 @@ export function MobileDayCarousel({
         edgeZoneTimeoutRef.current = null
       }
     }
-  }
+  }, [draggedTaskId])
 
-  const handleDragEnd = async (taskId: string) => {
+  const handleDragEnd = useCallback(async (taskId: string) => {
     if (edgeZoneTimeoutRef.current) {
       clearTimeout(edgeZoneTimeoutRef.current)
       edgeZoneTimeoutRef.current = null
@@ -188,7 +188,7 @@ export function MobileDayCarousel({
     }
     
     setDraggedTaskId(null)
-  }
+  }, [tasks, activeDay, onMove])
 
   useEffect(() => {
     if (!draggedTaskId) return

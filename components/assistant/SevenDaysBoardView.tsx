@@ -594,14 +594,7 @@ function SortableTaskCard({
     transform,
     transition,
     isDragging
-  } = useSortable({ 
-    id: task.id,
-    // Enable touch events for mobile drag&drop
-    activationConstraint: {
-      delay: 150,  // Slight delay to distinguish between tap and drag
-      tolerance: 5  // Allow 5px movement before starting drag
-    }
-  })
+  } = useSortable({ id: task.id })
 
   const style = {
     transform: CSS.Transform.toString(transform),
