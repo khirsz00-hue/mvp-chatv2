@@ -329,14 +329,22 @@ input[type="range"]::-moz-range-thumb:active {
 }
 
 /* FAB (Floating Action Button) container with safe area support */
+
+/* FAB (Floating Action Button) container with safe area support */
 .fab-container {
   position: fixed;
   z-index: 30;
-  display: flex;
+  display: none; /* Hidden by default on mobile */
   flex-direction: column;
   gap: 0.75rem;
   bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
   right: calc(1.5rem + env(safe-area-inset-right, 0px));
+}
+
+@media (min-width: 768px) {
+  .fab-container {
+    display: flex; /* Show on desktop */
+  }
 }
 
 @media (min-width: 1024px) {

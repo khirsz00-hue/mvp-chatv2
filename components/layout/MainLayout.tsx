@@ -446,7 +446,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             </div>
 
             {/* Mobile: Floating Menu - Single button with vertical menu */}
-            <div className="md:hidden fixed z-40 bottom-6 right-6" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)', paddingRight: 'env(safe-area-inset-right, 0px)' }}>
+            <div className="md:hidden fixed z-40 bottom-20 right-6" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)', paddingRight: 'env(safe-area-inset-right, 0px)' }}>
               <MobileFloatingMenu 
                 onAddTask={() => setShowQuickAdd(true)}
                 onOpenChat={() => setShowChat(true)}
@@ -526,7 +526,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </div>
 
           {/* Mobile: Floating Menu - Single button with vertical menu */}
-          <div className="md:hidden fixed z-40 bottom-6 right-6" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)', paddingRight: 'env(safe-area-inset-right, 0px)' }}>
+          <div className="md:hidden fixed z-40 bottom-20 right-6" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)', paddingRight: 'env(safe-area-inset-right, 0px)' }}>
             <MobileFloatingMenu 
               onAddTask={() => setShowQuickAdd(true)}
               onOpenChat={() => setShowChat(true)}
