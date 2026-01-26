@@ -184,12 +184,14 @@ export function MobileDayCarousel({
         
         <div 
           data-scrollbar="visible"
-          className="flex gap-1 p-2 pb-3 bg-white border-b snap-x snap-mandatory scroll-smooth"
+          className="flex gap-1 p-2 pb-3 bg-white border-b snap-x snap-mandatory"
           style={{
             overflowX: 'scroll',
             scrollbarWidth: 'thin',
             scrollbarColor: '#a855f7 #f3f4f6',
-            WebkitOverflowScrolling: 'touch'
+            WebkitOverflowScrolling: 'touch',
+            display: 'flex',
+            flexWrap: 'nowrap'
           }}
         >
           {Array.from({ length: 7 }, (_, i) => {
@@ -276,14 +278,36 @@ export function MobileDayCarousel({
         </div>
       )}
       
-      {/* Simplified main view - only today's tasks */}
+      {/* Simplified main view - show activeDay tasks */}
       <div
         ref={containerRef}
         className="px-4 pb-4"
       >
         <DayCard
-          day={days[1]} 
-          tasks={days[1].tasks}
+          day={{
+            date: activeDay,
+            dateStr: format(activeDay, 'yyyy-MM-dd'),
+            label: format(activeDay, 'EEEE', { locale: pl }),
+            shortLabel: isSameDay(activeDay, new Date()) ? 'Dziś' : format(activeDay, 'd MMM', { locale: pl }),
+            tasks: tasks.filter(t => {
+              const taskDue = typeof t.due === 'string' ? t.due : t.due?.date
+              if (!taskDue) return false
+              try {
+                return isSameDay(startOfDay(parseISO(taskDue)), activeDay)
+              } catch {
+                return false
+              }
+            })
+          }}
+          tasks={tasks.filter(t => {
+            const taskDue = typeof t.due === 'string' ? t.due : t.due?.date
+            if (!taskDue) return false
+            try {
+              return isSameDay(startOfDay(parseISO(taskDue)), activeDay)
+            } catch {
+              return false
+            }
+          })}
           draggedTaskId={draggedTaskId}
           onStartDrag={setDraggedTaskId}
           onComplete={onComplete}
