@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { DndContext, closestCenter, DragEndEvent, DragOverlay, DragStartEvent } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -111,107 +111,19 @@ export function MobileDayCarousel({
     setActiveDay(prev => addDays(prev, 1))
   }
 
-  const handleLongPressStart = (e: React.MouseEvent | React.TouchEvent) => {
-    const target = e.target as HTMLElement
-    if (target.closest('button') || target.closest('[role="button"]')) return
-    
-    const taskCard = target.closest('[data-task-id]')
-    if (!taskCard) return
-    
-    const taskId = taskCard.getAttribute('data-task-id')
-    if (!taskId) return
-    
+  const handleLongPressStart = (taskId: string) => {
     longPressTimeoutRef.current = setTimeout(() => {
       setDraggedTaskId(taskId)
-    }, 200) // 200ms long press
+      console.log('[MobileDayCarousel] Long press activated for task:', taskId)
+    }, 500) // 500ms long press
   }
 
   const handleLongPressEnd = () => {
     if (longPressTimeoutRef.current) {
       clearTimeout(longPressTimeoutRef.current)
+      longPressTimeoutRef.current = null
     }
   }
-
-  const handleDragMove = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    if (!draggedTaskId || !containerRef.current) return
-    
-    const clientX = 'clientX' in e ? e.clientX : (e as React.TouchEvent).touches?.[0]?.clientX
-    if (!clientX) return
-    
-    const rect = containerRef.current.getBoundingClientRect()
-    const edgeZoneWidth = rect.width * 0.15 // 15% zones
-    
-    // Check if in edge zone
-    const inLeftZone = clientX - rect.left < edgeZoneWidth
-    const inRightZone = clientX - rect.left > rect.width - edgeZoneWidth
-    
-    if (inLeftZone || inRightZone) {
-      // Start edge zone timeout
-      if (!edgeZoneTimeoutRef.current) {
-        edgeZoneTimeoutRef.current = setTimeout(() => {
-          if (inLeftZone) {
-            setActiveDay(prev => addDays(prev, -1))
-          } else if (inRightZone) {
-            setActiveDay(prev => addDays(prev, 1))
-          }
-          edgeZoneTimeoutRef.current = null
-        }, 350) // 300-500ms range
-      }
-    } else {
-      // Clear edge zone timeout if moved away from edge
-      if (edgeZoneTimeoutRef.current) {
-        clearTimeout(edgeZoneTimeoutRef.current)
-        edgeZoneTimeoutRef.current = null
-      }
-    }
-  }, [draggedTaskId])
-
-  const handleDragEnd = useCallback(async (taskId: string) => {
-    if (edgeZoneTimeoutRef.current) {
-      clearTimeout(edgeZoneTimeoutRef.current)
-      edgeZoneTimeoutRef.current = null
-    }
-    
-    const task = tasks.find(t => t.id === taskId)
-    if (!task) {
-      setDraggedTaskId(null)
-      return
-    }
-    
-    const targetDateStr = format(activeDay, 'yyyy-MM-dd')
-    const currentDateStr = typeof task.due === 'string' ? task.due : task.due?.date
-    
-    if (targetDateStr !== currentDateStr) {
-      try {
-        await onMove(taskId, targetDateStr)
-      } catch (err) {
-        console.error('Error moving task:', err)
-      }
-    }
-    
-    setDraggedTaskId(null)
-  }, [tasks, activeDay, onMove])
-
-  useEffect(() => {
-    if (!draggedTaskId) return
-    
-    const handleMouseMove = (e: any) => handleDragMove(e)
-    const handleTouchMove = (e: any) => handleDragMove(e)
-    const handleMouseUp = () => handleDragEnd(draggedTaskId)
-    const handleTouchEnd = () => handleDragEnd(draggedTaskId)
-    
-    window.addEventListener('mousemove', handleMouseMove)
-    window.addEventListener('touchmove', handleTouchMove)
-    window.addEventListener('mouseup', handleMouseUp)
-    window.addEventListener('touchend', handleTouchEnd)
-    
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('touchmove', handleTouchMove)
-      window.removeEventListener('mouseup', handleMouseUp)
-      window.removeEventListener('touchend', handleTouchEnd)
-    }
-  }, [draggedTaskId, activeDay, handleDragEnd, handleDragMove])
 
   return (
     <DndContext
@@ -224,8 +136,9 @@ export function MobileDayCarousel({
       )}
       
       {/* Week mini cards navigation */}
-      <div className="flex gap-1 p-2 bg-white border-b overflow-x-auto scrollbar-hide">
-        {Array.from({ length: 7 }, (_, i) => {
+      <div className="relative">
+        <div className="flex gap-1 p-2 bg-white border-b overflow-x-auto scrollbar-hide snap-x snap-mandatory scroll-smooth">
+          {Array.from({ length: 7 }, (_, i) => {
           const day = addDays(activeDay, i - 3) // Show 3 days before, current, 3 days after
           const isActive = isSameDay(day, activeDay)
           const dayTasks = tasks.filter(t => {
@@ -275,69 +188,29 @@ export function MobileDayCarousel({
             </button>
           )
         })}
+        </div>
+        {/* Scroll indicator */}
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-200">
+          <div className="h-full bg-gradient-to-r from-brand-purple to-brand-pink" style={{ width: '14.28%', marginLeft: '42.85%' }} />
+        </div>
       </div>
       
-      {/* Header */}
-      <div className="px-4 py-3 flex items-center justify-between">
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={previousDay}
-          className="w-10 h-10 p-0"
-        >
-          <CaretLeft size={16} weight="bold" />
-        </Button>
-        
-        <div className="text-center">
-          <h3 className="font-bold text-lg">
-            {format(activeDay, 'd MMMM yyyy', { locale: pl })}
-          </h3>
-          <p className="text-xs text-gray-500">
-            {format(activeDay, 'EEEE', { locale: pl })}
-          </p>
-        </div>
-        
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={nextDay}
-          className="w-10 h-10 p-0"
-        >
-          <CaretRight size={16} weight="bold" />
-        </Button>
-      </div>
-
-      {/* Carousel - 3 columns: prev (20%), active (100%), next (20%) */}
+      {/* Simplified main view - only today's tasks */}
       <div
         ref={containerRef}
-        className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide"
-        style={{ scrollBehavior: 'smooth' }}
+        className="px-4 pb-4"
       >
-        {days.map((day, idx) => (
-          <div
-            key={idx}
-            className={cn(
-              'flex-shrink-0 snap-center px-2 pb-4',
-              idx === 1 ? 'w-full' : 'w-[20%]'
-            )}
-            onMouseDown={handleLongPressStart}
-            onMouseUp={handleLongPressEnd}
-            onMouseLeave={handleLongPressEnd}
-            onTouchStart={handleLongPressStart}
-            onTouchEnd={handleLongPressEnd}
-          >
-            <DayCard
-              day={day}
-              tasks={day.tasks}
-              isDragging={draggedTaskId !== null}
-              onComplete={onComplete}
-              onDelete={onDelete}
-              onDetails={onDetails}
-              onMove={onMove}
-              onAddForKey={onAddForKey}
-            />
-          </div>
-        ))}
+        <DayCard
+          day={days[1]} 
+          tasks={days[1].tasks}
+          draggedTaskId={draggedTaskId}
+          onStartDrag={setDraggedTaskId}
+          onComplete={onComplete}
+          onDelete={onDelete}
+          onDetails={onDetails}
+          onMove={onMove}
+          onAddForKey={onAddForKey}
+        />
       </div>
 
       <DragOverlay>
@@ -363,7 +236,8 @@ export function MobileDayCarousel({
 function DayCard({
   day,
   tasks,
-  isDragging,
+  draggedTaskId,
+  onStartDrag,
   onComplete,
   onDelete,
   onDetails,
@@ -372,7 +246,8 @@ function DayCard({
 }: {
   day: any
   tasks: Task[]
-  isDragging: boolean
+  draggedTaskId: string | null
+  onStartDrag: (taskId: string) => void
   onComplete: (id: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
   onDetails: (task: Task) => void
@@ -437,6 +312,7 @@ function DayCard({
                 onDetails={onDetails}
                 onMove={onMove}
                 dayDateStr={day.dateStr}
+                onStartDrag={onStartDrag}
               />
             ))
           )}
@@ -468,7 +344,8 @@ function TaskCardMobile({
   onDelete,
   onDetails,
   onMove,
-  dayDateStr
+  dayDateStr,
+  onStartDrag
 }: {
   task: Task
   onComplete: (id: string) => Promise<void>
@@ -476,10 +353,12 @@ function TaskCardMobile({
   onDetails: (task: Task) => void
   onMove: (taskId: string, newDate: string) => Promise<void>
   dayDateStr: string
+  onStartDrag: (taskId: string) => void
 }) {
   const [loading, setLoading] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showMoveSheet, setShowMoveSheet] = useState(false)
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null)
   
   const priorityColors = {
     1: 'border-l-red-500 bg-red-50/30',
@@ -521,6 +400,21 @@ function TaskCardMobile({
           loading && 'opacity-50'
         )}
         onClick={() => onDetails(task)}
+        onTouchStart={() => {
+          longPressTimerRef.current = setTimeout(() => {
+            onStartDrag(task.id)
+          }, 500)
+        }}
+        onTouchEnd={() => {
+          if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current)
+          }
+        }}
+        onTouchMove={() => {
+          if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current)
+          }
+        }}
       >
         <div className="flex items-center gap-1.5">
           <div className="flex-1 min-w-0">
