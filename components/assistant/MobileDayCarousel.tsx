@@ -176,15 +176,20 @@ export function MobileDayCarousel({
       )}
       
       {/* Week mini cards navigation */}
-      <div className="relative z-30 select-none" style={{ WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}>
+      <div className="relative z-30 select-none px-2 pb-2 bg-white border-b" style={{ WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}>
+        {/* Scroll hint */}
+        <div className="flex items-center justify-center pt-1 pb-1">
+          <span className="text-[10px] text-gray-400 font-medium tracking-wide">← PRZESUŃ →</span>
+        </div>
+        
         {/* Left gradient overlay */}
-        <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white to-transparent pointer-events-none z-10" />
+        <div className="absolute left-2 top-7 bottom-2 w-8 bg-gradient-to-r from-white to-transparent pointer-events-none z-10" />
         {/* Right gradient overlay */}
-        <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none z-10" />
+        <div className="absolute right-2 top-7 bottom-2 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none z-10" />
         
         <div 
           data-scrollbar="visible"
-          className="flex gap-1 p-2 pb-3 bg-white border-b snap-x snap-mandatory"
+          className="snap-x snap-mandatory pt-2 pb-3"
           style={{
             overflowX: 'scroll',
             scrollbarWidth: 'thin',
@@ -372,8 +377,8 @@ function DayCard({
   return (
     <div
       className={cn(
-        'rounded-xl border-2 shadow-sm transition-all flex flex-col select-none',
-        isToday ? 'border-brand-purple bg-gradient-to-br from-brand-purple/5 to-brand-pink/5' : 'border-gray-200 bg-white'
+        'rounded-xl border-2 shadow-sm transition-all flex flex-col select-none bg-white',
+        isToday ? 'border-brand-purple/60' : 'border-gray-200'
       )}
       style={{ 
         height: 'calc(100dvh - 120px)',

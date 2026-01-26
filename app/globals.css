@@ -385,8 +385,8 @@ input[type="range"]::-moz-range-thumb:active {
 }
 
 [data-scrollbar="visible"]::-webkit-scrollbar-track {
-  background: #f3f4f6 !important;
-  border-radius: 4px !important;
+  background: transparent !important;
+  margin: 0 8px !important;
 }
 
 [data-scrollbar="visible"]::-webkit-scrollbar-thumb {
@@ -396,4 +396,10 @@ input[type="range"]::-moz-range-thumb:active {
 
 [data-scrollbar="visible"]::-webkit-scrollbar-thumb:hover {
   background: #9333ea !important;
+}
+
+/* Firefox scrollbar */
+[data-scrollbar="visible"] {
+  scrollbar-width: auto !important;
+  scrollbar-color: #a855f7 #f3f4f6 !important;
 }
