@@ -1615,30 +1615,31 @@ export function TasksAssistant() {
           }}
         />
       ) : (
-      <SevenDaysBoardView 
-        tasks={activeTasks}
-        grouping={boardGrouping}
-        projects={projects}
-        onMove={handleMove}
-        onComplete={handleComplete}
-        onDelete={handleDelete}
-        onDetails={(t) => {
-          setUniversalModalTask(t)
-          setShowUniversalModal(true)
-        }}
-        onAddForKey={(key) => {
-          setUniversalModalTask({
-            id: '',
-            content: '',
-            description: '',
-            project_id: key === 'all' ? undefined : key,
-            priority: 4,
-            due: boardGrouping === 'day' ? key : undefined
-          } as Task)
-          setShowUniversalModal(true)
-        }}
-      />
-      )}
+        <SevenDaysBoardView 
+          tasks={activeTasks}
+          grouping={boardGrouping}
+          projects={projects}
+          onMove={handleMove}
+          onComplete={handleComplete}
+          onDelete={handleDelete}
+          onDetails={(t) => {
+            setUniversalModalTask(t)
+            setShowUniversalModal(true)
+          }}
+          onAddForKey={(key) => {
+            setUniversalModalTask({
+              id: '',
+              content: '',
+              description: '',
+              project_id: key === 'all' ? undefined : key,
+              priority: 4,
+              due: boardGrouping === 'day' ? key : undefined
+            } as Task)
+            setShowUniversalModal(true)
+          }}
+        />
+      )
+    ) : null}
       </div>
       
       {/* Modals */}
