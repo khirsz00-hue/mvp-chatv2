@@ -4,7 +4,6 @@ interface TodoistUpdatePayload {
   content?: string
   description?: string
   priority?: number
-  project_id?: string
   labels?: string[]
   due_string?: string
   due_date?: string | null  // ✅ Only due_date is accepted for updates (YYYY-MM-DD)
@@ -13,7 +12,7 @@ interface TodoistUpdatePayload {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { id, token, ...updates } = body
+    const { id, token, project_id: projectIdToMove, ...updates } = body
 
     if (!id || !token) {
       return NextResponse.json({ error: 'Brak wymaganych parametrów' }, { status: 400 })
@@ -25,7 +24,6 @@ export async function POST(req: Request) {
     if (updates.content !== undefined) updatePayload.content = updates.content
     if (updates.description !== undefined) updatePayload.description = updates.description
     if (updates.priority !== undefined) updatePayload.priority = updates.priority
-    if (updates.project_id !== undefined) updatePayload.project_id = updates.project_id
     if (updates.labels !== undefined) updatePayload.labels = updates.labels
     
     // ✅ FIX: Handle due date - use due_string for setting and clearing
@@ -67,12 +65,71 @@ export async function POST(req: Request) {
       }
     }
     
-    // Validate that we have at least one field to update
-    if (Object.keys(updatePayload).length === 0) {
+    const normalizedProjectId = (() => {
+      if (projectIdToMove === undefined || projectIdToMove === null) return undefined
+      if (typeof projectIdToMove === 'string') {
+        const trimmed = projectIdToMove.trim()
+        if (!trimmed || trimmed.toLowerCase() === 'none') return undefined
+        return trimmed
+      }
+      return projectIdToMove
+    })()
+
+    const hasProjectMove = normalizedProjectId !== undefined
+    const hasUpdateFields = Object.keys(updatePayload).length > 0
+
+    if (!hasProjectMove && !hasUpdateFields) {
       console.error('❌ [Todoist Update] No valid update fields provided')
       return NextResponse.json({ 
         error: 'No valid update fields provided. Please specify at least one field to update.' 
       }, { status: 400 })
+    }
+
+    if (hasProjectMove) {
+      const movePayload = { project_id: normalizedProjectId }
+      const moveRes = await fetch(`https://api.todoist.com/rest/v2/tasks/${id}/move`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(movePayload),
+      })
+
+      if (!moveRes.ok) {
+        const errorText = await moveRes.text()
+        console.error('❌ [Todoist Update] Move API error:', errorText)
+        return NextResponse.json({
+          error: 'Nie udało się przenieść zadania do nowego projektu',
+          details: { taskId: id, payload: movePayload }
+        }, { status: moveRes.status })
+      }
+
+      console.log('🚚 [Todoist Update] Project move success:', normalizedProjectId)
+
+      if (!hasUpdateFields) {
+        try {
+          const latestRes = await fetch(`https://api.todoist.com/rest/v2/tasks/${id}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+
+          if (latestRes.ok) {
+            const latestTask = await latestRes.json()
+            return NextResponse.json({ success: true, task: latestTask })
+          }
+        } catch (fetchErr) {
+          console.warn('⚠️ [Todoist Update] Failed to fetch task after move:', fetchErr)
+        }
+
+        return NextResponse.json({ 
+          success: true, 
+          task: { id, project_id: normalizedProjectId }
+        })
+      }
+    }
+
+    if (!hasUpdateFields) {
+      return NextResponse.json({ success: true })
     }
 
     console.log('📝 [Todoist Update] Sending payload:', JSON.stringify(updatePayload))
