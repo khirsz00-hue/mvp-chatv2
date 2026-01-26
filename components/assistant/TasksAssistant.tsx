@@ -1832,7 +1832,8 @@ export function TasksAssistant() {
       {/* Task Timer (floating widget) */}
       <TaskTimer />
       
-      {/* Mobile Bottom Bar (only on mobile < 768px) */}
+      {/* Mobile Bottom Bar (only on mobile < 768px, hide in board view) */}
+      {!(isMobile && view === 'board') && (
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-lg"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
@@ -1896,6 +1897,7 @@ export function TasksAssistant() {
           </button>
         </div>
       </div>
+      )}
       
       {/* Mobile Bottom Sheets */}
       <BottomSheet

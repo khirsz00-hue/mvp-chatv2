@@ -47,6 +47,8 @@ export function MobileDayCarousel({
   const containerRef = useRef<HTMLDivElement>(null)
   const longPressTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const edgeZoneTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const touchStartX = useRef<number>(0)
+  const touchStartY = useRef<number>(0)
   
   // Get 3 days: yesterday, today, tomorrow
   const days = useMemo(() => {
@@ -124,6 +126,29 @@ export function MobileDayCarousel({
       longPressTimeoutRef.current = null
     }
   }
+  
+  const handleSwipeStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX
+    touchStartY.current = e.touches[0].clientY
+  }
+  
+  const handleSwipeEnd = (e: React.TouchEvent) => {
+    const touchEndX = e.changedTouches[0].clientX
+    const touchEndY = e.changedTouches[0].clientY
+    const deltaX = touchEndX - touchStartX.current
+    const deltaY = touchEndY - touchStartY.current
+    
+    // Only trigger swipe if horizontal movement is greater than vertical
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
+      if (deltaX > 0) {
+        // Swipe right - previous day
+        setActiveDay(prev => addDays(prev, -1))
+      } else {
+        // Swipe left - next day
+        setActiveDay(prev => addDays(prev, 1))
+      }
+    }
+  }
 
   return (
     <DndContext
@@ -137,6 +162,11 @@ export function MobileDayCarousel({
       
       {/* Week mini cards navigation */}
       <div className="relative">
+        {/* Left gradient overlay */}
+        <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white to-transparent pointer-events-none z-10" />
+        {/* Right gradient overlay */}
+        <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none z-10" />
+        
         <div className="flex gap-1 p-2 bg-white border-b overflow-x-auto scrollbar-hide snap-x snap-mandatory scroll-smooth">
           {Array.from({ length: 7 }, (_, i) => {
           const day = addDays(activeDay, i - 3) // Show 3 days before, current, 3 days after
@@ -189,11 +219,19 @@ export function MobileDayCarousel({
           )
         })}
         </div>
-        {/* Scroll indicator */}
-        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-200">
-          <div className="h-full bg-gradient-to-r from-brand-purple to-brand-pink" style={{ width: '14.28%', marginLeft: '42.85%' }} />
-        </div>
       </div>
+      
+      {/* Today button - only show if not on today */}
+      {!isSameDay(activeDay, new Date()) && (
+        <div className="px-4 pt-2">
+          <button
+            onClick={() => setActiveDay(startOfDay(new Date()))}
+            className="w-full py-2 text-xs font-medium text-brand-purple bg-brand-purple/10 rounded-lg hover:bg-brand-purple/20 transition-colors"
+          >
+            ← Wróć do dziś
+          </button>
+        </div>
+      )}
       
       {/* Simplified main view - only today's tasks */}
       <div
@@ -210,6 +248,8 @@ export function MobileDayCarousel({
           onDetails={onDetails}
           onMove={onMove}
           onAddForKey={onAddForKey}
+          onSwipeStart={handleSwipeStart}
+          onSwipeEnd={handleSwipeEnd}
         />
       </div>
 
@@ -259,9 +299,12 @@ function DayCard({
   return (
     <div
       className={cn(
-        'rounded-xl border-2 shadow-sm transition-all flex flex-col h-[calc(100dvh-180px)]',
+        'rounded-xl border-2 shadow-sm transition-all flex flex-col',
         isToday ? 'border-brand-pink bg-brand-pink/5' : 'border-gray-200 bg-white'
       )}
+      style={{ height: 'calc(100dvh - 280px)' }}
+      onTouchStart={handleSwipeStart}
+      onTouchEnd={handleSwipeEnd}
     >
       {/* Header */}
       <div className={cn(
