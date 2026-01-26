@@ -22,7 +22,8 @@ import { BottomSheet } from '@/components/ui/BottomSheet'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/DropdownMenu'
 
 interface Task {
-  id: string
+  id: string  // Supabase UUID
+  todoist_task_id?: string  // Todoist task ID (for Todoist sync)
   content: string
   description?:  string
   project_id?:  string
@@ -34,6 +35,7 @@ interface Task {
   duration?: number
   labels?: string[]
   status?: 'todo' | 'in_progress' | 'done'
+  source?: 'local' | 'todoist' | 'asana'  // Task source
 }
 
 interface Project {
@@ -180,7 +182,8 @@ export function TasksAssistant() {
               
               // Map tasks to expected format
               const mapped = fetchedTasks.map((t: any) => ({
-                id: t.id,
+                id: t.id,  // Supabase UUID
+                todoist_task_id: t.todoist_task_id,  // ✅ Todoist ID for API calls
                 content: t.title,
                 description: t.description,
                 priority: t.priority,
@@ -190,7 +193,8 @@ export function TasksAssistant() {
                 created_at: t.created_at,
                 project_id: t.project_id,
                 labels: t.tags || [],
-                duration: t.estimate_min
+                duration: t.estimate_min,
+                source: t.source  // ✅ Source for sync logic
               }))
               
               console.log('✅ Unified API - Mapped tasks:', mapped)
@@ -835,10 +839,28 @@ export function TasksAssistant() {
   
   const handleUpdate = async (taskId: string, updates: Partial<Task>, showToastMsg: boolean = true) => {
     try {
+      // Find the task to get its Todoist ID
+      const task = tasks.find(t => t.id === taskId)
+      if (!task) {
+        showToast('Nie znaleziono zadania', 'error')
+        return
+      }
+
+      // ✅ POPRAWKA: Use todoist_task_id for Todoist API calls
+      if (!task.todoist_task_id) {
+        // Task is local-only or from different source
+        showToast('To zadanie nie jest zsynchronizowane z Todoist', 'error')
+        return
+      }
+      
       const res = await fetch('/api/todoist/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: taskId, token, ...updates })
+        body: JSON.stringify({ 
+          id: task.todoist_task_id,  // ✅ Use Todoist task ID, not Supabase UUID
+          token, 
+          ...updates 
+        })
       })
       
       if (!res.ok) {
