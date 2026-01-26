@@ -200,7 +200,7 @@ export function UniversalTaskModal({
         } else {
           console.warn('No session available for fetching projects')
         }
-        
+          
         // Fetch labels
         if (token) {
           const labelsRes = await fetch(`/api/todoist/labels?token=${token}`)
