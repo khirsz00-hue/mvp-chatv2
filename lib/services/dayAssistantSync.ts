@@ -351,7 +351,14 @@ export async function syncTaskToTodoist(
     })
     
     if (!response.ok) {
-      console.error('Failed to update Todoist task:', response.status)
+      if (response.status === 404) {
+        console.warn(`⚠️ Task ${taskId} not found in Todoist - may have been deleted. Skipping sync.`)
+        // Task doesn't exist in Todoist anymore - consider clearing todoist_task_id
+        return false
+      }
+      
+      const errorData = await response.json().catch(() => ({}))
+      console.error('Failed to update Todoist task:', response.status, errorData)
       return false
     }
     

@@ -5,8 +5,8 @@ interface TodoistUpdatePayload {
   description?: string
   priority?: number
   labels?: string[]
-  due_string?: string
-  due_date?: string | null  // ✅ Only due_date is accepted for updates (YYYY-MM-DD)
+  due_date?: string | null  // ✅ Todoist API v2: use due_date for YYYY-MM-DD format
+  due_string?: string       // ✅ Use only for natural language ("today", "tomorrow", etc.)
 }
 
 export async function POST(req: Request) {
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
 
     if (updates.due !== undefined) {
       if (updates.due === null) {
-        updatePayload.due_string = 'no date'
+        updatePayload.due_date = null  // ✅ Clear due date
       } else if (typeof updates.due === 'string') {
         if (/^\d{4}-\d{2}-\d{2}$/.test(updates.due)) {
           updatePayload.due_date = updates.due
@@ -43,12 +43,16 @@ export async function POST(req: Request) {
       }
     }
 
+    // Handle due_string from updates (convert date formats to due_date)
     if (updates.due_string !== undefined) {
-      if (typeof updates.due_string === 'string') {
+      if (updates.due_string === null) {
+        updatePayload.due_date = null  // ✅ Clear due date
+      } else if (typeof updates.due_string === 'string') {
         if (/^\d{4}-\d{2}-\d{2}$/.test(updates.due_string)) {
-          console.warn('⚠️ [Todoist Update] Converting due_string with date format to due_date:', updates.due_string)
+          // Convert date format to due_date
           updatePayload.due_date = updates.due_string
         } else {
+          // Keep natural language strings ("today", "tomorrow", etc.)
           updatePayload.due_string = updates.due_string
         }
       }
@@ -75,6 +79,19 @@ export async function POST(req: Request) {
     }
 
     if (hasProjectMove) {
+      // Validate that the task exists before attempting move
+      const taskCheckRes = await fetch(`https://api.todoist.com/rest/v2/tasks/${id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      
+      if (!taskCheckRes.ok) {
+        console.error('❌ [Todoist Update] Task not found:', id)
+        return NextResponse.json({
+          error: 'Zadanie nie istnieje w Todoist (może zostało usunięte)',
+          details: { taskId: id }
+        }, { status: 404 })
+      }
+      
       const movePayload = { project_id: normalizedProjectId }
       const moveRes = await fetch(`https://api.todoist.com/rest/v2/tasks/${id}/move`, {
         method: 'POST',
@@ -88,9 +105,31 @@ export async function POST(req: Request) {
       if (!moveRes.ok) {
         const errorText = await moveRes.text()
         console.error('❌ [Todoist Update] Move API error:', errorText)
+        
+        let errorJson: any = null
+        try {
+          errorJson = JSON.parse(errorText)
+        } catch {}
+        
+        // Handle 404 - task or project not found
+        if (moveRes.status === 404) {
+          return NextResponse.json({
+            error: 'Zadanie lub projekt nie istnieje w Todoist',
+            details: { 
+              taskId: id, 
+              payload: movePayload,
+              todoistError: errorJson || errorText
+            }
+          }, { status: 404 })
+        }
+        
         return NextResponse.json({
           error: 'Nie udało się przenieść zadania do nowego projektu',
-          details: { taskId: id, payload: movePayload }
+          details: { 
+            taskId: id, 
+            payload: movePayload,
+            todoistError: errorJson || errorText
+          }
         }, { status: moveRes.status })
       }
 
@@ -139,20 +178,38 @@ export async function POST(req: Request) {
       console.error('❌ [Todoist Update] Task ID:', id)
       
       let errorMessage = 'Nie udało się zaktualizować zadania'
+      let errorJson: any = null
+      
       try {
-        const errorJson = JSON.parse(errorText)
+        errorJson = JSON.parse(errorText)
         if (errorJson.error) {
-          errorMessage = `Bad Todoist UPDATE: ${errorJson.error}`
+          errorMessage = `Todoist API: ${errorJson.error}`
         }
       } catch {
         if (errorText) {
-          errorMessage = `Bad Todoist UPDATE: ${errorText}`
+          errorMessage = `Todoist API: ${errorText}`
         }
+      }
+      
+      // Handle 404 - task not found
+      if (res.status === 404) {
+        return NextResponse.json({ 
+          error: 'Zadanie nie istnieje w Todoist (może zostało usunięte)',
+          details: { 
+            taskId: id, 
+            payload: updatePayload,
+            todoistError: errorJson || errorText
+          }
+        }, { status: 404 })
       }
       
       return NextResponse.json({ 
         error: errorMessage,
-        details: { taskId: id, payload: updatePayload }
+        details: { 
+          taskId: id, 
+          payload: updatePayload,
+          todoistError: errorJson || errorText
+        }
       }, { status: res.status })
     }
 

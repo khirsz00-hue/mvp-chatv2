@@ -841,7 +841,19 @@ export function TasksAssistant() {
         body: JSON.stringify({ id: taskId, token, ...updates })
       })
       
-      if (!res.ok) throw new Error('Failed to update task')
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}))
+        
+        if (res.status === 404) {
+          // Task doesn't exist in Todoist anymore
+          showToast('Zadanie nie istnieje w Todoist (może zostało usunięte)', 'error')
+          // Remove from local state
+          setTasks(prev => prev.filter(t => t.id !== taskId))
+          return
+        }
+        
+        throw new Error(errorData.error || 'Failed to update task')
+      }
       
       const data = await res.json()
       const updatedTask = data.task || data
@@ -855,10 +867,10 @@ export function TasksAssistant() {
       }
       
       console.log('💾 Zadanie zaktualizowane!')
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error updating task:', err)
       if (showToastMsg) {
-        showToast('Nie udało się zaktualizować zadania', 'error')
+        showToast(err.message || 'Nie udało się zaktualizować zadania', 'error')
       }
       throw err
     }
