@@ -846,43 +846,85 @@ export function TasksAssistant() {
         return
       }
 
-      // ✅ POPRAWKA: Use todoist_task_id for Todoist API calls
-      if (!task.todoist_task_id) {
-        // Task is local-only or from different source
-        showToast('To zadanie nie jest zsynchronizowane z Todoist', 'error')
-        return
-      }
-      
-      const res = await fetch('/api/todoist/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          id: task.todoist_task_id,  // ✅ Use Todoist task ID, not Supabase UUID
-          token, 
-          ...updates 
+      // ⚡ OPTIMISTIC UPDATE - Update UI immediately for instant feedback
+      setTasks(prev => prev.map(t => 
+        t.id === taskId ? { ...t, ...updates } : t
+      ))
+
+      // ✅ If task has Todoist ID, sync with Todoist API
+      if (task.todoist_task_id && token) {
+        const res = await fetch('/api/todoist/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            id: task.todoist_task_id,
+            token, 
+            ...updates 
+          })
         })
-      })
-      
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}))
         
-        if (res.status === 404) {
-          // Task doesn't exist in Todoist anymore
-          showToast('Zadanie nie istnieje w Todoist (może zostało usunięte)', 'error')
-          // Remove from local state
-          setTasks(prev => prev.filter(t => t.id !== taskId))
-          return
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}))
+          
+          if (res.status === 404) {
+            showToast('Zadanie nie istnieje w Todoist (może zostało usunięte)', 'error')
+            setTasks(prev => prev.filter(t => t.id !== taskId))
+            return
+          }
+          
+          // ❌ Revert optimistic update on error
+          setTasks(prev => prev.map(t => 
+            t.id === taskId ? task : t
+          ))
+          throw new Error(errorData.error || 'Failed to update task')
         }
         
-        throw new Error(errorData.error || 'Failed to update task')
+        const data = await res.json()
+        const updatedTask = data.task || data
+        
+        // Update with actual response from server
+        setTasks(prev => prev.map(t => 
+          t.id === taskId ? { ...t, ...updatedTask } : t
+        ))
+      } else if (token) {
+        // ✅ Local task with Todoist connected - create in Todoist for bidirectional sync
+        console.log('📤 [Bidirectional Sync] Creating local task in Todoist:', task.content)
+        
+        try {
+          const res = await fetch('/api/todoist/tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              token,
+              content: task.content,
+              description: task.description,
+              priority: task.priority,
+              due: updates.due || task.due,
+              labels: task.labels
+            })
+          })
+
+          if (res.ok) {
+            const data = await res.json()
+            const newTask = data.task || data
+            
+            // Update task with Todoist ID for future syncs
+            setTasks(prev => prev.map(t => 
+              t.id === taskId ? { ...t, todoist_task_id: newTask.id, source: 'todoist' } : t
+            ))
+            
+            console.log('✅ [Bidirectional Sync] Task created in Todoist:', newTask.id)
+          } else {
+            console.warn('⚠️ [Bidirectional Sync] Failed to create in Todoist, keeping local only')
+          }
+        } catch (syncError) {
+          console.error('❌ [Bidirectional Sync] Error:', syncError)
+          // Task remains local-only if sync fails
+        }
+      } else {
+        // ✅ Local task without Todoist - already updated optimistically
+        console.log('📝 [Local Task] Updated locally:', taskId)
       }
-      
-      const data = await res.json()
-      const updatedTask = data.task || data
-      
-      setTasks(prev => prev.map(t => 
-        t.id === taskId ? { ...t, ...updatedTask } : t
-      ))
       
       if (showToastMsg) {
         showToast('Zadanie zaktualizowane', 'success')
