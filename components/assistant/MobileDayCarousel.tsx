@@ -184,19 +184,20 @@ export function MobileDayCarousel({
         
         <div 
           data-scrollbar="visible"
-          className="flex gap-1 p-2 pb-3 bg-white border-b"
-          style={{overflowX: 'scroll',
+          className="flex gap-1 p-2 pb-3 bg-white border-b snap-x snap-mandatory"
+          style={{
+            overflowX: 'scroll',
             scrollbarWidth: 'thin',
             scrollbarColor: '#a855f7 #f3f4f6',
             WebkitOverflowScrolling: 'touch',
-            display: 'flex',
-            flexWrap: 'nowrap',
-            minWidth: '100%',
-            width: 'max-content'
+            display: 'grid',
+            gridAutoFlow: 'column',
+            gridAutoColumns: 'calc((100% - 6 * 4px) / 7)',
+            gap: '4px'
           }}
         >
-          {Array.from({ length: 15 }, (_, i) => {
-          const day = addDays(new Date(), i - 4) // Show 4 days before today, today, 10 days after
+          {Array.from({ length: 20 }, (_, i) => {
+          const day = addDays(new Date(), i - 10) // Show 10 days before today, today, 9 days after
           const isActive = isSameDay(day, activeDay)
           const dayTasks = tasks.filter(t => {
             const taskDue = typeof t.due === 'string' ? t.due : t.due?.date
@@ -241,7 +242,7 @@ export function MobileDayCarousel({
                 }
               }}
               className={cn(
-                'flex-shrink-0 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ease-out transform active:scale-95',
+                'flex-shrink-0 px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ease-out transform active:scale-95 snap-center',
                 isActive 
                   ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-md' 
                   : draggedTaskId
@@ -375,7 +376,7 @@ function DayCard({
         isToday ? 'border-brand-purple bg-gradient-to-br from-brand-purple/5 to-brand-pink/5' : 'border-gray-200 bg-white'
       )}
       style={{ 
-        height: 'calc(100dvh - 140px)',
+        height: 'calc(100dvh - 120px)',
         WebkitUserSelect: 'none',
         WebkitTouchCallout: 'none'
       }}
@@ -514,7 +515,7 @@ function TaskCardMobile({
     <div data-task-id={task.id} className="relative">
       <div
         className={cn(
-          'px-3 py-2 border-l-4 rounded-lg transition-all duration-200 ease-out text-sm cursor-pointer group bg-white shadow-sm hover:shadow-md select-none',
+          'px-2 py-1.5 border-l-3 rounded-md transition-all duration-200 ease-out text-xs cursor-pointer group bg-white shadow-sm hover:shadow-md select-none',
           task.priority === 1 && 'border-l-red-500',
           task.priority === 2 && 'border-l-orange-500',
           task.priority === 3 && 'border-l-blue-500',
@@ -553,9 +554,9 @@ function TaskCardMobile({
           }
         }}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-sm line-clamp-2 text-gray-800">
+            <p className="font-medium text-xs line-clamp-2 text-gray-800">
               {task.content}
             </p>
           </div>
@@ -565,9 +566,9 @@ function TaskCardMobile({
               e.stopPropagation()
               setShowMenu(!showMenu)
             }}
-            className="md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1.5 hover:bg-gray-100 rounded-lg flex-shrink-0"
+            className="md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1 hover:bg-gray-100 rounded flex-shrink-0"
           >
-            <DotsThree size={18} weight="bold" className="text-gray-600" />
+            <DotsThree size={16} weight="bold" className="text-gray-600" />
           </button>
         </div>
       </div>
@@ -579,7 +580,7 @@ function TaskCardMobile({
             className="fixed inset-0 z-40"
             onClick={() => setShowMenu(false)}
           />
-          <div className="absolute z-50 right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200 p-1 space-y-1 min-w-[140px]">
+          <div className="absolute z-[60] right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200 p-1 space-y-1 min-w-[140px]">
             <button
               onClick={(e) => {
                 e.stopPropagation()
