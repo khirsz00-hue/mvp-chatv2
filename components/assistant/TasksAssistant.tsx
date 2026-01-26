@@ -90,7 +90,7 @@ export function TasksAssistant() {
   const [view, setView] = useState<ViewType>('list')  // ✅ Default to list view
   const [boardGrouping, setBoardGrouping] = useState<BoardGrouping>('day')
   const [filters, setFilters] = useState<FiltersState>({})
-  const [filter, setFilter] = useState<FilterType>('week')  // ✅ Default to "Tydzień"
+  const [filter, setFilter] = useState<FilterType>('today')  // ✅ Default to "Dziś"
   const [completedRange, setCompletedRange] = useState<CompletedRange>('recent')
   const [completedSearch, setCompletedSearch] = useState('')
   const [sortBy, setSortBy] = useState<SortType>('date')
@@ -542,6 +542,15 @@ export function TasksAssistant() {
   let filteredTasks = filterTasks(tasks, filter)
   filteredTasks = filterByProject(filteredTasks)
   const sortedTasks = sortTasks(filteredTasks)
+  
+  // ✅ Auto-switch: If filter is 'today' and no tasks, switch to 'week' with day grouping
+  useEffect(() => {
+    if (view === 'list' && filter === 'today' && sortedTasks.length === 0 && tasks.length > 0) {
+      console.log('📅 No tasks today, auto-switching to week view with day grouping')
+      setFilter('week')
+      setGroupBy('day')
+    }
+  }, [view, filter, sortedTasks.length, tasks.length])
   
   // Group tasks
   const groupTasks = (tasks: Task[]) => {
