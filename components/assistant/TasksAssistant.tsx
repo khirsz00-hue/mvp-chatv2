@@ -112,11 +112,25 @@ export function TasksAssistant() {
   // Mobile bottom sheet states
   const [mobileBottomSheet, setMobileBottomSheet] = useState<'filter' | 'group' | 'sort' | 'project' | 'quick' | 'boardGrouping' | null>(null)
   
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(false)
+  
   // Feature flag for unified task API (Phase 2B)
   const USE_UNIFIED_API = process.env.NEXT_PUBLIC_USE_UNIFIED_TASKS === 'true'
   
   // Ref for cleanup in auto-sync effect
   const syncCleanupRef = useRef(true)
+  
+  // Mobile detection effect
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
   
   const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
 
@@ -1733,7 +1747,7 @@ export function TasksAssistant() {
           )
         ) : view === 'board' ? (
       // Mobile view for day board
-      typeof window !== 'undefined' && window.innerWidth < 768 && boardGrouping === 'day' ? (
+      isMobile && boardGrouping === 'day' ? (
         <MobileDayCarousel
           tasks={activeTasks}
           onMove={handleMove}
