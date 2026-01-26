@@ -641,4 +641,3 @@ function MoveToDaySheet({
     </>
   )
 }
-export { MobileDayCarousel }
