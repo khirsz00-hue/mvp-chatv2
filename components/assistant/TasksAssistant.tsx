@@ -988,13 +988,18 @@ export function TasksAssistant() {
   
   const handleMove = async (taskId: string, newValue: string, grouping?: BoardGrouping) => {
     try {
+      console.log('[handleMove] Called with:', { taskId, newValue, grouping, boardGrouping })
+      
       const task = tasks.find(t => t.id === taskId)
       if (!task) {
-        console.error('Task not found:', taskId)
+        console.error('[handleMove] Task not found:', taskId)
         return
       }
       
+      console.log('[handleMove] Found task:', task)
+      
       const currentGrouping = grouping || boardGrouping
+      console.log('[handleMove] Using grouping:', currentGrouping)
       
       let updates: Partial<Task> = {}
       
@@ -1002,6 +1007,8 @@ export function TasksAssistant() {
       if (currentGrouping === 'day') {
         const oldDate = typeof task.due === 'string' ? task.due : task.due?.date
         updates.due = newValue
+        
+        console.log('[handleMove] Updating due date:', { oldDate, newDate: newValue })
         
         // Track analytics for postponement
         if (oldDate && oldDate !== newValue) {
@@ -1024,7 +1031,9 @@ export function TasksAssistant() {
         updates.project_id = newValue === 'none' ? undefined : newValue
       }
       
+      console.log('[handleMove] Calling handleUpdate with:', { taskId, updates })
       await handleUpdate(taskId, updates, false)
+      console.log('[handleMove] Update completed successfully')
       showToast('Zadanie przeniesione', 'success')
     } catch (err) {
       console.error('Error moving task:', err)
@@ -1768,7 +1777,10 @@ export function TasksAssistant() {
       isMobile ? (
         <MobileDayCarousel
           tasks={activeTasks}
-          onMove={handleMove}
+          onMove={async (taskId, newDate) => {
+            console.log('[TasksAssistant] MobileDayCarousel onMove called:', { taskId, newDate })
+            await handleMove(taskId, newDate, 'day')
+          }}
           onComplete={handleComplete}
           onDelete={handleDelete}
           onDetails={(t) => {

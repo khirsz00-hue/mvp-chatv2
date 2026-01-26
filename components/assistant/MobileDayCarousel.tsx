@@ -157,13 +157,15 @@ export function MobileDayCarousel({
       {draggedTaskId && (
         <>
           <div 
-            className="fixed inset-0 z-40 bg-black/20" 
-            onClick={() => setDraggedTaskId(null)}
+            className="fixed inset-0 z-20 bg-black/20 pointer-events-none" 
           />
           <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-brand-purple text-white px-4 py-2 rounded-full shadow-lg text-sm font-medium">
             <span>Kliknij w dzień aby przenieść zadanie</span>
             <button
-              onClick={() => setDraggedTaskId(null)}
+              onClick={(e) => {
+                e.stopPropagation()
+                setDraggedTaskId(null)
+              }}
               className="ml-2 p-1 hover:bg-white/20 rounded-full transition-colors"
               aria-label="Anuluj"
             >
@@ -174,17 +176,18 @@ export function MobileDayCarousel({
       )}
       
       {/* Week mini cards navigation */}
-      <div className="relative">
+      <div className="relative z-30">
         {/* Left gradient overlay */}
         <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white to-transparent pointer-events-none z-10" />
         {/* Right gradient overlay */}
         <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none z-10" />
         
         <div 
-          className="flex gap-1 p-2 pb-3 bg-white border-b overflow-x-auto snap-x snap-mandatory scroll-smooth"
+          className="flex gap-1 p-2 pb-3 bg-white border-b overflow-x-scroll snap-x snap-mandatory scroll-smooth"
           style={{
             scrollbarWidth: 'thin',
-            scrollbarColor: '#a855f7 #f3f4f6'
+            scrollbarColor: '#a855f7 #f3f4f6',
+            WebkitOverflowScrolling: 'touch'
           }}
         >
           {Array.from({ length: 7 }, (_, i) => {

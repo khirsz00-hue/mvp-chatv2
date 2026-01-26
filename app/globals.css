@@ -376,3 +376,23 @@ input[type="range"]::-moz-range-thumb:active {
 .focus-reminder-shake {
   animation: gentle-shake var(--shake-duration) ease-in-out var(--shake-iterations);
 }
+
+/* === Custom Scrollbar for Mobile Day Carousel === */
+/* Webkit browsers (Chrome, Safari, Edge) */
+.overflow-x-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+
+.overflow-x-scroll::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 4px;
+}
+
+.overflow-x-scroll::-webkit-scrollbar-thumb {
+  background: #a855f7;
+  border-radius: 4px;
+}
+
+.overflow-x-scroll::-webkit-scrollbar-thumb:hover {
+  background: #9333ea;
+}
