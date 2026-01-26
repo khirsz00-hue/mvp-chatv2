@@ -436,13 +436,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
             {/* Desktop: Floating Action Buttons - Stacked vertically with safe area support */}
             <div className="fab-container hidden md:flex">
               {/* Add Task Button - Top */}
-              <FloatingAddButton onClick={() => setShowQuickAdd(true)} className="hidden md:block" />
+              <FloatingAddButton onClick={() => setShowQuickAdd(true)} />
               
               {/* Chat Assistant Button - Middle */}
-              <FloatingChatButton onClick={() => setShowChat(true)} className="hidden md:block" />
+              <FloatingChatButton onClick={() => setShowChat(true)} />
               
               {/* Voice Ramble Button - Bottom */}
-              <VoiceCapture className="hidden md:block" />
+              <VoiceCapture />
             </div>
 
             {/* Mobile: Floating Menu - Single button with vertical menu */}
@@ -516,13 +516,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
           {/* Desktop: Floating Action Buttons - Stacked vertically with safe area support */}
           <div className="fab-container hidden md:flex">
             {/* Add Task Button - Top */}
-            <FloatingAddButton onClick={() => setShowQuickAdd(true)} className="hidden md:block" />
+            <FloatingAddButton onClick={() => setShowQuickAdd(true)} />
             
             {/* Chat Assistant Button - Middle */}
-            <FloatingChatButton onClick={() => setShowChat(true)} className="hidden md:block" />
+            <FloatingChatButton onClick={() => setShowChat(true)} />
             
             {/* Voice Ramble Button - Bottom */}
-            <VoiceCapture className="hidden md:block" />
+            <VoiceCapture />
           </div>
 
           {/* Mobile: Floating Menu - Single button with vertical menu */}
