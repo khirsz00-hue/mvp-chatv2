@@ -182,30 +182,14 @@ export function MobileDayCarousel({
         {/* Right gradient overlay */}
         <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none z-10" />
         
-        <style jsx>{`
-          .mini-cards-scroll::-webkit-scrollbar {
-            height: 8px !important;
-            display: block !important;
-          }
-          .mini-cards-scroll::-webkit-scrollbar-track {
-            background: #f3f4f6 !important;
-            border-radius: 4px !important;
-          }
-          .mini-cards-scroll::-webkit-scrollbar-thumb {
-            background: #a855f7 !important;
-            border-radius: 4px !important;
-          }
-          .mini-cards-scroll::-webkit-scrollbar-thumb:hover {
-            background: #9333ea !important;
-          }
-        `}</style>
         <div 
-          className="mini-cards-scroll flex gap-1 p-2 pb-3 bg-white border-b overflow-x-scroll snap-x snap-mandatory scroll-smooth"
+          data-scrollbar="visible"
+          className="flex gap-1 p-2 pb-3 bg-white border-b snap-x snap-mandatory scroll-smooth"
           style={{
+            overflowX: 'scroll',
             scrollbarWidth: 'thin',
             scrollbarColor: '#a855f7 #f3f4f6',
-            WebkitOverflowScrolling: 'touch',
-            overflowX: 'scroll'
+            WebkitOverflowScrolling: 'touch'
           }}
         >
           {Array.from({ length: 7 }, (_, i) => {

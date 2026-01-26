@@ -379,20 +379,21 @@ input[type="range"]::-moz-range-thumb:active {
 
 /* === Custom Scrollbar for Mobile Day Carousel === */
 /* Webkit browsers (Chrome, Safari, Edge) */
-.overflow-x-scroll::-webkit-scrollbar {
-  height: 8px;
+[data-scrollbar="visible"]::-webkit-scrollbar {
+  height: 8px !important;
+  display: block !important;
 }
 
-.overflow-x-scroll::-webkit-scrollbar-track {
-  background: #f3f4f6;
-  border-radius: 4px;
+[data-scrollbar="visible"]::-webkit-scrollbar-track {
+  background: #f3f4f6 !important;
+  border-radius: 4px !important;
 }
 
-.overflow-x-scroll::-webkit-scrollbar-thumb {
-  background: #a855f7;
-  border-radius: 4px;
+[data-scrollbar="visible"]::-webkit-scrollbar-thumb {
+  background: #a855f7 !important;
+  border-radius: 4px !important;
 }
 
-.overflow-x-scroll::-webkit-scrollbar-thumb:hover {
-  background: #9333ea;
+[data-scrollbar="visible"]::-webkit-scrollbar-thumb:hover {
+  background: #9333ea !important;
 }
