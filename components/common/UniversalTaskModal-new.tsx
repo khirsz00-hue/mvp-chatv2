@@ -652,11 +652,11 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
             <section className="space-y-2 sm:space-y-4">
               {/* Title */}
               <div>
-                <input 
-                  type="text" 
+                <textarea 
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
-                  className="w-full text-lg sm:text-2xl font-bold text-slate-800 placeholder-slate-300 border-none focus:ring-0 p-0 bg-transparent focus:outline-none" 
+                  rows={2}
+                  className="w-full text-base sm:text-lg font-bold text-slate-800 placeholder-slate-300 border-none focus:ring-0 p-0 bg-transparent focus:outline-none resize-none" 
                   placeholder="Co trzeba zrobić?"
                 />
               </div>
@@ -699,7 +699,7 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                     setShowDatePicker(false)
                     setShowPriorityPicker(false)
                   }}
-                  className="group relative flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 bg-slate-100 hover:bg-violet-50 active:bg-violet-50 border border-slate-200 hover:border-violet-300 rounded-full text-[10px] sm:text-xs font-medium text-slate-700 hover:text-violet-700 transition-all min-h-[32px] sm:min-h-auto"
+                  className="group relative flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 bg-slate-100 hover:bg-violet-50 active:bg-violet-50 border border-slate-200 hover:border-violet-300 rounded-lg text-[10px] sm:text-xs font-medium text-slate-700 hover:text-violet-700 transition-all min-h-[32px] sm:min-h-auto"
                 >
                   <FolderOpen size={isMobile ? 10 : 14} className="text-slate-400 group-hover:text-violet-500" />
                   <span>{selectedProject?.name || 'Brak projektu'}</span>
@@ -714,7 +714,7 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                     setShowDatePicker(false)
                     setShowProjectPicker(false)
                   }}
-                  className={`group relative flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 border rounded-full text-[10px] sm:text-xs font-medium transition-all min-h-[32px] sm:min-h-auto ${priorityColors[priority]}`}
+                  className={`group relative flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 border rounded-lg text-[10px] sm:text-xs font-medium transition-all min-h-[32px] sm:min-h-auto ${priorityColors[priority]}`}
                 >
                   <Flag size={isMobile ? 10 : 14} weight="fill" />
                   <span>P{priority}</span>
@@ -725,7 +725,7 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
               {/* Tags - Second Row */}
               <div className="flex flex-wrap gap-1.5 sm:gap-2 items-center">
                 {selectedLabels.map((label) => (
-                  <span key={label} className="px-2 sm:px-3 py-1.5 bg-violet-100 text-violet-700 rounded-full text-[10px] sm:text-xs font-medium border border-violet-200 flex items-center gap-1 sm:gap-1.5 min-h-[32px] sm:min-h-auto">
+                  <span key={label} className="px-2 sm:px-3 py-1.5 bg-violet-100 text-violet-700 rounded-lg text-[10px] sm:text-xs font-medium border border-violet-200 flex items-center gap-1 sm:gap-1.5 min-h-[32px] sm:min-h-auto">
                     #{label} 
                     <button 
                       type="button"
@@ -736,18 +736,38 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                     </button>
                   </span>
                 ))}
-                <button 
-                  type="button"
-                  onClick={() => {
-                    const label = prompt('Wprowadź tag:')
-                    if (label?.trim()) {
-                      setSelectedLabels([...selectedLabels, label.trim()])
-                    }
-                  }}
-                  className="px-2 sm:px-3 py-1.5 text-[10px] sm:text-xs text-slate-500 hover:bg-slate-100 active:bg-slate-100 rounded-full border border-dashed border-slate-300 transition flex items-center gap-1 min-h-[32px] sm:min-h-auto"
-                >
-                  <Plus size={isMobile ? 8 : 10} /> Tag
-                </button>
+                <div className="relative group">
+                  <button 
+                    type="button"
+                    onClick={() => setShowDatePicker(false) || setShowProjectPicker(false) || setShowPriorityPicker(false)}
+                    className="px-2 sm:px-3 py-1.5 text-[10px] sm:text-xs text-slate-500 hover:bg-slate-100 active:bg-slate-100 rounded-lg border border-dashed border-slate-300 transition flex items-center gap-1 min-h-[32px] sm:min-h-auto"
+                  >
+                    <Plus size={isMobile ? 8 : 10} /> Tag
+                  </button>
+                  
+                  {/* Label Dropdown */}
+                  <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-xl border border-slate-200 p-2 space-y-1 min-w-[180px] max-h-[240px] overflow-y-auto z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
+                    {availableLabels.filter(l => !selectedLabels.includes(l.name)).length > 0 ? (
+                      availableLabels
+                        .filter(l => !selectedLabels.includes(l.name))
+                        .map((label) => (
+                          <button
+                            key={label.id}
+                            type="button"
+                            onClick={() => setSelectedLabels([...selectedLabels, label.name])}
+                            className="w-full px-3 py-2 text-left text-xs hover:bg-violet-50 rounded transition flex items-center gap-2 text-slate-700"
+                          >
+                            <Tag size={12} className="text-violet-500" />
+                            {label.name}
+                          </button>
+                        ))
+                    ) : (
+                      <div className="px-3 py-2 text-xs text-slate-400 italic">
+                        Wszystkie etykiety dodane
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Expandable Date Picker */}
@@ -863,9 +883,9 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
               )}
 
               {/* Cognitive Load as Buttons - 4 LEVELS ONLY */}
-              <div className="mt-3 sm:mt-5">
-                <h3 className="text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-3">
-                  <Brain size={isMobile ? 10 : 14} className="text-slate-400" />
+              <div className="mt-3 sm:mt-4">
+                <h3 className="text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
+                  <Brain size={isMobile ? 10 : 12} className="text-slate-400" />
                   Obciążenie poznawcze
                 </h3>
                 <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
@@ -874,18 +894,18 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                       key={level}
                       type="button"
                       onClick={() => setCognitiveLoad(level)}
-                      className={`h-10 rounded-lg border-2 transition-all flex flex-col items-center justify-center min-h-[40px] ${
+                      className={`h-8 rounded-lg border-2 transition-all flex flex-col items-center justify-center min-h-[32px] ${
                         cognitiveLoad === level 
                           ? cognitiveLoadColors[level - 1]
                           : 'border-slate-200 hover:border-slate-300 active:border-slate-300'
                       }`}
                     >
-                      <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${
+                      <div className={`w-1 h-1 rounded-full ${
                         cognitiveLoad === level 
                           ? 'bg-current' 
                           : 'bg-slate-300'
                       }`} />
-                      <span className={`text-[8px] sm:text-[9px] mt-0.5 ${
+                      <span className={`text-[7px] sm:text-[8px] mt-0.5 ${
                         cognitiveLoad === level 
                           ? 'font-medium' 
                           : 'text-slate-400'
@@ -898,14 +918,14 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
               </div>
 
               {/* Time Estimation */}
-              <div className="bg-slate-50 p-3 sm:p-4 rounded-xl border border-slate-100 mt-3">
+              <div className="bg-slate-50 p-2 sm:p-3 rounded-lg border border-slate-100 mt-2">
                 <div>
-                  <div className="flex justify-between items-center mb-2 sm:mb-3">
-                    <h3 className="text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 sm:gap-2">
-                      <Timer size={isMobile ? 10 : 14} className="text-slate-400" />
+                  <div className="flex justify-between items-center mb-1.5">
+                    <h3 className="text-[9px] sm:text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                      <Timer size={isMobile ? 9 : 11} className="text-slate-400" />
                       Estymacja Czasu
                     </h3>
-                    <div className="flex items-center gap-1.5 sm:gap-2">
+                    <div className="flex items-center gap-1">
                       <input 
                         type="number" 
                         value={estimatedMinutes}
@@ -913,13 +933,13 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                         min="5" 
                         max="240" 
                         step="5" 
-                        className="w-12 sm:w-16 text-center text-xs sm:text-sm font-bold text-violet-600 bg-violet-100 px-1 sm:px-2 py-1 rounded border-none focus:ring-2 focus:ring-violet-300 outline-none min-h-[28px]"
+                        className="w-10 sm:w-12 text-center text-xs font-bold text-violet-600 bg-violet-100 px-1 py-0.5 rounded border-none focus:ring-1 focus:ring-violet-300 outline-none"
                       />
-                      <span className="text-[10px] sm:text-xs text-slate-500">min</span>
+                      <span className="text-[9px] sm:text-[10px] text-slate-500">min</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <span className="text-[9px] sm:text-xs text-slate-400 whitespace-nowrap">5m</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[8px] sm:text-[9px] text-slate-400 whitespace-nowrap">5m</span>
                     <input 
                       type="range" 
                       min="5" 
@@ -927,41 +947,44 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                       value={estimatedMinutes}
                       onChange={(e) => setEstimatedMinutes(Number(e.target.value))}
                       step="5" 
-                      className="flex-1 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-violet-600"
+                      className="flex-1 h-1 bg-slate-200 rounded-full appearance-none cursor-pointer accent-violet-600 [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:h-2.5"
+                      style={{
+                        WebkitAppearance: 'none',
+                      }}
                     />
-                    <span className="text-[9px] sm:text-xs text-slate-400 whitespace-nowrap">4h</span>
+                    <span className="text-[8px] sm:text-[9px] text-slate-400 whitespace-nowrap">4h</span>
                   </div>
                 </div>
               </div>
 
               {/* AI Understanding Section */}
-              <div className="bg-violet-50/50 border border-violet-100/50 rounded-lg p-2.5 sm:p-3 mt-3">
-                <div className="flex items-start gap-1.5 sm:gap-2 mb-2">
-                  <Sparkle size={isMobile ? 12 : 14} weight="fill" className="text-violet-400 mt-0.5" />
+              <div className="bg-violet-50/50 border border-violet-100/50 rounded-lg p-2 mt-2">
+                <div className="flex items-start gap-1.5 mb-1.5">
+                  <Sparkle size={isMobile ? 10 : 12} weight="fill" className="text-violet-400 mt-0.5" />
                   <div className="flex-1">
-                    <h4 className="text-[10px] sm:text-xs font-medium text-violet-700 mb-0.5 sm:mb-1">
+                    <h4 className="text-[9px] sm:text-[10px] font-medium text-violet-700 mb-0.5">
                       Jak AI rozumie to zadanie
                     </h4>
-                    <p className="text-[10px] sm:text-xs text-violet-600 leading-relaxed">
+                    <p className="text-[9px] sm:text-[10px] text-violet-600 leading-relaxed">
                       {aiUnderstanding || 'Wpisz tytuł zadania, aby AI mogło je zrozumieć...'}
                     </p>
                   </div>
                 </div>
-                <div className="flex gap-1.5 sm:gap-2 ml-4 sm:ml-5">
+                <div className="flex gap-1.5 ml-4">
                   <button 
                     type="button"
                     onClick={handleClarify}
-                    className="px-2 py-1.5 text-[9px] sm:text-[11px] font-medium text-violet-600 bg-white hover:bg-violet-100 active:bg-violet-100 border border-violet-200 rounded-md transition-all flex items-center gap-1 sm:gap-1.5 min-h-[32px]"
+                    className="px-1.5 py-1 text-[8px] sm:text-[9px] font-medium text-violet-600 bg-white hover:bg-violet-100 active:bg-violet-100 border border-violet-200 rounded transition-all flex items-center gap-1"
                   >
-                    <MagicWand size={isMobile ? 10 : 12} />
+                    <MagicWand size={isMobile ? 9 : 10} />
                     Doprecyzuj
                   </button>
                   <button 
                     type="button"
                     onClick={handleGeneratePlan}
-                    className="px-2 py-1.5 text-[9px] sm:text-[11px] font-medium text-violet-600 bg-white hover:bg-violet-100 active:bg-violet-100 border border-violet-200 rounded-md transition-all flex items-center gap-1 sm:gap-1.5 min-h-[32px]"
+                    className="px-1.5 py-1 text-[8px] sm:text-[9px] font-medium text-violet-600 bg-white hover:bg-violet-100 active:bg-violet-100 border border-violet-200 rounded transition-all flex items-center gap-1"
                   >
-                    <Question size={isMobile ? 10 : 12} />
+                    <Question size={isMobile ? 9 : 10} />
                     Pomóż mi
                   </button>
                 </div>
@@ -1055,6 +1078,15 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                                   subtask.completed ? 'text-slate-400 line-through' : 'text-slate-700'
                                 }`}
                               />
+                              <input 
+                                type="date" 
+                                className="text-[10px] px-2 py-1 border border-slate-200 rounded text-slate-600 focus:ring-1 focus:ring-violet-300 outline-none"
+                                onChange={(e) => {
+                                  setSubtasks(subtasks.map(s => 
+                                    s.id === subtask.id ? { ...s, due: e.target.value } : s
+                                  ))
+                                }}
+                              />
                               <button 
                                 type="button"
                                 onClick={() => setSubtasks(subtasks.filter(s => s.id !== subtask.id))}
@@ -1067,7 +1099,7 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                           <div className="flex items-center gap-3 group mt-3">
                             <button 
                               type="button"
-                              className="text-slate-300 hover:text-violet-600 transition"
+                              className="text-violet-500 transition"
                             >
                               <Plus size={18} />
                             </button>
@@ -1120,7 +1152,7 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                 <button 
                   type="button"
                   onClick={handleComplete}
-                  className="w-full bg-violet-600 active:bg-violet-700 text-white px-6 py-2.5 rounded-xl font-medium shadow-lg shadow-violet-200 flex items-center justify-center gap-2 min-h-[44px]"
+                  className="w-full bg-slate-700 active:bg-slate-800 text-white px-6 py-2.5 rounded-xl font-medium shadow-lg shadow-slate-200 flex items-center justify-center gap-2 min-h-[44px]"
                 >
                   <CheckCircle size={16} weight="fill" /> Ukończ zadanie
                 </button>
@@ -1243,7 +1275,7 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
             <div className="flex-1 overflow-y-auto p-4">
               <div className="space-y-2.5">
                 {subtasks.map((subtask) => (
-                  <div key={subtask.id} className="flex items-center gap-2 group min-h-[40px]">
+                  <div key={subtask.id} className="flex items-start gap-2 group min-h-[40px]">
                     <button 
                       type="button"
                       onClick={() => handleToggleSubtask(subtask.id, !subtask.completed)}
@@ -1257,18 +1289,29 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                         <div className="w-[18px] h-[18px] rounded-full border-2 border-current" />
                       )}
                     </button>
-                    <input 
-                      type="text" 
-                      value={subtask.content}
-                      onChange={(e) => {
-                        setSubtasks(subtasks.map(s => 
-                          s.id === subtask.id ? { ...s, content: e.target.value } : s
-                        ))
-                      }}
-                      className={`flex-1 bg-transparent border-none text-xs focus:ring-0 p-0 placeholder-slate-400 ${
-                        subtask.completed ? 'text-slate-400 line-through' : 'text-slate-700'
-                      }`}
-                    />
+                    <div className="flex-1">
+                      <input 
+                        type="text" 
+                        value={subtask.content}
+                        onChange={(e) => {
+                          setSubtasks(subtasks.map(s => 
+                            s.id === subtask.id ? { ...s, content: e.target.value } : s
+                          ))
+                        }}
+                        className={`w-full bg-transparent border-none text-xs focus:ring-0 p-0 placeholder-slate-400 mb-1 ${
+                          subtask.completed ? 'text-slate-400 line-through' : 'text-slate-700'
+                        }`}
+                      />
+                      <input 
+                        type="date" 
+                        className="text-[10px] px-2 py-1 border border-slate-200 rounded text-slate-600 focus:ring-1 focus:ring-violet-300 outline-none w-full"
+                        onChange={(e) => {
+                          setSubtasks(subtasks.map(s => 
+                            s.id === subtask.id ? { ...s, due: e.target.value } : s
+                          ))
+                        }}
+                      />
+                    </div>
                     <button 
                       type="button"
                       onClick={() => setSubtasks(subtasks.filter(s => s.id !== subtask.id))}
@@ -1278,10 +1321,10 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                     </button>
                   </div>
                 ))}
-                <div className="flex items-center gap-2 group mt-2 min-h-[40px]">
+                <div className="flex items-center gap-2 mt-3 min-h-[44px]">
                   <button 
                     type="button"
-                    className="text-slate-300 active:text-violet-600 w-7 h-7 flex items-center justify-center"
+                    className="text-violet-500 w-7 h-7 flex items-center justify-center"
                   >
                     <Plus size={18} />
                   </button>
