@@ -157,6 +157,8 @@ export function UniversalTaskModal({
     priority: 3 as 1 | 2 | 3 | 4,
     dueDate: ''
   })
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const isSavingRef = useRef(false)
   
   // UI State
   const [showDatePicker, setShowDatePicker] = useState(false)
@@ -292,7 +294,7 @@ export function UniversalTaskModal({
   
   // Auto-save and change tracking for edit mode
   useEffect(() => {
-    if (!task?.id || !isEditMode) return
+    if (!task?.id || !isEditMode || isSavingRef.current) return
     
     // Check if anything changed
     if (
@@ -307,7 +309,12 @@ export function UniversalTaskModal({
       return
     }
     
-    const timeout = setTimeout(() => {
+    // Clear any existing timeout
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current)
+    }
+    
+    autoSaveTimeoutRef.current = setTimeout(async () => {
       const now = new Date().toISOString()
       const changes: ChangeHistoryItem[] = []
       
@@ -369,23 +376,34 @@ export function UniversalTaskModal({
         dueDate
       }
       
-      // Auto-save but keep modal open - only manual Save button closes it
-      const autoSaveHandler = onAutoSave || onSave
-      autoSaveHandler({
-        id: task.id,
-        content,
-        description,
-        priority,
-        due: dueDate || undefined,
-        project_id: projectId || undefined,
-        labels: selectedLabels,
-        estimated_minutes: estimatedMinutes,
-        cognitive_load: cognitiveLoad
-      })
+      // Set saving flag to prevent concurrent saves
+      isSavingRef.current = true
+      
+      try {
+        // Auto-save but keep modal open - only manual Save button closes it
+        const autoSaveHandler = onAutoSave || onSave
+        await autoSaveHandler({
+          id: task.id,
+          content,
+          description,
+          priority,
+          due: dueDate || undefined,
+          project_id: projectId || undefined,
+          labels: selectedLabels,
+          estimated_minutes: estimatedMinutes,
+          cognitive_load: cognitiveLoad
+        })
+      } finally {
+        isSavingRef.current = false
+      }
     }, 1500) // Increased timeout to give user more time to type
     
-    return () => clearTimeout(timeout)
-  }, [content, description, priority, dueDate, projectId, selectedLabels, estimatedMinutes, cognitiveLoad, task?.id, isEditMode, onSave, cognitiveLoad])
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current)
+      }
+    }
+  }, [content, description, priority, dueDate, projectId, selectedLabels, estimatedMinutes, cognitiveLoad, task?.id, isEditMode, onAutoSave, onSave])
   
   /* =======================
      HANDLERS
