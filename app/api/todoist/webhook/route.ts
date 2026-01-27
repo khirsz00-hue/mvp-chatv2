@@ -112,7 +112,7 @@ async function syncSingleTaskFromWebhook(userId: string, taskData: any) {
     
     // Get or create assistant for day_assistant_v2
     // Try to find existing assistant from day_assistant_v2_assistants table
-    const { data: assistant } = await supabase
+    let { data: assistant, error: assistantError } = await supabase
       .from('day_assistant_v2_assistants')
       .select('id')
       .eq('user_id', userId)
@@ -120,8 +120,26 @@ async function syncSingleTaskFromWebhook(userId: string, taskData: any) {
       .single()
 
     if (!assistant) {
-      console.warn(`⚠️ [Webhook] No assistant found for user ${userId}`)
-      return
+      console.log(`📝 [Webhook] No assistant found, creating one for user ${userId}`)
+      
+      // Create a new assistant for this user
+      const { data: newAssistant, error: createError } = await supabase
+        .from('day_assistant_v2_assistants')
+        .insert({
+          user_id: userId,
+          name: 'Mój Dzień',
+          created_at: new Date().toISOString()
+        })
+        .select('id')
+        .single()
+      
+      if (createError || !newAssistant) {
+        console.error(`❌ [Webhook] Failed to create assistant for user ${userId}:`, createError)
+        return
+      }
+      
+      assistant = newAssistant
+      console.log(`✅ [Webhook] Created assistant ${assistant.id} for user ${userId}`)
     }
 
     const assistantId = assistant.id
