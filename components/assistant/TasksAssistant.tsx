@@ -1612,11 +1612,18 @@ export function TasksAssistant() {
               </div>
             )}
             
-            {/* Middle: Board grouping selector + week navigation - Desktop only (≥768px) - ONLY for board view */}
-            {view === 'board' && boardGrouping === 'day' && (
-              <div className="hidden md:flex items-center gap-3 flex-1 justify-center">
-                {/* Week Navigation */}
-                {boardWeekLabel && (
+            {/* Middle: Board controls - Desktop only */}
+            {view === 'board' && (
+              <div className="hidden md:flex items-center gap-4 flex-1 justify-center">
+                {/* Welcome message */}
+                <div className="text-sm text-gray-600">
+                  <span className="font-semibold">Cześć {user?.user_metadata?.full_name || 'Użytkowniku'}</span>
+                  <span className="text-gray-400 mx-2">•</span>
+                  <span>{format(new Date(), "d MMMM yyyy 'godz' HH:mm", { locale: pl })}</span>
+                </div>
+                
+                {/* Week navigation - only for day grouping */}
+                {boardGrouping === 'day' && boardWeekLabel && (
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => {
@@ -1646,42 +1653,45 @@ export function TasksAssistant() {
                   </div>
                 )}
                 
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide px-1">
-                    Grupowanie
-                  </label>
-                  <select 
-                    value={boardGrouping} 
-                    onChange={(e) => setBoardGrouping(e.target.value as BoardGrouping)}
-                    className="px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-brand-purple transition-colors min-w-[140px]"
+                {/* Grouping buttons */}
+                <div className="flex items-center gap-2 bg-gray-100 p-1 rounded-lg">
+                  <button
+                    onClick={() => setBoardGrouping('day')}
+                    className={cn(
+                      'px-3 py-1.5 text-sm font-medium rounded-md transition-all',
+                      boardGrouping === 'day' 
+                        ? 'bg-white shadow-sm text-brand-purple' 
+                        : 'text-gray-600 hover:text-gray-900'
+                    )}
                   >
-                    <option value="day">📅 Dni</option>
-                    <option value="priority">🚩 Priorytety</option>
-                    <option value="project">📁 Projekty</option>
-                  </select>
+                    Wg dni
+                  </button>
+                  <button
+                    onClick={() => setBoardGrouping('project')}
+                    className={cn(
+                      'px-3 py-1.5 text-sm font-medium rounded-md transition-all',
+                      boardGrouping === 'project' 
+                        ? 'bg-white shadow-sm text-brand-purple' 
+                        : 'text-gray-600 hover:text-gray-900'
+                    )}
+                  >
+                    Wg projektu
+                  </button>
+                  <button
+                    onClick={() => setBoardGrouping('priority')}
+                    className={cn(
+                      'px-3 py-1.5 text-sm font-medium rounded-md transition-all',
+                      boardGrouping === 'priority' 
+                        ? 'bg-white shadow-sm text-brand-purple' 
+                        : 'text-gray-600 hover:text-gray-900'
+                    )}
+                  >
+                    Wg priorytetu
+                  </button>
                 </div>
               </div>
             )}
-            
-            {/* Middle: Board grouping selector - Desktop only (≥768px) - For non-day groupings */}
-            {view === 'board' && boardGrouping !== 'day' && (
-              <div className="hidden md:flex items-center gap-3 flex-1 justify-center">
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide px-1">
-                    Grupowanie
-                  </label>
-                  <select 
-                    value={boardGrouping} 
-                    onChange={(e) => setBoardGrouping(e.target.value as BoardGrouping)}
-                    className="px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-brand-purple transition-colors min-w-[140px]"
-                  >
-                    <option value="day">📅 Dni</option>
-                    <option value="priority">🚩 Priorytety</option>
-                    <option value="project">📁 Projekty</option>
-                  </select>
-                </div>
-              </div>
-            )}
+
             
             {/* Right: Task count badge */}
             <div className="hidden md:block">

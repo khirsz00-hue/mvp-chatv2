@@ -564,24 +564,24 @@ function DayColumnComponent({
     <div
       ref={setNodeRef}
       className={cn(
-        'w-full bg-white rounded-xl border-2 shadow-sm transition-all flex flex-col',
+        'w-full bg-white rounded-xl border-2 shadow-sm transition-all flex flex-col h-[calc(100vh-240px)]',
         isOver ? 'border-brand-purple bg-brand-purple/5 shadow-lg' : 'border-gray-200',
         isToday && 'border-brand-pink shadow-md'
       )}
     >
       {/* Header */}
       <div className={cn(
-        'p-3 border-b flex items-center justify-between',
+        'p-4 border-b flex items-center justify-between flex-shrink-0',
         isToday && 'bg-gradient-to-r from-brand-purple/10 to-brand-pink/10'
       )}>
         <div className="flex-1 min-w-0">
           <h3 className={cn(
-            'font-bold text-base truncate',
+            'font-bold text-lg truncate',
             isToday && 'text-brand-purple'
           )}>
             {day.shortLabel}
           </h3>
-          <p className="text-xs text-gray-500 truncate">
+          <p className="text-sm text-gray-500 truncate">
             {format(day.date, 'd MMM', { locale: pl })}
           </p>
         </div>
@@ -589,7 +589,7 @@ function DayColumnComponent({
         <Badge 
           variant={isToday ? 'default' : 'secondary'} 
           className={cn(
-            'ml-2 text-xs px-2 py-0.5',
+            'ml-2 text-sm px-2.5 py-1',
             day.tasks.length > 5 && 'bg-orange-500 text-white'
           )}
         >
@@ -602,11 +602,11 @@ function DayColumnComponent({
         items={day.tasks.map(t => t.id)}
         strategy={verticalListSortingStrategy}
       >
-        <div className="p-1.5 space-y-1 min-h-[150px] max-h-[calc(100vh-280px)] overflow-y-auto flex-1">
+        <div className="p-2 space-y-2 overflow-y-auto flex-1">
           {day.tasks.length === 0 ? (
-            <div className="text-center py-6 text-gray-400 h-full flex flex-col items-center justify-center">
-              <CalendarBlank size={24} className="mx-auto mb-1 opacity-40" />
-              <p className="text-xs font-medium">Brak zadań</p>
+            <div className="text-center py-8 text-gray-400 h-full flex flex-col items-center justify-center">
+              <CalendarBlank size={28} className="mx-auto mb-2 opacity-40" />
+              <p className="text-sm font-medium">Brak zadań</p>
             </div>
           ) : (
             <>
@@ -787,10 +787,10 @@ function MiniTaskCard({
 
   return (
     <div className="relative">
-      {/* Using div instead of Card component for ultra-compact design with minimal padding */}
+      {/* Task card with better spacing and larger text */}
       <div
         className={cn(
-          'px-3 py-2 border-l-2 rounded-md transition-all hover:shadow-sm group text-sm cursor-pointer',
+          'px-4 py-3 border-l-3 rounded-md transition-all hover:shadow-md group cursor-pointer',
           priorityColors[task.priority] || priorityColors[4],
           loading && 'opacity-50'
         )}
@@ -801,14 +801,14 @@ function MiniTaskCard({
         tabIndex={0}
         aria-label={`Task: ${task.content}`}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           {/* Complete button - circle on the left */}
           <button
             onClick={handleComplete}
             className="flex-shrink-0 text-gray-300 hover:text-green-500 transition-colors"
             title="Ukończ zadanie"
           >
-            <div className="w-4 h-4 rounded-full border-2 border-current" />
+            <div className="w-5 h-5 rounded-full border-2 border-current" />
           </button>
           
           {/* Drag handle - only this part is draggable */}
@@ -819,16 +819,16 @@ function MiniTaskCard({
               onClick={(e) => e.stopPropagation()}
               title="Przeciągnij aby przenieść"
             >
-              <DotsNine size={14} weight="bold" className="text-gray-400" />
+              <DotsNine size={16} weight="bold" className="text-gray-400" />
             </button>
           )}
           
           {/* Priority indicator dot */}
-          <div className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', priorityDots[task.priority])} />
+          <div className={cn('w-2 h-2 rounded-full flex-shrink-0', priorityDots[task.priority])} />
           
           {/* Content */}
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-sm line-clamp-1 group-hover:text-brand-purple transition-colors">
+            <p className="font-medium text-base line-clamp-2 group-hover:text-brand-purple transition-colors leading-snug">
               {task.content}
             </p>
           </div>
