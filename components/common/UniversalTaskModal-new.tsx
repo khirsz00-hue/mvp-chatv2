@@ -166,16 +166,34 @@ export function UniversalTaskModal({
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [showProjectPicker, setShowProjectPicker] = useState(false)
   const [showPriorityPicker, setShowPriorityPicker] = useState(false)
+  const [showLabelPicker, setShowLabelPicker] = useState(false)
   const [activeTab, setActiveTab] = useState<'subtasks' | 'history'>('subtasks')
   const [showSubtasksModal, setShowSubtasksModal] = useState(false)
   const [showHistoryModal, setShowHistoryModal] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  
+  // Refs for dropdown click-outside detection
+  const labelPickerRef = useRef<HTMLDivElement>(null)
   
   const token = typeof window !== 'undefined' ? localStorage.getItem('todoist_token') : null
   
   /* =======================
      EFFECTS
   ======================= */
+  
+  // Close label picker on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (labelPickerRef.current && !labelPickerRef.current.contains(event.target as Node)) {
+        setShowLabelPicker(false)
+      }
+    }
+    
+    if (showLabelPicker) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showLabelPicker])
   
   // Detect mobile
   useEffect(() => {
@@ -290,20 +308,70 @@ export function UniversalTaskModal({
   }, [open, task?.id, defaultDate, task]) // eslint-disable-line react-hooks/exhaustive-deps
   // Note: We intentionally omit individual task properties to prevent re-running on task updates
   
-  // Auto-generate AI understanding when title changes
-  useEffect(() => {
-    if (!content.trim() || content.length < 5) {
+  // Auto-generate AI understanding when title or description changes
+  const aiAnalysisRef = useRef<NodeJS.Timeout | null>(null)
+  
+  const analyzeWithAI = useCallback(async (taskContent: string, taskDesc: string) => {
+    if (taskContent.trim().length < 3) {
       setAiUnderstanding('')
       return
     }
     
-    const timeout = setTimeout(() => {
-      // Simple AI understanding for now
-      setAiUnderstanding(`Zrozumiałem: "${content}"`)
-    }, 1000)
+    setLoadingAI(true)
     
-    return () => clearTimeout(timeout)
-  }, [content])
+    try {
+      const prompt = `Przeanalizuj to zadanie i opisz krótko, jak je rozumiesz. Odpowiedz w 1-2 zdaniach po polsku w formie "Rozumiem, że...".
+
+Tytuł: "${taskContent}"
+${taskDesc ? `Opis: "${taskDesc}"` : ''}
+
+Bądź konkretny i pomocny.`
+
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: prompt }]
+        })
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setAiUnderstanding(data.response || 'Analizuję zadanie...')
+      } else {
+        // Fallback
+        setAiUnderstanding(`Rozumiem: "${taskContent}"`)
+      }
+    } catch (error) {
+      console.error('AI analysis failed:', error)
+      setAiUnderstanding(`Rozumiem: "${taskContent}"`)
+    } finally {
+      setLoadingAI(false)
+    }
+  }, [])
+  
+  useEffect(() => {
+    if (!content.trim() || content.length < 3) {
+      setAiUnderstanding('')
+      return
+    }
+    
+    // Clear previous timeout
+    if (aiAnalysisRef.current) {
+      clearTimeout(aiAnalysisRef.current)
+    }
+    
+    // Debounce AI call - wait 800ms after user stops typing
+    aiAnalysisRef.current = setTimeout(() => {
+      analyzeWithAI(content, description)
+    }, 800)
+    
+    return () => {
+      if (aiAnalysisRef.current) {
+        clearTimeout(aiAnalysisRef.current)
+      }
+    }
+  }, [content, description, analyzeWithAI])
   
   // Track content/description changes for save button
   useEffect(() => {
@@ -649,17 +717,17 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
   
   const cognitiveLoadLabels = ['Łatwe', 'Proste', 'Średnie', 'Trudne']
   const cognitiveLoadColors = [
-    'border-green-300 bg-green-50 text-green-700',
-    'border-lime-300 bg-lime-50 text-lime-700',
-    'border-amber-300 bg-amber-50 text-amber-700',
-    'border-orange-300 bg-orange-50 text-orange-700'
+    'border-emerald-400 bg-emerald-50 text-emerald-700 shadow-sm',
+    'border-lime-400 bg-lime-50 text-lime-700 shadow-sm',
+    'border-amber-400 bg-amber-50 text-amber-700 shadow-sm',
+    'border-orange-400 bg-orange-50 text-orange-700 shadow-sm'
   ]
   
   const priorityColors = {
-    1: 'text-red-500 bg-red-50 border-red-200',
-    2: 'text-orange-400 bg-orange-50 border-orange-200',
-    3: 'text-blue-500 bg-blue-50 border-blue-200',
-    4: 'text-gray-400 bg-gray-50 border-gray-200'
+    1: 'text-red-600 bg-red-50 border-red-300',
+    2: 'text-orange-600 bg-orange-50 border-orange-300',
+    3: 'text-blue-600 bg-blue-50 border-blue-300',
+    4: 'text-slate-500 bg-slate-50 border-slate-300'
   }
   
   /* =======================
@@ -670,67 +738,68 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent 
-          className="w-full max-w-[95vw] sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] p-0 overflow-hidden flex flex-col"
+          className="w-[95vw] sm:w-full md:max-w-2xl lg:max-w-3xl max-h-[90vh] p-0 overflow-hidden flex flex-col bg-white rounded-2xl shadow-2xl"
           aria-labelledby="universal-task-modal-title"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100 bg-white sticky top-0 z-20">
-            <div className="flex items-center gap-2 sm:gap-3 text-slate-500">
-              <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-violet-100 flex items-center justify-center text-violet-600">
-                <Lightning weight="fill" size={isMobile ? 14 : 16} />
+          <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-violet-50 to-white sticky top-0 z-20">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-violet-200">
+                <Lightning weight="fill" size={isMobile ? 18 : 20} />
               </div>
-              <span className="font-medium text-[10px] sm:text-sm uppercase tracking-wide">
+              <span className="font-semibold text-sm sm:text-base text-slate-700 uppercase tracking-wide">
                 {modalTitle}
               </span>
             </div>
             
-            <div className="flex items-center gap-2 sm:gap-4">
+            <div className="flex items-center gap-3">
               {saving && (
-                <span className="text-[9px] sm:text-xs text-green-600 flex items-center gap-1 sm:gap-1.5 bg-green-50 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
-                  <CheckCircle weight="fill" size={isMobile ? 12 : 14} /> Zapisano
+                <span className="text-xs text-emerald-600 flex items-center gap-1.5 bg-emerald-50 px-3 py-1.5 rounded-full font-medium border border-emerald-200">
+                  <CheckCircle weight="fill" size={14} /> Zapisano
                 </span>
               )}
               <button 
                 type="button"
-                className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors" 
+                className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-100 active:bg-slate-200 text-slate-400 hover:text-slate-600 transition-all" 
                 onClick={() => onOpenChange(false)}
               >
-                <X size={isMobile ? 18 : 20} />
+                <X size={22} weight="bold" />
               </button>
             </div>
           </div>
 
-          {/* Scrollable Content */}
-          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-3 sm:py-6 space-y-3 sm:space-y-6">
+          {/* Scrollable Content - Single scroll area */}
+          <div className="flex-1 overflow-y-auto overscroll-contain">
+            <div className="px-5 sm:px-6 py-5 sm:py-6 space-y-5 sm:space-y-6">
             
             {/* Main Inputs Section */}
-            <section className="space-y-2 sm:space-y-4">
+            <section className="space-y-4">
               {/* Title */}
               <div>
                 <textarea 
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   rows={2}
-                  className="w-full text-base sm:text-lg font-bold text-slate-800 placeholder-slate-300 border-none focus:ring-0 p-0 bg-transparent focus:outline-none resize-none" 
+                  className="w-full text-lg sm:text-xl font-bold text-slate-800 placeholder-slate-400 border-none focus:ring-0 p-0 bg-transparent focus:outline-none resize-none leading-tight" 
                   placeholder="Co trzeba zrobić?"
                 />
               </div>
               
               {/* Description */}
-              <div>
+              <div className="border-l-3 border-slate-200 pl-4">
                 <textarea 
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full text-xs sm:text-base text-slate-600 placeholder-slate-400 border-none focus:ring-0 p-0 bg-transparent focus:outline-none resize-none h-10 sm:h-16" 
+                  className="w-full text-sm sm:text-base text-slate-600 placeholder-slate-400 border-none focus:ring-0 p-0 bg-transparent focus:outline-none resize-none h-14 sm:h-16 leading-relaxed" 
                   placeholder="Dodatkowe szczegóły (opcjonalnie)..."
                 />
               </div>
             </section>
 
             {/* Compact Properties Grid */}
-            <section className="space-y-2 sm:space-y-3">
+            <section className="space-y-4">
               {/* Quick Properties as Badges - First Row */}
-              <div className="flex flex-wrap gap-1.5 sm:gap-2 items-center">
+              <div className="flex flex-wrap gap-2 items-center">
                 {/* Date Badge */}
                 <button 
                   type="button"
@@ -739,11 +808,11 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                     setShowProjectPicker(false)
                     setShowPriorityPicker(false)
                   }}
-                  className="group relative flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 bg-slate-100 hover:bg-violet-50 active:bg-violet-50 border border-slate-200 hover:border-violet-300 rounded-full text-[10px] sm:text-xs font-medium text-slate-700 hover:text-violet-700 transition-all min-h-[32px] sm:min-h-auto"
+                  className="group flex items-center gap-2 px-3 sm:px-4 py-2 bg-white hover:bg-violet-50 active:bg-violet-100 border-2 border-slate-200 hover:border-violet-400 rounded-xl text-xs sm:text-sm font-medium text-slate-700 hover:text-violet-700 transition-all shadow-sm"
                 >
-                  <Calendar size={isMobile ? 10 : 14} className="text-slate-400 group-hover:text-violet-500" />
+                  <Calendar size={16} className="text-slate-500 group-hover:text-violet-500" />
                   <span>{dueDate ? formatDate(dueDate) : 'Brak terminu'}</span>
-                  <CaretDown size={isMobile ? 8 : 10} className="text-slate-300 group-hover:text-violet-400" />
+                  <CaretDown size={12} className="text-slate-400 group-hover:text-violet-500" />
                 </button>
 
                 {/* Project Badge */}
@@ -754,11 +823,11 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                     setShowDatePicker(false)
                     setShowPriorityPicker(false)
                   }}
-                  className="group relative flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 bg-slate-100 hover:bg-violet-50 active:bg-violet-50 border border-slate-200 hover:border-violet-300 rounded-lg text-[10px] sm:text-xs font-medium text-slate-700 hover:text-violet-700 transition-all min-h-[32px] sm:min-h-auto"
+                  className="group flex items-center gap-2 px-3 sm:px-4 py-2 bg-white hover:bg-violet-50 active:bg-violet-100 border-2 border-slate-200 hover:border-violet-400 rounded-xl text-xs sm:text-sm font-medium text-slate-700 hover:text-violet-700 transition-all shadow-sm"
                 >
-                  <FolderOpen size={isMobile ? 10 : 14} className="text-slate-400 group-hover:text-violet-500" />
-                  <span>{selectedProject?.name || 'Brak projektu'}</span>
-                  <CaretDown size={isMobile ? 8 : 10} className="text-slate-300 group-hover:text-violet-400" />
+                  <FolderOpen size={16} className="text-slate-500 group-hover:text-violet-500" />
+                  <span>{selectedProject?.name || 'Inbox'}</span>
+                  <CaretDown size={12} className="text-slate-400 group-hover:text-violet-500" />
                 </button>
 
                 {/* Priority Badge */}
@@ -769,63 +838,118 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                     setShowDatePicker(false)
                     setShowProjectPicker(false)
                   }}
-                  className={`group relative flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 border rounded-lg text-[10px] sm:text-xs font-medium transition-all min-h-[32px] sm:min-h-auto ${priorityColors[priority]}`}
+                  className={`group flex items-center gap-2 px-3 sm:px-4 py-2 border-2 rounded-xl text-xs sm:text-sm font-semibold transition-all shadow-sm ${priorityColors[priority]}`}
                 >
-                  <Flag size={isMobile ? 10 : 14} weight="fill" />
+                  <Flag size={16} weight="fill" />
                   <span>P{priority}</span>
-                  <CaretDown size={isMobile ? 8 : 10} />
+                  <CaretDown size={12} />
                 </button>
               </div>
 
               {/* Tags - Second Row */}
-              <div className="flex flex-wrap gap-1.5 sm:gap-2 items-center">
+              <div className="flex flex-wrap gap-2 items-center">
                 {selectedLabels.map((label) => (
-                  <span key={label} className="px-2 sm:px-3 py-1.5 bg-violet-100 text-violet-700 rounded-lg text-[10px] sm:text-xs font-medium border border-violet-200 flex items-center gap-1 sm:gap-1.5 min-h-[32px] sm:min-h-auto">
-                    #{label} 
+                  <span key={label} className="px-3 py-2 bg-gradient-to-r from-violet-100 to-purple-100 text-violet-700 rounded-xl text-xs sm:text-sm font-medium border border-violet-200 flex items-center gap-2 shadow-sm">
+                    <Tag size={14} weight="fill" className="text-violet-500" />
+                    {label} 
                     <button 
                       type="button"
                       onClick={() => handleRemoveLabel(label)}
-                      className="hover:text-violet-900 active:text-violet-900 ml-0.5"
+                      className="hover:text-violet-900 active:text-violet-900 hover:bg-violet-200 rounded-full p-0.5 transition"
                     >
-                      <X size={isMobile ? 8 : 10} />
+                      <X size={12} weight="bold" />
                     </button>
                   </span>
                 ))}
-                <div className="relative group">
+                <div className="relative" ref={labelPickerRef}>
                   <button 
                     type="button"
                     onClick={() => {
                       setShowDatePicker(false)
                       setShowProjectPicker(false)
                       setShowPriorityPicker(false)
+                      setShowLabelPicker(!showLabelPicker)
                     }}
-                    className="px-2 sm:px-3 py-1.5 text-[10px] sm:text-xs text-slate-500 hover:bg-slate-100 active:bg-slate-100 rounded-lg border border-dashed border-slate-300 transition flex items-center gap-1 min-h-[32px] sm:min-h-auto"
+                    className={`px-3 py-2 text-xs sm:text-sm font-medium rounded-xl border-2 border-dashed transition flex items-center gap-2 ${
+                      showLabelPicker 
+                        ? 'border-violet-400 bg-violet-50 text-violet-600' 
+                        : 'text-slate-500 hover:bg-slate-100 active:bg-slate-200 border-slate-300 hover:border-slate-400'
+                    }`}
                   >
-                    <Plus size={isMobile ? 8 : 10} /> Tag
+                    <Plus size={14} weight="bold" /> Tag
                   </button>
                   
-                  {/* Label Dropdown */}
-                  <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-xl border border-slate-200 p-2 space-y-1 min-w-[180px] max-h-[240px] overflow-y-auto z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
-                    {availableLabels.filter(l => !selectedLabels.includes(l.name)).length > 0 ? (
-                      availableLabels
-                        .filter(l => !selectedLabels.includes(l.name))
-                        .map((label) => (
+                  {/* Label Dropdown - Click controlled */}
+                  {showLabelPicker && (
+                    <div className="absolute top-full left-0 mt-2 bg-white rounded-xl shadow-2xl border-2 border-slate-200 min-w-[280px] max-h-[340px] overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
+                      {/* Add New Label Input */}
+                      <div className="p-3 border-b border-slate-100 bg-slate-50">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={newLabel}
+                            onChange={(e) => setNewLabel(e.target.value)}
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                handleAddLabel()
+                              }
+                            }}
+                            placeholder="Nowa etykieta..."
+                            className="flex-1 px-3 py-2 text-sm border-2 border-slate-200 rounded-lg focus:ring-2 focus:ring-violet-300 focus:border-violet-400 outline-none"
+                          />
                           <button
-                            key={label.id}
                             type="button"
-                            onClick={() => setSelectedLabels([...selectedLabels, label.name])}
-                            className="w-full px-3 py-2 text-left text-xs hover:bg-violet-50 rounded transition flex items-center gap-2 text-slate-700"
+                            onClick={handleAddLabel}
+                            disabled={!newLabel.trim()}
+                            className="px-3 py-2 bg-violet-600 hover:bg-violet-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg font-medium text-sm transition shadow-sm"
                           >
-                            <Tag size={12} className="text-violet-500" />
-                            {label.name}
+                            <Plus size={16} weight="bold" />
                           </button>
-                        ))
-                    ) : (
-                      <div className="px-3 py-2 text-xs text-slate-400 italic">
-                        Wszystkie etykiety dodane
+                        </div>
                       </div>
-                    )}
-                  </div>
+                      
+                      {/* Available Labels List */}
+                      <div className="max-h-[240px] overflow-y-auto p-2">
+                        {availableLabels.length === 0 ? (
+                          <div className="px-3 py-4 text-sm text-slate-400 text-center italic">
+                            Brak dostępnych etykiet.<br/>Dodaj pierwszą powyżej!
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            {availableLabels.map((label) => {
+                              const isSelected = selectedLabels.includes(label.name)
+                              return (
+                                <button
+                                  key={label.id}
+                                  type="button"
+                                  onClick={() => {
+                                    if (isSelected) {
+                                      handleRemoveLabel(label.name)
+                                    } else {
+                                      setSelectedLabels([...selectedLabels, label.name])
+                                    }
+                                  }}
+                                  className={`w-full px-3 py-2.5 text-left text-sm rounded-lg transition flex items-center gap-3 ${
+                                    isSelected 
+                                      ? 'bg-violet-100 text-violet-700 font-medium' 
+                                      : 'hover:bg-slate-100 active:bg-slate-200 text-slate-700'
+                                  }`}
+                                >
+                                  <div 
+                                    className="w-3 h-3 rounded-full flex-shrink-0" 
+                                    style={{ backgroundColor: label.color || '#8b5cf6' }}
+                                  />
+                                  <span className="flex-1">{label.name}</span>
+                                  {isSelected && <CheckCircle size={16} weight="fill" className="text-violet-600" />}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -941,33 +1065,33 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                 </div>
               )}
 
-              {/* Cognitive Load as Buttons - 4 LEVELS ONLY */}
-              <div className="mt-3 sm:mt-4">
-                <h3 className="text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
-                  <Brain size={isMobile ? 10 : 12} className="text-slate-400" />
+              {/* Cognitive Load as Buttons - 4 LEVELS */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2 mb-3">
+                  <Brain size={14} className="text-slate-500" />
                   Obciążenie poznawcze
                 </h3>
-                <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
+                <div className="grid grid-cols-4 gap-2 sm:gap-3">
                   {[1, 2, 3, 4].map((level) => (
                     <button 
                       key={level}
                       type="button"
                       onClick={() => setCognitiveLoad(level)}
-                      className={`h-8 rounded-lg border-2 transition-all flex flex-col items-center justify-center min-h-[32px] ${
+                      className={`py-2.5 sm:py-3 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-1 ${
                         cognitiveLoad === level 
                           ? cognitiveLoadColors[level - 1]
-                          : 'border-slate-200 hover:border-slate-300 active:border-slate-300'
+                          : 'border-slate-200 hover:border-slate-300 active:border-slate-400 bg-white'
                       }`}
                     >
-                      <div className={`w-1 h-1 rounded-full ${
+                      <div className={`w-2 h-2 rounded-full ${
                         cognitiveLoad === level 
                           ? 'bg-current' 
                           : 'bg-slate-300'
                       }`} />
-                      <span className={`text-[7px] sm:text-[8px] mt-0.5 ${
+                      <span className={`text-[10px] sm:text-xs font-medium ${
                         cognitiveLoad === level 
-                          ? 'font-medium' 
-                          : 'text-slate-400'
+                          ? '' 
+                          : 'text-slate-500'
                       }`}>
                         {cognitiveLoadLabels[level - 1]}
                       </span>
@@ -977,74 +1101,84 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
               </div>
 
               {/* Time Estimation */}
-              <div className="bg-slate-50 p-2 sm:p-3 rounded-lg border border-slate-100 mt-2">
-                <div>
-                  <div className="flex justify-between items-center mb-1.5">
-                    <h3 className="text-[9px] sm:text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                      <Timer size={isMobile ? 9 : 11} className="text-slate-400" />
-                      Estymacja Czasu
-                    </h3>
-                    <div className="flex items-center gap-1">
-                      <input 
-                        type="number" 
-                        value={estimatedMinutes}
-                        onChange={(e) => setEstimatedMinutes(Number(e.target.value))}
-                        min="5" 
-                        max="240" 
-                        step="5" 
-                        className="w-10 sm:w-12 text-center text-xs font-bold text-violet-600 bg-violet-100 px-1 py-0.5 rounded border-none focus:ring-1 focus:ring-violet-300 outline-none"
-                      />
-                      <span className="text-[9px] sm:text-[10px] text-slate-500">min</span>
-                    </div>
-                  </div>
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                    <Timer size={14} className="text-slate-500" />
+                    Estymacja Czasu
+                  </h3>
                   <div className="flex items-center gap-2">
-                    <span className="text-[8px] sm:text-[9px] text-slate-400 whitespace-nowrap">5m</span>
                     <input 
-                      type="range" 
-                      min="5" 
-                      max="240" 
+                      type="number" 
                       value={estimatedMinutes}
                       onChange={(e) => setEstimatedMinutes(Number(e.target.value))}
+                      min="5" 
+                      max="240" 
                       step="5" 
-                      className="flex-1 h-1 bg-slate-200 rounded-full appearance-none cursor-pointer accent-violet-600 [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:h-2.5"
-                      style={{
-                        WebkitAppearance: 'none',
-                      }}
+                      className="w-14 text-center text-sm font-bold text-violet-600 bg-violet-100 px-2 py-1.5 rounded-lg border-2 border-violet-200 focus:ring-2 focus:ring-violet-300 outline-none"
                     />
-                    <span className="text-[8px] sm:text-[9px] text-slate-400 whitespace-nowrap">4h</span>
+                    <span className="text-xs text-slate-500 font-medium">min</span>
                   </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-slate-400 font-medium">5m</span>
+                  <input 
+                    type="range" 
+                    min="5" 
+                    max="240" 
+                    value={estimatedMinutes}
+                    onChange={(e) => setEstimatedMinutes(Number(e.target.value))}
+                    step="5" 
+                    className="flex-1 h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-violet-600 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-violet-600 [&::-webkit-slider-thumb]:shadow-md"
+                    style={{ WebkitAppearance: 'none' }}
+                  />
+                  <span className="text-xs text-slate-400 font-medium">4h</span>
                 </div>
               </div>
 
               {/* AI Understanding Section */}
-              <div className="bg-violet-50/50 border border-violet-100/50 rounded-lg p-2 mt-2">
-                <div className="flex items-start gap-1.5 mb-1.5">
-                  <Sparkle size={isMobile ? 10 : 12} weight="fill" className="text-violet-400 mt-0.5" />
-                  <div className="flex-1">
-                    <h4 className="text-[9px] sm:text-[10px] font-medium text-violet-700 mb-0.5">
+              <div className="bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-200 rounded-xl p-4 shadow-sm">
+                <div className="flex items-start gap-3 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white shadow-md flex-shrink-0">
+                    {loadingAI ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Sparkle size={16} weight="fill" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-xs font-bold text-violet-700 uppercase tracking-wide mb-1">
                       Jak AI rozumie to zadanie
                     </h4>
-                    <p className="text-[9px] sm:text-[10px] text-violet-600 leading-relaxed">
-                      {aiUnderstanding || 'Wpisz tytuł zadania, aby AI mogło je zrozumieć...'}
+                    <p className="text-sm text-violet-600 leading-relaxed">
+                      {loadingAI ? (
+                        <span className="italic text-violet-400">Analizuję...</span>
+                      ) : aiUnderstanding ? (
+                        aiUnderstanding
+                      ) : (
+                        <span className="text-violet-400">Wpisz tytuł zadania, aby AI mogło je zrozumieć...</span>
+                      )}
                     </p>
                   </div>
                 </div>
-                <div className="flex gap-1.5 ml-4">
+                <div className="flex gap-2 ml-11">
                   <button 
                     type="button"
                     onClick={handleClarify}
-                    className="px-1.5 py-1 text-[8px] sm:text-[9px] font-medium text-violet-600 bg-white hover:bg-violet-100 active:bg-violet-100 border border-violet-200 rounded transition-all flex items-center gap-1"
+                    disabled={loadingAI || !content.trim()}
+                    className="px-3 py-1.5 text-xs font-medium text-violet-700 bg-white hover:bg-violet-100 active:bg-violet-200 disabled:opacity-50 disabled:cursor-not-allowed border-2 border-violet-200 rounded-lg transition-all flex items-center gap-1.5 shadow-sm"
                   >
-                    <MagicWand size={isMobile ? 9 : 10} />
+                    <MagicWand size={12} weight="fill" />
                     Doprecyzuj
                   </button>
                   <button 
                     type="button"
                     onClick={handleGeneratePlan}
-                    className="px-1.5 py-1 text-[8px] sm:text-[9px] font-medium text-violet-600 bg-white hover:bg-violet-100 active:bg-violet-100 border border-violet-200 rounded transition-all flex items-center gap-1"
+                    disabled={loadingAI || !content.trim()}
+                    className="px-3 py-1.5 text-xs font-medium text-violet-700 bg-white hover:bg-violet-100 active:bg-violet-200 disabled:opacity-50 disabled:cursor-not-allowed border-2 border-violet-200 rounded-lg transition-all flex items-center gap-1.5 shadow-sm"
                   >
-                    <Question size={isMobile ? 9 : 10} />
-                    Pomóż mi
+                    <Question size={12} weight="fill" />
+                    Pomóż mi zaplanować
                   </button>
                 </div>
               </div>
@@ -1203,35 +1337,34 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
               </section>
             )}
           </div>
+          </div>
 
           {/* Footer Actions */}
-          <div className="border-t border-slate-100 p-3 sm:p-4 bg-slate-50 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3 rounded-b-2xl">
+          <div className="border-t-2 border-slate-100 p-4 sm:p-5 bg-gradient-to-r from-slate-50 to-white flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 rounded-b-2xl">
             {isEditMode ? (
-              // Edit mode: Delete button + Close/Save button
               <>
                 {onDelete && (
                   <button 
                     type="button"
                     onClick={handleDelete}
-                    className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors text-sm flex items-center gap-2"
+                    className="text-slate-400 hover:text-red-500 hover:bg-red-50 active:bg-red-100 px-4 py-2.5 rounded-xl transition-colors text-sm font-medium flex items-center gap-2"
                   >
-                    <Trash size={16} />
-                    <span>Usuń</span>
+                    <Trash size={18} />
+                    <span>Usuń zadanie</span>
                   </button>
                 )}
                 
-                <div className="flex items-center gap-3 ml-auto">
+                <div className="flex items-center gap-3 sm:ml-auto">
                   {hasUnsavedContentChanges ? (
                     <>
                       <button
                         type="button"
                         onClick={() => {
-                          // Revert changes
                           setContent(initialContentRef.current.content)
                           setDescription(initialContentRef.current.description)
                           setHasUnsavedContentChanges(false)
                         }}
-                        className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+                        className="px-5 py-2.5 text-sm font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 active:bg-slate-200 rounded-xl transition-colors"
                       >
                         Anuluj
                       </button>
@@ -1242,30 +1375,30 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                           initialContentRef.current = { content, description }
                           setHasUnsavedContentChanges(false)
                         }}
-                        className="px-6 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg font-medium shadow-md hover:shadow-lg transition-all flex items-center gap-2"
+                        className="px-6 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white rounded-xl font-semibold shadow-lg shadow-violet-200 hover:shadow-xl transition-all flex items-center gap-2"
                       >
-                        Zapisz
+                        <CheckCircle size={18} weight="fill" />
+                        Zapisz zmiany
                       </button>
                     </>
                   ) : (
                     <button
                       type="button"
                       onClick={() => onOpenChange(false)}
-                      className="px-6 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg font-medium shadow-md transition-all flex items-center gap-2"
+                      className="px-6 py-2.5 bg-slate-600 hover:bg-slate-700 text-white rounded-xl font-semibold shadow-md transition-all flex items-center gap-2"
                     >
                       Zamknij
-                      <span className="text-xs opacity-75 ml-1">zmiany zapisane</span>
+                      <span className="text-xs opacity-75 bg-slate-500 px-2 py-0.5 rounded-full">auto-zapis</span>
                     </button>
                   )}
                 </div>
               </>
             ) : (
-              // New task mode: Cancel + Add task button
               <>
                 <button
                   type="button"
                   onClick={() => onOpenChange(false)}
-                  className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+                  className="px-5 py-2.5 text-sm font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 active:bg-slate-200 rounded-xl transition-colors"
                 >
                   Anuluj
                 </button>
@@ -1274,7 +1407,7 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                   type="button"
                   onClick={handleSave}
                   disabled={!hasUnsavedContentChanges}
-                  className="px-6 py-2 bg-violet-600 hover:bg-violet-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg font-medium shadow-md hover:shadow-lg transition-all flex items-center gap-2"
+                  className="px-6 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 disabled:from-slate-300 disabled:to-slate-400 disabled:cursor-not-allowed text-white rounded-xl font-semibold shadow-lg shadow-violet-200 hover:shadow-xl disabled:shadow-none transition-all flex items-center gap-2"
                 >
                   <Plus size={18} weight="bold" />
                   Dodaj zadanie
@@ -1287,10 +1420,12 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
 
       {/* Clarification Modal */}
       <Dialog open={showClarifyModal} onOpenChange={setShowClarifyModal}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg p-6">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <MagicWand size={20} className="text-violet-600" />
+            <DialogTitle className="flex items-center gap-3 text-lg">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white shadow-lg">
+                <MagicWand size={20} weight="fill" />
+              </div>
               Doprecyzuj zadanie
             </DialogTitle>
           </DialogHeader>
@@ -1304,23 +1439,29 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
               value={clarifyText}
               onChange={(e) => setClarifyText(e.target.value)}
               placeholder="np. 'To zadanie wymaga współpracy z zespołem marketingu' lub 'To jest pilne, ponieważ...'"
-              className="min-h-[120px]"
+              className="min-h-[120px] text-sm border-2 focus:border-violet-400 rounded-xl"
             />
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="gap-2">
             <Button
               variant="outline"
               onClick={() => setShowClarifyModal(false)}
+              className="px-5 py-2.5 rounded-xl"
             >
               Anuluj
             </Button>
             <Button
               onClick={handleSubmitClarification}
               disabled={!clarifyText.trim() || loadingAI}
-              className="bg-violet-600 hover:bg-violet-700"
+              className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 px-5 py-2.5 rounded-xl shadow-lg"
             >
-              {loadingAI ? 'Analizuję...' : 'Doprecyzuj'}
+              {loadingAI ? (
+                <span className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Analizuję...
+                </span>
+              ) : 'Doprecyzuj'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1329,48 +1470,50 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
       {/* Mobile Subtasks Modal */}
       {isMobile && (
         <div 
-          className={`fixed inset-0 bg-black/40 z-50 flex items-end transition-all ${
+          className={`fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end transition-all ${
             showSubtasksModal ? 'opacity-100' : 'opacity-0 pointer-events-none'
           }`}
           onClick={() => setShowSubtasksModal(false)}
         >
           <div 
-            className={`bg-white w-full rounded-t-2xl max-h-[70vh] flex flex-col transform transition-transform ${
+            className={`bg-white w-full rounded-t-3xl max-h-[75vh] flex flex-col transform transition-transform shadow-2xl ${
               showSubtasksModal ? 'translate-y-0' : 'translate-y-full'
             }`}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between p-4 border-b border-slate-100">
-              <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
-                <ListChecks size={18} className="text-violet-600" />
+            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-800 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center">
+                  <ListChecks size={18} className="text-violet-600" />
+                </div>
                 Podzadania 
-                <span className="bg-slate-100 text-slate-600 text-[10px] px-1.5 py-0.5 rounded-full ml-1">
+                <span className="bg-violet-100 text-violet-600 text-xs px-2 py-1 rounded-full font-semibold">
                   {completedSubtasksCount}/{subtasks.length}
                 </span>
               </h3>
               <button 
                 type="button"
                 onClick={() => setShowSubtasksModal(false)}
-                className="w-7 h-7 flex items-center justify-center rounded-full active:bg-slate-100 text-slate-400"
+                className="w-9 h-9 flex items-center justify-center rounded-full active:bg-slate-100 text-slate-400"
               >
-                <X size={20} />
+                <X size={22} weight="bold" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              <div className="space-y-2.5">
+            <div className="flex-1 overflow-y-auto p-5">
+              <div className="space-y-3">
                 {subtasks.map((subtask) => (
-                  <div key={subtask.id} className="flex items-start gap-2 group min-h-[40px]">
+                  <div key={subtask.id} className="flex items-start gap-3 group p-2 bg-slate-50 rounded-xl">
                     <button 
                       type="button"
                       onClick={() => handleToggleSubtask(subtask.id, !subtask.completed)}
-                      className={`w-7 h-7 flex items-center justify-center ${
-                        subtask.completed ? 'text-green-500' : 'text-slate-300 active:text-violet-600'
+                      className={`w-8 h-8 flex items-center justify-center flex-shrink-0 ${
+                        subtask.completed ? 'text-emerald-500' : 'text-slate-300 active:text-violet-600'
                       }`}
                     >
                       {subtask.completed ? (
-                        <CheckCircle size={18} weight="fill" />
+                        <CheckCircle size={24} weight="fill" />
                       ) : (
-                        <div className="w-[18px] h-[18px] rounded-full border-2 border-current" />
+                        <div className="w-6 h-6 rounded-full border-2 border-current" />
                       )}
                     </button>
                     <div className="flex-1">
@@ -1382,35 +1525,27 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                             s.id === subtask.id ? { ...s, content: e.target.value } : s
                           ))
                         }}
-                        className={`w-full bg-transparent border-none text-xs focus:ring-0 p-0 placeholder-slate-400 mb-1 ${
+                        className={`w-full bg-transparent border-none text-sm focus:ring-0 p-0 placeholder-slate-400 mb-1 ${
                           subtask.completed ? 'text-slate-400 line-through' : 'text-slate-700'
                         }`}
-                      />
-                      <input 
-                        type="date" 
-                        className="text-[10px] px-2 py-1 border border-slate-200 rounded text-slate-600 focus:ring-1 focus:ring-violet-300 outline-none w-full"
-                        onChange={(e) => {
-                          setSubtasks(subtasks.map(s => 
-                            s.id === subtask.id ? { ...s, due: e.target.value } : s
-                          ))
-                        }}
                       />
                     </div>
                     <button 
                       type="button"
                       onClick={() => setSubtasks(subtasks.filter(s => s.id !== subtask.id))}
-                      className="text-slate-300 active:text-red-500 w-7 h-7 flex items-center justify-center"
+                      className="text-slate-300 active:text-red-500 w-8 h-8 flex items-center justify-center"
                     >
-                      <Trash size={12} />
+                      <Trash size={16} />
                     </button>
                   </div>
                 ))}
-                <div className="flex items-center gap-2 mt-3 min-h-[44px]">
+                <div className="flex items-center gap-3 mt-4 p-3 border-2 border-dashed border-slate-200 rounded-xl">
                   <button 
                     type="button"
-                    className="text-violet-500 w-7 h-7 flex items-center justify-center"
+                    onClick={handleAddSubtask}
+                    className="text-violet-500 w-8 h-8 flex items-center justify-center"
                   >
-                    <Plus size={18} />
+                    <Plus size={22} weight="bold" />
                   </button>
                   <input 
                     type="text" 
@@ -1422,7 +1557,7 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                       }
                     }}
                     placeholder="Dodaj podzadanie..." 
-                    className="flex-1 bg-transparent border-none text-xs text-slate-700 focus:ring-0 p-0 placeholder-slate-400"
+                    className="flex-1 bg-transparent border-none text-sm text-slate-700 focus:ring-0 p-0 placeholder-slate-400"
                   />
                 </div>
               </div>
@@ -1434,43 +1569,45 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
       {/* Mobile History Modal */}
       {isMobile && (
         <div 
-          className={`fixed inset-0 bg-black/40 z-50 flex items-end transition-all ${
+          className={`fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end transition-all ${
             showHistoryModal ? 'opacity-100' : 'opacity-0 pointer-events-none'
           }`}
           onClick={() => setShowHistoryModal(false)}
         >
           <div 
-            className={`bg-white w-full rounded-t-2xl max-h-[70vh] flex flex-col transform transition-transform ${
+            className={`bg-white w-full rounded-t-3xl max-h-[75vh] flex flex-col transform transition-transform shadow-2xl ${
               showHistoryModal ? 'translate-y-0' : 'translate-y-full'
             }`}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between p-4 border-b border-slate-100">
-              <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
-                <ClockClockwise size={18} className="text-violet-600" />
+            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-800 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center">
+                  <ClockClockwise size={18} className="text-violet-600" />
+                </div>
                 Historia zmian
               </h3>
               <button 
                 type="button"
                 onClick={() => setShowHistoryModal(false)}
-                className="w-7 h-7 flex items-center justify-center rounded-full active:bg-slate-100 text-slate-400"
+                className="w-9 h-9 flex items-center justify-center rounded-full active:bg-slate-100 text-slate-400"
               >
-                <X size={20} />
+                <X size={22} weight="bold" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              <ul className="space-y-3 border-l-2 border-slate-100 ml-2 pl-3 py-1">
+            <div className="flex-1 overflow-y-auto p-5">
+              <ul className="space-y-4 border-l-2 border-violet-200 ml-2 pl-4 py-1">
                 {changeHistory.length === 0 ? (
-                  <li className="text-xs text-slate-400 italic">Brak historii zmian</li>
+                  <li className="text-sm text-slate-400 italic">Brak historii zmian</li>
                 ) : (
                   changeHistory.map((change) => (
-                    <li key={change.id} className="relative text-xs">
-                      <div className="absolute -left-[17px] top-1 w-2 h-2 rounded-full bg-slate-300 border-2 border-white"></div>
-                      <span className="text-slate-500 text-[10px]">
+                    <li key={change.id} className="relative text-sm">
+                      <div className="absolute -left-[21px] top-1.5 w-3 h-3 rounded-full bg-violet-400 border-2 border-white shadow-sm"></div>
+                      <span className="text-slate-400 text-xs">
                         {new Date(change.timestamp).toLocaleString('pl-PL')}
                       </span>
                       <p className="text-slate-700">
-                        {change.field}: <span className="font-medium">{change.oldValue}</span> → <span className="font-medium text-violet-600">{change.newValue}</span>
+                        {change.field}: <span className="font-medium text-slate-500">{change.oldValue}</span> → <span className="font-semibold text-violet-600">{change.newValue}</span>
                       </p>
                     </li>
                   ))
