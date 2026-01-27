@@ -631,11 +631,6 @@ function DayColumnComponent({
           )}
         </div>
       </SortableContext>
-              />
-            ))
-          )}
-        </div>
-      </SortableContext>
 
       {/* Add Task Button */}
       {onAddForKey && (
