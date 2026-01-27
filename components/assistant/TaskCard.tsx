@@ -482,21 +482,8 @@ export function TaskCard({
           </Button>
         </div>
         
-        {/* Mobile: Show complete button and context menu */}
+        {/* Mobile: Show context menu only (complete button is on the left side of task name) */}
         <div className="md:hidden flex items-center gap-1 flex-shrink-0 ml-2 z-40">
-          <Button 
-            size="sm" 
-            variant="ghost"
-            onClick={(e) => {
-              e.stopPropagation()
-              handleComplete(e)
-            }}
-            title="Ukończ"
-            className="p-2 h-auto text-green-600 hover:bg-green-50"
-          >
-            <CheckCircle size={18} weight="bold" />
-          </Button>
-          
           <div className="relative" ref={mobileMenuRef}>
             <Button 
               size="sm" 

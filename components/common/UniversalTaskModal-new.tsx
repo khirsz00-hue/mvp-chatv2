@@ -739,7 +739,11 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                 <div className="relative group">
                   <button 
                     type="button"
-                    onClick={() => setShowDatePicker(false) || setShowProjectPicker(false) || setShowPriorityPicker(false)}
+                    onClick={() => {
+                      setShowDatePicker(false)
+                      setShowProjectPicker(false)
+                      setShowPriorityPicker(false)
+                    }}
                     className="px-2 sm:px-3 py-1.5 text-[10px] sm:text-xs text-slate-500 hover:bg-slate-100 active:bg-slate-100 rounded-lg border border-dashed border-slate-300 transition flex items-center gap-1 min-h-[32px] sm:min-h-auto"
                   >
                     <Plus size={isMobile ? 8 : 10} /> Tag

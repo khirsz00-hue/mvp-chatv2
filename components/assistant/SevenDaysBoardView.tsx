@@ -531,24 +531,7 @@ function DayColumnComponent({
         items={day.tasks.map(t => t.id)}
         strategy={verticalListSortingStrategy}
       >
-        <div 
-          className="p-1.5 space-y-1 min-h-[150px] max-h-[calc(100vh-280px)] overflow-y-auto scroll-smooth"
-          onDragOver={(e) => {
-            // Auto-scroll when dragging near edges
-            const container = e.currentTarget
-            const rect = container.getBoundingClientRect()
-            const mouseY = e.clientY - rect.top
-            const scrollThreshold = 50
-            
-            if (mouseY < scrollThreshold) {
-              // Scroll up
-              container.scrollTop -= 10
-            } else if (mouseY > rect.height - scrollThreshold) {
-              // Scroll down
-              container.scrollTop += 10
-            }
-          }}
-        >
+        <div className="p-1.5 space-y-1 min-h-[150px] max-h-[calc(100vh-280px)] overflow-y-auto">
           {day.tasks.length === 0 ? (
             <div className="text-center py-6 text-gray-400">
               <CalendarBlank size={24} className="mx-auto mb-1 opacity-40" />
@@ -714,7 +697,7 @@ function MiniTaskCard({
       {/* Using div instead of Card component for ultra-compact design with minimal padding */}
       <div
         className={cn(
-          'px-2 py-1.5 border-l-2 rounded-md transition-all hover:shadow-sm group text-xs cursor-pointer',
+          'px-3 py-2 border-l-2 rounded-md transition-all hover:shadow-sm group text-sm cursor-pointer',
           priorityColors[task.priority] || priorityColors[4],
           loading && 'opacity-50'
         )}
@@ -725,7 +708,16 @@ function MiniTaskCard({
         tabIndex={0}
         aria-label={`Task: ${task.content}`}
       >
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
+          {/* Complete button - circle on the left */}
+          <button
+            onClick={handleComplete}
+            className="flex-shrink-0 text-gray-300 hover:text-green-500 transition-colors"
+            title="Ukończ zadanie"
+          >
+            <div className="w-4 h-4 rounded-full border-2 border-current" />
+          </button>
+          
           {/* Drag handle - only this part is draggable */}
           {dragHandleProps && (
             <button
@@ -743,7 +735,7 @@ function MiniTaskCard({
           
           {/* Content */}
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-xs line-clamp-1 group-hover:text-brand-purple transition-colors">
+            <p className="font-medium text-sm line-clamp-1 group-hover:text-brand-purple transition-colors">
               {task.content}
             </p>
           </div>
