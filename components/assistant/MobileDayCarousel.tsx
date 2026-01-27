@@ -311,27 +311,29 @@ export function MobileDayCarousel({
         </div>
       </div>
       
-      {/* Today button - always visible */}
-      <div className="px-4 pt-2">
-        <button
-          onClick={() => {
-            setActiveDay(startOfDay(new Date()))
-            // Scroll to today card
-            if (miniCardsRef.current) {
-              const todayIndex = 10
-              const cardWidth = miniCardsRef.current.scrollWidth / 20
-              miniCardsRef.current.scrollTo({
-                left: cardWidth * todayIndex - miniCardsRef.current.clientWidth / 2 + cardWidth / 2,
-                behavior: 'smooth'
-              })
-            }
-          }}
-          className="w-full py-2 text-xs font-medium text-brand-purple bg-brand-purple/10 rounded-lg hover:bg-brand-purple/20 transition-colors flex items-center justify-center gap-1.5"
-        >
+      {/* Today button - only when not on today */}
+      {!isSameDay(activeDay, new Date()) && (
+        <div className="px-4 pt-2">
+          <button
+            onClick={() => {
+              setActiveDay(startOfDay(new Date()))
+              // Scroll to today card
+              if (miniCardsRef.current) {
+                const todayIndex = 10
+                const cardWidth = miniCardsRef.current.scrollWidth / 20
+                miniCardsRef.current.scrollTo({
+                  left: cardWidth * todayIndex - miniCardsRef.current.clientWidth / 2 + cardWidth / 2,
+                  behavior: 'smooth'
+                })
+              }
+            }}
+            className="w-full py-2 text-xs font-medium text-brand-purple bg-brand-purple/10 rounded-lg hover:bg-brand-purple/20 transition-colors flex items-center justify-center gap-1.5"
+          >
           <CalendarBlank size={14} weight="bold" />
-          Dzisiaj
+          Przejdź do dzisiaj
         </button>
       </div>
+      )}
       
       {/* Simplified main view - show activeDay tasks */}
       <div
@@ -429,8 +431,8 @@ function DayCard({
         isToday ? 'border-brand-purple/60' : 'border-gray-200'
       )}
       style={{ 
-        height: 'calc(100dvh - 200px)',
-        maxHeight: '600px',
+        height: 'calc(100dvh - 280px)',
+        maxHeight: '520px',
         WebkitUserSelect: 'none',
         WebkitTouchCallout: 'none'
       }}
@@ -614,22 +616,6 @@ function TaskCardMobile({
               {task.content}
             </p>
           </div>
-          
-          <button
-            onClick={async (e) => {
-              e.stopPropagation()
-              setLoading(true)
-              try {
-                await onComplete(task.id)
-              } finally {
-                setLoading(false)
-              }
-            }}
-            className="md:opacity-0 md:group-hover:opacity-100 transition-all p-1 hover:bg-green-50 rounded flex-shrink-0 text-green-600 hover:text-green-700"
-            title="Ukończ zadanie"
-          >
-            <CheckCircle size={16} weight="bold" />
-          </button>
           
           <button
             onClick={(e) => {
