@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useMemo } from 'react'
+import React, { useState, useRef, useMemo } from 'react'
 import { DndContext, closestCenter, DragEndEvent, DragOverlay, DragStartEvent } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -46,6 +46,7 @@ export function MobileDayCarousel({
   const [dragTargetDay, setDragTargetDay] = useState<string | null>(null)
   const [isScrolling, setIsScrolling] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const miniCardsRef = useRef<HTMLDivElement>(null)
   const longPressTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const edgeZoneTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -106,6 +107,18 @@ export function MobileDayCarousel({
       }
     ]
   }, [activeDay, tasks])
+  
+  // Scroll to today on mount
+  React.useEffect(() => {
+    if (miniCardsRef.current) {
+      const todayIndex = 10 // Today is at index 10 (10 days before + today)
+      const cardWidth = miniCardsRef.current.scrollWidth / 20
+      miniCardsRef.current.scrollTo({
+        left: cardWidth * todayIndex - miniCardsRef.current.clientWidth / 2 + cardWidth / 2,
+        behavior: 'smooth'
+      })
+    }
+  }, [])
 
   const previousDay = () => {
     setActiveDay(prev => addDays(prev, -1))
@@ -185,6 +198,7 @@ export function MobileDayCarousel({
         <div className="absolute right-2 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none z-10" />
         
         <div 
+          ref={miniCardsRef}
           data-scrollbar={isScrolling ? "visible" : "hidden"}
           className="snap-x snap-mandatory pt-2"
           onScroll={(e) => {
@@ -257,12 +271,14 @@ export function MobileDayCarousel({
                 }
               }}
               className={cn(
-                'flex-shrink-0 px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ease-out transform active:scale-95 snap-center',
-                isActive 
-                  ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-md' 
-                  : draggedTaskId
-                    ? 'bg-brand-purple/10 text-brand-purple border-2 border-dashed border-brand-purple hover:bg-brand-purple/20 hover:scale-105'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:scale-105'
+                'flex-shrink-0 px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ease-out transform active:scale-95 snap-center border-2',
+                isToday && !isActive
+                  ? 'bg-violet-100 text-violet-700 border-violet-300' // Today but not active - subtle highlight
+                  : isActive 
+                    ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-md border-transparent' // Active (selected) - gradient
+                    : draggedTaskId
+                      ? 'bg-brand-purple/10 text-brand-purple border-dashed border-brand-purple hover:bg-brand-purple/20 hover:scale-105'
+                      : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200 hover:scale-105'
               )}
             >
               <div className="text-center">
@@ -294,17 +310,27 @@ export function MobileDayCarousel({
         </div>
       </div>
       
-      {/* Today button - only show if not on today */}
-      {!isSameDay(activeDay, new Date()) && (
-        <div className="px-4 pt-2">
-          <button
-            onClick={() => setActiveDay(startOfDay(new Date()))}
-            className="w-full py-2 text-xs font-medium text-brand-purple bg-brand-purple/10 rounded-lg hover:bg-brand-purple/20 transition-colors"
-          >
-            ← Wróć do dziś
-          </button>
-        </div>
-      )}
+      {/* Today button - always visible */}
+      <div className="px-4 pt-2">
+        <button
+          onClick={() => {
+            setActiveDay(startOfDay(new Date()))
+            // Scroll to today card
+            if (miniCardsRef.current) {
+              const todayIndex = 10
+              const cardWidth = miniCardsRef.current.scrollWidth / 20
+              miniCardsRef.current.scrollTo({
+                left: cardWidth * todayIndex - miniCardsRef.current.clientWidth / 2 + cardWidth / 2,
+                behavior: 'smooth'
+              })
+            }
+          }}
+          className="w-full py-2 text-xs font-medium text-brand-purple bg-brand-purple/10 rounded-lg hover:bg-brand-purple/20 transition-colors flex items-center justify-center gap-1.5"
+        >
+          <CalendarBlank size={14} weight="bold" />
+          Dzisiaj
+        </button>
+      </div>
       
       {/* Simplified main view - show activeDay tasks */}
       <div
@@ -402,7 +428,8 @@ function DayCard({
         isToday ? 'border-brand-purple/60' : 'border-gray-200'
       )}
       style={{ 
-        height: 'calc(100dvh - 120px)',
+        height: 'calc(100dvh - 200px)',
+        maxHeight: '600px',
         WebkitUserSelect: 'none',
         WebkitTouchCallout: 'none'
       }}
@@ -442,7 +469,7 @@ function DayCard({
         items={tasks.map(t => t.id)}
         strategy={verticalListSortingStrategy}
       >
-        <div className="p-2 space-y-1 overflow-y-auto flex-1">
+        <div className="p-2 space-y-1 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-brand-purple/40 scrollbar-track-transparent hover:scrollbar-thumb-brand-purple/60 transition-all">
           {tasks.length === 0 ? (
             <div className="text-center py-6 text-gray-400">
               <CalendarBlank size={24} className="mx-auto mb-1 opacity-40" />
@@ -541,7 +568,7 @@ function TaskCardMobile({
     <div data-task-id={task.id} className="relative">
       <div
         className={cn(
-          'px-2 py-1.5 border-l-3 rounded-md transition-all duration-200 ease-out text-xs cursor-pointer group bg-white shadow-sm hover:shadow-md select-none',
+          'px-3 py-2 border-l-3 rounded-md transition-all duration-200 ease-out text-sm cursor-pointer group bg-white shadow-sm hover:shadow-md select-none min-h-[52px]',
           task.priority === 1 && 'border-l-red-500',
           task.priority === 2 && 'border-l-orange-500',
           task.priority === 3 && 'border-l-blue-500',

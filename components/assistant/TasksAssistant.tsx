@@ -1709,7 +1709,7 @@ export function TasksAssistant() {
                       <DotsThree size={16} weight="bold" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
+                  <DropdownMenuContent align="end" className="z-[100]">
                     <DropdownMenuLabel>Filtry specjalne</DropdownMenuLabel>
                     <DropdownMenuItem onClick={() => setFilter('unscheduled')}>
                       Do zaplanowania
