@@ -44,9 +44,11 @@ export function MobileDayCarousel({
   const [activeDay, setActiveDay] = useState(startOfDay(new Date()))
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
   const [dragTargetDay, setDragTargetDay] = useState<string | null>(null)
+  const [isScrolling, setIsScrolling] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const longPressTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const edgeZoneTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const touchStartX = useRef<number>(0)
   const touchStartY = useRef<number>(0)
   
@@ -176,29 +178,37 @@ export function MobileDayCarousel({
       )}
       
       {/* Week mini cards navigation */}
-      <div className="relative z-30 select-none px-2 pb-2 bg-white border-b" style={{ WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}>
-        {/* Scroll hint */}
-        <div className="flex items-center justify-center pt-1 pb-1">
-          <span className="text-[10px] text-gray-400 font-medium tracking-wide">← PRZESUŃ →</span>
-        </div>
-        
+      <div className="relative z-30 select-none px-2 bg-white border-b" style={{ WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}>
         {/* Left gradient overlay */}
-        <div className="absolute left-2 top-7 bottom-2 w-8 bg-gradient-to-r from-white to-transparent pointer-events-none z-10" />
+        <div className="absolute left-2 top-0 bottom-0 w-8 bg-gradient-to-r from-white to-transparent pointer-events-none z-10" />
         {/* Right gradient overlay */}
-        <div className="absolute right-2 top-7 bottom-2 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none z-10" />
+        <div className="absolute right-2 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none z-10" />
         
         <div 
-          data-scrollbar="visible"
-          className="snap-x snap-mandatory pt-2 pb-3"
+          data-scrollbar={isScrolling ? "visible" : "hidden"}
+          className="snap-x snap-mandatory pt-2"
+          onScroll={(e) => {
+            // Show scrollbar when scrolling
+            setIsScrolling(true)
+            
+            // Hide scrollbar after 1 second of no scrolling
+            if (scrollTimeoutRef.current) {
+              clearTimeout(scrollTimeoutRef.current)
+            }
+            scrollTimeoutRef.current = setTimeout(() => {
+              setIsScrolling(false)
+            }, 1000)
+          }}
           style={{
             overflowX: 'scroll',
-            scrollbarWidth: 'thin',
+            scrollbarWidth: isScrolling ? 'thin' : 'none',
             scrollbarColor: '#a855f7 #f3f4f6',
             WebkitOverflowScrolling: 'touch',
             display: 'grid',
             gridAutoFlow: 'column',
             gridAutoColumns: 'calc((100% - 6 * 4px) / 7)',
-            gap: '4px'
+            gap: '4px',
+            paddingBottom: '8px'
           }}
         >
           {Array.from({ length: 20 }, (_, i) => {
@@ -270,6 +280,17 @@ export function MobileDayCarousel({
             </button>
           )
         })}
+        </div>
+        
+        {/* Scroll hint - shows when not scrolling */}
+        <div 
+          className="flex items-center justify-center pb-2 transition-opacity duration-200"
+          style={{
+            opacity: isScrolling ? 0 : 1,
+            pointerEvents: 'none'
+          }}
+        >
+          <span className="text-[10px] text-gray-400 font-medium tracking-wide">← PRZESUŃ →</span>
         </div>
       </div>
       
@@ -559,12 +580,28 @@ function TaskCardMobile({
           }
         }}
       >
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1">
           <div className="flex-1 min-w-0">
             <p className="font-medium text-xs line-clamp-2 text-gray-800">
               {task.content}
             </p>
           </div>
+          
+          <button
+            onClick={async (e) => {
+              e.stopPropagation()
+              setLoading(true)
+              try {
+                await onComplete(task.id)
+              } finally {
+                setLoading(false)
+              }
+            }}
+            className="md:opacity-0 md:group-hover:opacity-100 transition-all p-1 hover:bg-green-50 rounded flex-shrink-0 text-green-600 hover:text-green-700"
+            title="Ukończ zadanie"
+          >
+            <CheckCircle size={16} weight="bold" />
+          </button>
           
           <button
             onClick={(e) => {

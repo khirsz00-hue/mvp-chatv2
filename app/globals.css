@@ -403,3 +403,12 @@ input[type="range"]::-moz-range-thumb:active {
   scrollbar-width: auto !important;
   scrollbar-color: #a855f7 #f3f4f6 !important;
 }
+
+/* Hide scrollbar when not scrolling */
+[data-scrollbar="hidden"]::-webkit-scrollbar {
+  display: none !important;
+}
+
+[data-scrollbar="hidden"] {
+  scrollbar-width: none !important;
+}

@@ -482,20 +482,34 @@ export function TaskCard({
           </Button>
         </div>
         
-        {/* Mobile: Show context menu */}
-        <div className="md:hidden relative flex-shrink-0 ml-2 z-40" ref={mobileMenuRef}>
+        {/* Mobile: Show complete button and context menu */}
+        <div className="md:hidden flex items-center gap-1 flex-shrink-0 ml-2 z-40">
           <Button 
             size="sm" 
             variant="ghost"
             onClick={(e) => {
               e.stopPropagation()
-              setShowMobileMenu(!showMobileMenu)
+              handleComplete(e)
             }}
-            title="Więcej opcji"
-            className="p-2 h-auto"
+            title="Ukończ"
+            className="p-2 h-auto text-green-600 hover:bg-green-50"
           >
-            <DotsThree size={20} weight="bold" className="text-gray-600" />
+            <CheckCircle size={18} weight="bold" />
           </Button>
+          
+          <div className="relative" ref={mobileMenuRef}>
+            <Button 
+              size="sm" 
+              variant="ghost"
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowMobileMenu(!showMobileMenu)
+              }}
+              title="Więcej opcji"
+              className="p-2 h-auto"
+            >
+              <DotsThree size={20} weight="bold" className="text-gray-600" />
+            </Button>
           
           {showMobileMenu && (
             <div 
@@ -581,6 +595,7 @@ export function TaskCard({
               </button>
             </div>
           )}
+          </div>
         </div>
       </div>
 

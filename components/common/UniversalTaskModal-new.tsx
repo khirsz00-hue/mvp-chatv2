@@ -271,7 +271,7 @@ export function UniversalTaskModal({
         dueDate: ''
       }
     }
-  }, [open, task, defaultDate])
+  }, [open, task?.id, defaultDate]) // Only re-run when modal opens or task ID changes, not on every task update
   
   // Auto-generate AI understanding when title changes
   useEffect(() => {
