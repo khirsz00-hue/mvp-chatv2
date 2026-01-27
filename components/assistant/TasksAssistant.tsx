@@ -472,10 +472,36 @@ export function TasksAssistant() {
       }))
     })
     
-    // If filter is 'completed', tasks are already filtered by API
-    // Just return them as-is
+    // If filter is 'completed', apply range and search filters
     if (filterType === 'completed') {
-      return tasks
+      let filteredCompleted = tasks
+      
+      // Apply completedRange filter
+      if (completedRange === 'recent') {
+        const sevenDaysAgo = addDays(now, -7)
+        filteredCompleted = filteredCompleted.filter(task => {
+          if (!task.completed) return false
+          // Check when task was completed using created_at as proxy
+          if (!task.created_at) return true // Include if no date
+          try {
+            const completedDate = startOfDay(parseISO(task.created_at))
+            return completedDate >= sevenDaysAgo
+          } catch {
+            return true // Include if date parsing fails
+          }
+        })
+      }
+      
+      // Apply search filter if present
+      if (completedSearch) {
+        const searchLower = completedSearch.toLowerCase()
+        filteredCompleted = filteredCompleted.filter(task => 
+          task.content.toLowerCase().includes(searchLower) ||
+          task.description?.toLowerCase().includes(searchLower)
+        )
+      }
+      
+      return filteredCompleted
     }
     
     const now = startOfDay(new Date())
@@ -1567,6 +1593,45 @@ export function TasksAssistant() {
                   <span className="hidden md:inline">Tablica</span>
                 </button>
               </div>
+              
+              {/* Grouping buttons - only show in board view */}
+              {view === 'board' && (
+                <div className="inline-flex rounded-lg border border-gray-200 p-0.5 bg-gray-50">
+                  <button
+                    onClick={() => setBoardGrouping('day')}
+                    className={cn(
+                      'px-2.5 py-1.5 rounded-md transition-all flex items-center gap-1.5 font-medium text-xs',
+                      boardGrouping === 'day' 
+                        ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-sm' 
+                        : 'text-gray-600 hover:bg-white hover:shadow-sm'
+                    )}
+                  >
+                    Wg dni
+                  </button>
+                  <button
+                    onClick={() => setBoardGrouping('project')}
+                    className={cn(
+                      'px-2.5 py-1.5 rounded-md transition-all flex items-center gap-1.5 font-medium text-xs',
+                      boardGrouping === 'project' 
+                        ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-sm' 
+                        : 'text-gray-600 hover:bg-white hover:shadow-sm'
+                    )}
+                  >
+                    Wg projektu
+                  </button>
+                  <button
+                    onClick={() => setBoardGrouping('priority')}
+                    className={cn(
+                      'px-2.5 py-1.5 rounded-md transition-all flex items-center gap-1.5 font-medium text-xs',
+                      boardGrouping === 'priority' 
+                        ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-sm' 
+                        : 'text-gray-600 hover:bg-white hover:shadow-sm'
+                    )}
+                  >
+                    Wg priorytetu
+                  </button>
+                </div>
+              )}
             </div>
             
             {/* Middle: Compact filters - Desktop only (≥768px) */}
@@ -1629,7 +1694,7 @@ export function TasksAssistant() {
               <div className="hidden md:flex items-center gap-4 flex-1 justify-center">
                 {/* Welcome message */}
                 <div className="text-sm text-gray-600">
-                  <span className="font-semibold">Cześć {user?.user_metadata?.full_name || 'Użytkowniku'}</span>
+                  <span className="font-semibold">Cześć</span>
                   <span className="text-gray-400 mx-2">•</span>
                   <span>{format(new Date(), "d MMMM yyyy 'godz' HH:mm", { locale: pl })}</span>
                 </div>

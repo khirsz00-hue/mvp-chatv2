@@ -621,12 +621,6 @@ function DayColumnComponent({
                   isDraggingGlobal={isDraggingGlobal}
                 />
               ))}
-              {/* Drop zone at bottom */}
-              {isDraggingGlobal && (
-                <div className="h-20 border-2 border-dashed border-brand-purple/30 rounded-md flex items-center justify-center text-xs text-brand-purple/50">
-                  Upuść tutaj
-                </div>
-              )}
             </>
           )}
         </div>
@@ -687,6 +681,8 @@ function SortableTaskCard({
     <div
       ref={setNodeRef}
       style={style}
+      {...attributes}
+      {...listeners}
       className={cn(
         'transition-all relative',
         isDragging && 'opacity-0',
