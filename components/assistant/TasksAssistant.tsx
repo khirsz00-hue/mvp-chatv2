@@ -8,7 +8,7 @@ import { useToast } from '@/components/ui/Toast'
 import { Plus, List, Kanban, CalendarBlank, Calendar, CheckSquare, Trash, Funnel, SlidersHorizontal, SortAscending, FolderOpen, Lightning, DotsThree, CaretLeft, CaretRight } from '@phosphor-icons/react'
 import { startOfDay, addDays, parseISO, isSameDay, isBefore, isWithinInterval, format } from 'date-fns'
 import { pl } from 'date-fns/locale'
-import { UniversalTaskModal, TaskData } from '@/components/common/UniversalTaskModal-new'
+import { UniversalTaskModal, TaskData } from '@/components/common/UniversalTaskModal'
 import { TaskCard } from './TaskCard'
 import { SevenDaysBoardView } from './SevenDaysBoardView'
 import { MobileDayCarousel } from './MobileDayCarousel'
@@ -16,12 +16,10 @@ import { MonthView } from './MonthView'
 import { TaskTimer } from './TaskTimer'
 import { PomodoroTimer } from './PomodoroTimer'
 import { supabase } from '@/lib/supabaseClient'
-import { User } from '@supabase/supabase-js'
 import Dialog, { DialogContent } from '@/components/ui/Dialog'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/DropdownMenu'
-import { cn } from '@/lib/utils'
 
 interface Task {
   id: string  // Supabase UUID
@@ -86,7 +84,6 @@ const calculateElapsedSeconds = (startTime: number): number => {
 
 export function TasksAssistant() {
   const { showToast } = useToast()
-  const [user, setUser] = useState<User | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(false)
@@ -123,16 +120,9 @@ export function TasksAssistant() {
   
   // Ref for cleanup in auto-sync effect
   const syncCleanupRef = useRef(true)
-  const lastManualUpdateRef = useRef<number>(0)
   
-  // Fetch user data
-  useEffect(() => {
-    const fetchUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
-    }
-    fetchUser()
-  }, [])
+  // Ref for tracking last manual update timestamp (for preventing auto-sync conflicts)
+  const lastManualUpdateRef = useRef(0)
   
   // Mobile detection effect
   useEffect(() => {
@@ -199,6 +189,8 @@ export function TasksAssistant() {
   ]), [])
   
   const fetchTasks = useCallback(async () => {
+    const fetchId = Date.now()
+    console.log(`🔄 [fetchTasks #${fetchId}] Starting fetch...`)
     setLoading(true)
     try {
       console.log('🔍 Fetching tasks with token:', token ? 'EXISTS' : 'MISSING', 'USE_UNIFIED_API:', USE_UNIFIED_API)
@@ -236,14 +228,14 @@ export function TasksAssistant() {
                 source: t.source  // ✅ Source for sync logic
               }))
               
-              console.log('✅ Unified API - Mapped tasks:', mapped)
+              console.log(`✅ [fetchTasks #${fetchId}] Unified API - Mapped ${mapped.length} tasks`)
               setTasks(mapped)
               setLoading(false)
               return
             }
           }
           
-          console.warn('⚠️ Unified API failed or no session, falling back to Todoist API')
+          console.warn(`⚠️ [fetchTasks #${fetchId}] Unified API failed or no session, falling back to Todoist API`)
         } catch (unifiedError) {
           console.error('❌ Unified API error, falling back to Todoist API:', unifiedError)
         }
@@ -318,18 +310,33 @@ export function TasksAssistant() {
   
   // Fetch tasks initially
   useEffect(() => {
+    console.log('🔄 [useEffect] Mount/Token change effect triggered - token:', !!token, 'USE_UNIFIED_API:', USE_UNIFIED_API)
+    
     // In unified API mode without token, always fetch local tasks
     // In legacy mode, require token
     if (!token && !USE_UNIFIED_API) return
     
-    // Initial fetch on mount
-    fetchTasks()
+    // Check if there was a recent manual update
+    const timeSinceLastUpdate = Date.now() - lastManualUpdateRef.current
+    if (timeSinceLastUpdate < 120000) {
+      console.log('⏭️ [useEffect] Skipping initial fetch - recent manual update:', Math.floor(timeSinceLastUpdate / 1000), 's ago')
+    } else {
+      // Initial fetch on mount
+      fetchTasks()
+    }
     
     // Note: Periodic fetching is handled by the auto-sync effect below for Todoist users
     // For non-Todoist users, we poll every 45 seconds
     if (!token) {
+      console.log('⏱️ [useEffect] Starting 45s polling for non-Todoist user')
       const interval = setInterval(() => {
-        fetchTasks()
+        const timeSinceUpdate = Date.now() - lastManualUpdateRef.current
+        if (timeSinceUpdate < 120000) {
+          console.log('⏱️ [Polling] Skipping 45s fetch - recent manual update:', Math.floor(timeSinceUpdate / 1000), 's ago')
+        } else {
+          console.log('⏱️ [Polling] 45s interval - fetching tasks')
+          fetchTasks()
+        }
       }, 45000)
       
       return () => clearInterval(interval)
@@ -347,13 +354,6 @@ export function TasksAssistant() {
     
     const triggerSync = async () => {
       if (!syncCleanupRef.current) return  // Skip if component unmounted
-      
-      // Skip sync if manual update happened in last 60 seconds
-      const timeSinceLastUpdate = Date.now() - lastManualUpdateRef.current
-      if (timeSinceLastUpdate < 60000) {
-        console.log('⏭️ [TasksAssistant] Skipping auto-sync - recent manual update:', Math.floor(timeSinceLastUpdate / 1000), 's ago')
-        return
-      }
       
       try {
         console.log('🔄 [TasksAssistant] Auto-syncing with Todoist...')
@@ -373,9 +373,17 @@ export function TasksAssistant() {
         
         if (response.ok) {
           console.log('✅ [TasksAssistant] Todoist sync completed')
-          // Refresh tasks after sync
-          if (syncCleanupRef.current) {
-            await fetchTasks()
+          
+          // Check if there was a recent manual update
+          const timeSinceLastUpdate = Date.now() - lastManualUpdateRef.current
+          if (timeSinceLastUpdate < 120000) {  // 2 minutes protection
+            console.log('⏭️ [TasksAssistant] Skipping fetchTasks after sync - recent manual update:', Math.floor(timeSinceLastUpdate / 1000), 's ago')
+          } else {
+            // Refresh tasks after sync
+            if (syncCleanupRef.current) {
+              console.log('🔄 [TasksAssistant] Fetching tasks after successful sync')
+              await fetchTasks()
+            }
           }
         } else {
           console.warn('⚠️ [TasksAssistant] Todoist sync failed:', response.status)
@@ -461,8 +469,6 @@ export function TasksAssistant() {
   
   // Filter tasks by date
   const filterTasks = (tasks: Task[], filterType: FilterType) => {
-    const now = startOfDay(new Date())
-    
     console.log('🔍 FILTER DEBUG:', {
       totalTasks: tasks.length,
       filterType,
@@ -474,37 +480,13 @@ export function TasksAssistant() {
       }))
     })
     
-    // If filter is 'completed', apply range and search filters
+    // If filter is 'completed', tasks are already filtered by API
+    // Just return them as-is
     if (filterType === 'completed') {
-      let filteredCompleted = tasks
-      
-      // Apply completedRange filter
-      if (completedRange === 'recent') {
-        const sevenDaysAgo = addDays(now, -7)
-        filteredCompleted = filteredCompleted.filter(task => {
-          if (!task.completed) return false
-          // Check when task was completed using created_at as proxy
-          if (!task.created_at) return true // Include if no date
-          try {
-            const completedDate = startOfDay(parseISO(task.created_at))
-            return completedDate >= sevenDaysAgo
-          } catch {
-            return true // Include if date parsing fails
-          }
-        })
-      }
-      
-      // Apply search filter if present
-      if (completedSearch) {
-        const searchLower = completedSearch.toLowerCase()
-        filteredCompleted = filteredCompleted.filter(task => 
-          task.content.toLowerCase().includes(searchLower) ||
-          task.description?.toLowerCase().includes(searchLower)
-        )
-      }
-      
-      return filteredCompleted
+      return tasks
     }
+    
+    const now = startOfDay(new Date())
     
     const filtered = tasks.filter(task => {
       // Skip completed tasks for non-completed filters
@@ -838,66 +820,11 @@ export function TasksAssistant() {
   const handleComplete = async (taskId: string) => {
     try {
       const task = tasks.find(t => t.id === taskId)
-      if (!task) throw new Error('Task not found')
       
-      // Try unified API first
-      if (USE_UNIFIED_API) {
-        try {
-          const { data: { session } } = await supabase.auth.getSession()
-          if (session) {
-            const res = await fetch(`/api/tasks/${taskId}/complete`, {
-              method: 'POST',
-              headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${session.access_token}`
-              },
-              body: JSON.stringify({
-                sync_to_external: !!token && !!task.todoist_task_id
-              })
-            })
-            
-            if (res.ok) {
-              setTasks(prev => prev.filter(t => t.id !== taskId))
-              showToast('Zadanie ukończone!', 'success')
-              
-              // Track analytics
-              const dueDate = typeof task.due === 'string' ? task.due : task.due?.date
-              const today = new Date().toISOString().split('T')[0]
-              let completionSpeed: 'early' | 'on-time' | 'late' | null = null
-              
-              if (dueDate) {
-                if (dueDate > today) completionSpeed = 'early'
-                else if (dueDate === today) completionSpeed = 'on-time'
-                else completionSpeed = 'late'
-              }
-              
-              trackTaskAnalytics({
-                task_id: taskId,
-                task_title: task.content,
-                task_project: task.project_id || null,
-                task_labels: task.labels || [],
-                priority: task.priority || 4,
-                due_date: dueDate || null,
-                completed_date: new Date().toISOString(),
-                action_type: 'completed',
-                completion_speed: completionSpeed
-              })
-              
-              console.log('✅ Zadanie ukończone!')
-              return
-            }
-          }
-        } catch (unifiedError) {
-          console.warn('⚠️ Unified API failed, falling back to Todoist API:', unifiedError)
-        }
-      }
-      
-      // Fallback to Todoist API
-      const todoistId = task.todoist_task_id || taskId
       const res = await fetch('/api/todoist/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: todoistId, token })
+        body: JSON.stringify({ id: taskId, token })
       })
       
       if (!res.ok) throw new Error('Failed to complete task')
@@ -975,87 +902,21 @@ export function TasksAssistant() {
   
   const handleUpdate = async (taskId: string, updates: Partial<Task>, showToastMsg: boolean = true) => {
     try {
+      // 🔒 Mark manual update timestamp FIRST - before any async operations
+      lastManualUpdateRef.current = Date.now()
+      console.log('🔒 [handleUpdate] Set manual update protection timestamp:', new Date(lastManualUpdateRef.current).toISOString())
+      
       // Find the task to get its Todoist ID
       const task = tasks.find(t => t.id === taskId)
       if (!task) {
         showToast('Nie znaleziono zadania', 'error')
         return
       }
-      
-      // Mark timestamp of manual update to prevent auto-sync conflicts
-      lastManualUpdateRef.current = Date.now()
 
       // ⚡ OPTIMISTIC UPDATE - Update UI immediately for instant feedback
       setTasks(prev => prev.map(t => 
         t.id === taskId ? { ...t, ...updates } : t
       ))
-
-      // If unified API is enabled, use it first
-      if (USE_UNIFIED_API) {
-        try {
-          const { data: { session } } = await supabase.auth.getSession()
-          if (session) {
-            const sync_to_external = !!token && !!task.todoist_task_id
-            
-            // Normalize due date - extract string from object if needed
-            let due_date: string | undefined = undefined
-            if (updates.due) {
-              due_date = typeof updates.due === 'string' ? updates.due : updates.due.date
-            }
-            
-            const res = await fetch('/api/tasks', {
-              method: 'PATCH',
-              headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${session.access_token}`
-              },
-              body: JSON.stringify({
-                id: taskId,
-                title: updates.content,
-                description: updates.description,
-                priority: updates.priority,
-                due_date: due_date,
-                estimate_min: updates.duration,
-                sync_to_external: sync_to_external
-              })
-            })
-            
-            if (res.ok) {
-              const data = await res.json()
-              const updatedTask = data.task
-              
-              console.log('✅ Task updated via unified API:', updatedTask)
-              
-              // Update with actual response from server
-              setTasks(prev => prev.map(t => 
-                t.id === taskId ? { 
-                  ...t, 
-                  content: updatedTask.title,
-                  description: updatedTask.description,
-                  priority: updatedTask.priority,
-                  due: updatedTask.due_date,
-                  _dueYmd: updatedTask.due_date,
-                  duration: updatedTask.estimate_min
-                } : t
-              ))
-              
-              if (showToastMsg) {
-                if (data.sync_queued) {
-                  showToast('Zadanie zaktualizowane. Synchronizacja w tle...', 'success')
-                } else {
-                  showToast('Zadanie zaktualizowane', 'success')
-                }
-              }
-              
-              return
-            }
-            
-            console.warn('⚠️ Unified API PATCH failed, falling back to legacy API')
-          }
-        } catch (unifiedError) {
-          console.error('❌ Unified API error, falling back to legacy API:', unifiedError)
-        }
-      }
 
       // ✅ If task has Todoist ID, sync with Todoist API
       if (task.todoist_task_id && token) {
@@ -1148,15 +1009,11 @@ export function TasksAssistant() {
   
   const handleMove = async (taskId: string, newValue: string, grouping?: BoardGrouping) => {
     try {
-      console.log('[handleMove] Called with:', { taskId, newValue, grouping, boardGrouping })
-      
       const task = tasks.find(t => t.id === taskId)
       if (!task) {
-        console.error('[handleMove] Task not found:', taskId)
+        console.error('Task not found:', taskId)
         return
       }
-      
-      console.log('[handleMove] Found task:', task)
       
       const currentGrouping = grouping || boardGrouping
       console.log('[handleMove] Using grouping:', currentGrouping)
@@ -1168,7 +1025,12 @@ export function TasksAssistant() {
         const oldDate = typeof task.due === 'string' ? task.due : task.due?.date
         updates.due = newValue
         
-        console.log('[handleMove] Updating due date:', { oldDate, newDate: newValue })
+        console.log('[handleMove] Day grouping - updating due date:', { 
+          taskId, 
+          taskContent: task.content,
+          oldDate, 
+          newDate: newValue 
+        })
         
         // Track analytics for postponement
         if (oldDate && oldDate !== newValue) {
@@ -1267,26 +1129,9 @@ export function TasksAssistant() {
         token
       })
     }
-    // Close modal after manual save
+    // Close modal after save
     setShowUniversalModal(false)
     setUniversalModalTask(null)
-  }
-  
-  // Auto-save handler - doesn't close modal
-  const handleUniversalAutoSave = async (taskData: TaskData) => {
-    if (taskData.id) {
-      // UPDATE existing task silently
-      await handleUpdate(taskData.id, {
-        content: taskData.content,
-        description: taskData.description,
-        priority: taskData.priority,
-        due: taskData.due,
-        project_id: taskData.project_id,
-        labels: taskData.labels,
-        duration: taskData.estimated_minutes
-      }, false) // Don't show toast for auto-save
-    }
-    // Don't close modal for auto-save
   }
   
   // Convert Task to TaskData for UniversalTaskModal
@@ -1563,7 +1408,7 @@ export function TasksAssistant() {
         </div>
         
         {/* Control Bar - Compact Desktop Layout */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 mb-4">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3">
           <div className="flex items-center justify-between gap-3">
             {/* Left: View switcher */}
             <div className="flex items-center gap-2">
@@ -1593,45 +1438,6 @@ export function TasksAssistant() {
                   <span className="hidden md:inline">Tablica</span>
                 </button>
               </div>
-              
-              {/* Grouping buttons - only show in board view */}
-              {view === 'board' && (
-                <div className="inline-flex rounded-lg border border-gray-200 p-0.5 bg-gray-50">
-                  <button
-                    onClick={() => setBoardGrouping('day')}
-                    className={cn(
-                      'px-2.5 py-1.5 rounded-md transition-all flex items-center gap-1.5 font-medium text-xs',
-                      boardGrouping === 'day' 
-                        ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-sm' 
-                        : 'text-gray-600 hover:bg-white hover:shadow-sm'
-                    )}
-                  >
-                    Wg dni
-                  </button>
-                  <button
-                    onClick={() => setBoardGrouping('project')}
-                    className={cn(
-                      'px-2.5 py-1.5 rounded-md transition-all flex items-center gap-1.5 font-medium text-xs',
-                      boardGrouping === 'project' 
-                        ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-sm' 
-                        : 'text-gray-600 hover:bg-white hover:shadow-sm'
-                    )}
-                  >
-                    Wg projektu
-                  </button>
-                  <button
-                    onClick={() => setBoardGrouping('priority')}
-                    className={cn(
-                      'px-2.5 py-1.5 rounded-md transition-all flex items-center gap-1.5 font-medium text-xs',
-                      boardGrouping === 'priority' 
-                        ? 'bg-gradient-to-r from-brand-purple to-brand-pink text-white shadow-sm' 
-                        : 'text-gray-600 hover:bg-white hover:shadow-sm'
-                    )}
-                  >
-                    Wg priorytetu
-                  </button>
-                </div>
-              )}
             </div>
             
             {/* Middle: Compact filters - Desktop only (≥768px) */}
@@ -1689,18 +1495,11 @@ export function TasksAssistant() {
               </div>
             )}
             
-            {/* Middle: Board controls - Desktop only */}
-            {view === 'board' && (
-              <div className="hidden md:flex items-center gap-4 flex-1 justify-center">
-                {/* Welcome message */}
-                <div className="text-sm text-gray-600">
-                  <span className="font-semibold">Cześć</span>
-                  <span className="text-gray-400 mx-2">•</span>
-                  <span>{format(new Date(), "d MMMM yyyy 'godz' HH:mm", { locale: pl })}</span>
-                </div>
-                
-                {/* Week navigation - only for day grouping */}
-                {boardGrouping === 'day' && boardWeekLabel && (
+            {/* Middle: Board grouping selector + week navigation - Desktop only (≥768px) - ONLY for board view */}
+            {view === 'board' && boardGrouping === 'day' && (
+              <div className="hidden md:flex items-center gap-3 flex-1 justify-center">
+                {/* Week Navigation */}
+                {boardWeekLabel && (
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => {
@@ -1729,9 +1528,43 @@ export function TasksAssistant() {
                     </button>
                   </div>
                 )}
+                
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide px-1">
+                    Grupowanie
+                  </label>
+                  <select 
+                    value={boardGrouping} 
+                    onChange={(e) => setBoardGrouping(e.target.value as BoardGrouping)}
+                    className="px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-brand-purple transition-colors min-w-[140px]"
+                  >
+                    <option value="day">📅 Dni</option>
+                    <option value="priority">🚩 Priorytety</option>
+                    <option value="project">📁 Projekty</option>
+                  </select>
+                </div>
               </div>
             )}
-
+            
+            {/* Middle: Board grouping selector - Desktop only (≥768px) - For non-day groupings */}
+            {view === 'board' && boardGrouping !== 'day' && (
+              <div className="hidden md:flex items-center gap-3 flex-1 justify-center">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide px-1">
+                    Grupowanie
+                  </label>
+                  <select 
+                    value={boardGrouping} 
+                    onChange={(e) => setBoardGrouping(e.target.value as BoardGrouping)}
+                    className="px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-brand-purple transition-colors min-w-[140px]"
+                  >
+                    <option value="day">📅 Dni</option>
+                    <option value="priority">🚩 Priorytety</option>
+                    <option value="project">📁 Projekty</option>
+                  </select>
+                </div>
+              </div>
+            )}
             
             {/* Right: Task count badge */}
             <div className="hidden md:block">
@@ -1765,7 +1598,7 @@ export function TasksAssistant() {
                       <DotsThree size={16} weight="bold" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="z-[9999]">
+                  <DropdownMenuContent align="end">
                     <DropdownMenuLabel>Filtry specjalne</DropdownMenuLabel>
                     <DropdownMenuItem onClick={() => setFilter('unscheduled')}>
                       Do zaplanowania
@@ -1966,10 +1799,7 @@ export function TasksAssistant() {
       isMobile ? (
         <MobileDayCarousel
           tasks={activeTasks}
-          onMove={async (taskId, newDate) => {
-            console.log('[TasksAssistant] MobileDayCarousel onMove called:', { taskId, newDate })
-            await handleMove(taskId, newDate, 'day')
-          }}
+          onMove={handleMove}
           onComplete={handleComplete}
           onDelete={handleDelete}
           onDetails={(t) => {
@@ -2029,7 +1859,6 @@ export function TasksAssistant() {
         onOpenChange={setShowUniversalModal}
         task={taskToTaskData(universalModalTask)}
         onSave={handleUniversalSave}
-        onAutoSave={handleUniversalAutoSave}
         onDelete={handleDelete}
         onComplete={handleComplete}
       />
