@@ -159,6 +159,8 @@ export function UniversalTaskModal({
   })
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isSavingRef = useRef(false)
+  const [hasUnsavedContentChanges, setHasUnsavedContentChanges] = useState(false)
+  const initialContentRef = useRef({ content: '', description: '' })
   
   // UI State
   const [showDatePicker, setShowDatePicker] = useState(false)
@@ -246,7 +248,11 @@ export function UniversalTaskModal({
       setDueDate(initialDueDate)
       setSelectedLabels(task.labels || [])
       
-      // Initialize lastValuesRef
+      // Initialize refs
+      initialContentRef.current = {
+        content: initialContent,
+        description: initialDescription
+      }
       lastValuesRef.current = {
         content: initialContent,
         description: initialDescription,
@@ -267,6 +273,12 @@ export function UniversalTaskModal({
       setAiUnderstanding('')
       setSubtasks([])
       setChangeHistory([])
+      setHasUnsavedContentChanges(false)
+      
+      initialContentRef.current = {
+        content: '',
+        description: ''
+      }
       
       lastValuesRef.current = {
         content: '',
@@ -293,14 +305,25 @@ export function UniversalTaskModal({
     return () => clearTimeout(timeout)
   }, [content])
   
+  // Track content/description changes for save button
+  useEffect(() => {
+    if (isEditMode) {
+      const hasChanges = 
+        content !== initialContentRef.current.content ||
+        description !== initialContentRef.current.description
+      setHasUnsavedContentChanges(hasChanges)
+    } else {
+      // For new tasks, show save button if content is not empty
+      setHasUnsavedContentChanges(content.trim().length > 0)
+    }
+  }, [content, description, isEditMode])
+  
   // Auto-save and change tracking for edit mode
   useEffect(() => {
     if (!task?.id || !isEditMode || isSavingRef.current) return
     
-    // Check if anything changed
+    // Check if anything changed (exclude content/description - they need manual save)
     if (
-      content === (task.content || '') &&
-      description === (task.description || '') &&
       priority === (task.priority || 3) &&
       dueDate === (task.due || '') &&
       projectId === (task.project_id || '') &&
@@ -369,10 +392,10 @@ export function UniversalTaskModal({
         setChangeHistory(prev => [...changes, ...prev])
       }
       
-      // Update lastValuesRef
+      // Update lastValuesRef (excluding content/description)
       lastValuesRef.current = {
-        content,
-        description,
+        content: task.content || '',
+        description: task.description || '',
         priority,
         dueDate
       }
@@ -546,8 +569,7 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
     return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
   
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSave = async () => {
     if (!content.trim()) return
     
     setSaving(true)
@@ -565,16 +587,29 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
         labels: selectedLabels
       }
       
-      console.log('🎯 [MODAL] Submitting priority:', taskData.priority)
-      
       await onSave(taskData)
-      onOpenChange(false)
+      
+      // Update initial content ref
+      initialContentRef.current = {
+        content: content.trim(),
+        description: description.trim()
+      }
+      
+      // Don't close modal for edit mode, only for new tasks
+      if (!isEditMode) {
+        onOpenChange(false)
+      }
     } catch (error) {
       console.error('Failed to save task:', error)
       alert('Nie udało się zapisać zadania')
     } finally {
       setSaving(false)
     }
+  }
+  
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await handleSave()
   }
   
   const handleDelete = async () => {
@@ -1170,55 +1205,80 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
           </div>
 
           {/* Footer Actions */}
-          <div className="border-t border-slate-100 p-3 sm:p-4 bg-slate-50 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0 rounded-b-2xl">
-            {isMobile ? (
-              <>
-                <button 
-                  type="button"
-                  onClick={handleComplete}
-                  className="w-full bg-slate-700 active:bg-slate-800 text-white px-6 py-2.5 rounded-xl font-medium shadow-lg shadow-slate-200 flex items-center justify-center gap-2 min-h-[44px]"
-                >
-                  <CheckCircle size={16} weight="fill" /> Ukończ zadanie
-                </button>
-                
-                {onDelete && (
-                  <button 
-                    type="button"
-                    onClick={handleDelete}
-                    className="text-slate-400 active:text-red-500 active:bg-red-50 py-2 rounded-lg text-xs flex items-center justify-center gap-1.5 min-h-[40px]"
-                  >
-                    <Trash size={12} />
-                    <span>Usuń zadanie</span>
-                  </button>
-                )}
-              </>
-            ) : (
+          <div className="border-t border-slate-100 p-3 sm:p-4 bg-slate-50 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3 rounded-b-2xl">
+            {isEditMode ? (
+              // Edit mode: Delete button + Close/Save button
               <>
                 {onDelete && (
                   <button 
                     type="button"
                     onClick={handleDelete}
-                    className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors text-sm flex items-center gap-2 group"
+                    className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors text-sm flex items-center gap-2"
                   >
                     <Trash size={16} />
-                    <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 -ml-2 group-hover:ml-0">
-                      Usuń
-                    </span>
+                    <span>Usuń</span>
                   </button>
                 )}
                 
-                <div className="flex items-center gap-3">
-                  <div className="text-xs text-slate-400 italic mr-2 hidden sm:block">
-                    Enter aby zapisać, Esc aby wyjść
-                  </div>
-                  <button 
-                    type="button"
-                    onClick={handleComplete}
-                    className="bg-violet-600 hover:bg-violet-700 text-white px-6 py-2.5 rounded-xl font-medium shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all transform active:scale-95 flex items-center gap-2"
-                  >
-                    <CheckCircle size={18} weight="fill" /> Ukończ zadanie
-                  </button>
+                <div className="flex items-center gap-3 ml-auto">
+                  {hasUnsavedContentChanges ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // Revert changes
+                          setContent(initialContentRef.current.content)
+                          setDescription(initialContentRef.current.description)
+                          setHasUnsavedContentChanges(false)
+                        }}
+                        className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+                      >
+                        Anuluj
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await handleSave()
+                          initialContentRef.current = { content, description }
+                          setHasUnsavedContentChanges(false)
+                        }}
+                        className="px-6 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg font-medium shadow-md hover:shadow-lg transition-all flex items-center gap-2"
+                      >
+                        Zapisz
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onOpenChange(false)}
+                      className="px-6 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg font-medium shadow-md transition-all flex items-center gap-2"
+                    >
+                      Zamknij
+                      <span className="text-xs opacity-75 ml-1">zmiany zapisane</span>
+                    </button>
+                  )}
                 </div>
+              </>
+            ) : (
+              // New task mode: Cancel + Add task button
+              <>
+                <button
+                  type="button"
+                  onClick={() => onOpenChange(false)}
+                  className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                  Anuluj
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={!hasUnsavedContentChanges}
+                  className="px-6 py-2 bg-violet-600 hover:bg-violet-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg font-medium shadow-md hover:shadow-lg transition-all flex items-center gap-2"
+                >
+                  <Plus size={18} weight="bold" />
+                  Dodaj zadanie
+                </button>
               </>
             )}
           </div>
