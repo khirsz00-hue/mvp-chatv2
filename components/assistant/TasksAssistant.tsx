@@ -21,6 +21,7 @@ import Dialog, { DialogContent } from '@/components/ui/Dialog'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/DropdownMenu'
+import { cn } from '@/lib/utils'
 
 interface Task {
   id: string  // Supabase UUID
