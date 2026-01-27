@@ -461,6 +461,8 @@ export function TasksAssistant() {
   
   // Filter tasks by date
   const filterTasks = (tasks: Task[], filterType: FilterType) => {
+    const now = startOfDay(new Date())
+    
     console.log('🔍 FILTER DEBUG:', {
       totalTasks: tasks.length,
       filterType,
@@ -503,8 +505,6 @@ export function TasksAssistant() {
       
       return filteredCompleted
     }
-    
-    const now = startOfDay(new Date())
     
     const filtered = tasks.filter(task => {
       // Skip completed tasks for non-completed filters
