@@ -431,8 +431,8 @@ function DayCard({
         isToday ? 'border-brand-purple/60' : 'border-gray-200'
       )}
       style={{ 
-        height: 'calc(100dvh - 280px)',
-        maxHeight: '520px',
+        height: 'calc(100dvh - 340px)',
+        maxHeight: '450px',
         WebkitUserSelect: 'none',
         WebkitTouchCallout: 'none'
       }}
@@ -610,7 +610,24 @@ function TaskCardMobile({
           }
         }}
       >
-        <div className="flex items-center gap-1">
+        <div className="flex items-start gap-2">
+          {/* Complete button circle */}
+          <button
+            onClick={async (e) => {
+              e.stopPropagation()
+              setLoading(true)
+              try {
+                await onComplete(task.id)
+              } finally {
+                setLoading(false)
+              }
+            }}
+            className="flex-shrink-0 text-gray-300 hover:text-green-500 transition-colors mt-0.5"
+            title="Ukończ zadanie"
+          >
+            <div className="w-4 h-4 rounded-full border-2 border-current" />
+          </button>
+          
           <div className="flex-1 min-w-0">
             <p className="font-medium text-xs line-clamp-2 text-gray-800">
               {task.content}

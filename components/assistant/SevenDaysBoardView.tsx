@@ -114,30 +114,101 @@ export function SevenDaysBoardView({
     }, 100)
   }
 
-  // Generate 7 days columns from startDate
-  const days: DayColumn[] = Array.from({ length: 7 }, (_, i) => {
-    const date = addDays(startDate, i)
-    const dateStr = format(date, 'yyyy-MM-dd')
-    
-    return {
-      id: dateStr,
-      date,
-      dateStr,
-      label: format(date, 'EEEE', { locale: pl }),
-      shortLabel: format(date, 'EEE', { locale: pl }),
-      tasks: tasks.filter(task => {
-        const taskDueStr = typeof task.due === 'string' ? task.due : task.due?.date
-        if (!taskDueStr) return false
+  // Generate columns based on grouping
+  const days: DayColumn[] = (() => {
+    // Day grouping (default)
+    if (grouping === 'day') {
+      return Array.from({ length: 7 }, (_, i) => {
+        const date = addDays(startDate, i)
+        const dateStr = format(date, 'yyyy-MM-dd')
         
-        try {
-          const taskDate = startOfDay(parseISO(taskDueStr))
-          return isSameDay(taskDate, date)
-        } catch {
-          return false
+        return {
+          id: dateStr,
+          date,
+          dateStr,
+          label: format(date, 'EEEE', { locale: pl }),
+          shortLabel: format(date, 'EEE', { locale: pl }),
+          tasks: tasks.filter(task => {
+            const taskDueStr = typeof task.due === 'string' ? task.due : task.due?.date
+            if (!taskDueStr) return false
+            
+            try {
+              const taskDate = startOfDay(parseISO(taskDueStr))
+              return isSameDay(taskDate, date)
+            } catch {
+              return false
+            }
+          })
         }
       })
     }
-  })
+    
+    // Priority grouping
+    if (grouping === 'priority') {
+      const priorityLabels = {
+        1: 'Priorytet 1 (Najwyższy)',
+        2: 'Priorytet 2 (Wysoki)',
+        3: 'Priorytet 3 (Normalny)',
+        4: 'Priorytet 4 (Niski)'
+      }
+      
+      return [1, 2, 3, 4].map(priority => ({
+        id: `priority-${priority}`,
+        date: new Date(),
+        dateStr: `priority-${priority}`,
+        label: priorityLabels[priority as 1 | 2 | 3 | 4],
+        shortLabel: `P${priority}`,
+        tasks: tasks.filter(task => task.priority === priority)
+      }))
+    }
+    
+    // Project grouping
+    if (grouping === 'project') {
+      const projectGroups = new Map<string, Task[]>()
+      
+      tasks.forEach(task => {
+        const projectId = task.project_id || 'no-project'
+        if (!projectGroups.has(projectId)) {
+          projectGroups.set(projectId, [])
+        }
+        projectGroups.get(projectId)!.push(task)
+      })
+      
+      return Array.from(projectGroups.entries()).map(([projectId, projectTasks]) => {
+        const project = projects?.find(p => p.id === projectId)
+        const label = project?.name || 'Bez projektu'
+        
+        return {
+          id: `project-${projectId}`,
+          date: new Date(),
+          dateStr: `project-${projectId}`,
+          label,
+          shortLabel: label.slice(0, 15) + (label.length > 15 ? '...' : ''),
+          tasks: projectTasks
+        }
+      })
+    }
+    
+    // Status grouping
+    if (grouping === 'status') {
+      const statusLabels = {
+        'todo': 'Do zrobienia',
+        'in_progress': 'W trakcie',
+        'done': 'Ukończone'
+      }
+      
+      return (['todo', 'in_progress', 'done'] as const).map(status => ({
+        id: `status-${status}`,
+        date: new Date(),
+        dateStr: `status-${status}`,
+        label: statusLabels[status],
+        shortLabel: statusLabels[status],
+        tasks: tasks.filter(task => (task.status || 'todo') === status)
+      }))
+    }
+    
+    return []
+  })()
 
   // Date range label for header
   const dateRangeLabel = `${format(startDate, 'd MMM', { locale: pl })} - ${format(addDays(startDate, 6), 'd MMM yyyy', { locale: pl })}`
@@ -315,8 +386,8 @@ export function SevenDaysBoardView({
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
     >
-      {/* Header with date range and navigation - only show if not in parent header */}
-      {!showDateRangeInHeader && (
+      {/* Header with date range and navigation - only show for day grouping */}
+      {!showDateRangeInHeader && grouping === 'day' && (
         <div className="flex items-center justify-between mb-4 px-2">
           <div className="flex items-center gap-3">
             <Button
@@ -593,7 +664,8 @@ function SortableTaskCard({
     setNodeRef,
     transform,
     transition,
-    isDragging
+    isDragging,
+    isOver
   } = useSortable({ id: task.id })
 
   const style = {
@@ -608,11 +680,19 @@ function SortableTaskCard({
       ref={setNodeRef}
       style={style}
       className={cn(
-        'transition-all',
+        'transition-all relative',
         isDragging && 'opacity-0',
-        isMoving && 'pointer-events-none scale-95 opacity-70'
+        isMoving && 'pointer-events-none scale-95 opacity-70',
+        // Add spacing when dragging over this task
+        isDraggingGlobal && isOver && 'mb-16'
       )}
     >
+      {/* Drop indicator */}
+      {isDraggingGlobal && isOver && (
+        <div className="absolute inset-x-0 -bottom-8 h-12 bg-brand-purple/10 border-2 border-dashed border-brand-purple rounded-md flex items-center justify-center z-10">
+          <span className="text-xs font-medium text-brand-purple">Upuść tutaj</span>
+        </div>
+      )}
       <MiniTaskCard
         task={task}
         onComplete={onComplete}
