@@ -26,7 +26,7 @@ import {
   MagicWand,
   Question
 } from '@phosphor-icons/react'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/supabaseClient'
 import { toast } from 'sonner'
 
 /* =======================
