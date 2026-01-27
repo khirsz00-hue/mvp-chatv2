@@ -58,6 +58,12 @@ export async function POST(req: Request) {
       .single()
     
     if (error) {
+      // If table doesn't exist, silently skip analytics (graceful degradation)
+      if (error.code === 'PGRST205' || error.message?.includes('Could not find the table')) {
+        console.warn('⚠️ [Analytics] Table user_task_analytics not found, skipping analytics')
+        return NextResponse.json({ success: true, skipped: true })
+      }
+      
       console.error('Error inserting task analytics:', error)
       return NextResponse.json(
         { error: 'Failed to track task analytics' },
