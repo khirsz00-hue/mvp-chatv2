@@ -56,6 +56,7 @@ interface UniversalTaskModalProps {
   
   // Handlers
   onSave: (taskData: TaskData) => void | Promise<void>
+  onAutoSave?: (taskData: TaskData) => void | Promise<void>
   onDelete?: (taskId: string) => void | Promise<void>
   onComplete?: (taskId: string) => void | Promise<void>
   
@@ -109,6 +110,7 @@ export function UniversalTaskModal({
   task,
   defaultDate,
   onSave,
+  onAutoSave,
   onDelete,
   onComplete,
   title: customTitle,
@@ -367,9 +369,10 @@ export function UniversalTaskModal({
         dueDate
       }
       
-      // Auto-save via onSave callback
-      onSave({
-        ...(task.id && { id: task.id }),
+      // Auto-save but keep modal open - only manual Save button closes it
+      const autoSaveHandler = onAutoSave || onSave
+      autoSaveHandler({
+        id: task.id,
         content,
         description,
         priority,
@@ -379,10 +382,10 @@ export function UniversalTaskModal({
         estimated_minutes: estimatedMinutes,
         cognitive_load: cognitiveLoad
       })
-    }, 800)
+    }, 1500) // Increased timeout to give user more time to type
     
     return () => clearTimeout(timeout)
-  }, [content, description, priority, dueDate, projectId, selectedLabels, estimatedMinutes, cognitiveLoad, task, isEditMode, onSave])
+  }, [content, description, priority, dueDate, projectId, selectedLabels, estimatedMinutes, cognitiveLoad, task?.id, isEditMode, onSave, cognitiveLoad])
   
   /* =======================
      HANDLERS

@@ -8,7 +8,7 @@ import { useToast } from '@/components/ui/Toast'
 import { Plus, List, Kanban, CalendarBlank, Calendar, CheckSquare, Trash, Funnel, SlidersHorizontal, SortAscending, FolderOpen, Lightning, DotsThree, CaretLeft, CaretRight } from '@phosphor-icons/react'
 import { startOfDay, addDays, parseISO, isSameDay, isBefore, isWithinInterval, format } from 'date-fns'
 import { pl } from 'date-fns/locale'
-import { UniversalTaskModal, TaskData } from '@/components/common/UniversalTaskModal'
+import { UniversalTaskModal, TaskData } from '@/components/common/UniversalTaskModal-new'
 import { TaskCard } from './TaskCard'
 import { SevenDaysBoardView } from './SevenDaysBoardView'
 import { MobileDayCarousel } from './MobileDayCarousel'
@@ -800,11 +800,66 @@ export function TasksAssistant() {
   const handleComplete = async (taskId: string) => {
     try {
       const task = tasks.find(t => t.id === taskId)
+      if (!task) throw new Error('Task not found')
       
+      // Try unified API first
+      if (USE_UNIFIED_API) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session) {
+            const res = await fetch(`/api/tasks/${taskId}/complete`, {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+              },
+              body: JSON.stringify({
+                sync_to_external: !!token && !!task.todoist_task_id
+              })
+            })
+            
+            if (res.ok) {
+              setTasks(prev => prev.filter(t => t.id !== taskId))
+              showToast('Zadanie ukończone!', 'success')
+              
+              // Track analytics
+              const dueDate = typeof task.due === 'string' ? task.due : task.due?.date
+              const today = new Date().toISOString().split('T')[0]
+              let completionSpeed: 'early' | 'on-time' | 'late' | null = null
+              
+              if (dueDate) {
+                if (dueDate > today) completionSpeed = 'early'
+                else if (dueDate === today) completionSpeed = 'on-time'
+                else completionSpeed = 'late'
+              }
+              
+              trackTaskAnalytics({
+                task_id: taskId,
+                task_title: task.content,
+                task_project: task.project_id || null,
+                task_labels: task.labels || [],
+                priority: task.priority || 4,
+                due_date: dueDate || null,
+                completed_date: new Date().toISOString(),
+                action_type: 'completed',
+                completion_speed: completionSpeed
+              })
+              
+              console.log('✅ Zadanie ukończone!')
+              return
+            }
+          }
+        } catch (unifiedError) {
+          console.warn('⚠️ Unified API failed, falling back to Todoist API:', unifiedError)
+        }
+      }
+      
+      // Fallback to Todoist API
+      const todoistId = task.todoist_task_id || taskId
       const res = await fetch('/api/todoist/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: taskId, token })
+        body: JSON.stringify({ id: todoistId, token })
       })
       
       if (!res.ok) throw new Error('Failed to complete task')
@@ -1168,9 +1223,26 @@ export function TasksAssistant() {
         token
       })
     }
-    // Close modal after save
+    // Close modal after manual save
     setShowUniversalModal(false)
     setUniversalModalTask(null)
+  }
+  
+  // Auto-save handler - doesn't close modal
+  const handleUniversalAutoSave = async (taskData: TaskData) => {
+    if (taskData.id) {
+      // UPDATE existing task silently
+      await handleUpdate(taskData.id, {
+        content: taskData.content,
+        description: taskData.description,
+        priority: taskData.priority,
+        due: taskData.due,
+        project_id: taskData.project_id,
+        labels: taskData.labels,
+        duration: taskData.estimated_minutes
+      }, false) // Don't show toast for auto-save
+    }
+    // Don't close modal for auto-save
   }
   
   // Convert Task to TaskData for UniversalTaskModal
@@ -1901,6 +1973,7 @@ export function TasksAssistant() {
         onOpenChange={setShowUniversalModal}
         task={taskToTaskData(universalModalTask)}
         onSave={handleUniversalSave}
+        onAutoSave={handleUniversalAutoSave}
         onDelete={handleDelete}
         onComplete={handleComplete}
       />
