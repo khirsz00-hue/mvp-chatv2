@@ -897,6 +897,67 @@ export function TasksAssistant() {
         t.id === taskId ? { ...t, ...updates } : t
       ))
 
+      // If unified API is enabled, use it first
+      if (USE_UNIFIED_API) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session) {
+            const sync_to_external = !!token && !!task.todoist_task_id
+            
+            const res = await fetch('/api/tasks', {
+              method: 'PATCH',
+              headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+              },
+              body: JSON.stringify({
+                id: taskId,
+                title: updates.content,
+                description: updates.description,
+                priority: updates.priority,
+                due_date: updates.due,
+                estimate_min: updates.duration,
+                sync_to_external: sync_to_external
+              })
+            })
+            
+            if (res.ok) {
+              const data = await res.json()
+              const updatedTask = data.task
+              
+              console.log('✅ Task updated via unified API:', updatedTask)
+              
+              // Update with actual response from server
+              setTasks(prev => prev.map(t => 
+                t.id === taskId ? { 
+                  ...t, 
+                  content: updatedTask.title,
+                  description: updatedTask.description,
+                  priority: updatedTask.priority,
+                  due: updatedTask.due_date,
+                  _dueYmd: updatedTask.due_date,
+                  duration: updatedTask.estimate_min
+                } : t
+              ))
+              
+              if (showToastMsg) {
+                if (data.sync_queued) {
+                  showToast('Zadanie zaktualizowane. Synchronizacja w tle...', 'success')
+                } else {
+                  showToast('Zadanie zaktualizowane', 'success')
+                }
+              }
+              
+              return
+            }
+            
+            console.warn('⚠️ Unified API PATCH failed, falling back to legacy API')
+          }
+        } catch (unifiedError) {
+          console.error('❌ Unified API error, falling back to legacy API:', unifiedError)
+        }
+      }
+
       // ✅ If task has Todoist ID, sync with Todoist API
       if (task.todoist_task_id && token) {
         const res = await fetch('/api/todoist/update', {
