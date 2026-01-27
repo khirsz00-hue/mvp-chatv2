@@ -1729,43 +1729,6 @@ export function TasksAssistant() {
                     </button>
                   </div>
                 )}
-                
-                {/* Grouping buttons */}
-                <div className="flex items-center gap-2 bg-gray-100 p-1 rounded-lg">
-                  <button
-                    onClick={() => setBoardGrouping('day')}
-                    className={cn(
-                      'px-3 py-1.5 text-sm font-medium rounded-md transition-all',
-                      boardGrouping === 'day' 
-                        ? 'bg-white shadow-sm text-brand-purple' 
-                        : 'text-gray-600 hover:text-gray-900'
-                    )}
-                  >
-                    Wg dni
-                  </button>
-                  <button
-                    onClick={() => setBoardGrouping('project')}
-                    className={cn(
-                      'px-3 py-1.5 text-sm font-medium rounded-md transition-all',
-                      boardGrouping === 'project' 
-                        ? 'bg-white shadow-sm text-brand-purple' 
-                        : 'text-gray-600 hover:text-gray-900'
-                    )}
-                  >
-                    Wg projektu
-                  </button>
-                  <button
-                    onClick={() => setBoardGrouping('priority')}
-                    className={cn(
-                      'px-3 py-1.5 text-sm font-medium rounded-md transition-all',
-                      boardGrouping === 'priority' 
-                        ? 'bg-white shadow-sm text-brand-purple' 
-                        : 'text-gray-600 hover:text-gray-900'
-                    )}
-                  >
-                    Wg priorytetu
-                  </button>
-                </div>
               </div>
             )}
 
