@@ -16,6 +16,7 @@ import { MonthView } from './MonthView'
 import { TaskTimer } from './TaskTimer'
 import { PomodoroTimer } from './PomodoroTimer'
 import { supabase } from '@/lib/supabaseClient'
+import { User } from '@supabase/supabase-js'
 import Dialog, { DialogContent } from '@/components/ui/Dialog'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { BottomSheet } from '@/components/ui/BottomSheet'
@@ -84,6 +85,7 @@ const calculateElapsedSeconds = (startTime: number): number => {
 
 export function TasksAssistant() {
   const { showToast } = useToast()
+  const [user, setUser] = useState<User | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(false)
@@ -121,6 +123,15 @@ export function TasksAssistant() {
   // Ref for cleanup in auto-sync effect
   const syncCleanupRef = useRef(true)
   const lastManualUpdateRef = useRef<number>(0)
+  
+  // Fetch user data
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+    }
+    fetchUser()
+  }, [])
   
   // Mobile detection effect
   useEffect(() => {
