@@ -228,6 +228,7 @@ export function MobileDayCarousel({
           {Array.from({ length: 20 }, (_, i) => {
           const day = addDays(new Date(), i - 10) // Show 10 days before today, today, 9 days after
           const isActive = isSameDay(day, activeDay)
+          const isToday = isSameDay(day, new Date())
           const dayTasks = tasks.filter(t => {
             const taskDue = typeof t.due === 'string' ? t.due : t.due?.date
             if (!taskDue) return false

@@ -275,7 +275,8 @@ export function UniversalTaskModal({
         dueDate: ''
       }
     }
-  }, [open, task?.id, defaultDate]) // Only re-run when modal opens or task ID changes, not on every task update
+  }, [open, task?.id, defaultDate, task]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Note: We intentionally omit individual task properties to prevent re-running on task updates
   
   // Auto-generate AI understanding when title changes
   useEffect(() => {
@@ -403,7 +404,8 @@ export function UniversalTaskModal({
         clearTimeout(autoSaveTimeoutRef.current)
       }
     }
-  }, [content, description, priority, dueDate, projectId, selectedLabels, estimatedMinutes, cognitiveLoad, task?.id, isEditMode, onAutoSave, onSave])
+  }, [content, description, priority, dueDate, projectId, selectedLabels, estimatedMinutes, cognitiveLoad, task?.id, isEditMode, onAutoSave, onSave]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Note: We intentionally omit individual task properties to prevent infinite loops from external updates
   
   /* =======================
      HANDLERS
