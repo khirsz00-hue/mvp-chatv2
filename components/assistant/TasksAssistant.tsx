@@ -959,6 +959,12 @@ export function TasksAssistant() {
           if (session) {
             const sync_to_external = !!token && !!task.todoist_task_id
             
+            // Normalize due date - extract string from object if needed
+            let due_date: string | undefined = undefined
+            if (updates.due) {
+              due_date = typeof updates.due === 'string' ? updates.due : updates.due.date
+            }
+            
             const res = await fetch('/api/tasks', {
               method: 'PATCH',
               headers: { 
@@ -970,7 +976,7 @@ export function TasksAssistant() {
                 title: updates.content,
                 description: updates.description,
                 priority: updates.priority,
-                due_date: updates.due,
+                due_date: due_date,
                 estimate_min: updates.duration,
                 sync_to_external: sync_to_external
               })

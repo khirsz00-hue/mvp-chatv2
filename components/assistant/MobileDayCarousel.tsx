@@ -153,8 +153,12 @@ export function MobileDayCarousel({
     const deltaX = touchEndX - touchStartX.current
     const deltaY = touchEndY - touchStartY.current
     
-    // Only trigger swipe if horizontal movement is greater than vertical
-    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
+    // More lenient swipe detection - allow some vertical movement
+    const horizontalSwipe = Math.abs(deltaX)
+    const verticalSwipe = Math.abs(deltaY)
+    
+    // Trigger horizontal swipe if horizontal movement is at least 30px and 1.5x greater than vertical
+    if (horizontalSwipe > 30 && horizontalSwipe > verticalSwipe * 0.7) {
       if (deltaX > 0) {
         // Swipe right - previous day
         setActiveDay(prev => addDays(prev, -1))
@@ -628,7 +632,17 @@ function TaskCardMobile({
                 setLoading(false)
               }
             }}
-            className="flex-shrink-0 text-gray-300 hover:text-green-500 transition-colors mt-0.5"
+            onTouchEnd={async (e) => {
+              e.stopPropagation()
+              e.preventDefault()
+              setLoading(true)
+              try {
+                await onComplete(task.id)
+              } finally {
+                setLoading(false)
+              }
+            }}
+            className="flex-shrink-0 text-gray-300 hover:text-green-500 transition-colors mt-0.5 touch-none"
             title="Ukończ zadanie"
           >
             <div className="w-4 h-4 rounded-full border-2 border-current" />

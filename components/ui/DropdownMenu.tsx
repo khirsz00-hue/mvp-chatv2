@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { createPortal } from 'react-dom'
 
 export interface DropdownMenuProps {
   children: React.ReactNode
@@ -9,9 +10,10 @@ export interface DropdownMenuProps {
 
 export const DropdownMenu: React.FC<DropdownMenuProps> = ({ children }) => {
   const [open, setOpen] = React.useState(false)
+  const triggerRef = React.useRef<HTMLElement>(null)
 
   return (
-    <DropdownMenuContext.Provider value={{ open, setOpen }}>
+    <DropdownMenuContext.Provider value={{ open, setOpen, triggerRef }}>
       <div className="relative inline-block">
         {children}
       </div>
@@ -22,11 +24,13 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({ children }) => {
 interface DropdownMenuContextType {
   open: boolean
   setOpen: (open: boolean) => void
+  triggerRef: React.RefObject<HTMLElement>
 }
 
 const DropdownMenuContext = React.createContext<DropdownMenuContextType>({
   open: false,
-  setOpen: () => {}
+  setOpen: () => {},
+  triggerRef: { current: null }
 })
 
 export interface DropdownMenuTriggerProps {
@@ -36,7 +40,7 @@ export interface DropdownMenuTriggerProps {
 
 export const DropdownMenuTrigger = React.forwardRef<HTMLButtonElement, DropdownMenuTriggerProps>(
   ({ asChild, children }, ref) => {
-    const { open, setOpen } = React.useContext(DropdownMenuContext)
+    const { open, setOpen, triggerRef } = React.useContext(DropdownMenuContext)
 
     const handleClick = (e: React.MouseEvent) => {
       e.stopPropagation()
@@ -45,7 +49,11 @@ export const DropdownMenuTrigger = React.forwardRef<HTMLButtonElement, DropdownM
 
     if (asChild && React.isValidElement(children)) {
       return React.cloneElement(children as React.ReactElement<React.HTMLProps<HTMLElement>>, {
-        ref,
+        ref: (node: HTMLElement) => {
+          (triggerRef as React.MutableRefObject<HTMLElement | null>).current = node
+          if (typeof ref === 'function') ref(node as any)
+          else if (ref) (ref as React.MutableRefObject<HTMLElement | null>).current = node as any
+        },
         onClick: handleClick
       })
     }
@@ -78,9 +86,53 @@ export const DropdownMenuContent: React.FC<DropdownMenuContentProps> = ({
   className = '',
   children
 }) => {
-  const { open, setOpen } = React.useContext(DropdownMenuContext)
+  const { open, setOpen, triggerRef } = React.useContext(DropdownMenuContext)
   const contentRef = React.useRef<HTMLDivElement>(null)
   const [computedSide, setComputedSide] = React.useState<'top' | 'bottom'>(side)
+  const [position, setPosition] = React.useState({ top: 0, left: 0 })
+
+  // Calculate position based on trigger
+  React.useEffect(() => {
+    if (!open || !triggerRef.current) return
+
+    const updatePosition = () => {
+      const trigger = triggerRef.current
+      if (!trigger) return
+
+      const triggerRect = trigger.getBoundingClientRect()
+      let top = triggerRect.bottom + sideOffset
+      let left = triggerRect.right
+
+      // Adjust for alignment
+      if (contentRef.current) {
+        const contentWidth = contentRef.current.offsetWidth
+        
+        if (align === 'end') {
+          left = triggerRect.right - contentWidth
+        } else if (align === 'start') {
+          left = triggerRect.left
+        } else if (align === 'center') {
+          left = triggerRect.left + (triggerRect.width / 2) - (contentWidth / 2)
+        }
+      }
+
+      // Adjust for side
+      if (computedSide === 'top') {
+        top = triggerRect.top - sideOffset
+      }
+
+      setPosition({ top, left })
+    }
+
+    updatePosition()
+    window.addEventListener('scroll', updatePosition, true)
+    window.addEventListener('resize', updatePosition)
+
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true)
+      window.removeEventListener('resize', updatePosition)
+    }
+  }, [open, computedSide, align, sideOffset, triggerRef])
 
   // Handle collision detection
   React.useEffect(() => {
@@ -160,7 +212,7 @@ export const DropdownMenuContent: React.FC<DropdownMenuContentProps> = ({
   const initialY = computedSide === 'top' ? 10 : -10
   const animateY = 0
 
-  return (
+  const content = (
     <AnimatePresence>
       {open && (
         <motion.div
@@ -169,10 +221,10 @@ export const DropdownMenuContent: React.FC<DropdownMenuContentProps> = ({
           animate={{ opacity: 1, scale: 1, y: animateY }}
           exit={{ opacity: 0, scale: 0.95, y: initialY }}
           transition={{ duration: 0.1 }}
-          className={`absolute ${alignmentClass} ${positionClass} z-[200] min-w-[12rem] rounded-lg bg-white border border-gray-200 shadow-lg ${className}`}
+          className={`fixed z-[9999] min-w-[12rem] rounded-lg bg-white border border-gray-200 shadow-lg ${className}`}
           style={{
-            marginTop: computedSide === 'bottom' ? `${sideOffset}px` : undefined,
-            marginBottom: computedSide === 'top' ? `${sideOffset}px` : undefined,
+            top: computedSide === 'bottom' ? position.top : position.top - (contentRef.current?.offsetHeight || 0),
+            left: position.left,
           }}
         >
           <div className="p-1">
@@ -182,6 +234,8 @@ export const DropdownMenuContent: React.FC<DropdownMenuContentProps> = ({
       )}
     </AnimatePresence>
   )
+
+  return typeof window !== 'undefined' ? createPortal(content, document.body) : null
 }
 
 export interface DropdownMenuItemProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {

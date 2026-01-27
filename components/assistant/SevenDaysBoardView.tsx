@@ -602,22 +602,35 @@ function DayColumnComponent({
         items={day.tasks.map(t => t.id)}
         strategy={verticalListSortingStrategy}
       >
-        <div className="p-1.5 space-y-1 min-h-[150px] max-h-[calc(100vh-280px)] overflow-y-auto">
+        <div className="p-1.5 space-y-1 min-h-[150px] max-h-[calc(100vh-280px)] overflow-y-auto flex-1">
           {day.tasks.length === 0 ? (
-            <div className="text-center py-6 text-gray-400">
+            <div className="text-center py-6 text-gray-400 h-full flex flex-col items-center justify-center">
               <CalendarBlank size={24} className="mx-auto mb-1 opacity-40" />
               <p className="text-xs font-medium">Brak zadań</p>
             </div>
           ) : (
-            day.tasks.map(task => (
-              <SortableTaskCard
-                key={task.id}
-                task={task}
-                onComplete={onComplete}
-                onDelete={onDelete}
-                onDetails={onDetails}
-                isMoving={movingTaskId === task.id}
-                isDraggingGlobal={isDraggingGlobal}
+            <>
+              {day.tasks.map(task => (
+                <SortableTaskCard
+                  key={task.id}
+                  task={task}
+                  onComplete={onComplete}
+                  onDelete={onDelete}
+                  onDetails={onDetails}
+                  isMoving={movingTaskId === task.id}
+                  isDraggingGlobal={isDraggingGlobal}
+                />
+              ))}
+              {/* Drop zone at bottom */}
+              {isDraggingGlobal && (
+                <div className="h-20 border-2 border-dashed border-brand-purple/30 rounded-md flex items-center justify-center text-xs text-brand-purple/50">
+                  Upuść tutaj
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </SortableContext>
               />
             ))
           )}
