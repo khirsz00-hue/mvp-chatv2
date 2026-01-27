@@ -158,13 +158,22 @@ async function syncSingleTaskFromWebhook(userId: string, taskData: any) {
     // Check if task exists in day_assistant_v2_tasks
     const { data: existing } = await supabase
       .from('day_assistant_v2_tasks')
-      .select('id')
+      .select('id, updated_at')
       .eq('user_id', userId)
       .eq('assistant_id', assistantId)
       .eq('todoist_id', taskData.id)
       .single()
     
     if (existing) {
+      // Check if task was manually updated recently (within last 60 seconds)
+      const updatedAt = new Date(existing.updated_at).getTime()
+      const timeSinceUpdate = Date.now() - updatedAt
+      
+      if (timeSinceUpdate < 60000) {
+        console.log(`⏭️ [Webhook] Skipping update - task was manually updated ${Math.floor(timeSinceUpdate / 1000)}s ago`)
+        return
+      }
+      
       // Update existing task
       const { error: updateError } = await supabase
         .from('day_assistant_v2_tasks')

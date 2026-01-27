@@ -348,9 +348,9 @@ export function TasksAssistant() {
     const triggerSync = async () => {
       if (!syncCleanupRef.current) return  // Skip if component unmounted
       
-      // Skip sync if manual update happened in last 30 seconds
+      // Skip sync if manual update happened in last 60 seconds
       const timeSinceLastUpdate = Date.now() - lastManualUpdateRef.current
-      if (timeSinceLastUpdate < 30000) {
+      if (timeSinceLastUpdate < 60000) {
         console.log('⏭️ [TasksAssistant] Skipping auto-sync - recent manual update:', Math.floor(timeSinceLastUpdate / 1000), 's ago')
         return
       }

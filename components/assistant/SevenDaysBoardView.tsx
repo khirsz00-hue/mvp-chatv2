@@ -317,10 +317,24 @@ export function SevenDaysBoardView({
     if (!over) return
     
     const taskId = active.id as string
-    const newDateStr = over.id as string
+    let newDateStr = over.id as string
     
-    // Check if dropped on a valid day column
-    const targetDay = days.find(d => d.id === newDateStr)
+    // If dropped on a task (not a column), find which column that task belongs to
+    let targetDay = days.find(d => d.id === newDateStr)
+    if (!targetDay) {
+      // Dropped on a task - find the column containing this task
+      const droppedOnTask = tasks.find(t => t.id === newDateStr)
+      if (droppedOnTask) {
+        const taskDueStr = typeof droppedOnTask.due === 'string' ? droppedOnTask.due : droppedOnTask.due?.date
+        if (taskDueStr) {
+          targetDay = days.find(d => d.dateStr === taskDueStr)
+          if (targetDay) {
+            newDateStr = targetDay.dateStr
+          }
+        }
+      }
+    }
+    
     if (!targetDay) return
     
     // Don't move if already in this column
