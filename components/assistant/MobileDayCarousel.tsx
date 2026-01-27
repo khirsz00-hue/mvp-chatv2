@@ -174,14 +174,16 @@ export function MobileDayCarousel({
           <div 
             className="fixed inset-0 z-20 bg-black/20 pointer-events-none" 
           />
-          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-brand-purple text-white px-4 py-2 rounded-full shadow-lg text-sm font-medium">
+          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-brand-purple text-white px-4 py-2 rounded-full shadow-lg text-sm font-medium pointer-events-auto">
             <span>Kliknij w dzień aby przenieść zadanie</span>
             <button
               onClick={(e) => {
+                e.preventDefault()
                 e.stopPropagation()
+                console.log('[MobileDayCarousel] Canceling drag via X button')
                 setDraggedTaskId(null)
               }}
-              className="ml-2 p-1 hover:bg-white/20 rounded-full transition-colors"
+              className="ml-2 p-1 hover:bg-white/20 rounded-full transition-colors pointer-events-auto"
               aria-label="Anuluj"
             >
               ✕
@@ -489,6 +491,7 @@ function DayCard({
                 onMove={onMove}
                 dayDateStr={day.dateStr}
                 onStartDrag={onStartDrag}
+                draggedTaskId={draggedTaskId}
               />
             ))
           )}
@@ -521,7 +524,8 @@ function TaskCardMobile({
   onDetails,
   onMove,
   dayDateStr,
-  onStartDrag
+  onStartDrag,
+  draggedTaskId
 }: {
   task: Task
   onComplete: (id: string) => Promise<void>
@@ -530,6 +534,7 @@ function TaskCardMobile({
   onMove: (taskId: string, newDate: string) => Promise<void>
   dayDateStr: string
   onStartDrag: (taskId: string) => void
+  draggedTaskId: string | null
 }) {
   const [loading, setLoading] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
@@ -576,7 +581,8 @@ function TaskCardMobile({
           task.priority === 2 && 'border-l-orange-500',
           task.priority === 3 && 'border-l-blue-500',
           task.priority === 4 && 'border-l-gray-300',
-          loading && 'opacity-50'
+          loading && 'opacity-50',
+          draggedTaskId === task.id && 'ring-2 ring-brand-purple bg-brand-purple/5 animate-pulse'
         )}
         style={{
           WebkitUserSelect: 'none',
