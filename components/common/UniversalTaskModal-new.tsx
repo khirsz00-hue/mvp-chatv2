@@ -23,7 +23,7 @@ import {
   X,
   CaretDown,
   Flag,
-  WandSparkles,
+  MagicWand,
   Question
 } from '@phosphor-icons/react'
 import { supabase } from '@/lib/supabase'
@@ -950,7 +950,7 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
                     onClick={handleClarify}
                     className="px-2 py-1.5 text-[9px] sm:text-[11px] font-medium text-violet-600 bg-white hover:bg-violet-100 active:bg-violet-100 border border-violet-200 rounded-md transition-all flex items-center gap-1 sm:gap-1.5 min-h-[32px]"
                   >
-                    <WandSparkles size={isMobile ? 10 : 12} />
+                    <MagicWand size={isMobile ? 10 : 12} />
                     Doprecyzuj
                   </button>
                   <button 
@@ -1171,7 +1171,7 @@ Każdy subtask powinien być konkretny, wykonalny i logicznie uporządkowany.`
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <WandSparkles size={20} className="text-violet-600" />
+              <MagicWand size={20} className="text-violet-600" />
               Doprecyzuj zadanie
             </DialogTitle>
           </DialogHeader>
