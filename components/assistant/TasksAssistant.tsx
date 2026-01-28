@@ -343,6 +343,17 @@ export function TasksAssistant() {
     }
   }, [token, fetchTasks, USE_UNIFIED_API])
   
+  // Listen for task-added events from quick add modal
+  useEffect(() => {
+    const handleTaskAdded = () => {
+      console.log('📩 [TasksAssistant] task-added event received - refreshing tasks')
+      fetchTasks()
+    }
+    
+    window.addEventListener('task-added', handleTaskAdded)
+    return () => window.removeEventListener('task-added', handleTaskAdded)
+  }, [fetchTasks])
+  
   // Fetch projects
   useEffect(() => {
     fetchProjects()
