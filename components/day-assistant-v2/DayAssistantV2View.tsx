@@ -7,7 +7,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { UniversalTaskModal, TaskData } from '@/components/common/UniversalTaskModal'
+import { UniversalTaskModal, TaskData } from '@/components/common/UniversalTaskModal-new'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabaseClient'
 import { TestDayTask, DayPlan, WorkMode } from '@/lib/types/dayAssistantV2'

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { UniversalTaskModal, TaskData } from '@/components/common/UniversalTaskModal'
+import { UniversalTaskModal, TaskData } from '@/components/common/UniversalTaskModal-new'
 import Button from '@/components/ui/Button'
 
 export default function TestModalPage() {
