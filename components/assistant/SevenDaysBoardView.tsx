@@ -114,101 +114,33 @@ export function SevenDaysBoardView({
     }, 100)
   }
 
-  // Generate columns based on grouping
-  const days: DayColumn[] = (() => {
-    // Day grouping (default)
-    if (grouping === 'day') {
-      return Array.from({ length: 7 }, (_, i) => {
-        const date = addDays(startDate, i)
-        const dateStr = format(date, 'yyyy-MM-dd')
+  // Generate 7 days columns from startDate
+  // Double-check filtering to ensure no completed tasks appear
+  const activeTasks = tasks.filter(task => !task.completed)
+  
+  const days: DayColumn[] = Array.from({ length: 7 }, (_, i) => {
+    const date = addDays(startDate, i)
+    const dateStr = format(date, 'yyyy-MM-dd')
+    
+    return {
+      id: dateStr,
+      date,
+      dateStr,
+      label: format(date, 'EEEE', { locale: pl }),
+      shortLabel: format(date, 'EEE', { locale: pl }),
+      tasks: activeTasks.filter(task => {
+        const taskDueStr = typeof task.due === 'string' ? task.due : task.due?.date
+        if (!taskDueStr) return false
         
-        return {
-          id: dateStr,
-          date,
-          dateStr,
-          label: format(date, 'EEEE', { locale: pl }),
-          shortLabel: format(date, 'EEE', { locale: pl }),
-          tasks: tasks.filter(task => {
-            const taskDueStr = typeof task.due === 'string' ? task.due : task.due?.date
-            if (!taskDueStr) return false
-            
-            try {
-              const taskDate = startOfDay(parseISO(taskDueStr))
-              return isSameDay(taskDate, date)
-            } catch {
-              return false
-            }
-          })
+        try {
+          const taskDate = startOfDay(parseISO(taskDueStr))
+          return isSameDay(taskDate, date)
+        } catch {
+          return false
         }
       })
     }
-    
-    // Priority grouping
-    if (grouping === 'priority') {
-      const priorityLabels = {
-        1: 'Priorytet 1 (Najwyższy)',
-        2: 'Priorytet 2 (Wysoki)',
-        3: 'Priorytet 3 (Normalny)',
-        4: 'Priorytet 4 (Niski)'
-      }
-      
-      return [1, 2, 3, 4].map(priority => ({
-        id: `priority-${priority}`,
-        date: new Date(),
-        dateStr: `priority-${priority}`,
-        label: priorityLabels[priority as 1 | 2 | 3 | 4],
-        shortLabel: `P${priority}`,
-        tasks: tasks.filter(task => task.priority === priority)
-      }))
-    }
-    
-    // Project grouping
-    if (grouping === 'project') {
-      const projectGroups = new Map<string, Task[]>()
-      
-      tasks.forEach(task => {
-        const projectId = task.project_id || 'no-project'
-        if (!projectGroups.has(projectId)) {
-          projectGroups.set(projectId, [])
-        }
-        projectGroups.get(projectId)!.push(task)
-      })
-      
-      return Array.from(projectGroups.entries()).map(([projectId, projectTasks]) => {
-        const project = projects?.find(p => p.id === projectId)
-        const label = project?.name || 'Bez projektu'
-        
-        return {
-          id: `project-${projectId}`,
-          date: new Date(),
-          dateStr: `project-${projectId}`,
-          label,
-          shortLabel: label.slice(0, 15) + (label.length > 15 ? '...' : ''),
-          tasks: projectTasks
-        }
-      })
-    }
-    
-    // Status grouping
-    if (grouping === 'status') {
-      const statusLabels = {
-        'todo': 'Do zrobienia',
-        'in_progress': 'W trakcie',
-        'done': 'Ukończone'
-      }
-      
-      return (['todo', 'in_progress', 'done'] as const).map(status => ({
-        id: `status-${status}`,
-        date: new Date(),
-        dateStr: `status-${status}`,
-        label: statusLabels[status],
-        shortLabel: statusLabels[status],
-        tasks: tasks.filter(task => (task.status || 'todo') === status)
-      }))
-    }
-    
-    return []
-  })()
+  })
 
   // Date range label for header
   const dateRangeLabel = `${format(startDate, 'd MMM', { locale: pl })} - ${format(addDays(startDate, 6), 'd MMM yyyy', { locale: pl })}`
@@ -317,24 +249,10 @@ export function SevenDaysBoardView({
     if (!over) return
     
     const taskId = active.id as string
-    let newDateStr = over.id as string
+    const newDateStr = over.id as string
     
-    // If dropped on a task (not a column), find which column that task belongs to
-    let targetDay = days.find(d => d.id === newDateStr)
-    if (!targetDay) {
-      // Dropped on a task - find the column containing this task
-      const droppedOnTask = tasks.find(t => t.id === newDateStr)
-      if (droppedOnTask) {
-        const taskDueStr = typeof droppedOnTask.due === 'string' ? droppedOnTask.due : droppedOnTask.due?.date
-        if (taskDueStr) {
-          targetDay = days.find(d => d.dateStr === taskDueStr)
-          if (targetDay) {
-            newDateStr = targetDay.dateStr
-          }
-        }
-      }
-    }
-    
+    // Check if dropped on a valid day column
+    const targetDay = days.find(d => d.id === newDateStr)
     if (!targetDay) return
     
     // Don't move if already in this column
@@ -400,8 +318,8 @@ export function SevenDaysBoardView({
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
     >
-      {/* Header with date range and navigation - only show for day grouping */}
-      {!showDateRangeInHeader && grouping === 'day' && (
+      {/* Header with date range and navigation - only show if not in parent header */}
+      {!showDateRangeInHeader && (
         <div className="flex items-center justify-between mb-4 px-2">
           <div className="flex items-center gap-3">
             <Button
@@ -578,24 +496,24 @@ function DayColumnComponent({
     <div
       ref={setNodeRef}
       className={cn(
-        'w-full bg-white rounded-xl border-2 shadow-sm transition-all flex flex-col h-[calc(100vh-240px)]',
+        'w-full bg-white rounded-xl border-2 shadow-sm transition-all flex flex-col',
         isOver ? 'border-brand-purple bg-brand-purple/5 shadow-lg' : 'border-gray-200',
         isToday && 'border-brand-pink shadow-md'
       )}
     >
       {/* Header */}
       <div className={cn(
-        'p-4 border-b flex items-center justify-between flex-shrink-0',
+        'p-3 border-b flex items-center justify-between',
         isToday && 'bg-gradient-to-r from-brand-purple/10 to-brand-pink/10'
       )}>
         <div className="flex-1 min-w-0">
           <h3 className={cn(
-            'font-bold text-lg truncate',
+            'font-bold text-base truncate',
             isToday && 'text-brand-purple'
           )}>
             {day.shortLabel}
           </h3>
-          <p className="text-sm text-gray-500 truncate">
+          <p className="text-xs text-gray-500 truncate">
             {format(day.date, 'd MMM', { locale: pl })}
           </p>
         </div>
@@ -603,7 +521,7 @@ function DayColumnComponent({
         <Badge 
           variant={isToday ? 'default' : 'secondary'} 
           className={cn(
-            'ml-2 text-sm px-2.5 py-1',
+            'ml-2 text-xs px-2 py-0.5',
             day.tasks.length > 5 && 'bg-orange-500 text-white'
           )}
         >
@@ -616,26 +534,24 @@ function DayColumnComponent({
         items={day.tasks.map(t => t.id)}
         strategy={verticalListSortingStrategy}
       >
-        <div className="p-2 space-y-2 overflow-y-auto flex-1">
+        <div className="p-1.5 space-y-1 min-h-[150px] max-h-[calc(100vh-280px)] overflow-y-auto">
           {day.tasks.length === 0 ? (
-            <div className="text-center py-8 text-gray-400 h-full flex flex-col items-center justify-center">
-              <CalendarBlank size={28} className="mx-auto mb-2 opacity-40" />
-              <p className="text-sm font-medium">Brak zadań</p>
+            <div className="text-center py-6 text-gray-400">
+              <CalendarBlank size={24} className="mx-auto mb-1 opacity-40" />
+              <p className="text-xs font-medium">Brak zadań</p>
             </div>
           ) : (
-            <>
-              {day.tasks.map(task => (
-                <SortableTaskCard
-                  key={task.id}
-                  task={task}
-                  onComplete={onComplete}
-                  onDelete={onDelete}
-                  onDetails={onDetails}
-                  isMoving={movingTaskId === task.id}
-                  isDraggingGlobal={isDraggingGlobal}
-                />
-              ))}
-            </>
+            day.tasks.map(task => (
+              <SortableTaskCard
+                key={task.id}
+                task={task}
+                onComplete={onComplete}
+                onDelete={onDelete}
+                onDetails={onDetails}
+                isMoving={movingTaskId === task.id}
+                isDraggingGlobal={isDraggingGlobal}
+              />
+            ))
           )}
         </div>
       </SortableContext>
@@ -680,8 +596,7 @@ function SortableTaskCard({
     setNodeRef,
     transform,
     transition,
-    isDragging,
-    isOver
+    isDragging
   } = useSortable({ id: task.id })
 
   const style = {
@@ -695,22 +610,12 @@ function SortableTaskCard({
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
       className={cn(
-        'transition-all relative',
+        'transition-all',
         isDragging && 'opacity-0',
-        isMoving && 'pointer-events-none scale-95 opacity-70',
-        // Add spacing when dragging over this task
-        isDraggingGlobal && isOver && 'mb-16'
+        isMoving && 'pointer-events-none scale-95 opacity-70'
       )}
     >
-      {/* Drop indicator */}
-      {isDraggingGlobal && isOver && (
-        <div className="absolute inset-x-0 -bottom-8 h-12 bg-brand-purple/10 border-2 border-dashed border-brand-purple rounded-md flex items-center justify-center z-10">
-          <span className="text-xs font-medium text-brand-purple">Upuść tutaj</span>
-        </div>
-      )}
       <MiniTaskCard
         task={task}
         onComplete={onComplete}
@@ -792,10 +697,10 @@ function MiniTaskCard({
 
   return (
     <div className="relative">
-      {/* Task card with better spacing and larger text */}
+      {/* Using div instead of Card component for ultra-compact design with minimal padding */}
       <div
         className={cn(
-          'px-4 py-3 border-l-3 rounded-md transition-all hover:shadow-md group cursor-pointer',
+          'px-2 py-1.5 border-l-2 rounded-md transition-all hover:shadow-sm group text-xs cursor-pointer',
           priorityColors[task.priority] || priorityColors[4],
           loading && 'opacity-50'
         )}
@@ -806,16 +711,7 @@ function MiniTaskCard({
         tabIndex={0}
         aria-label={`Task: ${task.content}`}
       >
-        <div className="flex items-center gap-2.5">
-          {/* Complete button - circle on the left */}
-          <button
-            onClick={handleComplete}
-            className="flex-shrink-0 text-gray-300 hover:text-green-500 transition-colors"
-            title="Ukończ zadanie"
-          >
-            <div className="w-5 h-5 rounded-full border-2 border-current" />
-          </button>
-          
+        <div className="flex items-center gap-1.5">
           {/* Drag handle - only this part is draggable */}
           {dragHandleProps && (
             <button
@@ -824,16 +720,16 @@ function MiniTaskCard({
               onClick={(e) => e.stopPropagation()}
               title="Przeciągnij aby przenieść"
             >
-              <DotsNine size={16} weight="bold" className="text-gray-400" />
+              <DotsNine size={14} weight="bold" className="text-gray-400" />
             </button>
           )}
           
           {/* Priority indicator dot */}
-          <div className={cn('w-2 h-2 rounded-full flex-shrink-0', priorityDots[task.priority])} />
+          <div className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', priorityDots[task.priority])} />
           
           {/* Content */}
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-base line-clamp-2 group-hover:text-brand-purple transition-colors leading-snug">
+            <p className="font-medium text-xs line-clamp-1 group-hover:text-brand-purple transition-colors">
               {task.content}
             </p>
           </div>

@@ -663,7 +663,26 @@ export function TasksAssistant() {
   let activeTasks = tasks.filter(t => !t.completed)
   activeTasks = filterByProject(activeTasks)
   
+  // Debug: Log any tasks that might be old/completed but showing up
+  const sixMonthsAgo = new Date()
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 3)
+  const oldTasks = activeTasks.filter(t => {
+    const dueDate = typeof t.due === 'string' ? t.due : t.due?.date
+    if (!dueDate) return false
+    return new Date(dueDate) < sixMonthsAgo
+  })
+  if (oldTasks.length > 0) {
+    console.warn('⚠️ [DEBUG] Old tasks showing in activeTasks (older than 3 months):', oldTasks.map(t => ({
+      id: t.id,
+      content: t.content,
+      due: typeof t.due === 'string' ? t.due : t.due?.date,
+      completed: t.completed,
+      source: t.source
+    })))
+  }
+  
   console.log('🎯 FINAL SORTED TASKS:', sortedTasks)
+  console.log('📋 [DEBUG] Active tasks for 7-day view:', activeTasks.length, 'tasks, completed status:', activeTasks.map(t => ({ id: t.id.slice(0,8), completed: t.completed })))
   
   // Track task analytics
   interface TaskAnalyticsData {
