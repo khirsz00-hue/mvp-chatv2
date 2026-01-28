@@ -1116,7 +1116,7 @@ export function TasksAssistant() {
       } else if (currentGrouping === 'priority') {
         updates.priority = parseInt(newValue) as 1 | 2 | 3 | 4
       } else if (currentGrouping === 'project') {
-        updates.project_id = newValue === 'none' ? undefined : newValue
+        updates.project_id = newValue === 'no-project' ? undefined : newValue
       }
       
       console.log('[handleMove] Calling handleUpdate with:', { taskId, updates })

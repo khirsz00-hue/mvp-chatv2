@@ -114,33 +114,88 @@ export function SevenDaysBoardView({
     }, 100)
   }
 
-  // Generate 7 days columns from startDate
+  // Generate columns based on grouping type
   // Double-check filtering to ensure no completed tasks appear
   const activeTasks = tasks.filter(task => !task.completed)
   
-  const days: DayColumn[] = Array.from({ length: 7 }, (_, i) => {
-    const date = addDays(startDate, i)
-    const dateStr = format(date, 'yyyy-MM-dd')
-    
-    return {
-      id: dateStr,
-      date,
-      dateStr,
-      label: format(date, 'EEEE', { locale: pl }),
-      shortLabel: format(date, 'EEE', { locale: pl }),
-      tasks: activeTasks.filter(task => {
-        const taskDueStr = typeof task.due === 'string' ? task.due : task.due?.date
-        if (!taskDueStr) return false
+  const columns = () => {
+    if (grouping === 'day') {
+      // Generate 7 days columns from startDate
+      return Array.from({ length: 7 }, (_, i) => {
+        const date = addDays(startDate, i)
+        const dateStr = format(date, 'yyyy-MM-dd')
         
-        try {
-          const taskDate = startOfDay(parseISO(taskDueStr))
-          return isSameDay(taskDate, date)
-        } catch {
-          return false
+        return {
+          id: dateStr,
+          date,
+          dateStr,
+          label: format(date, 'EEEE', { locale: pl }),
+          shortLabel: format(date, 'EEE', { locale: pl }),
+          tasks: activeTasks.filter(task => {
+            const taskDueStr = typeof task.due === 'string' ? task.due : task.due?.date
+            if (!taskDueStr) return false
+            
+            try {
+              const taskDate = startOfDay(parseISO(taskDueStr))
+              return isSameDay(taskDate, date)
+            } catch {
+              return false
+            }
+          })
         }
       })
+    } else if (grouping === 'priority') {
+      // Group by priority (1=highest, 4=lowest)
+      const priorities = [
+        { id: '1', label: 'Bardzo wysoki', shortLabel: '🔴', value: 1 },
+        { id: '2', label: 'Wysoki', shortLabel: '🟠', value: 2 },
+        { id: '3', label: 'Średni', shortLabel: '🟡', value: 3 },
+        { id: '4', label: 'Niski', shortLabel: '🟢', value: 4 }
+      ]
+      
+      return priorities.map(priority => ({
+        id: priority.id,
+        date: new Date(), // Not used for priority grouping
+        dateStr: priority.id,
+        label: priority.label,
+        shortLabel: priority.shortLabel,
+        tasks: activeTasks.filter(task => task.priority === priority.value)
+      }))
+    } else if (grouping === 'project') {
+      // Group by project
+      const projectColumns = []
+      
+      // Add "No Project" column for tasks without project
+      projectColumns.push({
+        id: 'no-project',
+        date: new Date(),
+        dateStr: 'no-project',
+        label: 'Bez projektu',
+        shortLabel: '📋',
+        tasks: activeTasks.filter(task => !task.project_id)
+      })
+      
+      // Add columns for each project
+      if (projects) {
+        projects.forEach(project => {
+          projectColumns.push({
+            id: project.id,
+            date: new Date(),
+            dateStr: project.id,
+            label: project.name,
+            shortLabel: '📁',
+            tasks: activeTasks.filter(task => task.project_id === project.id)
+          })
+        })
+      }
+      
+      return projectColumns
     }
-  })
+    
+    return []
+  }
+  
+  const days: DayColumn[] = columns()
 
   // Date range label for header
   const dateRangeLabel = `${format(startDate, 'd MMM', { locale: pl })} - ${format(addDays(startDate, 6), 'd MMM yyyy', { locale: pl })}`
@@ -249,21 +304,37 @@ export function SevenDaysBoardView({
     if (!over) return
     
     const taskId = active.id as string
-    const newDateStr = over.id as string
+    const newValue = over.id as string
     
-    // Check if dropped on a valid day column
-    const targetDay = days.find(d => d.id === newDateStr)
-    if (!targetDay) return
+    // Check if dropped on a valid column
+    const targetColumn = days.find(d => d.id === newValue)
+    if (!targetColumn) return
     
-    // Don't move if already in this column
-    const task = tasks.find(t => t.id === taskId)
-    const currentDueStr = task?.due ? (typeof task.due === 'string' ? task.due : task.due.date) : null
-    if (currentDueStr === newDateStr) return
+    // For grouping by day, check due date
+    if (grouping === 'day') {
+      const task = tasks.find(t => t.id === taskId)
+      const currentDueStr = task?.due ? (typeof task.due === 'string' ? task.due : task.due.date) : null
+      if (currentDueStr === newValue) return
+    }
+    
+    // For grouping by priority, check priority
+    if (grouping === 'priority') {
+      const task = tasks.find(t => t.id === taskId)
+      const newPriority = parseInt(newValue) as 1 | 2 | 3 | 4
+      if (task?.priority === newPriority) return
+    }
+    
+    // For grouping by project, check project_id
+    if (grouping === 'project') {
+      const task = tasks.find(t => t.id === taskId)
+      const newProjectId = newValue === 'no-project' ? undefined : newValue
+      if (task?.project_id === newProjectId) return
+    }
     
     setMovingTaskId(taskId)
     
     try {
-      await onMove(taskId, newDateStr)
+      await onMove(taskId, newValue, grouping)
     } catch (err) {
       console.error('Error moving task:', err)
     } finally {
@@ -444,6 +515,7 @@ export function SevenDaysBoardView({
               <div key={day.id} className="w-[calc(100vw-5rem)] sm:w-72 md:w-80 flex-shrink-0 snap-center">
                 <DayColumnComponent
                   day={day}
+                  grouping={grouping}
                   onComplete={onComplete}
                   onDelete={onDelete}
                   onDetails={onDetails}
@@ -473,6 +545,7 @@ export function SevenDaysBoardView({
 // Day Column Component
 function DayColumnComponent({
   day,
+  grouping,
   onComplete,
   onDelete,
   onDetails,
@@ -481,6 +554,7 @@ function DayColumnComponent({
   isDraggingGlobal
 }: {
   day: DayColumn
+  grouping: BoardGrouping
   onComplete: (id: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
   onDetails: (task: Task) => void
@@ -490,32 +564,55 @@ function DayColumnComponent({
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: day.id })
   
-  const isToday = isSameDay(day.date, new Date())
+  const isToday = grouping === 'day' && isSameDay(day.date, new Date())
+  
+  // Column styling based on grouping type
+  const getColumnStyles = () => {
+    if (grouping === 'priority') {
+      switch (day.id) {
+        case '1': return 'border-red-300 bg-red-50/50'
+        case '2': return 'border-orange-300 bg-orange-50/50'
+        case '3': return 'border-yellow-300 bg-yellow-50/50'
+        case '4': return 'border-green-300 bg-green-50/50'
+        default: return 'border-gray-200'
+      }
+    } else if (grouping === 'project') {
+      return 'border-blue-200 bg-blue-50/50'
+    }
+    return 'border-gray-200'
+  }
   
   return (
     <div
       ref={setNodeRef}
       className={cn(
         'w-full bg-white rounded-xl border-2 shadow-sm transition-all flex flex-col',
-        isOver ? 'border-brand-purple bg-brand-purple/5 shadow-lg' : 'border-gray-200',
+        isOver ? 'border-brand-purple bg-brand-purple/5 shadow-lg' : getColumnStyles(),
         isToday && 'border-brand-pink shadow-md'
       )}
     >
       {/* Header */}
       <div className={cn(
         'p-3 border-b flex items-center justify-between',
-        isToday && 'bg-gradient-to-r from-brand-purple/10 to-brand-pink/10'
+        isToday && 'bg-gradient-to-r from-brand-purple/10 to-brand-pink/10',
+        grouping === 'priority' && day.id === '1' && 'bg-red-50/50',
+        grouping === 'priority' && day.id === '2' && 'bg-orange-50/50',
+        grouping === 'priority' && day.id === '3' && 'bg-yellow-50/50',
+        grouping === 'priority' && day.id === '4' && 'bg-green-50/50',
+        grouping === 'project' && 'bg-blue-50/50'
       )}>
         <div className="flex-1 min-w-0">
           <h3 className={cn(
             'font-bold text-base truncate',
             isToday && 'text-brand-purple'
           )}>
-            {day.shortLabel}
+            {day.shortLabel} {day.label}
           </h3>
-          <p className="text-xs text-gray-500 truncate">
-            {format(day.date, 'd MMM', { locale: pl })}
-          </p>
+          {grouping === 'day' && (
+            <p className="text-xs text-gray-500 truncate">
+              {format(day.date, 'd MMM', { locale: pl })}
+            </p>
+          )}
         </div>
         
         <Badge 
