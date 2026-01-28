@@ -821,13 +821,31 @@ export function TasksAssistant() {
     try {
       const task = tasks.find(t => t.id === taskId)
       
-      const res = await fetch('/api/todoist/complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: taskId, token })
-      })
+      if (!task) {
+        showToast('Nie znaleziono zadania', 'error')
+        return
+      }
       
-      if (!res.ok) throw new Error('Failed to complete task')
+      console.log('🔍 [Complete] Task:', { taskId, todoistId: task.todoist_task_id, source: task.source })
+      
+      // ✅ Only call Todoist API if task has Todoist ID (from Todoist)
+      if (task.todoist_task_id && token) {
+        console.log('📤 [Complete] Syncing with Todoist:', task.todoist_task_id)
+        
+        const res = await fetch('/api/todoist/complete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: task.todoist_task_id, token })
+        })
+        
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}))
+          console.error('❌ [Complete] Todoist API error:', errorData)
+          throw new Error(errorData.error || 'Failed to complete task')
+        }
+      } else {
+        console.log('📝 [Complete] Local/non-Todoist task - skipping Todoist API')
+      }
       
       setTasks(prev => prev.filter(t => t.id !== taskId))
       showToast('Zadanie ukończone!', 'success')
@@ -868,13 +886,31 @@ export function TasksAssistant() {
     try {
       const task = tasks.find(t => t.id === taskId)
       
-      const res = await fetch('/api/todoist/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: taskId, token })
-      })
+      if (!task) {
+        showToast('Nie znaleziono zadania', 'error')
+        return
+      }
       
-      if (!res.ok) throw new Error('Failed to delete task')
+      console.log('🔍 [Delete] Task:', { taskId, todoistId: task.todoist_task_id, source: task.source })
+      
+      // ✅ Only call Todoist API if task has Todoist ID (from Todoist)
+      if (task.todoist_task_id && token) {
+        console.log('📤 [Delete] Syncing with Todoist:', task.todoist_task_id)
+        
+        const res = await fetch('/api/todoist/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: task.todoist_task_id, token })
+        })
+        
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}))
+          console.error('❌ [Delete] Todoist API error:', errorData)
+          throw new Error(errorData.error || 'Failed to delete task')
+        }
+      } else {
+        console.log('📝 [Delete] Local/non-Todoist task - skipping Todoist API')
+      }
       
       setTasks(prev => prev.filter(t => t.id !== taskId))
       showToast('Zadanie usunięte', 'success')
